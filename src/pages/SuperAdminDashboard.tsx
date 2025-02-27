@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { 
   Users, 
   Building, 
-  BookOpen, 
+  GraduationCap, 
   BrainCircuit, 
   Clock, 
   ArrowUpRight,
@@ -38,7 +38,7 @@ const mockStats = [
     value: "68%",
     change: "+5% from last month",
     trend: "up",
-    icon: BookOpen,
+    icon: GraduationCap,
   },
   {
     title: "AI Responses",
@@ -101,28 +101,24 @@ const mockOrganizations = [
   {
     name: "TechCorp Solutions",
     users: 324,
-    activeCourses: 14,
     completionRate: 72,
     status: "active",
   },
   {
     name: "GlobalTech Industries",
     users: 518,
-    activeCourses: 28,
     completionRate: 65,
     status: "active",
   },
   {
     name: "Innovate Learning Ltd",
     users: 127,
-    activeCourses: 8,
     completionRate: 81,
     status: "active",
   },
   {
     name: "Future Academy",
     users: 203,
-    activeCourses: 12,
     completionRate: 59,
     status: "trial",
   },
@@ -278,18 +274,16 @@ const SuperAdminDashboard = () => {
               </CardHeader>
               <CardContent>
                 <div className="rounded-md border">
-                  <div className="grid grid-cols-5 p-3 text-sm font-medium text-muted-foreground bg-secondary/50">
+                  <div className="grid grid-cols-4 p-3 text-sm font-medium text-muted-foreground bg-secondary/50">
                     <div>Organization</div>
                     <div className="text-center">Users</div>
-                    <div className="text-center">Active Courses</div>
-                    <div className="text-center">Completion</div>
+                    <div className="text-center">Completion Rate</div>
                     <div className="text-center">Status</div>
                   </div>
                   {mockOrganizations.map((org, index) => (
-                    <div key={index} className="grid grid-cols-5 p-3 text-sm border-t items-center">
+                    <div key={index} className="grid grid-cols-4 p-3 text-sm border-t items-center">
                       <div className="font-medium">{org.name}</div>
                       <div className="text-center">{org.users}</div>
-                      <div className="text-center">{org.activeCourses}</div>
                       <div className="text-center">
                         <ProgressIndicator 
                           progress={org.completionRate} 

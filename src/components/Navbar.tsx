@@ -50,7 +50,6 @@ const Navbar = () => {
   
   const navItems = [
     { name: "Home", path: "/" },
-    { name: "Courses", path: "/courses" },
   ];
   
   // Add dashboard link based on user role

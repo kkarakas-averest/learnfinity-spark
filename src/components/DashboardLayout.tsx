@@ -4,7 +4,6 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import { 
   BarChart, 
   Users, 
-  BookOpen, 
   Settings, 
   LogOut, 
   Menu, 
@@ -12,7 +11,8 @@ import {
   Home,
   Building,
   BrainCircuit,
-  FileSpreadsheet
+  FileSpreadsheet,
+  GraduationCap
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -71,18 +71,18 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
     { title: "Dashboard", icon: BarChart, href: "/admin", role: "superadmin" },
     { title: "Organizations", icon: Building, href: "/admin/organizations", role: "superadmin" },
     { title: "Users", icon: Users, href: "/admin/users", role: "superadmin" },
-    { title: "Courses", icon: BookOpen, href: "/admin/courses", role: "superadmin" },
+    { title: "Course Management", icon: GraduationCap, href: "/admin/course", role: "superadmin" },
     { title: "AI Management", icon: BrainCircuit, href: "/admin/ai", role: "superadmin" },
     
     // HR items
     { title: "Dashboard", icon: BarChart, href: "/hr", role: "hr" },
     { title: "Employees", icon: Users, href: "/hr/employees", role: "hr" },
-    { title: "Learning Paths", icon: BookOpen, href: "/hr/learning-paths", role: "hr" },
+    { title: "Learning Path", icon: GraduationCap, href: "/hr/learning-path", role: "hr" },
     { title: "Reports", icon: FileSpreadsheet, href: "/hr/reports", role: "hr" },
     
     // Learner items
     { title: "Dashboard", icon: BarChart, href: "/dashboard", role: "learner" },
-    { title: "Courses", icon: BookOpen, href: "/courses", role: "learner" },
+    { title: "My Learning", icon: GraduationCap, href: "/learning", role: "learner" },
   ];
 
   const filteredItems = sidebarItems.filter(
