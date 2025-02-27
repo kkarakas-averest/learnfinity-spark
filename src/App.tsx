@@ -10,24 +10,47 @@ import NotFound from "./pages/NotFound";
 import SuperAdminDashboard from "./pages/SuperAdminDashboard";
 import HRDashboard from "./pages/HRDashboard";
 import LoginPage from "./pages/LoginPage";
+import { AuthProvider } from "./contexts/AuthContext";
+import ProtectedRoute from "./components/ProtectedRoute";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <Toaster />
-      <Sonner />
       <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/admin" element={<SuperAdminDashboard />} />
-          <Route path="/hr" element={<HRDashboard />} />
-          <Route path="/login" element={<LoginPage />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <AuthProvider>
+          <Toaster />
+          <Sonner />
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/dashboard" element={
+              <ProtectedRoute allowedRoles={["learner"]}>
+                <Dashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin" element={
+              <ProtectedRoute allowedRoles={["superadmin"]}>
+                <SuperAdminDashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/hr" element={
+              <ProtectedRoute allowedRoles={["hr"]}>
+                <HRDashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/login" element={<LoginPage />} />
+            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

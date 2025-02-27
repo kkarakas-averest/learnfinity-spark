@@ -1,17 +1,15 @@
 
 import { useState, useEffect } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { Menu, X, LogIn, UserCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useToast } from "@/components/ui/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [currentUser, setCurrentUser] = useState<any>(null);
   const location = useLocation();
-  const navigate = useNavigate();
-  const { toast } = useToast();
+  const { user, userDetails, signOut, isLoading } = useAuth();
   
   useEffect(() => {
     const handleScroll = () => {
@@ -20,17 +18,6 @@ const Navbar = () => {
     
     window.addEventListener("scroll", handleScroll);
     
-    // Check for user in localStorage
-    const userStr = localStorage.getItem("currentUser");
-    if (userStr) {
-      try {
-        const user = JSON.parse(userStr);
-        setCurrentUser(user);
-      } catch (error) {
-        console.error("Failed to parse user data", error);
-      }
-    }
-    
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
@@ -38,28 +25,20 @@ const Navbar = () => {
   
   const isActive = (path: string) => location.pathname === path;
   
-  const handleLogout = () => {
-    localStorage.removeItem("currentUser");
-    setCurrentUser(null);
-    toast({
-      title: "Logged out successfully",
-      description: "You have been logged out of your account.",
-    });
-    navigate("/");
-  };
-  
   const navItems = [
     { name: "Home", path: "/" },
   ];
   
   // Add dashboard link based on user role
-  if (currentUser) {
+  if (userDetails) {
     let dashboardPath = "/dashboard"; // Default for learners
     
-    if (currentUser.role === "superadmin") {
+    if (userDetails.role === "superadmin") {
       dashboardPath = "/admin";
-    } else if (currentUser.role === "hr") {
+    } else if (userDetails.role === "hr") {
       dashboardPath = "/hr";
+    } else if (userDetails.role === "mentor") {
+      dashboardPath = "/mentor";
     }
     
     navItems.push({ name: "Dashboard", path: dashboardPath });
@@ -92,13 +71,15 @@ const Navbar = () => {
         </div>
 
         <div className="hidden md:flex items-center gap-4">
-          {currentUser ? (
+          {isLoading ? (
+            <div className="h-9 w-20 bg-muted animate-pulse rounded-md"></div>
+          ) : userDetails ? (
             <div className="flex items-center gap-4">
               <div className="text-sm font-medium">
                 <span className="text-muted-foreground">Hello, </span>
-                {currentUser.email.split('@')[0]}
+                {userDetails.name.split(' ')[0]}
               </div>
-              <Button variant="outline" size="sm" onClick={handleLogout}>
+              <Button variant="outline" size="sm" onClick={signOut}>
                 Sign Out
               </Button>
             </div>
@@ -142,13 +123,15 @@ const Navbar = () => {
               </Link>
             ))}
             <div className="flex flex-col gap-4 pt-4 border-t">
-              {currentUser ? (
+              {isLoading ? (
+                <div className="h-10 bg-muted animate-pulse rounded-md"></div>
+              ) : userDetails ? (
                 <>
                   <div className="flex items-center gap-2 px-4 py-2">
                     <UserCircle className="h-5 w-5 text-muted-foreground" />
-                    <span className="text-muted-foreground">{currentUser.email}</span>
+                    <span className="text-muted-foreground">{userDetails.email}</span>
                   </div>
-                  <Button variant="outline" onClick={() => { handleLogout(); closeMenu(); }}>
+                  <Button variant="outline" onClick={() => { signOut(); closeMenu(); }}>
                     Sign Out
                   </Button>
                 </>

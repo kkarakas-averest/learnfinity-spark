@@ -1,182 +1,227 @@
 
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useToast } from "@/components/ui/use-toast";
-import { Lock, Mail, UserRound } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { Loader2 } from "lucide-react";
 
-// Mock user database for demonstration
-const mockUsers = [
-  { email: "admin@learnfinity.com", password: "admin123", role: "superadmin" },
-  { email: "hr@company.com", password: "hr123", role: "hr" },
-  { email: "learner@company.com", password: "learner123", role: "learner" }
-];
+const loginSchema = z.object({
+  email: z.string().email({ message: "Please enter a valid email address." }),
+  password: z.string().min(6, { message: "Password must be at least 6 characters." }),
+});
+
+const signupSchema = z.object({
+  name: z.string().min(2, { message: "Name must be at least 2 characters." }),
+  email: z.string().email({ message: "Please enter a valid email address." }),
+  password: z.string().min(6, { message: "Password must be at least 6 characters." }),
+  confirmPassword: z.string().min(6, { message: "Password must be at least 6 characters." }),
+}).refine(data => data.password === data.confirmPassword, {
+  message: "Passwords do not match",
+  path: ["confirmPassword"],
+});
 
 const LoginPage = () => {
-  const { toast } = useToast();
-  const navigate = useNavigate();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<"login" | "signup">("login");
+  const { signIn, signUp, isLoading } = useAuth();
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
+  const loginForm = useForm<z.infer<typeof loginSchema>>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: {
+      email: "",
+      password: "",
+    },
+  });
 
-    // Simulate API call delay
-    setTimeout(() => {
-      const user = mockUsers.find(user => user.email === email && user.password === password);
+  const signupForm = useForm<z.infer<typeof signupSchema>>({
+    resolver: zodResolver(signupSchema),
+    defaultValues: {
+      name: "",
+      email: "",
+      password: "",
+      confirmPassword: "",
+    },
+  });
 
-      if (user) {
-        // In a real app, you would store tokens in localStorage or use a proper auth library
-        localStorage.setItem("currentUser", JSON.stringify({ email: user.email, role: user.role }));
-        
-        toast({
-          title: "Login Successful",
-          description: "You have been successfully logged in.",
-          variant: "default",
-        });
-        
-        // Redirect based on role
-        switch (user.role) {
-          case "superadmin":
-            navigate("/admin");
-            break;
-          case "hr":
-            navigate("/hr");
-            break;
-          case "learner":
-            navigate("/dashboard");
-            break;
-          default:
-            navigate("/dashboard");
-        }
-      } else {
-        toast({
-          title: "Login Failed",
-          description: "Invalid email or password. Please try again.",
-          variant: "destructive",
-        });
-      }
-      
-      setIsLoading(false);
-    }, 1000);
+  const onLoginSubmit = async (values: z.infer<typeof loginSchema>) => {
+    try {
+      await signIn(values.email, values.password);
+    } catch (error) {
+      console.error("Login failed:", error);
+    }
+  };
+
+  const onSignupSubmit = async (values: z.infer<typeof signupSchema>) => {
+    try {
+      await signUp(values.email, values.password, values.name, "learner");
+    } catch (error) {
+      console.error("Signup failed:", error);
+    }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
-      <div className="w-full max-w-md">
-        <Card className="shadow-xl">
-          <CardHeader className="space-y-1 text-center">
-            <CardTitle className="text-2xl font-bold">Learnfinity</CardTitle>
-            <CardDescription>
-              Enter your credentials to access your account
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Tabs defaultValue="login" className="w-full">
-              <TabsList className="grid w-full grid-cols-2 mb-4">
-                <TabsTrigger value="login">Login</TabsTrigger>
-                <TabsTrigger value="demo">Demo Access</TabsTrigger>
+    <div className="min-h-screen flex flex-col">
+      <div className="flex min-h-screen flex-1 flex-col justify-center px-6 py-12 lg:px-8">
+        <div className="sm:mx-auto sm:w-full sm:max-w-md">
+          <h2 className="mt-6 text-center text-2xl font-bold leading-9 tracking-tight">
+            Welcome to Learnfinity
+          </h2>
+        </div>
+
+        <div className="mt-10 sm:mx-auto sm:w-full sm:max-w-md">
+          <div className="bg-white px-6 py-8 shadow sm:rounded-lg sm:px-8">
+            <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "login" | "signup")}>
+              <TabsList className="grid w-full grid-cols-2 mb-6">
+                <TabsTrigger value="login">Sign In</TabsTrigger>
+                <TabsTrigger value="signup">Create Account</TabsTrigger>
               </TabsList>
-              
+
               <TabsContent value="login">
-                <form onSubmit={handleLogin} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input 
-                        id="email" 
-                        type="email" 
-                        placeholder="name@example.com" 
-                        className="pl-10"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        required
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="password">Password</Label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input 
-                        id="password" 
-                        type="password" 
-                        className="pl-10"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        required
-                      />
-                    </div>
-                  </div>
-                  <Button type="submit" className="w-full" disabled={isLoading}>
-                    {isLoading ? "Logging in..." : "Log in"}
-                  </Button>
-                </form>
+                <Form {...loginForm}>
+                  <form onSubmit={loginForm.handleSubmit(onLoginSubmit)} className="space-y-5">
+                    <FormField
+                      control={loginForm.control}
+                      name="email"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Email</FormLabel>
+                          <FormControl>
+                            <Input placeholder="you@example.com" type="email" {...field} disabled={isLoading} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={loginForm.control}
+                      name="password"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Password</FormLabel>
+                          <FormControl>
+                            <Input placeholder="••••••••" type="password" {...field} disabled={isLoading} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <Button type="submit" className="w-full" disabled={isLoading}>
+                      {isLoading ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Signing In...
+                        </>
+                      ) : (
+                        "Sign In"
+                      )}
+                    </Button>
+                  </form>
+                </Form>
               </TabsContent>
-              
-              <TabsContent value="demo">
-                <div className="space-y-4">
-                  <p className="text-sm text-muted-foreground text-center mb-4">
-                    Select a demo account to quickly explore different user roles
-                  </p>
-                  <Button 
-                    variant="outline" 
-                    className="w-full justify-start gap-2 mb-2"
-                    onClick={() => {
-                      setEmail("admin@learnfinity.com");
-                      setPassword("admin123");
-                    }}
-                  >
-                    <UserRound size={16} />
-                    Super Admin
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    className="w-full justify-start gap-2 mb-2"
-                    onClick={() => {
-                      setEmail("hr@company.com");
-                      setPassword("hr123");
-                    }}
-                  >
-                    <UserRound size={16} />
-                    HR Manager
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    className="w-full justify-start gap-2"
-                    onClick={() => {
-                      setEmail("learner@company.com");
-                      setPassword("learner123");
-                    }}
-                  >
-                    <UserRound size={16} />
-                    Learner
-                  </Button>
-                  <Button type="submit" className="w-full mt-4" onClick={handleLogin} disabled={isLoading}>
-                    {isLoading ? "Logging in..." : "Continue with Demo Account"}
-                  </Button>
-                </div>
+
+              <TabsContent value="signup">
+                <Form {...signupForm}>
+                  <form onSubmit={signupForm.handleSubmit(onSignupSubmit)} className="space-y-5">
+                    <FormField
+                      control={signupForm.control}
+                      name="name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Full Name</FormLabel>
+                          <FormControl>
+                            <Input placeholder="John Doe" {...field} disabled={isLoading} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={signupForm.control}
+                      name="email"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Email</FormLabel>
+                          <FormControl>
+                            <Input placeholder="you@example.com" type="email" {...field} disabled={isLoading} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={signupForm.control}
+                      name="password"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Password</FormLabel>
+                          <FormControl>
+                            <Input placeholder="••••••••" type="password" {...field} disabled={isLoading} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={signupForm.control}
+                      name="confirmPassword"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Confirm Password</FormLabel>
+                          <FormControl>
+                            <Input placeholder="••••••••" type="password" {...field} disabled={isLoading} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <Button type="submit" className="w-full" disabled={isLoading}>
+                      {isLoading ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Creating Account...
+                        </>
+                      ) : (
+                        "Create Account"
+                      )}
+                    </Button>
+                  </form>
+                </Form>
               </TabsContent>
             </Tabs>
-          </CardContent>
-          <CardFooter className="flex flex-col space-y-4">
-            <div className="text-sm text-center text-muted-foreground">
-              <span>Demo credentials for testing:</span>
-              <ul className="mt-2 text-xs">
-                <li>Super Admin: admin@learnfinity.com / admin123</li>
-                <li>HR: hr@company.com / hr123</li>
-                <li>Learner: learner@company.com / learner123</li>
-              </ul>
-            </div>
-          </CardFooter>
-        </Card>
+          </div>
+
+          <p className="mt-10 text-center text-sm text-gray-500">
+            By continuing, you agree to Learnfinity's{" "}
+            <Link
+              to="#"
+              className="font-semibold leading-6 text-primary hover:text-primary/80"
+            >
+              Terms of Service
+            </Link>{" "}
+            and{" "}
+            <Link
+              to="#"
+              className="font-semibold leading-6 text-primary hover:text-primary/80"
+            >
+              Privacy Policy
+            </Link>
+            .
+          </p>
+        </div>
       </div>
     </div>
   );
