@@ -4,7 +4,81 @@
  * This file contains all type definitions related to the HR module
  */
 
-// HR User Type
+// Basic user type for HR authentication
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+}
+
+// HR Dashboard types
+export interface KeyMetric {
+  title: string;
+  value: string | number;
+  change?: string;
+  trend?: 'up' | 'down' | 'neutral';
+  icon?: React.ComponentType<{ className?: string }>;
+}
+
+export interface QuickAction {
+  title: string;
+  description: string;
+  icon?: React.ComponentType<{ className?: string }>;
+  onClick: () => void;
+}
+
+export interface ActivityItem {
+  id: string;
+  type: 'enrollment' | 'completion' | 'achievement' | 'warning';
+  user: string;
+  course?: string;
+  timestamp: string;
+  description: string;
+}
+
+// Employee types
+export interface Employee {
+  id: string;
+  name: string;
+  email: string;
+  department: string;
+  position?: string;
+  courses: number;
+  coursesCompleted: number;
+  progress: number;
+  lastActivity: string;
+  status: 'active' | 'inactive' | 'onboarding' | 'offboarding';
+}
+
+// Course types
+export interface Course {
+  id: string;
+  title: string;
+  description: string;
+  department: string;
+  enrollments: number;
+  completionRate: number;
+  averageScore?: number;
+  duration: string;
+  status: 'active' | 'draft' | 'archived';
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Department type
+export interface Department {
+  id: string;
+  name: string;
+  employeeCount: number;
+  courseCount: number;
+  averageCompletion: number;
+}
+
+// HRDashboard tab type
+export type HRDashboardTab = 'overview' | 'employees' | 'courses' | 'reports';
+
+// Legacy types kept for backward compatibility
 export interface HRUser {
   id: string;
   name: string;
@@ -12,32 +86,12 @@ export interface HRUser {
   role: string;
 }
 
-// Employee Type
-export interface Employee {
-  id: string;
-  name: string;
-  email: string;
-  department: string;
-  courses: number;
-  coursesCompleted: number;
-  progress: number;
-  lastActivity: string;
-  status: string;
-}
-
-// Course Type
-export interface Course {
-  id: string;
-  title: string;
-  description: string;
-  category: string;
-  skillLevel: string;
-  enrolledCount: number;
-  completionRate: number;
-  duration: string;
-  isAIGenerated: boolean;
-  lastUpdate: string;
-  rating: number;
+export interface HRAuthContext {
+  currentUser: HRUser | null;
+  isLoading: boolean;
+  isAuthenticated: boolean;
+  login: (username: string, password: string) => Promise<HRUser>;
+  logout: () => void;
 }
 
 // Learning Path Type
@@ -51,15 +105,6 @@ export interface LearningPath {
   duration: string;
 }
 
-// Key Metric Type for Dashboard
-export interface KeyMetric {
-  title: string;
-  value: string;
-  change: string;
-  trend: 'up' | 'down' | 'neutral';
-  icon: any; // Using any for icon component type
-}
-
 // Activity Type for Recent Activities
 export interface Activity {
   type: 'enrollment' | 'completion' | 'feedback' | 'alert';
@@ -70,13 +115,4 @@ export interface Activity {
   issue?: string;
   time: string;
   icon: any; // Using any for icon component type
-}
-
-// HR Authentication context
-export interface HRAuthContext {
-  currentUser: HRUser | null;
-  isLoading: boolean;
-  isAuthenticated: boolean;
-  login: (username: string, password: string) => Promise<HRUser>;
-  logout: () => void;
 } 

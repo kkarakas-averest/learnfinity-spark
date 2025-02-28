@@ -1,119 +1,106 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { HRUser, HRAuthContext as HRAuthContextType } from '@/types/hr.types';
-import { useToast } from '@/hooks/use-toast';
+import React from 'react';
+import { User } from '@/types/hr.types';
 
-// Hardcoded HR credentials
-const HR_CREDENTIALS = {
-  username: "adminhr",
-  password: "adminhr"
-};
+// Define context types
+interface HRAuthContextType {
+  user: User | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  login: (username: string, password: string) => Promise<void>;
+  logout: () => void;
+}
 
-// Create context with default values
-const HRAuthContext = createContext<HRAuthContextType>({
-  currentUser: null,
-  isLoading: false,
+// Create the context with default values
+const HRAuthContext = React.createContext<HRAuthContextType>({
+  user: null,
   isAuthenticated: false,
-  login: async () => { throw new Error('HRAuthContext not initialized'); },
+  isLoading: false,
+  login: async () => {},
   logout: () => {},
 });
 
-export const HRAuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [currentUser, setCurrentUser] = useState<HRUser | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const navigate = useNavigate();
-  const { toast } = useToast();
+// Custom hook for using the auth context
+export const useHRAuth = () => React.useContext(HRAuthContext);
 
-  // Check for existing login on mount
-  useEffect(() => {
-    const checkExistingLogin = () => {
+interface HRAuthProviderProps {
+  children: React.ReactNode;
+}
+
+export const HRAuthProvider: React.FC<HRAuthProviderProps> = ({ children }) => {
+  const [user, setUser] = React.useState<User | null>(null);
+  const [isLoading, setIsLoading] = React.useState(true);
+
+  // Check for existing session on mount
+  React.useEffect(() => {
+    const checkAuthStatus = () => {
       try {
-        const userStr = localStorage.getItem("currentUser");
-        if (userStr) {
-          const user = JSON.parse(userStr);
-          if (user.role === "hr") {
-            setCurrentUser(user);
-          }
+        const storedUser = localStorage.getItem('hrUser');
+        if (storedUser) {
+          const parsedUser = JSON.parse(storedUser);
+          setUser(parsedUser);
         }
       } catch (error) {
-        console.error("Error checking existing login:", error);
-        localStorage.removeItem("currentUser");
+        console.error('Error checking HR auth status:', error);
+        localStorage.removeItem('hrUser');
       } finally {
         setIsLoading(false);
       }
     };
 
-    checkExistingLogin();
+    checkAuthStatus();
   }, []);
 
-  // Login function
-  const login = async (username: string, password: string): Promise<HRUser> => {
+  // Hard-coded credentials for demo
+  const ADMIN_USERNAME = 'adminhr';
+  const ADMIN_PASSWORD = 'adminhr';
+
+  const login = async (username: string, password: string): Promise<void> => {
     setIsLoading(true);
     
-    try {
-      // Check against hardcoded credentials
-      if (username === HR_CREDENTIALS.username && password === HR_CREDENTIALS.password) {
-        // Create HR user object
-        const hrUser: HRUser = {
-          id: "hr-admin-id",
-          name: "HR Administrator",
-          email: "hr@learnfinity.com",
-          role: "hr"
-        };
-        
-        // Store in localStorage
-        localStorage.setItem("currentUser", JSON.stringify(hrUser));
-        
-        // Update state
-        setCurrentUser(hrUser);
-        
-        // Success message
-        toast({
-          title: "HR Login Successful",
-          description: "Welcome to the HR dashboard",
-        });
-        
-        return hrUser;
-      } else {
-        throw new Error("Invalid HR credentials");
-      }
-    } catch (error) {
-      toast({
-        title: "Login Failed",
-        description: error instanceof Error ? error.message : "Authentication failed",
-        variant: "destructive",
-      });
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
+    return new Promise((resolve, reject) => {
+      // Simulate API delay
+      setTimeout(() => {
+        if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
+          const hrUser: User = {
+            id: '1',
+            name: 'HR Admin',
+            email: 'hr@learnfinity.com',
+            role: 'hr',
+          };
+          
+          // Store in localStorage
+          localStorage.setItem('hrUser', JSON.stringify(hrUser));
+          setUser(hrUser);
+          setIsLoading(false);
+          console.log('HR Login successful');
+          resolve();
+        } else {
+          setIsLoading(false);
+          console.log('HR Login failed');
+          reject(new Error('Invalid credentials'));
+        }
+      }, 800);
+    });
   };
 
-  // Logout function
   const logout = () => {
-    localStorage.removeItem("currentUser");
-    setCurrentUser(null);
-    navigate('/hr-login');
+    localStorage.removeItem('hrUser');
+    setUser(null);
+  };
+
+  const value = {
+    user,
+    isAuthenticated: !!user,
+    isLoading,
+    login,
+    logout,
   };
 
   return (
-    <HRAuthContext.Provider value={{
-      currentUser,
-      isLoading,
-      isAuthenticated: !!currentUser,
-      login,
-      logout
-    }}>
+    <HRAuthContext.Provider value={value}>
       {children}
     </HRAuthContext.Provider>
   );
 };
 
-// Custom hook for using the HR auth context
-export const useHRAuth = () => {
-  const context = useContext(HRAuthContext);
-  if (context === undefined) {
-    throw new Error('useHRAuth must be used within an HRAuthProvider');
-  }
-  return context;
-}; 
+export default HRAuthProvider; 

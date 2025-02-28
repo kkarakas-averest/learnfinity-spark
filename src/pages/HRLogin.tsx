@@ -1,8 +1,8 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
+import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -32,10 +32,11 @@ const HRLogin = () => {
   const { login, isAuthenticated, isLoading: authLoading } = useHRAuth();
 
   // Redirect if already authenticated
-  if (isAuthenticated) {
-    navigate('/hr');
-    return null;
-  }
+  React.useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/hr');
+    }
+  }, [isAuthenticated, navigate]);
 
   const loginForm = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -53,11 +54,16 @@ const HRLogin = () => {
       await login(values.username, values.password);
       
       // If successful, navigate to dashboard
-      navigate('/hr', { replace: true });
+      navigate('/hr');
     } catch (error) {
       setLoginError("Invalid HR credentials. Please try again.");
     }
   };
+
+  // Early return if already authenticated to avoid form flashing
+  if (isAuthenticated) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen flex flex-col">

@@ -1,226 +1,121 @@
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
-import { 
-  LayoutDashboard, 
-  Users, 
-  BookOpen, 
-  Settings, 
-  BellRing,
-  LogOut 
-} from 'lucide-react';
-
-import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
-import {
-  Sheet,
-  SheetContent,
-  SheetTrigger,
-} from '@/components/ui/sheet';
-
-import DashboardOverview from '@/components/hr/DashboardOverview';
-import EmployeeManagement from '@/components/hr/EmployeeManagement';
-import CourseManagement from '@/components/hr/CourseManagement';
-import AgentStatusPanel from '@/components/dashboard/AgentStatusPanel';
+import React, { useEffect } from 'react';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { useHRAuth } from '@/contexts/HRAuthContext';
-import HRAuth from '@/components/hr/HRAuth';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from '@/components/ui/button';
+import { LogOut, Users, BookOpen, BarChart2 } from 'lucide-react';
+import { HRDashboardTab } from '@/types/hr.types';
 
-// Main Dashboard component
-const HRDashboard: React.FC = () => {
-  const [activeSection, setActiveSection] = React.useState('dashboard');
+// Import HR components
+const DashboardOverview = React.lazy(() => import('@/components/hr/DashboardOverview'));
+const EmployeeManagement = React.lazy(() => import('@/components/hr/EmployeeManagement'));
+
+export default function HRDashboard() {
   const navigate = useNavigate();
-  const { currentUser, logout } = useHRAuth();
+  const { user, isAuthenticated, isLoading, logout } = useHRAuth();
+  const [activeTab, setActiveTab] = React.useState<HRDashboardTab>('overview');
 
-  // Handle logout
+  // Redirect if not authenticated
+  if (!isLoading && !isAuthenticated) {
+    return <Navigate to="/hr-login" />;
+  }
+
+  const handleTabChange = (value: string) => {
+    setActiveTab(value as HRDashboardTab);
+  };
+
   const handleLogout = () => {
     logout();
+    navigate('/hr-login');
   };
 
-  // Handle section change
-  const handleSectionChange = (section: string) => {
-    setActiveSection(section);
-  };
-
-  // Define navigation items
-  const navItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="h-5 w-5" /> },
-    { id: 'employees', label: 'Employees', icon: <Users className="h-5 w-5" /> },
-    { id: 'courses', label: 'Courses', icon: <BookOpen className="h-5 w-5" /> },
-    { id: 'ai-agents', label: 'AI Agents', icon: <BellRing className="h-5 w-5" /> },
-    { id: 'settings', label: 'Settings', icon: <Settings className="h-5 w-5" /> }
-  ];
+  if (isLoading) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
-    <HRAuth>
-      <div className="flex min-h-screen bg-background">
-        {/* Desktop Sidebar */}
-        <div className="hidden lg:flex w-64 flex-col border-r bg-background">
-          <div className="p-6">
-            <h2 className="text-2xl font-bold">HR Dashboard</h2>
-            <p className="text-sm text-muted-foreground mt-1">Learnfinity HR Admin</p>
+    <div className="min-h-screen bg-background">
+      {/* Header with user info and logout */}
+      <header className="border-b bg-card">
+        <div className="container flex h-16 items-center justify-between px-4">
+          <div className="flex items-center">
+            <h1 className="text-xl font-bold">Learnfinity HR Dashboard</h1>
           </div>
-          
-          <div className="flex-1 px-4 space-y-2">
-            {navItems.map((item) => (
-              <Button
-                key={item.id}
-                variant={activeSection === item.id ? "secondary" : "ghost"}
-                className="w-full justify-start gap-3"
-                onClick={() => handleSectionChange(item.id)}
-              >
-                {item.icon}
-                {item.label}
-              </Button>
-            ))}
-          </div>
-          
-          <div className="p-4 mt-auto">
-            <Separator className="mb-4" />
-            {currentUser && (
-              <div className="flex items-center mb-4">
-                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold mr-3">
-                  {currentUser.name.charAt(0).toUpperCase()}
-                </div>
-                <div>
-                  <p className="font-medium">{currentUser.name}</p>
-                  <p className="text-xs text-muted-foreground">HR Administrator</p>
-                </div>
-              </div>
+          <div className="flex items-center space-x-4">
+            {user && (
+              <span className="text-sm text-muted-foreground">
+                Logged in as <span className="font-medium text-foreground">{user.name}</span>
+              </span>
             )}
-            <Button variant="outline" className="w-full gap-2" onClick={handleLogout}>
-              <LogOut className="h-4 w-4" />
+            <Button variant="outline" size="sm" onClick={handleLogout}>
+              <LogOut className="mr-2 h-4 w-4" />
               Logout
             </Button>
           </div>
         </div>
-        
-        {/* Mobile Navigation */}
-        <Sheet>
-          <div className="lg:hidden flex items-center justify-between p-4 border-b">
-            <h2 className="font-bold">HR Dashboard</h2>
-            <SheetTrigger asChild>
-              <Button variant="outline" size="icon">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
-                  <line x1="4" x2="20" y1="12" y2="12"></line>
-                  <line x1="4" x2="20" y1="6" y2="6"></line>
-                  <line x1="4" x2="20" y1="18" y2="18"></line>
-                </svg>
-              </Button>
-            </SheetTrigger>
-          </div>
-          <SheetContent side="left" className="flex flex-col">
-            <div className="py-4">
-              <h2 className="text-xl font-bold">HR Dashboard</h2>
-              <p className="text-sm text-muted-foreground">Learnfinity HR Admin</p>
-            </div>
-            
-            <div className="flex-1 space-y-2">
-              {navItems.map((item) => (
-                <Button
-                  key={item.id}
-                  variant={activeSection === item.id ? "secondary" : "ghost"}
-                  className="w-full justify-start gap-3"
-                  onClick={() => {
-                    handleSectionChange(item.id);
-                    
-                    // Close the sheet after navigation on mobile
-                    const closeButton = document.querySelector('[data-radix-collection-item]');
-                    if (closeButton instanceof HTMLElement) {
-                      closeButton.click();
-                    }
-                  }}
-                >
-                  {item.icon}
-                  {item.label}
-                </Button>
-              ))}
-            </div>
-            
-            <div className="pt-4 mt-auto">
-              <Separator className="mb-4" />
-              {currentUser && (
-                <div className="flex items-center mb-4">
-                  <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold mr-3">
-                    {currentUser.name.charAt(0).toUpperCase()}
-                  </div>
-                  <div>
-                    <p className="font-medium">{currentUser.name}</p>
-                    <p className="text-xs text-muted-foreground">HR Administrator</p>
-                  </div>
-                </div>
-              )}
-              <Button variant="outline" className="w-full gap-2" onClick={handleLogout}>
-                <LogOut className="h-4 w-4" />
-                Logout
-              </Button>
-            </div>
-          </SheetContent>
-        </Sheet>
-        
-        {/* Main Content */}
-        <div className="flex-1 overflow-auto">
-          <div className="container py-6 md:py-10 max-w-7xl">
-            {/* Dashboard Overview */}
-            {activeSection === 'dashboard' && (
-              <>
-                <h1 className="text-3xl font-bold mb-6">Dashboard Overview</h1>
-                <DashboardOverview />
-              </>
-            )}
-            
-            {/* Employees Section */}
-            {activeSection === 'employees' && (
-              <>
-                <h1 className="text-3xl font-bold mb-6">Employee Management</h1>
-                <EmployeeManagement />
-              </>
-            )}
-            
-            {/* Courses Section */}
-            {activeSection === 'courses' && (
-              <>
-                <h1 className="text-3xl font-bold mb-6">Course Management</h1>
-                <CourseManagement />
-              </>
-            )}
-            
-            {/* AI Agents Section */}
-            {activeSection === 'ai-agents' && (
-              <>
-                <h1 className="text-3xl font-bold mb-6">AI Agent Monitoring</h1>
-                <AgentStatusPanel />
-              </>
-            )}
-            
-            {/* Settings Section */}
-            {activeSection === 'settings' && (
-              <>
-                <h1 className="text-3xl font-bold mb-6">HR Dashboard Settings</h1>
-                <div className="grid gap-6">
-                  <div className="border rounded-lg p-6">
-                    <h2 className="text-xl font-medium mb-4">General Settings</h2>
-                    <p className="text-muted-foreground mb-4">Configure general HR dashboard settings and preferences.</p>
-                    <Button variant="outline">Coming Soon</Button>
-                  </div>
-                  
-                  <div className="border rounded-lg p-6">
-                    <h2 className="text-xl font-medium mb-4">Notifications</h2>
-                    <p className="text-muted-foreground mb-4">Configure notification preferences for employee activities and system alerts.</p>
-                    <Button variant="outline">Coming Soon</Button>
-                  </div>
-                  
-                  <div className="border rounded-lg p-6">
-                    <h2 className="text-xl font-medium mb-4">Integrations</h2>
-                    <p className="text-muted-foreground mb-4">Manage integrations with HR tools and third-party services.</p>
-                    <Button variant="outline">Coming Soon</Button>
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-    </HRAuth>
-  );
-};
+      </header>
 
-export default HRDashboard;
+      {/* Main content with tabs */}
+      <div className="container p-4">
+        <Tabs defaultValue="overview" value={activeTab} onValueChange={handleTabChange}>
+          <TabsList className="grid w-full max-w-3xl grid-cols-4 mb-8">
+            <TabsTrigger value="overview" className="flex items-center">
+              <BarChart2 className="mr-2 h-4 w-4" />
+              Overview
+            </TabsTrigger>
+            <TabsTrigger value="employees" className="flex items-center">
+              <Users className="mr-2 h-4 w-4" />
+              Employees
+            </TabsTrigger>
+            <TabsTrigger value="courses" className="flex items-center">
+              <BookOpen className="mr-2 h-4 w-4" />
+              Courses
+            </TabsTrigger>
+            <TabsTrigger value="reports" className="flex items-center">
+              <BarChart2 className="mr-2 h-4 w-4" />
+              Reports
+            </TabsTrigger>
+          </TabsList>
+          
+          <React.Suspense fallback={
+            <div className="flex items-center justify-center h-[60vh]">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+            </div>
+          }>
+            <TabsContent value="overview">
+              <DashboardOverview />
+            </TabsContent>
+            
+            <TabsContent value="employees">
+              <EmployeeManagement />
+            </TabsContent>
+            
+            <TabsContent value="courses">
+              <div className="rounded-lg border bg-card p-6">
+                <h2 className="text-2xl font-bold mb-4">Course Management</h2>
+                <p className="text-muted-foreground">
+                  Manage your organization's courses, curricula, and learning paths.
+                  This feature is under development.
+                </p>
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="reports">
+              <div className="rounded-lg border bg-card p-6">
+                <h2 className="text-2xl font-bold mb-4">Reports & Analytics</h2>
+                <p className="text-muted-foreground">
+                  View detailed reports and analytics on learning progress across the organization.
+                  This feature is under development.
+                </p>
+              </div>
+            </TabsContent>
+          </React.Suspense>
+        </Tabs>
+      </div>
+    </div>
+  );
+}
