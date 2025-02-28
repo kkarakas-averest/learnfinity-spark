@@ -1,4 +1,3 @@
-
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
@@ -35,7 +34,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const navigate = useNavigate();
   
   // Set this to true to disable new sign ups
-  const signupDisabled = true;
+  const signupDisabled = false;
 
   useEffect(() => {
     // Get the initial session
@@ -179,10 +178,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       setIsLoading(true);
       
-      // Create auth user
+      // Create auth user with email confirmation disabled
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          emailRedirectTo: window.location.origin,
+          data: {
+            name,
+            role
+          }
+        }
       });
 
       if (authError) {
