@@ -1,25 +1,38 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { AlertCircle, FileText, Upload } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { useHRAuth } from '@/contexts/HRAuthContext';
 
-const EmployeeProfileForm = ({ onSubmit, isLoading }) => {
+const EmployeeProfileForm = ({ onSubmit, isLoading, departments = [], positions = [] }) => {
+  const { hrUser } = useHRAuth() || {};
+  
   const [formData, setFormData] = useState({
-    employee_id: '',
     name: '',
-    role: '',
-    department: '',
-    experience: 'entry-level',
-    additional_info: '',
+    email: '',
+    departmentId: '',
+    positionId: '',
+    status: 'active',
+    notes: '',
+    companyId: '',
   });
   
-  const [uploadedFiles, setUploadedFiles] = useState([]);
   const [error, setError] = useState(null);
+  
+  // Set the company ID from the HR user's context when component mounts
+  useEffect(() => {
+    if (hrUser?.company_id) {
+      setFormData(prev => ({
+        ...prev,
+        companyId: hrUser.company_id
+      }));
+    }
+  }, [hrUser]);
   
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -36,45 +49,40 @@ const EmployeeProfileForm = ({ onSubmit, isLoading }) => {
     }));
   };
   
-  const handleFileUpload = (e) => {
-    const files = Array.from(e.target.files);
-    setUploadedFiles(prev => [...prev, ...files]);
-  };
-  
-  const removeFile = (index) => {
-    setUploadedFiles(prev => prev.filter((_, i) => i !== index));
-  };
-  
   const handleSubmit = (e) => {
     e.preventDefault();
     
     // Simple validation
-    if (!formData.employee_id || !formData.name || !formData.role || !formData.department) {
+    if (!formData.name || !formData.email || !formData.departmentId) {
       setError('Please fill out all required fields');
       return;
     }
     
-    // Create form data with files for upload
-    const submitData = new FormData();
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email)) {
+      setError('Please enter a valid email address');
+      return;
+    }
     
-    // Add form fields
-    Object.entries(formData).forEach(([key, value]) => {
-      submitData.append(key, value);
-    });
-    
-    // Add files
-    uploadedFiles.forEach((file, index) => {
-      submitData.append(`document_${index}`, file);
-    });
+    // Ensure company ID is set
+    if (!formData.companyId) {
+      console.warn('Company ID not set. Using default or null value.');
+    }
     
     // Submit the form
-    onSubmit(submitData);
+    onSubmit(formData);
   };
+  
+  // Filter positions based on selected department
+  const filteredPositions = formData.departmentId
+    ? positions.filter(pos => pos.department_id === formData.departmentId)
+    : positions;
   
   return (
     <Card className="w-full max-w-3xl mx-auto">
       <CardHeader>
-        <CardTitle>Create Employee Profile</CardTitle>
+        <CardTitle>Employee Information</CardTitle>
       </CardHeader>
       
       <form onSubmit={handleSubmit}>
@@ -86,141 +94,112 @@ const EmployeeProfileForm = ({ onSubmit, isLoading }) => {
             </Alert>
           )}
           
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="employee_id">Employee ID *</Label>
-              <Input 
-                id="employee_id" 
-                name="employee_id" 
-                value={formData.employee_id} 
-                onChange={handleChange} 
-                placeholder="EMP001"
-                required
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="name">Full Name *</Label>
-              <Input 
-                id="name" 
-                name="name" 
-                value={formData.name} 
-                onChange={handleChange} 
-                placeholder="John Doe"
-                required
-              />
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="name">Full Name *</Label>
+            <Input 
+              id="name" 
+              name="name" 
+              value={formData.name} 
+              onChange={handleChange} 
+              placeholder="John Doe"
+              required
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="email">Email Address *</Label>
+            <Input 
+              id="email" 
+              name="email" 
+              type="email"
+              value={formData.email} 
+              onChange={handleChange} 
+              placeholder="john.doe@example.com"
+              required
+            />
+            <p className="text-sm text-muted-foreground">
+              Employee will be automatically registered with this email address
+            </p>
           </div>
           
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="role">Job Role *</Label>
-              <Input 
-                id="role" 
-                name="role" 
-                value={formData.role} 
-                onChange={handleChange} 
-                placeholder="Software Developer"
-                required
-              />
+              <Label htmlFor="departmentId">Department *</Label>
+              <Select 
+                value={formData.departmentId} 
+                onValueChange={(value) => handleSelectChange('departmentId', value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select department" />
+                </SelectTrigger>
+                <SelectContent>
+                  {departments.map(dept => (
+                    <SelectItem key={dept.id} value={dept.id}>
+                      {dept.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="department">Department *</Label>
-              <Input 
-                id="department" 
-                name="department" 
-                value={formData.department} 
-                onChange={handleChange} 
-                placeholder="Engineering"
-                required
-              />
+              <Label htmlFor="positionId">Position</Label>
+              <Select 
+                value={formData.positionId} 
+                onValueChange={(value) => handleSelectChange('positionId', value)}
+                disabled={!formData.departmentId}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select position" />
+                </SelectTrigger>
+                <SelectContent>
+                  {filteredPositions.map(pos => (
+                    <SelectItem key={pos.id} value={pos.id}>
+                      {pos.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="experience">Experience Level</Label>
+            <Label htmlFor="status">Status</Label>
             <Select 
-              value={formData.experience} 
-              onValueChange={(value) => handleSelectChange('experience', value)}
+              value={formData.status} 
+              onValueChange={(value) => handleSelectChange('status', value)}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select experience level" />
+                <SelectValue placeholder="Select status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="entry-level">Entry-level</SelectItem>
-                <SelectItem value="mid-level">Mid-level</SelectItem>
-                <SelectItem value="senior">Senior</SelectItem>
-                <SelectItem value="lead">Lead/Manager</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="inactive">Inactive</SelectItem>
+                <SelectItem value="onboarding">Onboarding</SelectItem>
+                <SelectItem value="on_leave">On Leave</SelectItem>
               </SelectContent>
             </Select>
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="additional_info">Additional Information</Label>
+            <Label htmlFor="notes">Notes</Label>
             <Textarea 
-              id="additional_info" 
-              name="additional_info" 
-              value={formData.additional_info} 
+              id="notes" 
+              name="notes" 
+              value={formData.notes} 
               onChange={handleChange} 
-              placeholder="Enter any additional information about the employee's background, skills, interests, or learning preferences..."
-              rows={5}
+              placeholder="Any additional notes about the employee..."
+              rows={3}
             />
           </div>
-          
-          <div className="space-y-2">
-            <Label>Upload Documents</Label>
-            <div className="border-2 border-dashed border-gray-300 rounded-md p-6 text-center">
-              <Upload className="h-8 w-8 mx-auto mb-2 text-gray-400" />
-              <p className="text-sm text-gray-500 mb-2">
-                Upload employee documents (resume, certifications, etc.)
-              </p>
-              <Input
-                type="file"
-                id="documents"
-                multiple
-                onChange={handleFileUpload}
-                className="hidden"
-              />
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={() => document.getElementById('documents').click()}
-              >
-                Select Files
-              </Button>
-            </div>
-            
-            {/* Display uploaded files */}
-            {uploadedFiles.length > 0 && (
-              <div className="mt-4">
-                <h4 className="text-sm font-medium mb-2">Uploaded Files:</h4>
-                <ul className="space-y-2">
-                  {uploadedFiles.map((file, index) => (
-                    <li key={index} className="flex justify-between items-center bg-secondary p-2 rounded">
-                      <div className="flex items-center">
-                        <FileText className="h-4 w-4 mr-2" />
-                        <span className="text-sm truncate max-w-xs">{file.name}</span>
-                      </div>
-                      <Button 
-                        type="button" 
-                        variant="ghost" 
-                        size="sm" 
-                        onClick={() => removeFile(index)}
-                      >
-                        Remove
-                      </Button>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
+
+          {/* Hidden input for company ID - populated automatically from HR user context */}
+          <input type="hidden" name="companyId" value={formData.companyId} />
         </CardContent>
         
         <CardFooter className="flex justify-end">
           <Button type="submit" disabled={isLoading}>
-            {isLoading ? 'Creating Profile...' : 'Create Profile'}
+            {isLoading ? 'Creating Employee...' : 'Create Employee'}
           </Button>
         </CardFooter>
       </form>

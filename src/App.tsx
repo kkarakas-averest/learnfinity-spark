@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { HRAuthProvider } from "@/contexts/HRAuthContext";
+import { ROUTES } from "@/lib/routes";
 import Index from "@/pages/Index";
 import LoginPage from "@/pages/LoginPage";
 import RegisterPage from "@/pages/RegisterPage";
@@ -18,6 +19,7 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 import OnboardingWizard from "@/pages/OnboardingWizard";
 import ProfileSettings from "@/pages/ProfileSettings";
 import Billing from "@/pages/Billing";
+import CreateEmployeePage from "@/components/hr/CreateEmployeePage";
 
 import "./App.css";
 
@@ -28,14 +30,14 @@ function App() {
         <AuthProvider>
           <HRAuthProvider>
             <Routes>
-              <Route path="/" element={<Index />} />
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="/register" element={<RegisterPage />} />
-              <Route path="/courses" element={<Courses />} />
+              <Route path={ROUTES.HOME} element={<Index />} />
+              <Route path={ROUTES.LOGIN} element={<LoginPage />} />
+              <Route path={ROUTES.REGISTER} element={<RegisterPage />} />
+              <Route path={ROUTES.COURSES} element={<Courses />} />
               <Route path="/course/:id" element={<CourseDetail />} />
-              <Route path="/onboarding" element={<OnboardingWizard />} />
+              <Route path={ROUTES.ONBOARDING} element={<OnboardingWizard />} />
               <Route
-                path="/dashboard"
+                path={ROUTES.DASHBOARD}
                 element={
                   <ProtectedRoute allowedRoles={["learner"]}>
                     <Dashboard />
@@ -43,7 +45,7 @@ function App() {
                 }
               />
               <Route
-                path="/settings/profile"
+                path={ROUTES.SETTINGS_PROFILE}
                 element={
                   <ProtectedRoute>
                     <ProfileSettings />
@@ -51,7 +53,7 @@ function App() {
                 }
               />
               <Route
-                path="/settings/billing"
+                path={ROUTES.SETTINGS_BILLING}
                 element={
                   <ProtectedRoute>
                     <Billing />
@@ -59,18 +61,23 @@ function App() {
                 }
               />
               {/* HR routes using HRAuthProvider */}
-              <Route path="/hr-login" element={
+              <Route path={ROUTES.HR_LOGIN} element={
                 <HRAuthProvider>
                   <HRLogin />
                 </HRAuthProvider>
               } />
-              <Route path="/hr" element={
+              <Route path={ROUTES.HR_DASHBOARD} element={
                 <HRAuthProvider>
                   <HRDashboard />
                 </HRAuthProvider>
               } />
+              <Route path={ROUTES.HR_DASHBOARD_EMPLOYEES_NEW} element={
+                <HRAuthProvider>
+                  <CreateEmployeePage />
+                </HRAuthProvider>
+              } />
               <Route 
-                path="/profile" 
+                path={ROUTES.USER_PROFILE} 
                 element={
                   <ProtectedRoute>
                     <ProfilePage />
@@ -78,7 +85,7 @@ function App() {
                 } 
               />
               <Route 
-                path="/admin" 
+                path={ROUTES.ADMIN_DASHBOARD} 
                 element={
                   <ProtectedRoute allowedRoles={["admin"]}>
                     <SuperAdminDashboard />

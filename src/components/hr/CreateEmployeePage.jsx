@@ -1,111 +1,178 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, CheckCircle } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { toast } from 'sonner';
 import EmployeeProfileForm from './EmployeeProfileForm';
-import agentProfileService from '@/services/agentProfileService';
+import { hrEmployeeService } from '@/lib/services/hrEmployeeService';
+import { hrDepartmentService } from '@/lib/services/hrDepartmentService';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
+import { PageHeader } from '@/components/PageHeader';
+import { ROUTES } from '@/lib/routes';
+import { Button } from '@/components/ui/button';
+import { 
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter 
+} from '@/components/ui/dialog';
+import { 
+  Alert, 
+  AlertTitle, 
+  AlertDescription 
+} from '@/components/ui/alert';
+import { Copy, Info } from 'lucide-react';
 
 const CreateEmployeePage = () => {
   const navigate = useNavigate();
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [result, setResult] = useState(null);
-  const [error, setError] = useState(null);
-  
-  const handleSubmit = async (formData) => {
-    setIsSubmitting(true);
-    setError(null);
-    
-    try {
-      const response = await agentProfileService.submitEmployeeProfile(formData);
-      
-      if (!response.success) {
-        throw new Error(response.message || 'Failed to create employee profile');
+  const [isLoading, setIsLoading] = useState(false);
+  const [departments, setDepartments] = useState([]);
+  const [positions, setPositions] = useState([]);
+  const [isDataLoading, setIsDataLoading] = useState(true);
+  const [showCredentials, setShowCredentials] = useState(false);
+  const [credentials, setCredentials] = useState(null);
+
+  useEffect(() => {
+    const fetchFormData = async () => {
+      try {
+        setIsDataLoading(true);
+        
+        // Fetch departments
+        const { data: departmentsData, error: departmentsError } = 
+          await hrDepartmentService.getDepartments();
+        
+        if (departmentsError) throw departmentsError;
+        setDepartments(departmentsData || []);
+        
+        // Fetch positions
+        const { data: positionsData, error: positionsError } = 
+          await hrDepartmentService.getPositions();
+        
+        if (positionsError) throw positionsError;
+        setPositions(positionsData || []);
+        
+      } catch (error) {
+        console.error('Error fetching form data:', error);
+        toast.error('Failed to load form data. Please try again.');
+      } finally {
+        setIsDataLoading(false);
       }
+    };
+    
+    fetchFormData();
+  }, []);
+
+  const handleSubmit = async (formData) => {
+    try {
+      setIsLoading(true);
       
-      setResult(response);
-    } catch (err) {
-      console.error('Error creating employee profile:', err);
-      setError(err.message || 'An unexpected error occurred');
-    } finally {
-      setIsSubmitting(false);
+      // Create employee using HR service with user account creation
+      const { data, error, userAccount, authError } = await hrEmployeeService.createEmployeeWithUserAccount({
+        name: formData.name,
+        email: formData.email,
+        department_id: formData.departmentId,
+        position_id: formData.positionId || null,
+        status: formData.status,
+        notes: formData.notes || '',
+        company_id: formData.companyId // This is needed for learner record creation
+      });
+      
+      if (error) throw error;
+      
+      if (userAccount) {
+        setCredentials(userAccount);
+        setShowCredentials(true);
+      } else if (authError) {
+        toast.warning(
+          'Employee created, but failed to create user account',
+          { description: authError.message || 'Please create the user account manually.' }
+        );
+        setTimeout(() => navigate(ROUTES.HR_DASHBOARD_EMPLOYEES), 3000);
+      } else {
+        toast.success('Employee created successfully!');
+        navigate(ROUTES.HR_DASHBOARD_EMPLOYEES);
+      }
+    } catch (error) {
+      console.error('Error creating employee:', error);
+      toast.error('Failed to create employee. Please try again.');
+      setIsLoading(false);
     }
   };
-  
-  const handleGoBack = () => {
-    navigate('/hr/employees');
+
+  const handleCopyCredentials = () => {
+    if (credentials) {
+      navigator.clipboard.writeText(
+        `Email: ${credentials.email}\nPassword: ${credentials.password}`
+      );
+      toast.success('Credentials copied to clipboard');
+    }
   };
-  
-  const handleCreateAnother = () => {
-    setResult(null);
-    setError(null);
+
+  const handleCloseCredentialsDialog = () => {
+    setShowCredentials(false);
+    setCredentials(null);
+    navigate(ROUTES.HR_DASHBOARD_EMPLOYEES);
   };
-  
+
   return (
-    <div className="container py-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-2">
-          <Button variant="ghost" size="icon" onClick={handleGoBack}>
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <h1 className="text-2xl font-bold">Create Employee Profile</h1>
+    <div className="container mx-auto p-4">
+      <PageHeader
+        title="Create New Employee"
+        description="Add a new employee to the HR system"
+        backButton={{
+          label: 'Back to Employees',
+          to: ROUTES.HR_DASHBOARD_EMPLOYEES
+        }}
+      />
+      
+      {isDataLoading ? (
+        <div className="flex justify-center items-center h-64">
+          <LoadingSpinner size="lg" />
         </div>
-      </div>
-      
-      <Separator />
-      
-      {/* Success message */}
-      {result && (
-        <Alert className="bg-green-50 border-green-200">
-          <CheckCircle className="h-5 w-5 text-green-600" />
-          <AlertTitle className="text-green-800">Profile Created Successfully</AlertTitle>
-          <AlertDescription className="text-green-700">
-            The employee profile for {result.employeeRecord.name} has been created and submitted for AI processing.
-            <div className="mt-4 flex space-x-4">
-              <Button onClick={handleCreateAnother}>Create Another Profile</Button>
-              <Button 
-                variant="outline" 
-                onClick={() => navigate(`/hr/employees/view/${result.employeeRecord.id}`)}
-              >
-                View Profile
-              </Button>
-            </div>
-          </AlertDescription>
-        </Alert>
-      )}
-      
-      {/* Error message */}
-      {error && (
-        <Alert variant="destructive">
-          <AlertTitle>Error Creating Profile</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
-      
-      {/* Form */}
-      {!result && (
+      ) : (
         <EmployeeProfileForm 
           onSubmit={handleSubmit} 
-          isLoading={isSubmitting} 
+          isLoading={isLoading}
+          departments={departments}
+          positions={positions}
         />
       )}
-      
-      {/* Instructions */}
-      {!result && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-6">
-          <h3 className="text-lg font-medium text-blue-800 mb-2">What happens next?</h3>
-          <p className="text-blue-700 mb-2">
-            After submitting this form:
-          </p>
-          <ol className="list-decimal list-inside text-blue-700 space-y-1 ml-2">
-            <li>Our AI agent will analyze the employee information</li>
-            <li>A personalized learning profile will be created</li>
-            <li>The content creation agent will generate relevant courses</li>
-            <li>The employee will be able to access their personalized learning path</li>
-          </ol>
-        </div>
-      )}
+
+      <Dialog open={showCredentials} onOpenChange={setShowCredentials}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Employee Account Created</DialogTitle>
+            <DialogDescription>
+              A learning platform account has been created for this employee.
+              Please save or share these credentials securely with the employee.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {credentials && (
+            <div className="space-y-4 py-4">
+              <Alert>
+                <Info className="h-4 w-4" />
+                <AlertTitle>User Credentials</AlertTitle>
+                <AlertDescription className="mt-2">
+                  <div><strong>Email:</strong> {credentials.email}</div>
+                  <div><strong>Password:</strong> {credentials.password}</div>
+                </AlertDescription>
+              </Alert>
+              <p className="text-sm text-muted-foreground">
+                These credentials will not be shown again. Please make sure to save them securely.
+              </p>
+            </div>
+          )}
+          
+          <DialogFooter className="flex flex-col sm:flex-row gap-2">
+            <Button variant="outline" onClick={handleCopyCredentials} className="flex gap-2">
+              <Copy className="h-4 w-4" />
+              Copy Credentials
+            </Button>
+            <Button onClick={handleCloseCredentialsDialog}>Continue</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

@@ -9,6 +9,7 @@ import {
   Clock,
   Check
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -32,9 +33,11 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useToast } from '@/components/ui/use-toast';
-import hrEmployeeService from '@/services/hrEmployeeService';
+import { toast } from 'sonner';
+import { hrEmployeeService } from '@/lib/services/hrEmployeeService';
+import { hrDepartmentService } from '@/lib/services/hrDepartmentService';
+import { ROUTES } from '@/lib/routes';
 import { Employee } from '@/types/hr.types';
-import hrDepartmentService from '@/services/hrDepartmentService';
 
 // Function to get status badge color
 const getStatusBadge = (status: string) => {
@@ -60,7 +63,8 @@ const getProgressColor = (progress: number) => {
 };
 
 const EmployeeManagement: React.FC = () => {
-  const { toast } = useToast();
+  const { toast: uiToast } = useToast();
+  const navigate = useNavigate();
   const [isLoading, setIsLoading] = React.useState(true);
   const [employees, setEmployees] = React.useState<Employee[]>([]);
   const [filteredEmployees, setFilteredEmployees] = React.useState<Employee[]>([]);
@@ -76,24 +80,22 @@ const EmployeeManagement: React.FC = () => {
         setIsLoading(true);
         
         // Fetch all employees
-        const employeeData = await hrEmployeeService.getAllEmployees();
+        const { data: employeeData, error: employeeError } = await hrEmployeeService.getEmployees();
+        if (employeeError) throw employeeError;
         if (employeeData) {
           setEmployees(employeeData);
           setFilteredEmployees(employeeData);
         }
         
         // Fetch departments for filtering
-        const departmentData = await hrDepartmentService.getAllDepartments();
+        const { data: departmentData, error: departmentError } = await hrDepartmentService.getDepartments();
+        if (departmentError) throw departmentError;
         if (departmentData) {
           setDepartments(departmentData);
         }
       } catch (error) {
         console.error('Error fetching data:', error);
-        toast({
-          title: "Error",
-          description: "Failed to load employee data. Please try again.",
-          variant: "destructive",
-        });
+        toast.error("Failed to load employee data. Please try again.");
       } finally {
         setIsLoading(false);
       }
@@ -181,34 +183,28 @@ const EmployeeManagement: React.FC = () => {
   const handleDeleteEmployee = async (id: string, name: string) => {
     if (confirm(`Are you sure you want to delete ${name}?`)) {
       try {
-        const result = await hrEmployeeService.deleteEmployee(id);
-        if (result) {
-          // Remove the employee from the state
-          setEmployees(employees.filter(emp => emp.id !== id));
-          toast({
-            title: "Employee deleted",
-            description: `${name} has been deleted successfully.`,
-          });
-        }
+        const { error } = await hrEmployeeService.deleteEmployee(id);
+        
+        if (error) throw error;
+        
+        // Remove the employee from the state
+        setEmployees(employees.filter(emp => emp.id !== id));
+        toast.success(`${name} has been deleted successfully.`);
       } catch (error) {
         console.error('Error deleting employee:', error);
-        toast({
-          title: "Error",
-          description: `Failed to delete ${name}. Please try again.`,
-          variant: "destructive",
-        });
+        toast.error(`Failed to delete ${name}. Please try again.`);
       }
     }
   };
   
   // Function to handle adding a new employee (redirects to the add employee page)
   const handleAddEmployee = () => {
-    window.location.href = '/hr-dashboard/employees/new';
+    navigate(ROUTES.HR_DASHBOARD_EMPLOYEES_NEW);
   };
   
   // Function to handle editing an employee (redirects to the edit employee page)
   const handleEditEmployee = (id: string) => {
-    window.location.href = `/hr-dashboard/employees/edit/${id}`;
+    navigate(ROUTES.HR_DASHBOARD_EMPLOYEES_EDIT(id));
   };
   
   // Display loading state
