@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS hr_employees (
   manager_id UUID REFERENCES hr_employees(id),
   status VARCHAR(20) DEFAULT 'active',
   profile_image_url TEXT,
+  resume_url TEXT,
   last_active_at TIMESTAMP WITH TIME ZONE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP

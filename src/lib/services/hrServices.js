@@ -1,14 +1,50 @@
 import { supabase } from '@/lib/supabase';
 import { seedHRDatabase } from '@/lib/database/seed-hr-database';
+import { hrEmployeeService } from './hrEmployeeService';
 
 // High-level HR services for dashboard functionality
 export const hrServices = {
   /**
    * Initialize the HR database
    * This checks if seeding is needed and performs the seeding if necessary
+   * Also ensures required storage buckets exist
    */
   async initializeHRDatabase() {
     try {
+      // First, ensure the hr-documents storage bucket exists
+      try {
+        const { data: buckets } = await supabase.storage.listBuckets();
+        const hrDocumentsBucket = buckets?.find(bucket => bucket.name === 'hr-documents');
+        
+        if (!hrDocumentsBucket) {
+          console.log('Creating hr-documents storage bucket...');
+          // Create the bucket
+          const { error: bucketError } = await supabase.storage.createBucket('hr-documents', {
+            public: false, // Private by default
+            fileSizeLimit: 10485760, // 10MB
+            allowedMimeTypes: [
+              'application/pdf',
+              'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+            ]
+          });
+          
+          if (bucketError) {
+            console.error('Error creating hr-documents bucket:', bucketError);
+          } else {
+            // Set bucket policy to make it publicly accessible
+            await supabase.storage.updateBucket('hr-documents', {
+              public: true
+            });
+          }
+        }
+      } catch (storageError) {
+        console.error('Error initializing storage bucket:', storageError);
+      }
+      
+      // Ensure the resume_url column exists in the hr_employees table
+      await hrEmployeeService.ensureResumeUrlColumn();
+      
+      // Seed the database if necessary
       return await seedHRDatabase();
     } catch (error) {
       console.error('Error initializing HR database:', error);

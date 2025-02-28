@@ -1,9 +1,50 @@
-import { supabase } from '@/lib/database/supabaseClient';
+import { supabase } from '@/lib/supabase';
 import { generateSecurePassword } from '@/lib/utils';
 
 const TABLE_NAME = 'hr_employees';
 
 export const hrEmployeeService = {
+  /**
+   * Ensure the resume_url column exists in the hr_employees table
+   * This will be called once during initialization
+   */
+  async ensureResumeUrlColumn() {
+    try {
+      // Check if the column exists by trying to update a non-existent record with it
+      const { error } = await supabase.rpc('add_resume_url_column_if_not_exists');
+      
+      if (error) {
+        console.warn('Unable to check/add resume_url column via RPC, trying alternative approach:', error);
+        
+        // Alternative approach: Create a dummy query that uses the column
+        // If it fails, we'll create the function and try again
+        const testQuery = await supabase
+          .from(TABLE_NAME)
+          .select('resume_url')
+          .limit(1);
+          
+        if (testQuery.error && testQuery.error.message.includes('column "resume_url" does not exist')) {
+          console.log('Resume URL column does not exist, creating RPC function...');
+          
+          // Create the RPC function that adds the column if it doesn't exist
+          const createRpcFn = await supabase.rpc('create_add_resume_url_column_function');
+          
+          if (createRpcFn.error) {
+            console.error('Error creating RPC function:', createRpcFn.error);
+          } else {
+            // Try to add the column again
+            await supabase.rpc('add_resume_url_column_if_not_exists');
+          }
+        }
+      }
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Error ensuring resume_url column exists:', error);
+      return { success: false, error };
+    }
+  },
+
   /**
    * Get all employees
    * @param {Object} options - Query options
@@ -109,15 +150,61 @@ export const hrEmployeeService = {
   /**
    * Create a new employee and also create a user account for them
    * @param {Object} employee - Employee data
+   * @param {File} employee.resumeFile - Resume file (optional)
+   * @param {Array} employee.courseIds - Course IDs to enroll the employee in
    * @returns {Promise<{data: Object, error: Object, userAccount: Object}>}
    */
   async createEmployeeWithUserAccount(employee) {
     try {
       // First create the employee record
-      const { data: employeeData, error: employeeError } = await this.createEmployee(employee);
+      const employeeData = {
+        name: employee.name,
+        email: employee.email,
+        department_id: employee.department_id || employee.departmentId,
+        position_id: employee.position_id || employee.positionId,
+        status: employee.status,
+        notes: employee.notes,
+        company_id: employee.company_id || employee.companyId
+      };
+      
+      const { data: createdEmployee, error: employeeError } = await this.createEmployee(employeeData);
       
       if (employeeError) {
         throw employeeError;
+      }
+      
+      // Upload resume if provided
+      let resumeUrl = null;
+      if (employee.resumeFile) {
+        try {
+          const fileName = `${Date.now()}-${employee.resumeFile.name}`;
+          const filePath = `resumes/${createdEmployee.id}/${fileName}`;
+          
+          // Upload file to Supabase Storage
+          const { data: fileData, error: uploadError } = await supabase.storage
+            .from('hr-documents')
+            .upload(filePath, employee.resumeFile);
+            
+          if (uploadError) {
+            console.error('Error uploading resume:', uploadError);
+          } else {
+            // Get the public URL
+            const { data: urlData } = supabase.storage
+              .from('hr-documents')
+              .getPublicUrl(filePath);
+              
+            resumeUrl = urlData?.publicUrl;
+            
+            // Update employee record with resume URL
+            if (resumeUrl) {
+              await this.updateEmployee(createdEmployee.id, {
+                resume_url: resumeUrl
+              });
+            }
+          }
+        } catch (uploadError) {
+          console.error('Error in resume upload:', uploadError);
+        }
       }
       
       // Generate a secure random password for the new account
@@ -142,7 +229,7 @@ export const hrEmployeeService = {
       if (authError) {
         console.error('Error creating user account:', authError);
         return { 
-          data: employeeData, 
+          data: createdEmployee, 
           error: null, 
           userAccount: null,
           authError
@@ -174,7 +261,7 @@ export const hrEmployeeService = {
           .from('learners')
           .insert({
             id: authData.user.id,
-            company_id: employee.company_id,
+            company_id: employee.company_id || employee.companyId,
             progress_status: {},
             preferences: {},
             certifications: {}
@@ -187,8 +274,44 @@ export const hrEmployeeService = {
         console.warn('Exception when creating learner record:', learnerError);
       }
       
+      // Enroll employee in selected courses
+      if (employee.courseIds && employee.courseIds.length > 0) {
+        try {
+          const enrollments = employee.courseIds.map(courseId => ({
+            employee_id: createdEmployee.id,
+            course_id: courseId,
+            status: 'enrolled',
+            progress: 0,
+            enrollment_date: new Date().toISOString()
+          }));
+          
+          const { error: enrollmentError } = await supabase
+            .from('hr_course_enrollments')
+            .insert(enrollments);
+            
+          if (enrollmentError) {
+            console.warn('Failed to enroll employee in courses:', enrollmentError);
+          }
+          
+          // Create activity records for enrollments
+          const activities = employee.courseIds.map(courseId => ({
+            employee_id: createdEmployee.id,
+            activity_type: 'enrollment',
+            description: `Enrolled in course`,
+            course_id: courseId,
+            timestamp: new Date().toISOString()
+          }));
+          
+          await supabase
+            .from('hr_employee_activities')
+            .insert(activities);
+        } catch (enrollError) {
+          console.warn('Exception when enrolling employee in courses:', enrollError);
+        }
+      }
+      
       return { 
-        data: employeeData, 
+        data: createdEmployee, 
         error: null, 
         userAccount: {
           email: employee.email,

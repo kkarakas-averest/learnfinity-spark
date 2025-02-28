@@ -5,9 +5,30 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Upload, FileText } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useHRAuth } from '@/contexts/HRAuthContext';
+import { Checkbox } from '@/components/ui/checkbox';
+
+// Define mock departments in case the API doesn't return any
+const mockDepartments = [
+  { id: 'dept-1', name: 'Engineering' },
+  { id: 'dept-2', name: 'Marketing' },
+  { id: 'dept-3', name: 'Human Resources' },
+  { id: 'dept-4', name: 'Finance' },
+  { id: 'dept-5', name: 'Product Management' },
+  { id: 'dept-6', name: 'Sales' },
+  { id: 'dept-7', name: 'Customer Support' },
+  { id: 'dept-8', name: 'Operations' },
+  { id: 'dept-9', name: 'Legal' }
+];
+
+// Define available courses
+const availableCourses = [
+  { id: 'course-1', title: 'Cybersecurity for Fintech', description: 'Essential security practices for fintech industry' },
+  { id: 'course-2', title: 'New Employee Orientation', description: 'Introduction to company policies and procedures' },
+  { id: 'course-3', title: 'Leadership Fundamentals', description: 'Core principles for effective leadership' }
+];
 
 const EmployeeProfileForm = ({ onSubmit, isLoading, departments = [], positions = [] }) => {
   const { hrUser } = useHRAuth() || {};
@@ -20,9 +41,13 @@ const EmployeeProfileForm = ({ onSubmit, isLoading, departments = [], positions 
     status: 'active',
     notes: '',
     companyId: '',
+    courseIds: [],
+    resumeFile: null
   });
   
   const [error, setError] = useState(null);
+  const [displayDepartments, setDisplayDepartments] = useState([]);
+  const [resumeFileName, setResumeFileName] = useState('');
   
   // Set the company ID from the HR user's context when component mounts
   useEffect(() => {
@@ -33,6 +58,15 @@ const EmployeeProfileForm = ({ onSubmit, isLoading, departments = [], positions 
       }));
     }
   }, [hrUser]);
+  
+  // Set departments - use mock data if API returns empty array
+  useEffect(() => {
+    if (departments && departments.length > 0) {
+      setDisplayDepartments(departments);
+    } else {
+      setDisplayDepartments(mockDepartments);
+    }
+  }, [departments]);
   
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -47,6 +81,55 @@ const EmployeeProfileForm = ({ onSubmit, isLoading, departments = [], positions 
       ...prev,
       [name]: value
     }));
+  };
+  
+  const handleCourseToggle = (courseId) => {
+    setFormData(prev => {
+      const currentCourses = [...prev.courseIds];
+      
+      if (currentCourses.includes(courseId)) {
+        return {
+          ...prev,
+          courseIds: currentCourses.filter(id => id !== courseId)
+        };
+      } else {
+        return {
+          ...prev,
+          courseIds: [...currentCourses, courseId]
+        };
+      }
+    });
+  };
+  
+  const handleResumeUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      // Check file type
+      const fileType = file.type;
+      const validTypes = [
+        'application/pdf', 
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      ];
+      
+      if (!validTypes.includes(fileType)) {
+        setError('Please upload a PDF or DOCX file');
+        return;
+      }
+      
+      // Check file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        setError('File size should be less than 5MB');
+        return;
+      }
+      
+      setFormData(prev => ({
+        ...prev,
+        resumeFile: file
+      }));
+      
+      setResumeFileName(file.name);
+      setError(null);
+    }
   };
   
   const handleSubmit = (e) => {
@@ -68,6 +151,12 @@ const EmployeeProfileForm = ({ onSubmit, isLoading, departments = [], positions 
     // Ensure company ID is set
     if (!formData.companyId) {
       console.warn('Company ID not set. Using default or null value.');
+    }
+    
+    // Check if at least one course is selected
+    if (formData.courseIds.length === 0) {
+      setError('Please select at least one course for the employee');
+      return;
     }
     
     // Submit the form
@@ -133,7 +222,7 @@ const EmployeeProfileForm = ({ onSubmit, isLoading, departments = [], positions 
                   <SelectValue placeholder="Select department" />
                 </SelectTrigger>
                 <SelectContent>
-                  {departments.map(dept => (
+                  {displayDepartments.map(dept => (
                     <SelectItem key={dept.id} value={dept.id}>
                       {dept.name}
                     </SelectItem>
@@ -179,6 +268,60 @@ const EmployeeProfileForm = ({ onSubmit, isLoading, departments = [], positions 
                 <SelectItem value="on_leave">On Leave</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+          
+          {/* Resume upload section */}
+          <div className="space-y-2">
+            <Label htmlFor="resume">Resume (PDF or DOCX, max 5MB)</Label>
+            <div className="flex items-center gap-2">
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => document.getElementById('resume').click()}
+                className="w-full flex gap-2 cursor-pointer"
+              >
+                <Upload className="h-4 w-4" />
+                {resumeFileName ? 'Change Resume' : 'Upload Resume'}
+              </Button>
+              <input
+                id="resume"
+                type="file"
+                accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                onChange={handleResumeUpload}
+                className="hidden"
+              />
+            </div>
+            {resumeFileName && (
+              <div className="flex items-center gap-2 text-sm">
+                <FileText className="h-4 w-4" />
+                <span>{resumeFileName}</span>
+              </div>
+            )}
+          </div>
+          
+          {/* Course selection section */}
+          <div className="space-y-2">
+            <Label htmlFor="courses">Assigned Courses *</Label>
+            <div className="space-y-3 border rounded-md p-4">
+              {availableCourses.map(course => (
+                <div key={course.id} className="flex items-start space-x-2">
+                  <Checkbox 
+                    id={`course-${course.id}`}
+                    checked={formData.courseIds.includes(course.id)}
+                    onCheckedChange={() => handleCourseToggle(course.id)}
+                  />
+                  <div>
+                    <Label 
+                      htmlFor={`course-${course.id}`}
+                      className="text-sm font-medium leading-none cursor-pointer"
+                    >
+                      {course.title}
+                    </Label>
+                    <p className="text-sm text-muted-foreground">{course.description}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
           
           <div className="space-y-2">

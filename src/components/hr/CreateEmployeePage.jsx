@@ -31,6 +31,7 @@ const CreateEmployeePage = () => {
   const [isDataLoading, setIsDataLoading] = useState(true);
   const [showCredentials, setShowCredentials] = useState(false);
   const [credentials, setCredentials] = useState(null);
+  const [enrolledCourses, setEnrolledCourses] = useState([]);
 
   useEffect(() => {
     const fetchFormData = async () => {
@@ -66,15 +67,33 @@ const CreateEmployeePage = () => {
     try {
       setIsLoading(true);
       
+      // Update toast to show resume processing if a file is included
+      const hasResume = formData.resumeFile !== null;
+      
+      if (hasResume) {
+        toast.info('Processing resume and creating employee account...', { duration: 3000 });
+      }
+      
+      // Store selected course titles for display
+      const selectedCourses = formData.courseIds.map(courseId => {
+        // Find the course title from the ID
+        const courseTitle = availableCourses.find(course => course.id === courseId)?.title || 'Course';
+        return courseTitle;
+      });
+      
+      setEnrolledCourses(selectedCourses);
+      
       // Create employee using HR service with user account creation
       const { data, error, userAccount, authError } = await hrEmployeeService.createEmployeeWithUserAccount({
         name: formData.name,
         email: formData.email,
-        department_id: formData.departmentId,
-        position_id: formData.positionId || null,
+        departmentId: formData.departmentId,
+        positionId: formData.positionId || null,
         status: formData.status,
         notes: formData.notes || '',
-        company_id: formData.companyId // This is needed for learner record creation
+        companyId: formData.companyId, // This is needed for learner record creation
+        resumeFile: formData.resumeFile, // Add resume file
+        courseIds: formData.courseIds // Add course IDs
       });
       
       if (error) throw error;
@@ -158,6 +177,18 @@ const CreateEmployeePage = () => {
                   <div><strong>Password:</strong> {credentials.password}</div>
                 </AlertDescription>
               </Alert>
+              
+              {enrolledCourses.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-medium mb-1">Enrolled Courses:</h4>
+                  <ul className="list-disc pl-5 text-sm text-muted-foreground">
+                    {enrolledCourses.map((course, index) => (
+                      <li key={index}>{course}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              
               <p className="text-sm text-muted-foreground">
                 These credentials will not be shown again. Please make sure to save them securely.
               </p>
@@ -176,5 +207,12 @@ const CreateEmployeePage = () => {
     </div>
   );
 };
+
+// Make availableCourses accessible for the component
+const availableCourses = [
+  { id: 'course-1', title: 'Cybersecurity for Fintech', description: 'Essential security practices for fintech industry' },
+  { id: 'course-2', title: 'New Employee Orientation', description: 'Introduction to company policies and procedures' },
+  { id: 'course-3', title: 'Leadership Fundamentals', description: 'Core principles for effective leadership' }
+];
 
 export default CreateEmployeePage; 
