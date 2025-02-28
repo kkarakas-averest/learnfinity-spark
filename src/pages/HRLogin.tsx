@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -15,50 +15,29 @@ import {
 import { Input } from "@/components/ui/input";
 import { Loader2, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { useToast } from "@/hooks/use-toast";
+import { useHRAuth } from "@/contexts/HRAuthContext";
 
-// Hardcoded HR credentials
-const HR_CREDENTIALS = {
-  username: "adminhr",
-  password: "adminhr"
-};
-
+// Login form schema validation
 const loginSchema = z.object({
   username: z.string().min(1, { message: "Username is required." }),
   password: z.string().min(1, { message: "Password is required." }),
 });
 
+// Type for form values based on schema
+type LoginFormValues = z.infer<typeof loginSchema>;
+
 const HRLogin = () => {
-  const [isLoading, setIsLoading] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
   const navigate = useNavigate();
-  const { toast } = useToast();
+  const { login, isAuthenticated, isLoading: authLoading } = useHRAuth();
 
-  // Check if already logged in as HR
-  useEffect(() => {
-    const checkExistingLogin = () => {
-      try {
-        const userStr = localStorage.getItem("currentUser");
-        if (userStr) {
-          const user = JSON.parse(userStr);
-          console.log("Found existing user in localStorage:", user.role);
-          if (user.role === "hr") {
-            console.log("Already logged in as HR, redirecting to dashboard");
-            navigate('/hr');
-            return true;
-          }
-        }
-        return false;
-      } catch (error) {
-        console.error("Error checking existing login:", error);
-        return false;
-      }
-    };
+  // Redirect if already authenticated
+  if (isAuthenticated) {
+    navigate('/hr');
+    return null;
+  }
 
-    checkExistingLogin();
-  }, [navigate]);
-
-  const loginForm = useForm<z.infer<typeof loginSchema>>({
+  const loginForm = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
       username: "",
@@ -66,53 +45,17 @@ const HRLogin = () => {
     },
   });
 
-  const onLoginSubmit = async (values: z.infer<typeof loginSchema>) => {
+  const onLoginSubmit = async (values: LoginFormValues) => {
     try {
       setLoginError(null);
-      setIsLoading(true);
       
-      console.log("Attempting HR login with username:", values.username);
+      // Attempt login with credentials
+      await login(values.username, values.password);
       
-      // Add a small delay to simulate a real login process
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
-      // Check against hardcoded credentials
-      if (values.username === HR_CREDENTIALS.username && values.password === HR_CREDENTIALS.password) {
-        // Store HR user info in localStorage
-        const hrUser = {
-          id: "hr-admin-id",
-          name: "HR Administrator",
-          email: "hr@learnfinity.com",
-          role: "hr"
-        };
-        
-        console.log("Login successful, storing HR user in localStorage");
-        localStorage.setItem("currentUser", JSON.stringify(hrUser));
-        
-        // Double-check the localStorage was set correctly
-        const storedUser = localStorage.getItem("currentUser");
-        console.log("Verification - localStorage currentUser set to:", storedUser);
-        
-        // Success message
-        toast({
-          title: "HR Login Successful",
-          description: "Redirecting to HR dashboard...",
-        });
-        
-        // Add a small delay before redirecting to ensure localStorage is updated
-        await new Promise(resolve => setTimeout(resolve, 200));
-        
-        // Redirect to HR dashboard
-        console.log("Redirecting to HR dashboard");
-        navigate('/hr', { replace: true });
-      } else {
-        throw new Error("Invalid HR credentials");
-      }
-    } catch (error: any) {
-      console.error("Login failed:", error);
+      // If successful, navigate to dashboard
+      navigate('/hr', { replace: true });
+    } catch (error) {
       setLoginError("Invalid HR credentials. Please try again.");
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -148,7 +91,7 @@ const HRLogin = () => {
                     <FormItem>
                       <FormLabel>Username</FormLabel>
                       <FormControl>
-                        <Input placeholder="HR username" {...field} disabled={isLoading} />
+                        <Input placeholder="HR username" {...field} disabled={authLoading} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -161,15 +104,15 @@ const HRLogin = () => {
                     <FormItem>
                       <FormLabel>Password</FormLabel>
                       <FormControl>
-                        <Input placeholder="••••••••" type="password" {...field} disabled={isLoading} />
+                        <Input placeholder="••••••••" type="password" {...field} disabled={authLoading} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
 
-                <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading ? (
+                <Button type="submit" className="w-full" disabled={authLoading}>
+                  {authLoading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       Signing In...
