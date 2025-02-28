@@ -14,6 +14,7 @@ interface AuthContextProps {
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, name: string, role: UserRole) => Promise<void>;
   signOut: () => Promise<void>;
+  signupDisabled: boolean; // Added this property to expose signup status
 }
 
 interface UserDetails {
@@ -32,6 +33,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
   const navigate = useNavigate();
+  
+  // Set this to true to disable new sign ups
+  const signupDisabled = true;
 
   useEffect(() => {
     // Get the initial session
@@ -163,6 +167,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signUp = async (email: string, password: string, name: string, role: UserRole) => {
     try {
+      // Check if signups are disabled
+      if (signupDisabled) {
+        toast({
+          title: 'Registration Closed',
+          description: 'New user registration is currently disabled.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
       setIsLoading(true);
       
       // Create auth user
@@ -287,6 +301,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     signIn,
     signUp,
     signOut,
+    signupDisabled, // Expose signup status to components
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
