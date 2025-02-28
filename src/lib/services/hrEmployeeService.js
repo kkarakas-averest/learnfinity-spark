@@ -536,6 +536,76 @@ export const hrEmployeeService = {
    */
   async updateEmployeeStatus(id, status) {
     return this.updateEmployee(id, { status });
+  },
+
+  /**
+   * Test minimal API functionality for troubleshooting
+   * @returns {Promise<{success: boolean, error: Object, responseText: string}>}
+   */
+  async testMinimalApiRequest() {
+    try {
+      console.log('==== Testing minimal API request ====');
+      
+      // 1. First try direct fetch to check API connectivity
+      const apiUrl = 'https://ujlqzkkkfatehxeqtbdl.supabase.co/rest/v1/hr_employees';
+      const apiKey = supabase.supabaseKey;
+      
+      console.log('Testing direct fetch to:', apiUrl);
+      console.log('Using API key length:', apiKey?.length || 0);
+      
+      try {
+        const response = await fetch(apiUrl, {
+          method: 'GET',
+          headers: {
+            'apikey': apiKey,
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        const responseText = await response.text();
+        console.log('Direct API test response status:', response.status);
+        console.log('Response headers:', Object.fromEntries([...response.headers.entries()]));
+        console.log('Response text (truncated):', responseText.substring(0, 100) + '...');
+        
+        // 2. Try minimal insert with just required fields
+        const minimalEmployee = {
+          name: 'Test Employee ' + new Date().toISOString(),
+          email: 'test' + Date.now() + '@example.com',
+          company_id: '4fb1a692-3995-40ee-8aa5-292fd8ebf029'
+        };
+        
+        console.log('Testing minimal insert with:', minimalEmployee);
+        
+        const insertResponse = await fetch(apiUrl, {
+          method: 'POST',
+          headers: {
+            'apikey': apiKey,
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=minimal'
+          },
+          body: JSON.stringify(minimalEmployee)
+        });
+        
+        const insertResponseText = await insertResponse.text();
+        console.log('Insert API test response status:', insertResponse.status);
+        console.log('Insert response headers:', Object.fromEntries([...insertResponse.headers.entries()]));
+        console.log('Insert response text:', insertResponseText);
+        
+        return {
+          success: insertResponse.status >= 200 && insertResponse.status < 300,
+          error: insertResponse.status >= 400 ? { status: insertResponse.status } : null,
+          responseText: insertResponseText
+        };
+      } catch (fetchError) {
+        console.error('Error during direct API test:', fetchError);
+        return { success: false, error: fetchError, responseText: null };
+      }
+    } catch (error) {
+      console.error('Exception in testMinimalApiRequest:', error);
+      return { success: false, error, responseText: null };
+    }
   }
 };
 

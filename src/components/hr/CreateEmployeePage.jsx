@@ -21,7 +21,7 @@ import {
   AlertTitle, 
   AlertDescription 
 } from '@/components/ui/alert';
-import { Copy, Info } from 'lucide-react';
+import { Copy, Info, Wrench } from 'lucide-react';
 
 const CreateEmployeePage = () => {
   const navigate = useNavigate();
@@ -32,6 +32,8 @@ const CreateEmployeePage = () => {
   const [showCredentials, setShowCredentials] = useState(false);
   const [credentials, setCredentials] = useState(null);
   const [enrolledCourses, setEnrolledCourses] = useState([]);
+  const [testResults, setTestResults] = useState(null);
+  const [isTestingApi, setIsTestingApi] = useState(false);
 
   useEffect(() => {
     const checkDatabaseAndFetchData = async () => {
@@ -186,6 +188,29 @@ const CreateEmployeePage = () => {
     navigate(ROUTES.HR_DASHBOARD_EMPLOYEES);
   };
 
+  const runApiTest = async () => {
+    try {
+      setIsTestingApi(true);
+      setTestResults(null);
+      toast.info('Running API diagnostics...');
+      
+      const results = await hrEmployeeService.testMinimalApiRequest();
+      setTestResults(results);
+      
+      if (results.success) {
+        toast.success('API test successful!');
+      } else {
+        toast.error('API test failed. Check console for details.');
+      }
+    } catch (error) {
+      console.error('Error running API test:', error);
+      setTestResults({ success: false, error, responseText: error.message });
+      toast.error('API test error: ' + error.message);
+    } finally {
+      setIsTestingApi(false);
+    }
+  };
+
   return (
     <div className="container mx-auto p-4">
       <PageHeader
@@ -202,12 +227,53 @@ const CreateEmployeePage = () => {
           <LoadingSpinner size="lg" />
         </div>
       ) : (
-        <EmployeeProfileForm 
-          onSubmit={handleSubmit} 
-          isLoading={isLoading}
-          departments={departments}
-          positions={positions}
-        />
+        <>
+          <div className="mb-6">
+            <Button 
+              variant="outline" 
+              onClick={runApiTest} 
+              disabled={isTestingApi}
+              className="flex items-center gap-2"
+            >
+              <Wrench className="h-4 w-4" />
+              {isTestingApi ? 'Testing API...' : 'Run API Diagnostics'}
+            </Button>
+            
+            {testResults && (
+              <div className="mt-4 p-4 border rounded-md bg-muted/30">
+                <h3 className="text-lg font-medium mb-2">
+                  API Test Results
+                  <span className={`ml-2 px-2 py-0.5 text-xs rounded-full ${testResults.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                    {testResults.success ? 'SUCCESS' : 'FAILED'}
+                  </span>
+                </h3>
+                {testResults.responseText && (
+                  <div className="mt-2">
+                    <h4 className="text-sm font-medium">Response:</h4>
+                    <pre className="text-xs mt-1 p-2 bg-muted rounded overflow-auto max-h-32">
+                      {testResults.responseText}
+                    </pre>
+                  </div>
+                )}
+                {testResults.error && (
+                  <div className="mt-2">
+                    <h4 className="text-sm font-medium text-red-600">Error:</h4>
+                    <pre className="text-xs mt-1 p-2 bg-red-50 text-red-900 rounded overflow-auto max-h-32">
+                      {JSON.stringify(testResults.error, null, 2)}
+                    </pre>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+          
+          <EmployeeProfileForm 
+            onSubmit={handleSubmit} 
+            isLoading={isLoading}
+            departments={departments}
+            positions={positions}
+          />
+        </>
       )}
 
       <Dialog open={showCredentials} onOpenChange={setShowCredentials}>
