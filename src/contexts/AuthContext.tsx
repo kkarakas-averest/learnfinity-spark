@@ -252,17 +252,41 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setIsLoading(true);
       console.log("SignOut: Starting sign out process");
       
-      console.log("SignOut: Calling supabase.auth.signOut()");
-      const { error } = await supabase.auth.signOut();
+      // Create a timeout promise to prevent hanging
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Supabase signOut timed out after 5 seconds')), 5000);
+      });
       
-      if (error) {
-        console.error("SignOut: Error from supabase.auth.signOut()", error);
-        throw error;
+      console.log("SignOut: Calling supabase.auth.signOut()");
+      
+      try {
+        // Race between the signOut call and the timeout
+        await Promise.race([
+          supabase.auth.signOut(),
+          timeoutPromise
+        ]);
+        console.log("SignOut: Successfully signed out from Supabase");
+      } catch (supabaseError) {
+        console.error("SignOut: Error or timeout in supabase.auth.signOut()", supabaseError);
+        console.log("SignOut: Continuing with local logout despite Supabase error");
+        // Continue with local logout even if Supabase fails
       }
       
-      console.log("SignOut: Successfully signed out from Supabase");
+      // Force clear any Supabase storage
+      console.log("SignOut: Manually clearing localStorage items");
+      try {
+        // Clear Supabase items from localStorage
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.includes('supabase')) {
+            localStorage.removeItem(key);
+          }
+        }
+      } catch (storageError) {
+        console.error("SignOut: Error clearing localStorage", storageError);
+      }
       
-      // Clear local state
+      // Clear local state regardless of Supabase result
       console.log("SignOut: Clearing local state (user, session, userDetails)");
       setUser(null);
       setSession(null);
@@ -275,7 +299,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
       
       console.log("SignOut: Navigating to home page");
-      navigate('/');
+      // Force a full page reload to ensure clean state
+      window.location.href = '/';
     } catch (error: any) {
       console.error('SignOut: Error in signOut function:', error);
       toast({
@@ -283,6 +308,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         description: error.message || 'An error occurred during sign out.',
         variant: 'destructive',
       });
+      
+      // Even if there's an error, try to force logout
+      console.log("SignOut: Attempting forced logout despite error");
+      setUser(null);
+      setSession(null);
+      setUserDetails(null);
+      window.location.href = '/';
     } finally {
       console.log("SignOut: Setting isLoading to false");
       setIsLoading(false);
