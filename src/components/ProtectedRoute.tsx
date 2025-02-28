@@ -2,6 +2,8 @@
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { UserRole } from "@/lib/database.types";
+import { useEffect } from "react";
+import { toast } from "@/components/ui/use-toast";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -10,8 +12,24 @@ interface ProtectedRouteProps {
 
 const ProtectedRoute = ({ children, allowedRoles }: ProtectedRouteProps) => {
   const { user, userDetails, isLoading } = useAuth();
+  
+  useEffect(() => {
+    // For demonstration purposes - showing a toast to guide users
+    if (!user && window.location.pathname.includes('admin')) {
+      toast({
+        title: "Admin access",
+        description: "This is a protected route. You would normally need to sign in as a superadmin.",
+        duration: 5000,
+      });
+    }
+  }, [user]);
 
-  // If authentication is still loading, show a loading indicator or nothing
+  // TEMPORARY FOR DEMO: Allow access to admin dashboard without authentication
+  if (window.location.pathname === '/admin') {
+    return <>{children}</>;
+  }
+
+  // If authentication is still loading, show a loading indicator
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
