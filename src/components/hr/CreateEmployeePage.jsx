@@ -132,7 +132,6 @@ const CreateEmployeePage = () => {
         departmentId: formData.departmentId,
         positionId: formData.positionId || null,
         status: formData.status,
-        notes: formData.notes || '',
         companyId: formData.companyId,
         resumeFile: formData.resumeFile,
         courseIds: formData.courseIds

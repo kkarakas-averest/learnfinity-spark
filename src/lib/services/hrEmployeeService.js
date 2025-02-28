@@ -344,7 +344,6 @@ export const hrEmployeeService = {
         department_id: employee.department_id || employee.departmentId,
         position_id: employee.position_id || employee.positionId,
         status: employee.status,
-        notes: employee.notes,
         company_id: companyId
       };
       
@@ -691,7 +690,7 @@ export const hrEmployeeService = {
         'department_id', 'departmentId',
         'position_id', 'positionId',
         'company_id', 'companyId',
-        'status', 'notes', 'phone',
+        'status', 'phone',
         'hire_date', 'hireDate',
         'profile_image_url', 'profileImageUrl'
       ];
@@ -733,7 +732,6 @@ export const hrEmployeeService = {
         position_id: employeeJSON.position_id || employeeJSON.positionId,
         company_id: employeeJSON.company_id || employeeJSON.companyId || DEFAULT_COMPANY_ID,
         status: employeeJSON.status || 'active',
-        notes: employeeJSON.notes,
         phone: employeeJSON.phone
       };
       

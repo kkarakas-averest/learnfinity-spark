@@ -84,7 +84,6 @@ const EmployeeProfileForm = ({ onSubmit, isLoading, departments = [], positions 
     departmentId: '',
     positionId: '',
     status: 'active',
-    notes: '',
     companyId: '',
     courseIds: [],
     resumeFile: null
@@ -370,23 +369,23 @@ const EmployeeProfileForm = ({ onSubmit, isLoading, departments = [], positions 
           </div>
           
           {/* Course selection section */}
-          <div className="space-y-2">
-            <Label htmlFor="courses">Assigned Courses *</Label>
-            <div className="space-y-3 border rounded-md p-4">
+          <div className="space-y-4">
+            <h3 className="text-lg font-medium">Course Enrollment</h3>
+            <div className="space-y-2">
               {availableCourses.map(course => (
-                <div key={course.id} className="flex items-start space-x-2">
+                <div key={course.id} className="flex items-start space-x-3">
                   <Checkbox 
                     id={`course-${course.id}`}
                     checked={formData.courseIds.includes(course.id)}
                     onCheckedChange={() => handleCourseToggle(course.id)}
                   />
                   <div>
-                    <Label 
+                    <label 
                       htmlFor={`course-${course.id}`}
-                      className="text-sm font-medium leading-none cursor-pointer"
+                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                     >
                       {course.title}
-                    </Label>
+                    </label>
                     <p className="text-sm text-muted-foreground">{course.description}</p>
                   </div>
                 </div>
@@ -394,18 +393,6 @@ const EmployeeProfileForm = ({ onSubmit, isLoading, departments = [], positions 
             </div>
           </div>
           
-          <div className="space-y-2">
-            <Label htmlFor="notes">Notes</Label>
-            <Textarea 
-              id="notes" 
-              name="notes" 
-              value={formData.notes} 
-              onChange={handleChange} 
-              placeholder="Any additional notes about the employee..."
-              rows={3}
-            />
-          </div>
-
           {/* Hidden input for company ID - populated automatically from HR user context */}
           <input type="hidden" name="companyId" value={formData.companyId} />
         </CardContent>
