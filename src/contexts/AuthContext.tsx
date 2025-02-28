@@ -250,31 +250,41 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signOut = async () => {
     try {
       setIsLoading(true);
+      console.log("SignOut: Starting sign out process");
       
+      console.log("SignOut: Calling supabase.auth.signOut()");
       const { error } = await supabase.auth.signOut();
       
       if (error) {
+        console.error("SignOut: Error from supabase.auth.signOut()", error);
         throw error;
       }
       
+      console.log("SignOut: Successfully signed out from Supabase");
+      
+      // Clear local state
+      console.log("SignOut: Clearing local state (user, session, userDetails)");
       setUser(null);
       setSession(null);
       setUserDetails(null);
       
+      console.log("SignOut: Showing success toast");
       toast({
         title: 'Signed out',
         description: 'You have successfully signed out.',
       });
       
+      console.log("SignOut: Navigating to home page");
       navigate('/');
     } catch (error: any) {
-      console.error('Error signing out:', error);
+      console.error('SignOut: Error in signOut function:', error);
       toast({
         title: 'Sign Out Failed',
         description: error.message || 'An error occurred during sign out.',
         variant: 'destructive',
       });
     } finally {
+      console.log("SignOut: Setting isLoading to false");
       setIsLoading(false);
     }
   };
