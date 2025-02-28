@@ -24,11 +24,6 @@ const ProtectedRoute = ({ children, allowedRoles }: ProtectedRouteProps) => {
     }
   }, [user]);
 
-  // TEMPORARY FOR DEMO: Allow access to admin dashboard without authentication
-  if (window.location.pathname === '/admin') {
-    return <>{children}</>;
-  }
-
   // If authentication is still loading, show a loading indicator
   if (isLoading) {
     return (

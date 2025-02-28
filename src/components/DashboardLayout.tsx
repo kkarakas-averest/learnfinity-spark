@@ -4,7 +4,6 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import { 
   BarChart, 
   Users, 
-  Settings, 
   LogOut, 
   Menu, 
   X,
@@ -16,13 +15,13 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { useToast } from "@/components/ui/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 type SidebarItem = {
   title: string;
   icon: React.ElementType;
   href: string;
-  role: "all" | "superadmin" | "hr" | "learner";
+  role: "all" | "superadmin" | "hr" | "learner" | "mentor";
 };
 
 interface DashboardLayoutProps {
@@ -31,36 +30,19 @@ interface DashboardLayoutProps {
 
 const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [userRole, setUserRole] = useState<string | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
-  const { toast } = useToast();
+  const { userDetails, signOut, isLoading } = useAuth();
 
   useEffect(() => {
-    // Get user role from localStorage
-    const userStr = localStorage.getItem("currentUser");
-    if (!userStr) {
-      navigate("/login");
-      return;
-    }
-    
-    try {
-      const user = JSON.parse(userStr);
-      setUserRole(user.role);
-    } catch (error) {
-      // Handle parsing error
-      console.error("Failed to parse user data", error);
+    // Redirect to login if not authenticated and not loading
+    if (!isLoading && !userDetails) {
       navigate("/login");
     }
-  }, [navigate]);
+  }, [userDetails, isLoading, navigate]);
 
   const handleLogout = () => {
-    localStorage.removeItem("currentUser");
-    toast({
-      title: "Logged out successfully",
-      description: "You have been logged out of your account.",
-    });
-    navigate("/login");
+    signOut();
   };
 
   const sidebarItems: SidebarItem[] = [
@@ -83,13 +65,26 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
     // Learner items
     { title: "Dashboard", icon: BarChart, href: "/dashboard", role: "learner" },
     { title: "My Learning", icon: GraduationCap, href: "/learning", role: "learner" },
+    
+    // Mentor items
+    { title: "Dashboard", icon: BarChart, href: "/mentor", role: "mentor" },
+    { title: "My Learners", icon: Users, href: "/mentor/learners", role: "mentor" },
   ];
 
   const filteredItems = sidebarItems.filter(
-    item => item.role === "all" || item.role === userRole
+    item => item.role === "all" || (userDetails && item.role === userDetails.role)
   );
 
   const isActive = (path: string) => location.pathname === path;
+
+  // Show loading state while checking authentication
+  if (isLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen bg-secondary/20 overflow-hidden">
