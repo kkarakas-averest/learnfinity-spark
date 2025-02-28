@@ -24,6 +24,9 @@ import {
 import { Copy, Info, Wrench } from 'lucide-react';
 
 const CreateEmployeePage = () => {
+  // For debugging
+  console.log('=== Rendering CreateEmployeePage with diagnostic button ===');
+  
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [departments, setDepartments] = useState([]);
@@ -84,6 +87,17 @@ const CreateEmployeePage = () => {
     };
     
     checkDatabaseAndFetchData();
+  }, []);
+  
+  // Add an effect to run the API test once after a short delay
+  useEffect(() => {
+    // Wait 3 seconds then automatically run the API test
+    const timer = setTimeout(() => {
+      console.log('Automatically running API test on component mount...');
+      runApiTest();
+    }, 3000);
+    
+    return () => clearTimeout(timer);
   }, []);
 
   const handleSubmit = async (formData) => {
@@ -190,11 +204,16 @@ const CreateEmployeePage = () => {
 
   const runApiTest = async () => {
     try {
+      console.log('API test button clicked!');
+      toast.info('Starting API diagnostics test...', { duration: 5000 });
+      
       setIsTestingApi(true);
       setTestResults(null);
-      toast.info('Running API diagnostics...');
       
+      console.log('Calling hrEmployeeService.testMinimalApiRequest()...');
       const results = await hrEmployeeService.testMinimalApiRequest();
+      console.log('API test results received:', results);
+      
       setTestResults(results);
       
       if (results.success) {
@@ -210,6 +229,17 @@ const CreateEmployeePage = () => {
       setIsTestingApi(false);
     }
   };
+  
+  // Add a global function to run the API test from the console
+  // This provides a fallback method if the button doesn't work
+  useEffect(() => {
+    window.runHrApiTest = runApiTest;
+    console.log('Global function window.runHrApiTest() is now available in the console');
+    
+    return () => {
+      delete window.runHrApiTest;
+    };
+  }, []);
 
   return (
     <div className="container mx-auto p-4">
@@ -228,12 +258,13 @@ const CreateEmployeePage = () => {
         </div>
       ) : (
         <>
-          <div className="mb-6">
+          <div className="mb-6 bg-blue-50 p-4 border rounded-md">
+            <h3 className="text-lg font-medium mb-3">API Diagnostics</h3>
             <Button 
-              variant="outline" 
+              variant="default" 
               onClick={runApiTest} 
               disabled={isTestingApi}
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700"
             >
               <Wrench className="h-4 w-4" />
               {isTestingApi ? 'Testing API...' : 'Run API Diagnostics'}

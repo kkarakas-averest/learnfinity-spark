@@ -609,4 +609,21 @@ export const hrEmployeeService = {
   }
 };
 
+// Create a global function to run the API test directly
+if (typeof window !== 'undefined') {
+  window.runSupabaseTest = async () => {
+    console.log('Direct API test running from global function...');
+    try {
+      const service = hrEmployeeService;
+      const result = await service.testMinimalApiRequest();
+      console.log('Direct API test result:', result);
+      return result;
+    } catch (error) {
+      console.error('Error in global test function:', error);
+      return { success: false, error };
+    }
+  };
+  console.log('Global function window.runSupabaseTest() is now available for API testing');
+}
+
 export default hrEmployeeService; 
