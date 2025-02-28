@@ -112,6 +112,21 @@ const CreateEmployeePage = () => {
       
       if (error) {
         console.error('Employee creation error:', error);
+        
+        // Show a more helpful error message
+        let errorMessage = 'Failed to create employee.';
+        
+        if (error.message) {
+          if (error.message.includes('hr_employees table does not exist')) {
+            errorMessage = 'Database setup issue: HR tables not initialized. Please contact your system administrator.';
+          } else if (error.message.includes('duplicate key')) {
+            errorMessage = 'An employee with this email already exists.';
+          } else {
+            errorMessage = error.message;
+          }
+        }
+        
+        toast.error(errorMessage);
         throw error;
       }
       
@@ -130,7 +145,7 @@ const CreateEmployeePage = () => {
       }
     } catch (error) {
       console.error('Error creating employee:', error);
-      toast.error('Failed to create employee. Please try again.');
+      // Error is already handled above, no need to show a duplicate toast
       setIsLoading(false);
     }
   };

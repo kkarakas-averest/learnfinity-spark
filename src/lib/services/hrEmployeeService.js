@@ -1,8 +1,9 @@
 import { supabase } from '@/lib/supabase';
 import { generateSecurePassword } from '@/lib/utils';
 
+// Import from env variables or use a fallback
+const DEFAULT_COMPANY_ID = import.meta.env.VITE_DEFAULT_COMPANY_ID || 'default-company-id';
 const TABLE_NAME = 'hr_employees';
-const DEFAULT_COMPANY_ID = '00000000-0000-0000-0000-000000000000'; // Default UUID to use if company ID is missing
 
 export const hrEmployeeService = {
   /**
@@ -159,6 +160,21 @@ export const hrEmployeeService = {
     try {
       console.log('Creating employee with account, company ID:', employee.companyId || employee.company_id || DEFAULT_COMPANY_ID);
       
+      // Validate required fields before proceeding
+      if (!employee.name || !employee.name.trim()) {
+        throw new Error('Employee name is required');
+      }
+      
+      if (!employee.email || !employee.email.trim()) {
+        throw new Error('Employee email is required');
+      }
+      
+      // Ensure we have a company ID
+      const companyId = employee.companyId || employee.company_id || DEFAULT_COMPANY_ID;
+      if (!companyId) {
+        throw new Error('Company ID is required for employee creation');
+      }
+      
       // Check if hr_employees table exists first
       const { error: tableCheckError } = await supabase
         .from(TABLE_NAME)
@@ -167,33 +183,10 @@ export const hrEmployeeService = {
         
       if (tableCheckError) {
         console.warn('HR employees table check error:', tableCheckError);
+        
+        // Instead of trying to create the table dynamically, guide the user
         if (tableCheckError.message.includes('relation "hr_employees" does not exist')) {
-          // Try to force create the table
-          const { error: createError } = await supabase.rpc('execute_sql', {
-            sql: `
-              CREATE TABLE IF NOT EXISTS hr_employees (
-                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-                name VARCHAR(100) NOT NULL,
-                email VARCHAR(100) NOT NULL UNIQUE,
-                phone VARCHAR(20),
-                hire_date DATE,
-                department_id UUID,
-                position_id UUID,
-                manager_id UUID,
-                status VARCHAR(20) DEFAULT 'active',
-                profile_image_url TEXT,
-                resume_url TEXT,
-                company_id UUID NOT NULL,
-                last_active_at TIMESTAMP WITH TIME ZONE,
-                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-              );
-            `
-          });
-          
-          if (createError) {
-            throw new Error(`Failed to create hr_employees table: ${createError.message}`);
-          }
+          throw new Error('The HR employees table does not exist. Please run the database initialization script from src/lib/database/hr-schema.sql in your Supabase SQL editor.');
         } else {
           throw tableCheckError;
         }
@@ -207,7 +200,7 @@ export const hrEmployeeService = {
         position_id: employee.position_id || employee.positionId,
         status: employee.status,
         notes: employee.notes,
-        company_id: employee.company_id || employee.companyId || DEFAULT_COMPANY_ID // Use default if missing
+        company_id: companyId
       };
       
       console.log('Creating employee with data:', employeeData);
