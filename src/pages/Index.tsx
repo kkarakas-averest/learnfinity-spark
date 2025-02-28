@@ -1,4 +1,3 @@
-
 import { ArrowRight, Bookmark, Layers, Zap } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -182,6 +181,11 @@ const Index = () => {
                 <li>
                   <Link to="/privacy" className="text-sm text-muted-foreground hover:text-primary">
                     Privacy
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/hr-login" className="text-sm text-muted-foreground hover:text-primary">
+                    HR Admin
                   </Link>
                 </li>
               </ul>

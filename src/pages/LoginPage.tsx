@@ -354,6 +354,22 @@ const LoginPage = () => {
               </div>
             </div>
           </div>
+          
+          <div className="mt-6 border-t border-gray-200 pt-6">
+            <div className="text-center">
+              <h3 className="text-sm font-medium text-gray-900">HR Administrator?</h3>
+              <p className="mt-1 text-sm text-gray-500">
+                Access the HR administration portal to manage employees and learning paths.
+              </p>
+              <div className="mt-3">
+                <Link to="/hr-login">
+                  <Button variant="outline" className="w-full">
+                    HR Admin Login
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

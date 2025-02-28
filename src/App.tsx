@@ -9,6 +9,7 @@ import ProfilePage from "@/pages/ProfilePage";
 import Courses from "@/pages/Courses";
 import CourseDetail from "@/pages/CourseDetail";
 import HRDashboard from "@/pages/HRDashboard";
+import HRLogin from "@/pages/HRLogin";
 import SuperAdminDashboard from "@/pages/SuperAdminDashboard";
 import NotFound from "@/pages/NotFound";
 import ProtectedRoute from "@/components/ProtectedRoute";
@@ -23,6 +24,7 @@ function App() {
           <Route path="/" element={<Index />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/hr-login" element={<HRLogin />} />
           
           {/* Protected routes */}
           <Route 
