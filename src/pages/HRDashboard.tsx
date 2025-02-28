@@ -122,10 +122,10 @@ const HRDashboard: React.FC = () => {
           {currentUser && (
             <div className="flex items-center mb-4">
               <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold mr-3">
-                {currentUser.username.charAt(0).toUpperCase()}
+                {currentUser.name.charAt(0).toUpperCase()}
               </div>
               <div>
-                <p className="font-medium">{currentUser.username}</p>
+                <p className="font-medium">{currentUser.name}</p>
                 <p className="text-xs text-muted-foreground">HR Administrator</p>
               </div>
             </div>
@@ -184,10 +184,10 @@ const HRDashboard: React.FC = () => {
             {currentUser && (
               <div className="flex items-center mb-4">
                 <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold mr-3">
-                  {currentUser.username.charAt(0).toUpperCase()}
+                  {currentUser.name.charAt(0).toUpperCase()}
                 </div>
                 <div>
-                  <p className="font-medium">{currentUser.username}</p>
+                  <p className="font-medium">{currentUser.name}</p>
                   <p className="text-xs text-muted-foreground">HR Administrator</p>
                 </div>
               </div>
