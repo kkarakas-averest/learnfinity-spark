@@ -125,27 +125,26 @@ const CreateEmployeePage = () => {
       
       setEnrolledCourses(selectedCourses);
       
-      console.log('Submitting employee data:', {
-        name: formData.name,
-        email: formData.email,
-        departmentId: formData.departmentId,
-        positionId: formData.positionId,
-        companyId: formData.companyId,
-        courseCount: formData.courseIds?.length || 0
-      });
-      
-      // Create employee using HR service with user account creation
-      const { data, error, userAccount, authError } = await hrEmployeeService.createEmployeeWithUserAccount({
+      // Prepare employee data as a clean JSON object
+      const employeeJSON = {
         name: formData.name,
         email: formData.email,
         departmentId: formData.departmentId,
         positionId: formData.positionId || null,
         status: formData.status,
         notes: formData.notes || '',
-        companyId: formData.companyId, // This is needed for learner record creation
-        resumeFile: formData.resumeFile, // Add resume file
-        courseIds: formData.courseIds // Add course IDs
-      });
+        companyId: formData.companyId,
+        resumeFile: formData.resumeFile,
+        courseIds: formData.courseIds
+      };
+      
+      console.log('Submitting employee JSON:', JSON.stringify(employeeJSON, 
+        (key, value) => key === 'resumeFile' ? 
+          (value ? `[File: ${value.name}]` : null) : value, 2)
+      );
+      
+      // Create employee using the new JSON-based approach
+      const { data, error, userAccount, authError } = await hrEmployeeService.createEmployeeFromJSON(employeeJSON);
       
       if (error) {
         console.error('Employee creation error:', error);

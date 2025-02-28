@@ -232,14 +232,35 @@ export const hrEmployeeService = {
     try {
       console.log('Attempting to create employee with data:', JSON.stringify(employee, null, 2));
       
-      // Log full details about what's being sent
-      console.log('Employee object keys:', Object.keys(employee));
-      console.log('Company ID being used:', employee.company_id);
+      // Validate schema before sending to the database
+      const requiredFields = ['name', 'email', 'company_id'];
+      const missingFields = requiredFields.filter(field => !employee[field]);
+      
+      if (missingFields.length > 0) {
+        const error = new Error(`Missing required fields: ${missingFields.join(', ')}`);
+        console.error('Validation error:', error.message);
+        return { data: null, error };
+      }
+      
+      // Ensure company_id is a valid UUID
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(employee.company_id)) {
+        const error = new Error(`Invalid company_id format: ${employee.company_id}. Must be a valid UUID.`);
+        console.error('Validation error:', error.message);
+        return { data: null, error };
+      }
+
+      // Clean the employee object to remove undefined values
+      const cleanEmployee = Object.fromEntries(
+        Object.entries(employee).filter(([_, v]) => v !== undefined)
+      );
+      
+      console.log('Sending cleaned employee data to database:', cleanEmployee);
       
       // Step 1: Just try to insert the data with no options
       const { error: insertError } = await supabase
         .from(TABLE_NAME)
-        .insert(employee);
+        .insert(cleanEmployee);
 
       if (insertError) {
         console.error('Detailed error creating employee:', {
@@ -439,7 +460,40 @@ export const hrEmployeeService = {
       // Enroll employee in selected courses
       if (employee.courseIds && employee.courseIds.length > 0) {
         try {
-          const enrollments = employee.courseIds.map(courseId => ({
+          console.log('Attempting to enroll employee in courses:', employee.courseIds);
+          
+          // First check if the course IDs are valid UUIDs
+          const invalidCourseIds = employee.courseIds.filter(id => {
+            // Check if it's a UUID or a string like 'course-1'
+            const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+            return !uuidRegex.test(id) && !id.startsWith('course-');
+          });
+          
+          if (invalidCourseIds.length > 0) {
+            console.warn('Some course IDs have invalid format:', invalidCourseIds);
+            // Continue with valid IDs only
+          }
+          
+          // Filter out invalid course IDs
+          const validCourseIds = employee.courseIds.filter(id => {
+            const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+            return uuidRegex.test(id) || id.startsWith('course-');
+          });
+          
+          if (validCourseIds.length === 0) {
+            console.warn('No valid course IDs to enroll employee in');
+            return { 
+              data: createdEmployee, 
+              error: null, 
+              userAccount: {
+                email: employee.email,
+                password,
+                id: authData.user.id
+              }
+            };
+          }
+          
+          const enrollments = validCourseIds.map(courseId => ({
             employee_id: createdEmployee.id,
             course_id: courseId,
             status: 'enrolled',
@@ -447,28 +501,42 @@ export const hrEmployeeService = {
             enrollment_date: new Date().toISOString()
           }));
           
-          const { error: enrollmentError } = await supabase
-            .from('hr_course_enrollments')
-            .insert(enrollments);
-            
-          if (enrollmentError) {
-            console.warn('Failed to enroll employee in courses:', enrollmentError);
+          // Try to insert enrollments one by one instead of all at once
+          // This way, if one fails, the others can still succeed
+          let enrollmentErrors = [];
+          
+          for (const enrollment of enrollments) {
+            const { error: enrollmentError } = await supabase
+              .from('hr_course_enrollments')
+              .insert(enrollment);
+              
+            if (enrollmentError) {
+              console.warn(`Failed to enroll employee in course ${enrollment.course_id}:`, enrollmentError);
+              enrollmentErrors.push({
+                course_id: enrollment.course_id,
+                error: enrollmentError
+              });
+            } else {
+              // Create activity record for successful enrollment
+              await supabase
+                .from('hr_employee_activities')
+                .insert({
+                  employee_id: createdEmployee.id,
+                  activity_type: 'enrollment',
+                  description: `Enrolled in course ${enrollment.course_id}`,
+                  course_id: enrollment.course_id,
+                  timestamp: new Date().toISOString()
+                });
+            }
           }
           
-          // Create activity records for enrollments
-          const activities = employee.courseIds.map(courseId => ({
-            employee_id: createdEmployee.id,
-            activity_type: 'enrollment',
-            description: `Enrolled in course`,
-            course_id: courseId,
-            timestamp: new Date().toISOString()
-          }));
+          if (enrollmentErrors.length > 0) {
+            console.warn(`${enrollmentErrors.length} course enrollments failed:`, enrollmentErrors);
+          }
           
-          await supabase
-            .from('hr_employee_activities')
-            .insert(activities);
         } catch (enrollError) {
           console.warn('Exception when enrolling employee in courses:', enrollError);
+          // Don't fail the entire employee creation just because course enrollment failed
         }
       }
       
@@ -605,6 +673,297 @@ export const hrEmployeeService = {
     } catch (error) {
       console.error('Exception in testMinimalApiRequest:', error);
       return { success: false, error, responseText: null };
+    }
+  },
+
+  /**
+   * Create an employee from a JSON object with validation
+   * @param {Object} employeeJSON - JSON representation of employee data
+   * @returns {Promise<{data: Object, error: Object, userAccount: Object, authError: Object}>}
+   */
+  async createEmployeeFromJSON(employeeJSON) {
+    try {
+      console.log('Creating employee from JSON:', employeeJSON);
+      
+      // 1. Define the expected schema
+      const requiredFields = ['name', 'email'];
+      const optionalFields = [
+        'department_id', 'departmentId',
+        'position_id', 'positionId',
+        'company_id', 'companyId',
+        'status', 'notes', 'phone',
+        'hire_date', 'hireDate',
+        'profile_image_url', 'profileImageUrl'
+      ];
+      const allowedFields = [...requiredFields, ...optionalFields];
+      
+      // 2. Basic validation
+      const validationErrors = [];
+      
+      // Check for required fields
+      for (const field of requiredFields) {
+        if (!employeeJSON[field]) {
+          validationErrors.push(`Missing required field: ${field}`);
+        }
+      }
+      
+      // Check for unknown fields
+      for (const field in employeeJSON) {
+        if (!allowedFields.includes(field) && field !== 'courseIds' && field !== 'resumeFile') {
+          validationErrors.push(`Unknown field: ${field}`);
+        }
+      }
+      
+      // Validate email format
+      if (employeeJSON.email && !employeeJSON.email.includes('@')) {
+        validationErrors.push('Invalid email format');
+      }
+      
+      if (validationErrors.length > 0) {
+        const error = new Error(`Validation errors: ${validationErrors.join(', ')}`);
+        console.error('JSON validation failed:', error.message);
+        return { data: null, error, userAccount: null };
+      }
+      
+      // 3. Convert camelCase to snake_case and standardize the data
+      const standardizedEmployee = {
+        name: employeeJSON.name,
+        email: employeeJSON.email,
+        department_id: employeeJSON.department_id || employeeJSON.departmentId,
+        position_id: employeeJSON.position_id || employeeJSON.positionId,
+        company_id: employeeJSON.company_id || employeeJSON.companyId || DEFAULT_COMPANY_ID,
+        status: employeeJSON.status || 'active',
+        notes: employeeJSON.notes,
+        phone: employeeJSON.phone
+      };
+      
+      // Handle dates (convert to ISO string if needed)
+      if (employeeJSON.hire_date || employeeJSON.hireDate) {
+        const hireDate = employeeJSON.hire_date || employeeJSON.hireDate;
+        standardizedEmployee.hire_date = hireDate instanceof Date 
+          ? hireDate.toISOString()
+          : hireDate;
+      }
+      
+      // Extract course IDs and resume file for separate processing
+      const courseIds = employeeJSON.courseIds || [];
+      const resumeFile = employeeJSON.resumeFile;
+      
+      // 4. Create the employee
+      const { data: createdEmployee, error } = await this.createEmployee(standardizedEmployee);
+      
+      if (error) {
+        return { data: null, error, userAccount: null };
+      }
+      
+      // 5. Process resume file if provided
+      if (resumeFile && createdEmployee?.id) {
+        await this.uploadEmployeeResume(createdEmployee.id, resumeFile);
+      }
+      
+      // 6. Enroll in courses if provided
+      if (courseIds.length > 0 && createdEmployee?.id) {
+        await this.enrollEmployeeInCourses(createdEmployee.id, courseIds);
+      }
+      
+      // 7. Create user account
+      // Generate a secure random password for the new account
+      const password = generateSecurePassword({
+        length: 10,
+        includeSpecial: false // Avoid special chars for simplicity in initial password
+      });
+      
+      // Create a user account with Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: employeeJSON.email,
+        password,
+        options: {
+          emailRedirectTo: window.location.origin,
+          data: {
+            name: employeeJSON.name,
+            role: 'learner'
+          }
+        }
+      });
+      
+      if (authError) {
+        console.error('Error creating user account:', authError);
+        return { 
+          data: createdEmployee, 
+          error: null, 
+          userAccount: null,
+          authError
+        };
+      }
+      
+      // Try to insert user into users table
+      try {
+        const { error: insertError } = await supabase
+          .from('users')
+          .insert({
+            id: authData.user.id,
+            name: employeeJSON.name,
+            email: employeeJSON.email,
+            password: 'hashed-in-rpc', // The actual password is handled by Supabase Auth
+            role: 'learner',
+          });
+
+        if (insertError) {
+          console.warn('Failed to create user profile, but auth user was created:', insertError);
+        }
+      } catch (insertError) {
+        console.warn('Exception when creating user profile:', insertError);
+      }
+      
+      // Also create a learner record associated with the user
+      try {
+        const { error: learnerError } = await supabase
+          .from('learners')
+          .insert({
+            id: authData.user.id,
+            company_id: standardizedEmployee.company_id,
+            progress_status: {},
+            preferences: {},
+            certifications: {}
+          });
+          
+        if (learnerError) {
+          console.warn('Failed to create learner record:', learnerError);
+        }
+      } catch (learnerError) {
+        console.warn('Exception when creating learner record:', learnerError);
+      }
+      
+      return { 
+        data: createdEmployee, 
+        error: null, 
+        userAccount: {
+          email: employeeJSON.email,
+          password,
+          id: authData.user.id
+        }
+      };
+    } catch (error) {
+      console.error('Error in createEmployeeFromJSON:', error);
+      return { data: null, error, userAccount: null };
+    }
+  },
+
+  /**
+   * Upload an employee resume
+   * @param {string} employeeId - Employee ID
+   * @param {File} resumeFile - Resume file
+   * @returns {Promise<{url: string, error: Object}>}
+   */
+  async uploadEmployeeResume(employeeId, resumeFile) {
+    try {
+      if (!resumeFile) {
+        return { url: null, error: null };
+      }
+      
+      const fileName = `${Date.now()}-${resumeFile.name}`;
+      const filePath = `resumes/${employeeId}/${fileName}`;
+      
+      // Upload file to Supabase Storage
+      const { data: fileData, error: uploadError } = await supabase.storage
+        .from('hr-documents')
+        .upload(filePath, resumeFile);
+        
+      if (uploadError) {
+        console.error('Error uploading resume:', uploadError);
+        return { url: null, error: uploadError };
+      }
+      
+      // Get the public URL
+      const { data: urlData } = supabase.storage
+        .from('hr-documents')
+        .getPublicUrl(filePath);
+        
+      const resumeUrl = urlData?.publicUrl;
+      
+      // Update employee record with resume URL
+      if (resumeUrl) {
+        await this.updateEmployee(employeeId, {
+          resume_url: resumeUrl
+        });
+      }
+      
+      return { url: resumeUrl, error: null };
+    } catch (error) {
+      console.error('Error in uploadEmployeeResume:', error);
+      return { url: null, error };
+    }
+  },
+
+  /**
+   * Enroll an employee in courses
+   * @param {string} employeeId - Employee ID
+   * @param {Array<string>} courseIds - Course IDs
+   * @returns {Promise<{success: boolean, error: Object}>}
+   */
+  async enrollEmployeeInCourses(employeeId, courseIds) {
+    try {
+      if (!courseIds || courseIds.length === 0) {
+        return { success: true, error: null };
+      }
+      
+      // Filter out invalid course IDs
+      const validCourseIds = courseIds.filter(id => {
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        return uuidRegex.test(id) || id.startsWith('course-');
+      });
+      
+      if (validCourseIds.length === 0) {
+        console.warn('No valid course IDs to enroll employee in');
+        return { success: false, error: new Error('No valid course IDs') };
+      }
+      
+      // Try to insert enrollments one by one
+      let enrollmentErrors = [];
+      
+      for (const courseId of validCourseIds) {
+        const { error: enrollmentError } = await supabase
+          .from('hr_course_enrollments')
+          .insert({
+            employee_id: employeeId,
+            course_id: courseId,
+            status: 'enrolled',
+            progress: 0,
+            enrollment_date: new Date().toISOString()
+          });
+          
+        if (enrollmentError) {
+          console.warn(`Failed to enroll employee in course ${courseId}:`, enrollmentError);
+          enrollmentErrors.push({
+            course_id: courseId,
+            error: enrollmentError
+          });
+        } else {
+          // Create activity record for successful enrollment
+          await supabase
+            .from('hr_employee_activities')
+            .insert({
+              employee_id: employeeId,
+              activity_type: 'enrollment',
+              description: `Enrolled in course ${courseId}`,
+              course_id: courseId,
+              timestamp: new Date().toISOString()
+            });
+        }
+      }
+      
+      if (enrollmentErrors.length > 0) {
+        console.warn(`${enrollmentErrors.length} course enrollments failed:`, enrollmentErrors);
+        return { 
+          success: enrollmentErrors.length < validCourseIds.length, 
+          error: new Error(`${enrollmentErrors.length} enrollments failed`)
+        };
+      }
+      
+      return { success: true, error: null };
+    } catch (error) {
+      console.error('Error in enrollEmployeeInCourses:', error);
+      return { success: false, error };
     }
   }
 };
