@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
@@ -11,7 +10,8 @@ import {
   Upload,
   UserPlus,
   Search,
-  Download
+  Download,
+  Bot
 } from "lucide-react";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -21,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import ProgressIndicator from "@/components/ProgressIndicator";
+import AgentStatusPanel from "@/components/dashboard/AgentStatusPanel";
 
 // Mock data
 const mockStats = [
@@ -205,6 +206,7 @@ const HRDashboard = () => {
             <TabsTrigger value="employees">Employees</TabsTrigger>
             <TabsTrigger value="departments">Departments</TabsTrigger>
             <TabsTrigger value="import">Onboarding</TabsTrigger>
+            <TabsTrigger value="agents">AI Agents</TabsTrigger>
           </TabsList>
 
           <TabsContent value="employees" className="space-y-6">
@@ -434,6 +436,53 @@ const HRDashboard = () => {
                   </div>
                   
                   <Button>Add Employee & Send Invitation</Button>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="agents" className="space-y-6">
+            <AgentStatusPanel />
+            
+            <Card>
+              <CardHeader>
+                <CardTitle>AI Agent Management</CardTitle>
+                <CardDescription>Configure and control AI agents in your learning environment</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="border rounded-md p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Bot className="h-5 w-5 text-primary" />
+                        <h3 className="font-medium">Personalization Agent</h3>
+                      </div>
+                      <p className="text-sm text-muted-foreground mb-3">
+                        Customizes learning content based on employee skills, preferences, and performance.
+                      </p>
+                      <Button variant="outline" size="sm">Configure</Button>
+                    </div>
+                    
+                    <div className="border rounded-md p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Bot className="h-5 w-5 text-primary" />
+                        <h3 className="font-medium">RAG System Agent</h3>
+                      </div>
+                      <p className="text-sm text-muted-foreground mb-3">
+                        Monitors learner progress and triggers interventions when necessary.
+                      </p>
+                      <Button variant="outline" size="sm">Configure</Button>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-muted/50 rounded-md p-4 text-sm">
+                    <p className="font-medium mb-2">About AI Agents</p>
+                    <p className="text-muted-foreground">
+                      AI agents work behind the scenes to enhance the learning experience. 
+                      They analyze data, personalize content, and provide timely interventions 
+                      to help employees succeed in their learning journey.
+                    </p>
+                  </div>
                 </div>
               </CardContent>
             </Card>
