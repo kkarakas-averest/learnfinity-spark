@@ -1,4 +1,4 @@
-import React from 'react';
+import * as React from 'react';
 import { 
   Users, 
   BookOpen, 
@@ -15,74 +15,86 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-
-// Mock data for key metrics
-const keyMetrics = [
-  {
-    title: "Active Learners",
-    value: "248",
-    change: "+12 this month",
-    trend: "up",
-    icon: Users,
-  },
-  {
-    title: "Course Completion",
-    value: "62%",
-    change: "+4% from last month",
-    trend: "up",
-    icon: CheckCircle,
-  },
-  {
-    title: "Skill Gaps",
-    value: "18",
-    change: "-3 this month",
-    trend: "down",
-    icon: Activity,
-  },
-  {
-    title: "Learning Hours",
-    value: "1,845",
-    change: "+142 this month",
-    trend: "up",
-    icon: Clock,
-  },
-];
-
-// Mock data for recent activity
-const recentActivities = [
-  {
-    type: "enrollment",
-    user: "Alex Johnson",
-    course: "Introduction to Data Science",
-    time: "2 hours ago",
-    icon: BookOpen,
-  },
-  {
-    type: "completion",
-    user: "Sarah Miller",
-    course: "Leadership Fundamentals",
-    time: "5 hours ago",
-    icon: Award,
-  },
-  {
-    type: "feedback",
-    user: "James Wilson",
-    course: "Project Management",
-    comment: "The real-world examples were very helpful.",
-    rating: 4.5,
-    time: "Yesterday",
-    icon: MessageSquare,
-  },
-  {
-    type: "alert",
-    user: "Emma Davis",
-    issue: "No activity for 14 days",
-    time: "2 days ago",
-    icon: AlertTriangle,
-  },
-];
+import { useToast } from '@/components/ui/use-toast';
+import hrEmployeeService from '@/services/hrEmployeeService';
+import { hrServices } from '@/services/hrServices';
 
 const DashboardOverview: React.FC = () => {
+  const { toast } = useToast();
+  const [isLoading, setIsLoading] = React.useState(true);
+  const [keyMetricsData, setKeyMetricsData] = React.useState([]);
+  const [recentActivities, setRecentActivities] = React.useState([]);
+
+  React.useEffect(() => {
+    // Fetch data when component mounts
+    const fetchDashboardData = async () => {
+      try {
+        setIsLoading(true);
+        
+        // Fetch key metrics data
+        const metrics = await hrServices.getDashboardMetrics();
+        if (metrics) {
+          setKeyMetricsData([
+            {
+              title: "Active Learners",
+              value: metrics.activeEmployees.toString(),
+              change: `${metrics.newEmployees > 0 ? '+' : ''}${metrics.newEmployees} this month`,
+              trend: metrics.newEmployees >= 0 ? "up" : "down",
+              icon: Users,
+            },
+            {
+              title: "Course Completion",
+              value: `${metrics.completionRate}%`,
+              change: `${metrics.completionRateChange >= 0 ? '+' : ''}${metrics.completionRateChange}% from last month`,
+              trend: metrics.completionRateChange >= 0 ? "up" : "down",
+              icon: CheckCircle,
+            },
+            {
+              title: "Skill Gaps",
+              value: metrics.skillGaps.toString(),
+              change: `${metrics.skillGapsChange >= 0 ? '+' : ''}${metrics.skillGapsChange} this month`,
+              trend: metrics.skillGapsChange <= 0 ? "up" : "down", // Fewer skill gaps is positive
+              icon: Activity,
+            },
+            {
+              title: "Learning Hours",
+              value: metrics.learningHours.toLocaleString(),
+              change: `${metrics.learningHoursChange >= 0 ? '+' : ''}${metrics.learningHoursChange} this month`,
+              trend: metrics.learningHoursChange >= 0 ? "up" : "down",
+              icon: Clock,
+            },
+          ]);
+        }
+        
+        // Fetch recent activities
+        const activities = await hrServices.getRecentActivities();
+        if (activities && activities.length > 0) {
+          setRecentActivities(activities);
+        }
+      } catch (error) {
+        console.error('Error fetching dashboard data:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load dashboard data. Please try again.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+  }, []);
+
+  // Display loading state
+  if (isLoading) {
+    return (
+      <div className="flex h-full items-center justify-center min-h-[60vh]">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8">
       {/* Page Header */}
@@ -97,7 +109,7 @@ const DashboardOverview: React.FC = () => {
       <section>
         <h2 className="text-xl font-semibold mb-4">Key Metrics</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {keyMetrics.map((metric, index) => (
+          {keyMetricsData.map((metric, index) => (
             <Card key={index}>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -137,7 +149,12 @@ const DashboardOverview: React.FC = () => {
                   <p className="text-sm text-muted-foreground">Onboard new team members</p>
                 </div>
               </div>
-              <Button className="w-full mt-4">Add Employee</Button>
+              <Button 
+                className="w-full mt-4"
+                onClick={() => window.location.href = '/hr-dashboard/employees/new'}
+              >
+                Add Employee
+              </Button>
             </CardContent>
           </Card>
           
@@ -152,7 +169,12 @@ const DashboardOverview: React.FC = () => {
                   <p className="text-sm text-muted-foreground">Set learning paths for employees</p>
                 </div>
               </div>
-              <Button className="w-full mt-4">Assign Courses</Button>
+              <Button 
+                className="w-full mt-4"
+                onClick={() => window.location.href = '/hr-dashboard/courses'}
+              >
+                Assign Courses
+              </Button>
             </CardContent>
           </Card>
           
@@ -167,7 +189,12 @@ const DashboardOverview: React.FC = () => {
                   <p className="text-sm text-muted-foreground">Create learning analytics reports</p>
                 </div>
               </div>
-              <Button className="w-full mt-4">Generate Report</Button>
+              <Button 
+                className="w-full mt-4"
+                onClick={() => window.location.href = '/hr-dashboard/reports'}
+              >
+                Generate Report
+              </Button>
             </CardContent>
           </Card>
         </div>
@@ -183,45 +210,58 @@ const DashboardOverview: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {recentActivities.map((activity, index) => (
-                <div key={index} className="flex items-start space-x-4 p-3 rounded-md bg-secondary/20">
-                  <div className={`rounded-full p-2 ${
-                    activity.type === 'enrollment' ? 'bg-blue-100 text-blue-600' :
-                    activity.type === 'completion' ? 'bg-green-100 text-green-600' :
-                    activity.type === 'feedback' ? 'bg-purple-100 text-purple-600' :
-                    'bg-amber-100 text-amber-600'
-                  }`}>
-                    <activity.icon className="h-4 w-4" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between">
-                      <div className="font-medium">{activity.user}</div>
-                      <Badge variant="outline" className="text-xs">
-                        {activity.time}
-                      </Badge>
+              {recentActivities.length > 0 ? (
+                recentActivities.map((activity, index) => (
+                  <div key={index} className="flex items-start space-x-4 p-3 rounded-md bg-secondary/20">
+                    <div className={`rounded-full p-2 ${
+                      activity.type === 'enrollment' ? 'bg-blue-100 text-blue-600' :
+                      activity.type === 'completion' ? 'bg-green-100 text-green-600' :
+                      activity.type === 'feedback' ? 'bg-purple-100 text-purple-600' :
+                      'bg-amber-100 text-amber-600'
+                    }`}>
+                      {activity.type === 'enrollment' && <BookOpen className="h-4 w-4" />}
+                      {activity.type === 'completion' && <Award className="h-4 w-4" />}
+                      {activity.type === 'feedback' && <MessageSquare className="h-4 w-4" />}
+                      {activity.type === 'alert' && <AlertTriangle className="h-4 w-4" />}
                     </div>
-                    {activity.type === 'enrollment' && (
-                      <p className="text-sm mt-1">Enrolled in <span className="font-medium">{activity.course}</span></p>
-                    )}
-                    {activity.type === 'completion' && (
-                      <p className="text-sm mt-1">Completed <span className="font-medium">{activity.course}</span></p>
-                    )}
-                    {activity.type === 'feedback' && (
-                      <div className="mt-1">
-                        <p className="text-sm">Rated <span className="font-medium">{activity.course}</span> ({activity.rating}/5)</p>
-                        <p className="text-sm text-muted-foreground mt-1">"{activity.comment}"</p>
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between">
+                        <div className="font-medium">{activity.user}</div>
+                        <Badge variant="outline" className="text-xs">
+                          {activity.time}
+                        </Badge>
                       </div>
-                    )}
-                    {activity.type === 'alert' && (
-                      <p className="text-sm mt-1 text-amber-700">{activity.issue}</p>
-                    )}
+                      {activity.type === 'enrollment' && (
+                        <p className="text-sm mt-1">Enrolled in <span className="font-medium">{activity.course}</span></p>
+                      )}
+                      {activity.type === 'completion' && (
+                        <p className="text-sm mt-1">Completed <span className="font-medium">{activity.course}</span></p>
+                      )}
+                      {activity.type === 'feedback' && (
+                        <div className="mt-1">
+                          <p className="text-sm">Rated <span className="font-medium">{activity.course}</span> ({activity.rating}/5)</p>
+                          <p className="text-sm text-muted-foreground mt-1">"{activity.comment}"</p>
+                        </div>
+                      )}
+                      {activity.type === 'alert' && (
+                        <p className="text-sm mt-1 text-amber-700">{activity.issue}</p>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))
+              ) : (
+                <p className="text-center text-muted-foreground py-4">No recent activities to display</p>
+              )}
             </div>
           </CardContent>
           <CardFooter className="border-t pt-4">
-            <Button variant="outline" className="w-full">View All Activity</Button>
+            <Button 
+              variant="outline" 
+              className="w-full"
+              onClick={() => window.location.href = '/hr-dashboard/activities'}
+            >
+              View All Activity
+            </Button>
           </CardFooter>
         </Card>
       </section>

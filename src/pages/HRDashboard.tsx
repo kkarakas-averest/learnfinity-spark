@@ -1,10 +1,12 @@
-import React, { useEffect } from 'react';
+import * as React from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useHRAuth } from '@/contexts/HRAuthContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from '@/components/ui/button';
 import { LogOut, Users, BookOpen, BarChart2 } from 'lucide-react';
 import { HRDashboardTab } from '@/types/hr.types';
+import { useToast } from '@/components/ui/use-toast';
+import { hrServices } from '@/services/hrServices';
 
 // Import HR components
 const DashboardOverview = React.lazy(() => import('@/components/hr/DashboardOverview'));
@@ -12,8 +14,34 @@ const EmployeeManagement = React.lazy(() => import('@/components/hr/EmployeeMana
 
 export default function HRDashboard() {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const { user, isAuthenticated, isLoading, logout } = useHRAuth();
   const [activeTab, setActiveTab] = React.useState<HRDashboardTab>('overview');
+  const [initializing, setInitializing] = React.useState(true);
+  
+  // Initialize database if needed
+  React.useEffect(() => {
+    const initializeDatabase = async () => {
+      try {
+        await hrServices.initializeHRDatabase();
+      } catch (error) {
+        console.error('Error initializing database:', error);
+        toast({
+          title: 'Database Error',
+          description: 'There was an error initializing the HR database. Some features may not work correctly.',
+          variant: 'destructive',
+        });
+      } finally {
+        setInitializing(false);
+      }
+    };
+    
+    if (isAuthenticated && !isLoading) {
+      initializeDatabase();
+    } else if (!isLoading) {
+      setInitializing(false);
+    }
+  }, [isAuthenticated, isLoading]);
 
   // Redirect if not authenticated
   if (!isLoading && !isAuthenticated) {
@@ -29,7 +57,7 @@ export default function HRDashboard() {
     navigate('/hr-login');
   };
 
-  if (isLoading) {
+  if (isLoading || initializing) {
     return (
       <div className="flex h-screen w-full items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
