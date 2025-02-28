@@ -30,11 +30,21 @@ const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { user, userDetails, signOut } = useAuth();
 
-  const navItems = [
+  // Navigation items that are shown to all users
+  const publicNavItems = [
     { name: "Home", href: "/", icon: Home },
     { name: "Courses", href: "/courses", icon: Book },
+  ];
+
+  // Navigation items that are only shown to authenticated users
+  const authenticatedNavItems = [
     { name: "My Learning", href: "/dashboard", icon: GraduationCap },
   ];
+
+  // Determine which nav items to show based on authentication status
+  const navItems = user 
+    ? [...publicNavItems, ...authenticatedNavItems]
+    : publicNavItems;
 
   const getInitials = (name: string) => {
     return name
@@ -71,6 +81,7 @@ const Navbar = () => {
           </div>
           <div className="flex items-center gap-4">
             {user ? (
+              // AUTHENTICATED USER: Show profile dropdown
               <div className="flex items-center gap-4">
                 {userDetails?.role && userDetails.role !== "learner" && (
                   <Link to={userDetails.role === "superadmin" ? "/admin" : "/hr"}>
@@ -139,8 +150,12 @@ const Navbar = () => {
                 </DropdownMenu>
               </div>
             ) : (
+              // VISITOR: Show sign in button
               <Link to="/login">
-                <Button>Sign In</Button>
+                <Button className="flex items-center gap-2">
+                  <User className="h-4 w-4" />
+                  Sign In
+                </Button>
               </Link>
             )}
             <button
@@ -177,7 +192,8 @@ const Navbar = () => {
                 {item.name}
               </Link>
             ))}
-            {user && (
+            {user ? (
+              // AUTHENTICATED USER: Show profile links in mobile menu
               <>
                 <Link
                   to="/profile"
@@ -208,6 +224,16 @@ const Navbar = () => {
                   Log out
                 </button>
               </>
+            ) : (
+              // VISITOR: Show sign in link in mobile menu
+              <Link
+                to="/login"
+                className="flex items-center gap-2 text-lg font-medium text-primary"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                <User className="h-5 w-5" />
+                Sign In
+              </Link>
             )}
           </nav>
         </div>
