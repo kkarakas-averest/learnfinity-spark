@@ -1,158 +1,218 @@
 
-import { useState, useEffect } from "react";
-import { Link, useLocation } from "react-router-dom";
-import { Menu, X, LogIn, UserCircle } from "lucide-react";
+import { useState } from "react";
+import { Link } from "react-router-dom";
+import { 
+  Menu, 
+  X, 
+  Book, 
+  GraduationCap, 
+  Settings, 
+  Home,
+  User,
+  LogOut
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuLabel, 
+  DropdownMenuSeparator, 
+  DropdownMenuTrigger 
+} from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
+import { UserRole } from "@/lib/database.types";
 
 const Navbar = () => {
-  const [isScrolled, setIsScrolled] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const location = useLocation();
-  const { user, userDetails, signOut, isLoading } = useAuth();
-  
-  useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 10);
-    };
-    
-    window.addEventListener("scroll", handleScroll);
-    
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const { user, userDetails, signOut } = useAuth();
 
-  const closeMenu = () => setIsMobileMenuOpen(false);
-  
-  const isActive = (path: string) => location.pathname === path;
-  
   const navItems = [
-    { name: "Home", path: "/" },
+    { name: "Home", href: "/", icon: Home },
+    { name: "Courses", href: "/courses", icon: Book },
+    { name: "My Learning", href: "/dashboard", icon: GraduationCap },
   ];
-  
-  // Add dashboard link based on user role
-  if (userDetails) {
-    let dashboardPath = "/dashboard"; // Default for learners
-    
-    if (userDetails.role === "superadmin") {
-      dashboardPath = "/admin";
-    } else if (userDetails.role === "hr") {
-      dashboardPath = "/hr";
-    } else if (userDetails.role === "mentor") {
-      dashboardPath = "/mentor";
-    }
-    
-    navItems.push({ name: "Dashboard", path: dashboardPath });
-  }
+
+  const getInitials = (name: string) => {
+    return name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase();
+  };
+
+  const toggleMenu = () => {
+    setIsMenuOpen(!isMenuOpen);
+  };
 
   return (
-    <nav 
-      className={`fixed w-full z-50 transition-all duration-300 px-6 md:px-10 py-4 
-        ${isScrolled ? "bg-white/80 backdrop-blur-lg shadow-sm" : "bg-transparent"}`}
-    >
-      <div className="max-w-7xl mx-auto flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-2">
-          <span className="text-xl font-semibold">Learnfinity</span>
-        </Link>
-
-        {/* Desktop Navigation */}
-        <div className="hidden md:flex items-center gap-8">
-          {navItems.map((item) => (
-            <Link
-              key={item.path}
-              to={item.path}
-              className={`text-sm font-medium transition-colors hover:text-primary/80 relative after:absolute after:bottom-0 after:left-0 after:h-[2px] after:bg-primary after:transition-all after:duration-300
-                ${isActive(item.path) 
-                  ? "text-primary after:w-full" 
-                  : "text-muted-foreground after:w-0 hover:after:w-full"}`}
-            >
-              {item.name}
+    <header className="fixed inset-x-0 top-0 z-30 h-16 border-b bg-background">
+      <div className="container h-full px-4 md:px-6">
+        <div className="flex h-full items-center justify-between">
+          <div className="flex items-center gap-6">
+            <Link to="/" className="flex items-center gap-2">
+              <span className="text-xl font-semibold">Learnfinity</span>
             </Link>
-          ))}
-        </div>
-
-        <div className="hidden md:flex items-center gap-4">
-          {isLoading ? (
-            <div className="h-9 w-20 bg-muted animate-pulse rounded-md"></div>
-          ) : userDetails ? (
-            <div className="flex items-center gap-4">
-              <div className="text-sm font-medium">
-                <span className="text-muted-foreground">Hello, </span>
-                {userDetails.name.split(' ')[0]}
+            <nav className="hidden md:flex gap-6">
+              {navItems.map((item) => (
+                <Link
+                  key={item.name}
+                  to={item.href}
+                  className="flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  <item.icon className="h-4 w-4" />
+                  {item.name}
+                </Link>
+              ))}
+            </nav>
+          </div>
+          <div className="flex items-center gap-4">
+            {user ? (
+              <div className="flex items-center gap-4">
+                {userDetails?.role && userDetails.role !== "learner" && (
+                  <Link to={userDetails.role === "superadmin" ? "/admin" : "/hr"}>
+                    <Badge variant="outline" className="hidden md:inline-flex">
+                      {userDetails.role === "superadmin" ? "Admin Panel" : "HR Dashboard"}
+                    </Badge>
+                  </Link>
+                )}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+                      <Avatar className="h-8 w-8">
+                        <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${userDetails?.name}`} alt={userDetails?.name} />
+                        <AvatarFallback>{userDetails?.name ? getInitials(userDetails.name) : <User size={14} />}</AvatarFallback>
+                      </Avatar>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="w-56" align="end" forceMount>
+                    <DropdownMenuLabel className="font-normal">
+                      <div className="flex flex-col space-y-1">
+                        <p className="text-sm font-medium leading-none">{userDetails?.name}</p>
+                        <p className="text-xs leading-none text-muted-foreground">
+                          {userDetails?.email}
+                        </p>
+                        {userDetails?.role && (
+                          <Badge variant="outline" className="mt-1 w-fit">
+                            {userDetails.role}
+                          </Badge>
+                        )}
+                      </div>
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem asChild>
+                      <Link to="/profile" className="flex items-center cursor-pointer">
+                        <User className="mr-2 h-4 w-4" />
+                        <span>Profile</span>
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link to="/dashboard" className="flex items-center cursor-pointer">
+                        <GraduationCap className="mr-2 h-4 w-4" />
+                        <span>Dashboard</span>
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link to="/courses" className="flex items-center cursor-pointer">
+                        <Book className="mr-2 h-4 w-4" />
+                        <span>Courses</span>
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link to="/settings" className="flex items-center cursor-pointer">
+                        <Settings className="mr-2 h-4 w-4" />
+                        <span>Settings</span>
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      className="cursor-pointer text-red-500 focus:text-red-500"
+                      onClick={signOut}
+                    >
+                      <LogOut className="mr-2 h-4 w-4" />
+                      <span>Log out</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
-              <Button variant="outline" size="sm" onClick={signOut}>
-                Sign Out
-              </Button>
-            </div>
-          ) : (
-            <>
-              <Button variant="outline" size="sm" asChild>
-                <Link to="/login">Sign In</Link>
-              </Button>
-              <Button size="sm" asChild>
-                <Link to="/login">Get Started</Link>
-              </Button>
-            </>
-          )}
+            ) : (
+              <Link to="/login">
+                <Button>Sign In</Button>
+              </Link>
+            )}
+            <button
+              className="block md:hidden"
+              onClick={toggleMenu}
+              aria-label="Toggle menu"
+            >
+              {isMenuOpen ? (
+                <X className="h-6 w-6" />
+              ) : (
+                <Menu className="h-6 w-6" />
+              )}
+            </button>
+          </div>
         </div>
-
-        {/* Mobile menu button */}
-        <button 
-          className="md:hidden" 
-          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          aria-label="Toggle menu"
-        >
-          {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-        </button>
       </div>
-
-      {/* Mobile Navigation */}
-      {isMobileMenuOpen && (
-        <div className="md:hidden fixed inset-0 top-16 bg-background animate-fade-in z-40">
-          <div className="flex flex-col p-6 space-y-6">
+      {/* Mobile menu */}
+      <div
+        className={cn(
+          "fixed inset-0 top-16 z-20 bg-background md:hidden",
+          isMenuOpen ? "block" : "hidden"
+        )}
+      >
+        <div className="container p-6">
+          <nav className="flex flex-col gap-6">
             {navItems.map((item) => (
               <Link
-                key={item.path}
-                to={item.path}
-                className={`text-lg font-medium px-4 py-2 rounded-md transition-colors
-                  ${isActive(item.path) 
-                    ? "bg-secondary text-primary" 
-                    : "text-muted-foreground hover:bg-secondary/50"}`}
-                onClick={closeMenu}
+                key={item.name}
+                to={item.href}
+                className="flex items-center gap-2 text-lg font-medium"
+                onClick={() => setIsMenuOpen(false)}
               >
+                <item.icon className="h-5 w-5" />
                 {item.name}
               </Link>
             ))}
-            <div className="flex flex-col gap-4 pt-4 border-t">
-              {isLoading ? (
-                <div className="h-10 bg-muted animate-pulse rounded-md"></div>
-              ) : userDetails ? (
-                <>
-                  <div className="flex items-center gap-2 px-4 py-2">
-                    <UserCircle className="h-5 w-5 text-muted-foreground" />
-                    <span className="text-muted-foreground">{userDetails.email}</span>
-                  </div>
-                  <Button variant="outline" onClick={() => { signOut(); closeMenu(); }}>
-                    Sign Out
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Button variant="outline" asChild>
-                    <Link to="/login" onClick={closeMenu}>
-                      <LogIn className="mr-2 h-4 w-4" />
-                      Sign In
-                    </Link>
-                  </Button>
-                  <Button asChild>
-                    <Link to="/login" onClick={closeMenu}>Get Started</Link>
-                  </Button>
-                </>
-              )}
-            </div>
-          </div>
+            {user && (
+              <>
+                <Link
+                  to="/profile"
+                  className="flex items-center gap-2 text-lg font-medium"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  <User className="h-5 w-5" />
+                  Profile
+                </Link>
+                {userDetails?.role && userDetails.role !== "learner" && (
+                  <Link
+                    to={userDetails.role === "superadmin" ? "/admin" : "/hr"}
+                    className="flex items-center gap-2 text-lg font-medium"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    <Settings className="h-5 w-5" />
+                    {userDetails.role === "superadmin" ? "Admin Panel" : "HR Dashboard"}
+                  </Link>
+                )}
+                <button
+                  className="flex items-center gap-2 text-lg font-medium text-red-500"
+                  onClick={() => {
+                    signOut();
+                    setIsMenuOpen(false);
+                  }}
+                >
+                  <LogOut className="h-5 w-5" />
+                  Log out
+                </button>
+              </>
+            )}
+          </nav>
         </div>
-      )}
-    </nav>
+      </div>
+    </header>
   );
 };
 

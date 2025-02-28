@@ -11,7 +11,8 @@ import {
   Building,
   BrainCircuit,
   FileSpreadsheet,
-  GraduationCap
+  GraduationCap,
+  User
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -48,6 +49,7 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   const sidebarItems: SidebarItem[] = [
     // Common items
     { title: "Home", icon: Home, href: "/", role: "all" },
+    { title: "Profile", icon: User, href: "/profile", role: "all" },
     
     // Super Admin items
     { title: "Dashboard", icon: BarChart, href: "/admin", role: "superadmin" },
