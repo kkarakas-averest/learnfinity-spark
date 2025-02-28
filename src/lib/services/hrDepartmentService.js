@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/database/supabaseClient';
+import { supabase } from '@/lib/supabase';
 
 export const hrDepartmentService = {
   /**

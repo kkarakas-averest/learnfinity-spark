@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/database/supabaseClient';
+import { supabase } from '@/lib/supabase';
 import { seedHRDatabase } from '@/lib/database/seed-hr-database';
 
 // High-level HR services for dashboard functionality
