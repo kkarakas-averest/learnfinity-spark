@@ -252,9 +252,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setIsLoading(true);
       console.log("SignOut: Starting sign out process");
       
+      // First clear application state immediately
+      console.log("SignOut: Pre-emptively clearing local state");
+      setUser(null);
+      setSession(null);
+      setUserDetails(null);
+      
       // Create a timeout promise to prevent hanging
       const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Supabase signOut timed out after 5 seconds')), 5000);
+        setTimeout(() => reject(new Error('Supabase signOut timed out after 3 seconds')), 3000);
       });
       
       console.log("SignOut: Calling supabase.auth.signOut()");
@@ -269,28 +275,39 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       } catch (supabaseError) {
         console.error("SignOut: Error or timeout in supabase.auth.signOut()", supabaseError);
         console.log("SignOut: Continuing with local logout despite Supabase error");
-        // Continue with local logout even if Supabase fails
       }
       
-      // Force clear any Supabase storage
-      console.log("SignOut: Manually clearing localStorage items");
+      // Aggressively clear all storage types
+      console.log("SignOut: Aggressively clearing all storage");
       try {
         // Clear Supabase items from localStorage
         for (let i = 0; i < localStorage.length; i++) {
           const key = localStorage.key(i);
-          if (key && key.includes('supabase')) {
+          if (key && (key.includes('supabase') || key.includes('sb-'))) {
+            console.log(`SignOut: Removing localStorage item: ${key}`);
             localStorage.removeItem(key);
           }
         }
+        
+        // Clear sessionStorage as well
+        for (let i = 0; i < sessionStorage.length; i++) {
+          const key = sessionStorage.key(i);
+          if (key && (key.includes('supabase') || key.includes('sb-'))) {
+            console.log(`SignOut: Removing sessionStorage item: ${key}`);
+            sessionStorage.removeItem(key);
+          }
+        }
+        
+        // Try to clear any cookies (this is browser-dependent)
+        document.cookie.split(";").forEach(function(c) {
+          if (c.includes('supabase') || c.includes('sb-')) {
+            document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+            console.log(`SignOut: Attempting to clear cookie: ${c}`);
+          }
+        });
       } catch (storageError) {
-        console.error("SignOut: Error clearing localStorage", storageError);
+        console.error("SignOut: Error clearing storage", storageError);
       }
-      
-      // Clear local state regardless of Supabase result
-      console.log("SignOut: Clearing local state (user, session, userDetails)");
-      setUser(null);
-      setSession(null);
-      setUserDetails(null);
       
       console.log("SignOut: Showing success toast");
       toast({
@@ -298,9 +315,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         description: 'You have successfully signed out.',
       });
       
-      console.log("SignOut: Navigating to home page");
-      // Force a full page reload to ensure clean state
-      window.location.href = '/';
+      // Wait a moment to ensure all state changes have propagated
+      console.log("SignOut: Waiting before reload to ensure state changes propagate");
+      setTimeout(() => {
+        console.log("SignOut: Forcing complete page reload");
+        // Force a complete page reload to ensure clean state
+        window.location.replace('/');
+      }, 100);
+      
     } catch (error: any) {
       console.error('SignOut: Error in signOut function:', error);
       toast({
@@ -309,12 +331,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         variant: 'destructive',
       });
       
-      // Even if there's an error, try to force logout
+      // Even if there's an error, try to force logout with a complete reload
       console.log("SignOut: Attempting forced logout despite error");
       setUser(null);
       setSession(null);
       setUserDetails(null);
-      window.location.href = '/';
+      
+      setTimeout(() => {
+        window.location.replace('/');
+      }, 100);
     } finally {
       console.log("SignOut: Setting isLoading to false");
       setIsLoading(false);
