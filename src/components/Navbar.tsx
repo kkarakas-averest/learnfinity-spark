@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { 
   Menu, 
@@ -28,6 +28,16 @@ import { UserRole } from "@/lib/database.types";
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { user, userDetails, signOut } = useAuth();
+  const [isClient, setIsClient] = useState(false);
+  
+  // Use useEffect to ensure we're running in the client environment
+  useEffect(() => {
+    setIsClient(true);
+    console.log('Auth state in Navbar:', { 
+      user: user ? 'User exists' : 'No user',
+      userDetails: userDetails ? `User details: ${userDetails.name}` : 'No details'
+    });
+  }, [user, userDetails]);
 
   // Navigation items that are shown to all users (including visitors)
   const publicNavItems = [
@@ -57,15 +67,22 @@ const Navbar = () => {
     setIsMenuOpen(!isMenuOpen);
   };
 
+  console.log('Current auth state:', user ? 'Logged in' : 'Not logged in');
+
   return (
     <header className="fixed inset-x-0 top-0 z-30 h-16 border-b bg-background">
+      {isClient && (
+        <div className="absolute bottom-0 right-0 bg-red-500 text-white text-xs px-2 py-1 rounded-tl-md z-50">
+          Auth: {user ? 'Logged In' : 'Logged Out'}
+        </div>
+      )}
       <div className="container h-full px-4 md:px-6">
         <div className="flex h-full items-center justify-between">
           <div className="flex items-center gap-6">
             <Link to="/" className="flex items-center gap-2">
               <span className="text-xl font-semibold">Learnfinity</span>
             </Link>
-            {user && (
+            {isClient && user && (
               <nav className="hidden md:flex gap-6">
                 {navItems.map((item) => (
                   <Link
@@ -81,12 +98,12 @@ const Navbar = () => {
             )}
           </div>
           <div className="flex items-center gap-4">
-            {user ? (
+            {isClient && (user ? (
               // AUTHENTICATED USER: Show profile dropdown
               <div className="flex items-center gap-4">
                 {userDetails?.role && userDetails.role !== "learner" && (
                   <Link to={userDetails.role === "superadmin" ? "/admin" : "/hr"}>
-                    <Badge variant="outline" className="hidden md:inline-flex">
+                    <Badge className="hidden md:inline-flex">
                       {userDetails.role === "superadmin" ? "Admin Panel" : "HR Dashboard"}
                     </Badge>
                   </Link>
@@ -108,7 +125,7 @@ const Navbar = () => {
                           {userDetails?.email}
                         </p>
                         {userDetails?.role && (
-                          <Badge variant="outline" className="mt-1 w-fit">
+                          <Badge className="mt-1 w-fit">
                             {userDetails.role}
                           </Badge>
                         )}
@@ -158,8 +175,8 @@ const Navbar = () => {
                   Sign In
                 </Button>
               </Link>
-            )}
-            {user && (
+            ))}
+            {isClient && user && (
               <button
                 className="block md:hidden"
                 onClick={toggleMenu}
@@ -175,7 +192,7 @@ const Navbar = () => {
           </div>
         </div>
       </div>
-      {user && (
+      {isClient && user && (
         <div
           className={cn(
             "fixed inset-0 top-16 z-20 bg-background md:hidden",
