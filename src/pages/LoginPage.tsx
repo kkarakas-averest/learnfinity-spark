@@ -338,6 +338,22 @@ const LoginPage = () => {
             </Link>
             .
           </p>
+
+          <div className="mt-6 border-t border-gray-200 pt-6">
+            <div className="text-center">
+              <h3 className="text-sm font-medium text-gray-900">Want to create a detailed profile?</h3>
+              <p className="mt-1 text-sm text-gray-500">
+                Use our comprehensive registration form to set up your full learning profile.
+              </p>
+              <div className="mt-3">
+                <Link to="/register">
+                  <Button variant="outline" className="w-full">
+                    Register with Full Profile
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

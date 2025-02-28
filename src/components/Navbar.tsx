@@ -53,6 +53,7 @@ const Navbar = () => {
 
   // Navigation items that are shown to all users (including visitors)
   const publicNavItems = [
+    { name: "Register", href: "/register", icon: User },
   ];
 
   // Navigation items that are only shown to authenticated users
