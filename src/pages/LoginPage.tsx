@@ -1,6 +1,5 @@
-
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -16,8 +15,15 @@ import {
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
-import { Loader2, AlertCircle } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Loader2, AlertCircle, Info } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useToast } from "@/hooks/use-toast";
+
+// For debugging purposes
+const testCredentials = {
+  email: "test@example.com",
+  password: "password123"
+};
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address." }),
@@ -35,10 +41,27 @@ const signupSchema = z.object({
 });
 
 const LoginPage = () => {
-  const { signIn, signUp, isLoading, signupDisabled } = useAuth();
+  const { signIn, signUp, isLoading, signupDisabled, user } = useAuth();
   const [activeTab, setActiveTab] = useState<"login" | "signup">(
     signupDisabled ? "login" : "login" // Always default to login if signup is disabled
   );
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [signupError, setSignupError] = useState<string | null>(null);
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
+  // Clear error when tab changes
+  useEffect(() => {
+    setLoginError(null);
+    setSignupError(null);
+  }, [activeTab]);
+
+  // Redirect if user is already authenticated
+  useEffect(() => {
+    if (user) {
+      navigate('/dashboard');
+    }
+  }, [user, navigate]);
 
   const loginForm = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
@@ -60,18 +83,51 @@ const LoginPage = () => {
 
   const onLoginSubmit = async (values: z.infer<typeof loginSchema>) => {
     try {
+      setLoginError(null);
+      console.log("Attempting login with:", values.email);
+      
+      // Add a small delay to ensure UI feedback
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
       await signIn(values.email, values.password);
-    } catch (error) {
+      
+      // Success message
+      toast({
+        title: "Login Successful",
+        description: "Redirecting to your dashboard...",
+      });
+    } catch (error: any) {
       console.error("Login failed:", error);
+      // Set user-friendly error message
+      setLoginError(error.message || "Failed to sign in. Please check your credentials and try again.");
     }
   };
 
   const onSignupSubmit = async (values: z.infer<typeof signupSchema>) => {
     try {
+      setSignupError(null);
+      console.log("Attempting signup with:", values.email);
+      
+      // Add a small delay to ensure UI feedback
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
       await signUp(values.email, values.password, values.name, "learner");
-    } catch (error) {
+      
+      // Success message
+      toast({
+        title: "Account Created",
+        description: "Your account has been successfully created. Welcome to Learnfinity!",
+      });
+    } catch (error: any) {
       console.error("Signup failed:", error);
+      // Set user-friendly error message
+      setSignupError(error.message || "Failed to create account. Please try again or contact support.");
     }
+  };
+
+  const fillTestCredentials = () => {
+    loginForm.setValue("email", testCredentials.email);
+    loginForm.setValue("password", testCredentials.password);
   };
 
   return (
@@ -85,6 +141,24 @@ const LoginPage = () => {
 
         <div className="mt-10 sm:mx-auto sm:w-full sm:max-w-md">
           <div className="bg-white px-6 py-8 shadow sm:rounded-lg sm:px-8">
+            {process.env.NODE_ENV === 'development' && (
+              <Alert className="mb-6" variant="default">
+                <Info className="h-4 w-4" />
+                <AlertTitle>Development Mode</AlertTitle>
+                <AlertDescription className="flex flex-col gap-2">
+                  <p>Running in development environment.</p>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={fillTestCredentials}
+                    className="w-full"
+                  >
+                    Fill Test Credentials
+                  </Button>
+                </AlertDescription>
+              </Alert>
+            )}
+            
             <Tabs 
               value={activeTab} 
               onValueChange={(value) => {
@@ -103,6 +177,15 @@ const LoginPage = () => {
               </TabsList>
 
               <TabsContent value="login">
+                {loginError && (
+                  <Alert variant="destructive" className="mb-6">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>
+                      {loginError}
+                    </AlertDescription>
+                  </Alert>
+                )}
+                
                 <Form {...loginForm}>
                   <form onSubmit={loginForm.handleSubmit(onLoginSubmit)} className="space-y-5">
                     <FormField
@@ -155,73 +238,84 @@ const LoginPage = () => {
                     </AlertDescription>
                   </Alert>
                 ) : (
-                  <Form {...signupForm}>
-                    <form onSubmit={signupForm.handleSubmit(onSignupSubmit)} className="space-y-5">
-                      <FormField
-                        control={signupForm.control}
-                        name="name"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Full Name</FormLabel>
-                            <FormControl>
-                              <Input placeholder="John Doe" {...field} disabled={isLoading} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={signupForm.control}
-                        name="email"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Email</FormLabel>
-                            <FormControl>
-                              <Input placeholder="you@example.com" type="email" {...field} disabled={isLoading} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={signupForm.control}
-                        name="password"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Password</FormLabel>
-                            <FormControl>
-                              <Input placeholder="••••••••" type="password" {...field} disabled={isLoading} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={signupForm.control}
-                        name="confirmPassword"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Confirm Password</FormLabel>
-                            <FormControl>
-                              <Input placeholder="••••••••" type="password" {...field} disabled={isLoading} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                  <>
+                    {signupError && (
+                      <Alert variant="destructive" className="mb-6">
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertDescription>
+                          {signupError}
+                        </AlertDescription>
+                      </Alert>
+                    )}
+                    
+                    <Form {...signupForm}>
+                      <form onSubmit={signupForm.handleSubmit(onSignupSubmit)} className="space-y-5">
+                        <FormField
+                          control={signupForm.control}
+                          name="name"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Full Name</FormLabel>
+                              <FormControl>
+                                <Input placeholder="John Doe" {...field} disabled={isLoading} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={signupForm.control}
+                          name="email"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Email</FormLabel>
+                              <FormControl>
+                                <Input placeholder="you@example.com" type="email" {...field} disabled={isLoading} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={signupForm.control}
+                          name="password"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Password</FormLabel>
+                              <FormControl>
+                                <Input placeholder="••••••••" type="password" {...field} disabled={isLoading} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={signupForm.control}
+                          name="confirmPassword"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Confirm Password</FormLabel>
+                              <FormControl>
+                                <Input placeholder="••••••••" type="password" {...field} disabled={isLoading} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
 
-                      <Button type="submit" className="w-full" disabled={isLoading}>
-                        {isLoading ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Creating Account...
-                          </>
-                        ) : (
-                          "Create Account"
-                        )}
-                      </Button>
-                    </form>
-                  </Form>
+                        <Button type="submit" className="w-full" disabled={isLoading}>
+                          {isLoading ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Creating Account...
+                            </>
+                          ) : (
+                            "Create Account"
+                          )}
+                        </Button>
+                      </form>
+                    </Form>
+                  </>
                 )}
               </TabsContent>
             </Tabs>
