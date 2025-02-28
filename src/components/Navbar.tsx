@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { 
@@ -30,14 +29,14 @@ const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { user, userDetails, signOut } = useAuth();
 
-  // Navigation items that are shown to all users
+  // Navigation items that are shown to all users (including visitors)
   const publicNavItems = [
-    { name: "Home", href: "/", icon: Home },
-    { name: "Courses", href: "/courses", icon: Book },
   ];
 
   // Navigation items that are only shown to authenticated users
   const authenticatedNavItems = [
+    { name: "Home", href: "/", icon: Home },
+    { name: "Courses", href: "/courses", icon: Book },
     { name: "My Learning", href: "/dashboard", icon: GraduationCap },
   ];
 
@@ -152,7 +151,7 @@ const Navbar = () => {
             ) : (
               // VISITOR: Show sign in button
               <Link to="/login">
-                <Button className="flex items-center gap-2">
+                <Button variant="default" className="flex items-center gap-2">
                   <User className="h-4 w-4" />
                   Sign In
                 </Button>
