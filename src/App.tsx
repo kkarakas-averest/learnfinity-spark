@@ -61,11 +61,7 @@ function App() {
           />
           <Route 
             path="/hr" 
-            element={
-              <ProtectedRoute allowedRoles={["hr", "superadmin"]}>
-                <HRDashboard />
-              </ProtectedRoute>
-            } 
+            element={<HRDashboard />} 
           />
           <Route 
             path="/admin" 
