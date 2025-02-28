@@ -1,8 +1,8 @@
 import { supabase } from '@/lib/supabase';
 import { generateSecurePassword } from '@/lib/utils';
 
-// Import from env variables or use a fallback
-const DEFAULT_COMPANY_ID = import.meta.env.VITE_DEFAULT_COMPANY_ID || 'default-company-id';
+// Import from env variables or use a fallback with a valid UUID
+const DEFAULT_COMPANY_ID = import.meta.env.VITE_DEFAULT_COMPANY_ID || '4fb1a692-3995-40ee-8aa5-292fd8ebf029';
 const TABLE_NAME = 'hr_employees';
 
 // List of all HR tables that should exist
@@ -184,11 +184,11 @@ export const hrEmployeeService = {
   async createEmployee(employee) {
     try {
       console.log('Attempting to create employee with data:', JSON.stringify(employee, null, 2));
+      
+      // Remove the select() call that's causing 400 errors
       const { data, error } = await supabase
         .from(TABLE_NAME)
-        .insert([employee])
-        .select()
-        .single();
+        .insert([employee]);
 
       if (error) {
         console.error('Detailed error creating employee:', {
@@ -197,6 +197,22 @@ export const hrEmployeeService = {
           details: error.details,
           hint: error.hint
         });
+        return { data: null, error };
+      }
+
+      // If insert succeeded, fetch the created employee separately
+      if (!error) {
+        const { data: createdEmployee, error: fetchError } = await supabase
+          .from(TABLE_NAME)
+          .select('*')
+          .eq('email', employee.email)
+          .single();
+          
+        if (fetchError) {
+          console.warn('Employee created but could not fetch details:', fetchError);
+        }
+        
+        return { data: createdEmployee || { email: employee.email }, error: null };
       }
 
       return { data, error };
