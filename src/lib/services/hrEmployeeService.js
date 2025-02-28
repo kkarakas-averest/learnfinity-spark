@@ -27,7 +27,11 @@ export const hrEmployeeService = {
     console.log('Checking if HR tables exist...');
     const missingTables = [];
     
-    for (const table of HR_TABLES) {
+    // Primary tables that we absolutely need for employee creation
+    const primaryTables = ['hr_departments', 'hr_positions', 'hr_employees'];
+    
+    // First check just the essential tables
+    for (const table of primaryTables) {
       try {
         const { error } = await supabase
           .from(table)
@@ -44,8 +48,51 @@ export const hrEmployeeService = {
       }
     }
     
+    // If we can't access primary tables, don't bother checking secondary ones
+    if (missingTables.length > 0) {
+      console.log(`Primary HR tables check: Missing tables:`, missingTables);
+      return { exists: false, missingTables };
+    }
+    
+    // Check remaining tables but don't block employee creation if they're missing
+    const secondaryTables = [
+      'hr_courses', 
+      'hr_course_enrollments',
+      'hr_employee_activities',
+      'hr_learning_paths',
+      'hr_learning_path_courses',
+      'hr_learning_path_enrollments'
+    ];
+    
+    const missingSampleTables = [];
+    for (const table of secondaryTables) {
+      try {
+        const { error } = await supabase
+          .from(table)
+          .select('id')
+          .limit(1);
+          
+        if (error) {
+          if (error.code === '42P01') {
+            console.warn(`Table ${table} does not exist`);
+            missingSampleTables.push(table);
+          } else if (error.status === 400) {
+            console.warn(`API error checking table ${table}:`, error.message);
+            // Don't consider 400 errors as missing tables for essential functionality
+          }
+        }
+      } catch (error) {
+        console.warn(`Exception checking table ${table}:`, error);
+        // Don't block creation for exceptions on secondary tables
+      }
+    }
+    
+    if (missingSampleTables.length > 0) {
+      console.log('Some secondary HR tables are missing, but proceeding with employee creation:', missingSampleTables);
+    }
+    
     const allExist = missingTables.length === 0;
-    console.log(`HR tables check: ${allExist ? 'All exist' : 'Some missing'}`);
+    console.log(`HR tables essential check: ${allExist ? 'All exist' : 'Some missing'}`);
     if (!allExist) {
       console.log('Missing tables:', missingTables);
     }
@@ -185,37 +232,49 @@ export const hrEmployeeService = {
     try {
       console.log('Attempting to create employee with data:', JSON.stringify(employee, null, 2));
       
-      // Remove the select() call that's causing 400 errors
-      const { data, error } = await supabase
+      // Log full details about what's being sent
+      console.log('Employee object keys:', Object.keys(employee));
+      console.log('Company ID being used:', employee.company_id);
+      
+      // Step 1: Just try to insert the data with no options
+      const { error: insertError } = await supabase
         .from(TABLE_NAME)
-        .insert([employee]);
+        .insert(employee);
 
-      if (error) {
+      if (insertError) {
         console.error('Detailed error creating employee:', {
-          message: error.message,
-          code: error.code,
-          details: error.details,
-          hint: error.hint
+          message: insertError.message,
+          code: insertError.code,
+          details: insertError.details,
+          hint: insertError.hint,
+          statusCode: insertError.status || insertError.statusCode,
+          fullError: JSON.stringify(insertError)
         });
-        return { data: null, error };
+        return { data: null, error: insertError };
       }
 
-      // If insert succeeded, fetch the created employee separately
-      if (!error) {
-        const { data: createdEmployee, error: fetchError } = await supabase
-          .from(TABLE_NAME)
-          .select('*')
-          .eq('email', employee.email)
-          .single();
-          
-        if (fetchError) {
-          console.warn('Employee created but could not fetch details:', fetchError);
-        }
-        
-        return { data: createdEmployee || { email: employee.email }, error: null };
+      console.log('Employee created successfully, fetching details...');
+      
+      // Step 2: If insert succeeded, fetch the employee data separately
+      const { data: createdEmployee, error: fetchError } = await supabase
+        .from(TABLE_NAME)
+        .select('*')
+        .eq('email', employee.email)
+        .maybeSingle();
+      
+      if (fetchError) {
+        console.warn('Employee likely created but could not fetch details:', fetchError);
+        // Return a minimal record with just the email so the app can continue
+        return { 
+          data: { email: employee.email }, 
+          error: null 
+        };
       }
-
-      return { data, error };
+      
+      return { 
+        data: createdEmployee || { email: employee.email }, 
+        error: null 
+      };
     } catch (error) {
       console.error('Exception in createEmployee:', error);
       return { data: null, error };
@@ -232,6 +291,7 @@ export const hrEmployeeService = {
   async createEmployeeWithUserAccount(employee) {
     try {
       console.log('Creating employee with account, company ID:', employee.companyId || employee.company_id || DEFAULT_COMPANY_ID);
+      console.log('Full employee object:', JSON.stringify(employee, null, 2));
       
       // Validate required fields before proceeding
       if (!employee.name || !employee.name.trim()) {
@@ -242,8 +302,8 @@ export const hrEmployeeService = {
         throw new Error('Employee email is required');
       }
       
-      // Ensure we have a company ID
-      const companyId = employee.companyId || employee.company_id || DEFAULT_COMPANY_ID;
+      // Ensure we have a company ID - prioritize snake_case (backend) over camelCase (frontend)
+      const companyId = employee.company_id || employee.companyId || DEFAULT_COMPANY_ID;
       if (!companyId) {
         throw new Error('Company ID is required for employee creation');
       }
@@ -256,7 +316,7 @@ export const hrEmployeeService = {
         throw new Error(errorMsg);
       }
       
-      // First create the employee record
+      // First create the employee record - convert all keys to snake_case for database
       const employeeData = {
         name: employee.name,
         email: employee.email,
