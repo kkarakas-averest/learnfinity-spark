@@ -159,86 +159,74 @@ const Navbar = () => {
                 </Button>
               </Link>
             )}
-            <button
-              className="block md:hidden"
-              onClick={toggleMenu}
-              aria-label="Toggle menu"
-            >
-              {isMenuOpen ? (
-                <X className="h-6 w-6" />
-              ) : (
-                <Menu className="h-6 w-6" />
-              )}
-            </button>
+            {user && (
+              <button
+                className="block md:hidden"
+                onClick={toggleMenu}
+                aria-label="Toggle menu"
+              >
+                {isMenuOpen ? (
+                  <X className="h-6 w-6" />
+                ) : (
+                  <Menu className="h-6 w-6" />
+                )}
+              </button>
+            )}
           </div>
         </div>
       </div>
-      {/* Mobile menu */}
-      <div
-        className={cn(
-          "fixed inset-0 top-16 z-20 bg-background md:hidden",
-          isMenuOpen ? "block" : "hidden"
-        )}
-      >
-        <div className="container p-6">
-          <nav className="flex flex-col gap-6">
-            {user ? (
-              // AUTHENTICATED USER: Show navigation and profile links in mobile menu
-              <>
-                {navItems.map((item) => (
-                  <Link
-                    key={item.name}
-                    to={item.href}
-                    className="flex items-center gap-2 text-lg font-medium"
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    <item.icon className="h-5 w-5" />
-                    {item.name}
-                  </Link>
-                ))}
+      {user && (
+        <div
+          className={cn(
+            "fixed inset-0 top-16 z-20 bg-background md:hidden",
+            isMenuOpen ? "block" : "hidden"
+          )}
+        >
+          <div className="container p-6">
+            <nav className="flex flex-col gap-6">
+              {navItems.map((item) => (
                 <Link
-                  to="/profile"
+                  key={item.name}
+                  to={item.href}
                   className="flex items-center gap-2 text-lg font-medium"
                   onClick={() => setIsMenuOpen(false)}
                 >
-                  <User className="h-5 w-5" />
-                  Profile
+                  <item.icon className="h-5 w-5" />
+                  {item.name}
                 </Link>
-                {userDetails?.role && userDetails.role !== "learner" && (
-                  <Link
-                    to={userDetails.role === "superadmin" ? "/admin" : "/hr"}
-                    className="flex items-center gap-2 text-lg font-medium"
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    <Settings className="h-5 w-5" />
-                    {userDetails.role === "superadmin" ? "Admin Panel" : "HR Dashboard"}
-                  </Link>
-                )}
-                <button
-                  className="flex items-center gap-2 text-lg font-medium text-red-500"
-                  onClick={() => {
-                    signOut();
-                    setIsMenuOpen(false);
-                  }}
-                >
-                  <LogOut className="h-5 w-5" />
-                  Log out
-                </button>
-              </>
-            ) : (
-              // VISITOR: Show sign in link in mobile menu
+              ))}
               <Link
-                to="/login"
-                className="flex items-center gap-2 text-lg font-medium text-primary"
+                to="/profile"
+                className="flex items-center gap-2 text-lg font-medium"
                 onClick={() => setIsMenuOpen(false)}
               >
                 <User className="h-5 w-5" />
-                Sign In
+                Profile
               </Link>
-            )}
-          </nav>
+              {userDetails?.role && userDetails.role !== "learner" && (
+                <Link
+                  to={userDetails.role === "superadmin" ? "/admin" : "/hr"}
+                  className="flex items-center gap-2 text-lg font-medium"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  <Settings className="h-5 w-5" />
+                  {userDetails.role === "superadmin" ? "Admin Panel" : "HR Dashboard"}
+                </Link>
+              )}
+              <button
+                className="flex items-center gap-2 text-lg font-medium text-red-500"
+                onClick={() => {
+                  signOut();
+                  setIsMenuOpen(false);
+                }}
+              >
+                <LogOut className="h-5 w-5" />
+                Log out
+              </button>
+            </nav>
+          </div>
         </div>
-      </div>
+      )}
     </header>
   );
 };
