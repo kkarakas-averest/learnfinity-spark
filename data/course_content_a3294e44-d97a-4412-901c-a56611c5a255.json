@@ -1,0 +1,669 @@
+{
+  "id": "a3294e44-d97a-4412-901c-a56611c5a255",
+  "title": "Cloud Computing Fundamentals",
+  "description": "Introduction to cloud computing concepts, services, and providers.",
+  "overview": {
+    "summary": "This course covers Cloud Computing Fundamentals with a focus on practical applications.",
+    "key_concepts": [
+      "Understanding core principles",
+      "Practical application techniques",
+      "Advanced topics in Cloud Computing Fundamentals"
+    ],
+    "prerequisites": [],
+    "target_audience": [
+      "Software Developers"
+    ],
+    "difficulty_level": "Intermediate",
+    "estimated_completion_time": "10 hours"
+  },
+  "modules": [
+    {
+      "id": "module_2b9fdcb0",
+      "title": "Module 1: Introduction to Cloud Computing Fundamentals",
+      "sequence_order": 1,
+      "content": {
+        "introduction": "In this module, you'll learn about module 1: introduction to cloud computing fundamentals.",
+        "sections": [
+          {
+            "title": "Section 1: Key Concepts",
+            "content": [
+              {
+                "type": "text",
+                "value": "This section explains important concepts related to Module 1: Introduction to Cloud Computing Fundamentals."
+              },
+              {
+                "type": "image",
+                "value": "Diagram illustrating the concept"
+              },
+              {
+                "type": "text",
+                "value": "After studying this section, you'll be able to apply these concepts in real-world scenarios."
+              }
+            ]
+          },
+          {
+            "title": "Section 2: Practical Examples",
+            "content": [
+              {
+                "type": "text",
+                "value": "This section explains important concepts related to Module 1: Introduction to Cloud Computing Fundamentals."
+              },
+              {
+                "type": "image",
+                "value": "Diagram illustrating the concept"
+              },
+              {
+                "type": "text",
+                "value": "After studying this section, you'll be able to apply these concepts in real-world scenarios."
+              }
+            ]
+          },
+          {
+            "title": "Section 3: Hands-on Exercise",
+            "content": [
+              {
+                "type": "text",
+                "value": "This section explains important concepts related to Module 1: Introduction to Cloud Computing Fundamentals."
+              },
+              {
+                "type": "image",
+                "value": "Diagram illustrating the concept"
+              },
+              {
+                "type": "text",
+                "value": "After studying this section, you'll be able to apply these concepts in real-world scenarios."
+              }
+            ]
+          }
+        ],
+        "summary": "You've completed Module 1! You should now understand the key concepts of module 1: introduction to cloud computing fundamentals."
+      },
+      "estimated_duration": "30 minutes",
+      "quiz": {
+        "title": "Quiz: Module 1: Introduction to Cloud Computing Fundamentals",
+        "description": "Test your understanding of module 1: introduction to cloud computing fundamentals",
+        "questions": [
+          {
+            "id": "q_e4f2585d",
+            "text": "Question 1 about Module 1: Introduction to Cloud Computing Fundamentals",
+            "type": "multiple_choice",
+            "options": [
+              {
+                "id": "a",
+                "text": "First potential answer"
+              },
+              {
+                "id": "b",
+                "text": "Second potential answer"
+              },
+              {
+                "id": "c",
+                "text": "Third potential answer"
+              },
+              {
+                "id": "d",
+                "text": "Fourth potential answer"
+              }
+            ],
+            "correct_answer": "a",
+            "explanation": "Explanation for the correct answer"
+          },
+          {
+            "id": "q_9fe64ca0",
+            "text": "Question 2 about Module 1: Introduction to Cloud Computing Fundamentals",
+            "type": "multiple_choice",
+            "options": [
+              {
+                "id": "a",
+                "text": "First potential answer"
+              },
+              {
+                "id": "b",
+                "text": "Second potential answer"
+              },
+              {
+                "id": "c",
+                "text": "Third potential answer"
+              },
+              {
+                "id": "d",
+                "text": "Fourth potential answer"
+              }
+            ],
+            "correct_answer": "a",
+            "explanation": "Explanation for the correct answer"
+          },
+          {
+            "id": "q_3124396a",
+            "text": "Question 3 about Module 1: Introduction to Cloud Computing Fundamentals",
+            "type": "multiple_choice",
+            "options": [
+              {
+                "id": "a",
+                "text": "First potential answer"
+              },
+              {
+                "id": "b",
+                "text": "Second potential answer"
+              },
+              {
+                "id": "c",
+                "text": "Third potential answer"
+              },
+              {
+                "id": "d",
+                "text": "Fourth potential answer"
+              }
+            ],
+            "correct_answer": "a",
+            "explanation": "Explanation for the correct answer"
+          },
+          {
+            "id": "q_f76da15a",
+            "text": "Question 4 about Module 1: Introduction to Cloud Computing Fundamentals",
+            "type": "multiple_choice",
+            "options": [
+              {
+                "id": "a",
+                "text": "First potential answer"
+              },
+              {
+                "id": "b",
+                "text": "Second potential answer"
+              },
+              {
+                "id": "c",
+                "text": "Third potential answer"
+              },
+              {
+                "id": "d",
+                "text": "Fourth potential answer"
+              }
+            ],
+            "correct_answer": "a",
+            "explanation": "Explanation for the correct answer"
+          },
+          {
+            "id": "q_2f552ac6",
+            "text": "Question 5 about Module 1: Introduction to Cloud Computing Fundamentals",
+            "type": "multiple_choice",
+            "options": [
+              {
+                "id": "a",
+                "text": "First potential answer"
+              },
+              {
+                "id": "b",
+                "text": "Second potential answer"
+              },
+              {
+                "id": "c",
+                "text": "Third potential answer"
+              },
+              {
+                "id": "d",
+                "text": "Fourth potential answer"
+              }
+            ],
+            "correct_answer": "a",
+            "explanation": "Explanation for the correct answer"
+          }
+        ],
+        "passing_score": 80
+      }
+    },
+    {
+      "id": "module_886fb44a",
+      "title": "Module 2: Core Concepts of Cloud Computing Fundamentals",
+      "sequence_order": 2,
+      "content": {
+        "introduction": "In this module, you'll learn about module 2: core concepts of cloud computing fundamentals.",
+        "sections": [
+          {
+            "title": "Section 1: Key Concepts",
+            "content": [
+              {
+                "type": "text",
+                "value": "This section explains important concepts related to Module 2: Core Concepts of Cloud Computing Fundamentals."
+              },
+              {
+                "type": "image",
+                "value": "Diagram illustrating the concept"
+              },
+              {
+                "type": "text",
+                "value": "After studying this section, you'll be able to apply these concepts in real-world scenarios."
+              }
+            ]
+          },
+          {
+            "title": "Section 2: Practical Examples",
+            "content": [
+              {
+                "type": "text",
+                "value": "This section explains important concepts related to Module 2: Core Concepts of Cloud Computing Fundamentals."
+              },
+              {
+                "type": "image",
+                "value": "Diagram illustrating the concept"
+              },
+              {
+                "type": "text",
+                "value": "After studying this section, you'll be able to apply these concepts in real-world scenarios."
+              }
+            ]
+          },
+          {
+            "title": "Section 3: Hands-on Exercise",
+            "content": [
+              {
+                "type": "text",
+                "value": "This section explains important concepts related to Module 2: Core Concepts of Cloud Computing Fundamentals."
+              },
+              {
+                "type": "image",
+                "value": "Diagram illustrating the concept"
+              },
+              {
+                "type": "text",
+                "value": "After studying this section, you'll be able to apply these concepts in real-world scenarios."
+              }
+            ]
+          },
+          {
+            "title": "Section 4: Advanced Techniques",
+            "content": [
+              {
+                "type": "text",
+                "value": "This section explains important concepts related to Module 2: Core Concepts of Cloud Computing Fundamentals."
+              },
+              {
+                "type": "image",
+                "value": "Diagram illustrating the concept"
+              },
+              {
+                "type": "text",
+                "value": "After studying this section, you'll be able to apply these concepts in real-world scenarios."
+              }
+            ]
+          }
+        ],
+        "summary": "You've completed Module 2! You should now understand the key concepts of module 2: core concepts of cloud computing fundamentals."
+      },
+      "estimated_duration": "45 minutes",
+      "quiz": {
+        "title": "Quiz: Module 2: Core Concepts of Cloud Computing Fundamentals",
+        "description": "Test your understanding of module 2: core concepts of cloud computing fundamentals",
+        "questions": [
+          {
+            "id": "q_0c76ee81",
+            "text": "Question 1 about Module 2: Core Concepts of Cloud Computing Fundamentals",
+            "type": "multiple_choice",
+            "options": [
+              {
+                "id": "a",
+                "text": "First potential answer"
+              },
+              {
+                "id": "b",
+                "text": "Second potential answer"
+              },
+              {
+                "id": "c",
+                "text": "Third potential answer"
+              },
+              {
+                "id": "d",
+                "text": "Fourth potential answer"
+              }
+            ],
+            "correct_answer": "a",
+            "explanation": "Explanation for the correct answer"
+          },
+          {
+            "id": "q_ce7f8a19",
+            "text": "Question 2 about Module 2: Core Concepts of Cloud Computing Fundamentals",
+            "type": "multiple_choice",
+            "options": [
+              {
+                "id": "a",
+                "text": "First potential answer"
+              },
+              {
+                "id": "b",
+                "text": "Second potential answer"
+              },
+              {
+                "id": "c",
+                "text": "Third potential answer"
+              },
+              {
+                "id": "d",
+                "text": "Fourth potential answer"
+              }
+            ],
+            "correct_answer": "a",
+            "explanation": "Explanation for the correct answer"
+          },
+          {
+            "id": "q_60d0b581",
+            "text": "Question 3 about Module 2: Core Concepts of Cloud Computing Fundamentals",
+            "type": "multiple_choice",
+            "options": [
+              {
+                "id": "a",
+                "text": "First potential answer"
+              },
+              {
+                "id": "b",
+                "text": "Second potential answer"
+              },
+              {
+                "id": "c",
+                "text": "Third potential answer"
+              },
+              {
+                "id": "d",
+                "text": "Fourth potential answer"
+              }
+            ],
+            "correct_answer": "a",
+            "explanation": "Explanation for the correct answer"
+          },
+          {
+            "id": "q_fffc4396",
+            "text": "Question 4 about Module 2: Core Concepts of Cloud Computing Fundamentals",
+            "type": "multiple_choice",
+            "options": [
+              {
+                "id": "a",
+                "text": "First potential answer"
+              },
+              {
+                "id": "b",
+                "text": "Second potential answer"
+              },
+              {
+                "id": "c",
+                "text": "Third potential answer"
+              },
+              {
+                "id": "d",
+                "text": "Fourth potential answer"
+              }
+            ],
+            "correct_answer": "a",
+            "explanation": "Explanation for the correct answer"
+          },
+          {
+            "id": "q_8b2c1d55",
+            "text": "Question 5 about Module 2: Core Concepts of Cloud Computing Fundamentals",
+            "type": "multiple_choice",
+            "options": [
+              {
+                "id": "a",
+                "text": "First potential answer"
+              },
+              {
+                "id": "b",
+                "text": "Second potential answer"
+              },
+              {
+                "id": "c",
+                "text": "Third potential answer"
+              },
+              {
+                "id": "d",
+                "text": "Fourth potential answer"
+              }
+            ],
+            "correct_answer": "a",
+            "explanation": "Explanation for the correct answer"
+          }
+        ],
+        "passing_score": 80
+      }
+    },
+    {
+      "id": "module_646233d3",
+      "title": "Module 3: Advanced Topics and Case Studies",
+      "sequence_order": 3,
+      "content": {
+        "introduction": "In this module, you'll learn about module 3: advanced topics and case studies.",
+        "sections": [
+          {
+            "title": "Section 1: Key Concepts",
+            "content": [
+              {
+                "type": "text",
+                "value": "This section explains important concepts related to Module 3: Advanced Topics and Case Studies."
+              },
+              {
+                "type": "image",
+                "value": "Diagram illustrating the concept"
+              },
+              {
+                "type": "text",
+                "value": "After studying this section, you'll be able to apply these concepts in real-world scenarios."
+              }
+            ]
+          },
+          {
+            "title": "Section 2: Practical Examples",
+            "content": [
+              {
+                "type": "text",
+                "value": "This section explains important concepts related to Module 3: Advanced Topics and Case Studies."
+              },
+              {
+                "type": "image",
+                "value": "Diagram illustrating the concept"
+              },
+              {
+                "type": "text",
+                "value": "After studying this section, you'll be able to apply these concepts in real-world scenarios."
+              }
+            ]
+          },
+          {
+            "title": "Section 3: Hands-on Exercise",
+            "content": [
+              {
+                "type": "text",
+                "value": "This section explains important concepts related to Module 3: Advanced Topics and Case Studies."
+              },
+              {
+                "type": "image",
+                "value": "Diagram illustrating the concept"
+              },
+              {
+                "type": "text",
+                "value": "After studying this section, you'll be able to apply these concepts in real-world scenarios."
+              }
+            ]
+          },
+          {
+            "title": "Section 4: Advanced Techniques",
+            "content": [
+              {
+                "type": "text",
+                "value": "This section explains important concepts related to Module 3: Advanced Topics and Case Studies."
+              },
+              {
+                "type": "image",
+                "value": "Diagram illustrating the concept"
+              },
+              {
+                "type": "text",
+                "value": "After studying this section, you'll be able to apply these concepts in real-world scenarios."
+              }
+            ]
+          },
+          {
+            "title": "Section 5: Advanced Techniques",
+            "content": [
+              {
+                "type": "text",
+                "value": "This section explains important concepts related to Module 3: Advanced Topics and Case Studies."
+              },
+              {
+                "type": "image",
+                "value": "Diagram illustrating the concept"
+              },
+              {
+                "type": "text",
+                "value": "After studying this section, you'll be able to apply these concepts in real-world scenarios."
+              }
+            ]
+          }
+        ],
+        "summary": "You've completed Module 3! You should now understand the key concepts of module 3: advanced topics and case studies."
+      },
+      "estimated_duration": "60 minutes",
+      "quiz": {
+        "title": "Quiz: Module 3: Advanced Topics and Case Studies",
+        "description": "Test your understanding of module 3: advanced topics and case studies",
+        "questions": [
+          {
+            "id": "q_db609bde",
+            "text": "Question 1 about Module 3: Advanced Topics and Case Studies",
+            "type": "multiple_choice",
+            "options": [
+              {
+                "id": "a",
+                "text": "First potential answer"
+              },
+              {
+                "id": "b",
+                "text": "Second potential answer"
+              },
+              {
+                "id": "c",
+                "text": "Third potential answer"
+              },
+              {
+                "id": "d",
+                "text": "Fourth potential answer"
+              }
+            ],
+            "correct_answer": "a",
+            "explanation": "Explanation for the correct answer"
+          },
+          {
+            "id": "q_2dc276d4",
+            "text": "Question 2 about Module 3: Advanced Topics and Case Studies",
+            "type": "multiple_choice",
+            "options": [
+              {
+                "id": "a",
+                "text": "First potential answer"
+              },
+              {
+                "id": "b",
+                "text": "Second potential answer"
+              },
+              {
+                "id": "c",
+                "text": "Third potential answer"
+              },
+              {
+                "id": "d",
+                "text": "Fourth potential answer"
+              }
+            ],
+            "correct_answer": "a",
+            "explanation": "Explanation for the correct answer"
+          },
+          {
+            "id": "q_430c1289",
+            "text": "Question 3 about Module 3: Advanced Topics and Case Studies",
+            "type": "multiple_choice",
+            "options": [
+              {
+                "id": "a",
+                "text": "First potential answer"
+              },
+              {
+                "id": "b",
+                "text": "Second potential answer"
+              },
+              {
+                "id": "c",
+                "text": "Third potential answer"
+              },
+              {
+                "id": "d",
+                "text": "Fourth potential answer"
+              }
+            ],
+            "correct_answer": "a",
+            "explanation": "Explanation for the correct answer"
+          },
+          {
+            "id": "q_b213d637",
+            "text": "Question 4 about Module 3: Advanced Topics and Case Studies",
+            "type": "multiple_choice",
+            "options": [
+              {
+                "id": "a",
+                "text": "First potential answer"
+              },
+              {
+                "id": "b",
+                "text": "Second potential answer"
+              },
+              {
+                "id": "c",
+                "text": "Third potential answer"
+              },
+              {
+                "id": "d",
+                "text": "Fourth potential answer"
+              }
+            ],
+            "correct_answer": "a",
+            "explanation": "Explanation for the correct answer"
+          },
+          {
+            "id": "q_f201d3f3",
+            "text": "Question 5 about Module 3: Advanced Topics and Case Studies",
+            "type": "multiple_choice",
+            "options": [
+              {
+                "id": "a",
+                "text": "First potential answer"
+              },
+              {
+                "id": "b",
+                "text": "Second potential answer"
+              },
+              {
+                "id": "c",
+                "text": "Third potential answer"
+              },
+              {
+                "id": "d",
+                "text": "Fourth potential answer"
+              }
+            ],
+            "correct_answer": "a",
+            "explanation": "Explanation for the correct answer"
+          }
+        ],
+        "passing_score": 80
+      }
+    }
+  ],
+  "employee_id": "emp001",
+  "learning_objectives": [
+    "Understand cloud service models",
+    "Compare major cloud providers",
+    "Deploy basic applications to the cloud"
+  ],
+  "metadata": {
+    "course_id": "a3294e44-d97a-4412-901c-a56611c5a255",
+    "created_at": "2025-02-28T13:03:00.037058",
+    "updated_at": "2025-02-28T13:03:00.037077",
+    "generated_for": "emp001"
+  }
+}

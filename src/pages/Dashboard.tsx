@@ -1,18 +1,37 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState, lazy, Suspense } from "react";
 import { useNavigate } from "react-router-dom";
-import { CalendarDays, Clock, Sparkles, Star, Target, BookOpen, Trophy } from "lucide-react";
+import { useUser } from "@clerk/clerk-react";
+import { Metadata } from "@/types";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { 
+  BookOpen, 
+  Clock, 
+  Target, 
+  Trophy, 
+  Star, 
+  Sparkles, 
+  CalendarDays 
+} from "lucide-react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Progress } from "@/components/ui/progress";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import Navbar from "@/components/Navbar";
 import WelcomeHeader from "@/components/dashboard/WelcomeHeader";
 import DashboardTabs from "@/components/dashboard/DashboardTabs";
 import { useAuth } from "@/contexts/AuthContext";
 import DashboardLayout from "@/components/DashboardLayout";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useLearningData } from "@/hooks/useLearningData";
+import AgentGeneratedCourses from "@/components/learner/AgentGeneratedCourses";
 
 const Dashboard = () => {
   const { user, userDetails, isLoading } = useAuth();
@@ -90,6 +109,7 @@ const Dashboard = () => {
             <TabsTrigger value="courses">My Courses</TabsTrigger>
             <TabsTrigger value="paths">Learning Paths</TabsTrigger>
             <TabsTrigger value="skills">Skills</TabsTrigger>
+            <TabsTrigger value="ai-generated">AI Generated</TabsTrigger>
           </TabsList>
           
           {/* Overview Tab */}
@@ -316,14 +336,21 @@ const Dashboard = () => {
                       </div>
                       <Progress value={path.progress} className="h-2" />
                     </div>
-                    
-                    <Button variant="outline" className="w-full mt-4" onClick={() => navigate(`/learning-paths/${path.id}`)}>
-                      View Path
-                    </Button>
                   </CardContent>
                 </Card>
               ))}
             </div>
+          </TabsContent>
+
+          {/* Add new AI Generated tab */}
+          <TabsContent value="ai-generated">
+            <Suspense fallback={
+              <div className="flex items-center justify-center p-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              </div>
+            }>
+              <AgentGeneratedCourses />
+            </Suspense>
           </TabsContent>
           
           {/* Skills Tab */}

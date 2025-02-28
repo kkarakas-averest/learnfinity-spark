@@ -1,0 +1,1076 @@
+{
+  "id": "cb3c2051-5eb5-41be-995d-5f8170bc853b",
+  "title": "Advanced JavaScript Frameworks",
+  "description": "Deep dive into modern JavaScript frameworks.",
+  "overview": {
+    "summary": "This course covers Advanced JavaScript Frameworks with a focus on practical applications.",
+    "key_concepts": [
+      "Understanding core principles",
+      "Practical application techniques",
+      "Advanced topics in Advanced JavaScript Frameworks"
+    ],
+    "prerequisites": [],
+    "target_audience": [
+      "Software Developers"
+    ],
+    "difficulty_level": "Intermediate",
+    "estimated_completion_time": "20 hours"
+  },
+  "modules": [
+    {
+      "id": "module_dc9554c7",
+      "title": "Module 1: Introduction to Advanced JavaScript Frameworks",
+      "sequence_order": 1,
+      "content": {
+        "introduction": "In this module, you'll learn about module 1: introduction to advanced javascript frameworks.",
+        "sections": [
+          {
+            "title": "Section 1: Key Concepts",
+            "content": [
+              {
+                "type": "text",
+                "value": "This section explains important concepts related to Module 1: Introduction to Advanced JavaScript Frameworks."
+              },
+              {
+                "type": "image",
+                "value": "Diagram illustrating the concept"
+              },
+              {
+                "type": "text",
+                "value": "After studying this section, you'll be able to apply these concepts in real-world scenarios."
+              }
+            ]
+          },
+          {
+            "title": "Section 2: Practical Examples",
+            "content": [
+              {
+                "type": "text",
+                "value": "This section explains important concepts related to Module 1: Introduction to Advanced JavaScript Frameworks."
+              },
+              {
+                "type": "image",
+                "value": "Diagram illustrating the concept"
+              },
+              {
+                "type": "text",
+                "value": "After studying this section, you'll be able to apply these concepts in real-world scenarios."
+              }
+            ]
+          },
+          {
+            "title": "Section 3: Hands-on Exercise",
+            "content": [
+              {
+                "type": "text",
+                "value": "This section explains important concepts related to Module 1: Introduction to Advanced JavaScript Frameworks."
+              },
+              {
+                "type": "image",
+                "value": "Diagram illustrating the concept"
+              },
+              {
+                "type": "text",
+                "value": "After studying this section, you'll be able to apply these concepts in real-world scenarios."
+              }
+            ]
+          }
+        ],
+        "summary": "You've completed Module 1! You should now understand the key concepts of module 1: introduction to advanced javascript frameworks."
+      },
+      "estimated_duration": "30 minutes",
+      "quiz": {
+        "title": "Quiz: Module 1: Introduction to Advanced JavaScript Frameworks",
+        "description": "Test your understanding of module 1: introduction to advanced javascript frameworks",
+        "questions": [
+          {
+            "id": "q_42fd243b",
+            "text": "Question 1 about Module 1: Introduction to Advanced JavaScript Frameworks",
+            "type": "multiple_choice",
+            "options": [
+              {
+                "id": "a",
+                "text": "First potential answer"
+              },
+              {
+                "id": "b",
+                "text": "Second potential answer"
+              },
+              {
+                "id": "c",
+                "text": "Third potential answer"
+              },
+              {
+                "id": "d",
+                "text": "Fourth potential answer"
+              }
+            ],
+            "correct_answer": "a",
+            "explanation": "Explanation for the correct answer"
+          },
+          {
+            "id": "q_af261000",
+            "text": "Question 2 about Module 1: Introduction to Advanced JavaScript Frameworks",
+            "type": "multiple_choice",
+            "options": [
+              {
+                "id": "a",
+                "text": "First potential answer"
+              },
+              {
+                "id": "b",
+                "text": "Second potential answer"
+              },
+              {
+                "id": "c",
+                "text": "Third potential answer"
+              },
+              {
+                "id": "d",
+                "text": "Fourth potential answer"
+              }
+            ],
+            "correct_answer": "a",
+            "explanation": "Explanation for the correct answer"
+          },
+          {
+            "id": "q_0d1b65dd",
+            "text": "Question 3 about Module 1: Introduction to Advanced JavaScript Frameworks",
+            "type": "multiple_choice",
+            "options": [
+              {
+                "id": "a",
+                "text": "First potential answer"
+              },
+              {
+                "id": "b",
+                "text": "Second potential answer"
+              },
+              {
+                "id": "c",
+                "text": "Third potential answer"
+              },
+              {
+                "id": "d",
+                "text": "Fourth potential answer"
+              }
+            ],
+            "correct_answer": "a",
+            "explanation": "Explanation for the correct answer"
+          },
+          {
+            "id": "q_4dd27556",
+            "text": "Question 4 about Module 1: Introduction to Advanced JavaScript Frameworks",
+            "type": "multiple_choice",
+            "options": [
+              {
+                "id": "a",
+                "text": "First potential answer"
+              },
+              {
+                "id": "b",
+                "text": "Second potential answer"
+              },
+              {
+                "id": "c",
+                "text": "Third potential answer"
+              },
+              {
+                "id": "d",
+                "text": "Fourth potential answer"
+              }
+            ],
+            "correct_answer": "a",
+            "explanation": "Explanation for the correct answer"
+          },
+          {
+            "id": "q_9d876ea3",
+            "text": "Question 5 about Module 1: Introduction to Advanced JavaScript Frameworks",
+            "type": "multiple_choice",
+            "options": [
+              {
+                "id": "a",
+                "text": "First potential answer"
+              },
+              {
+                "id": "b",
+                "text": "Second potential answer"
+              },
+              {
+                "id": "c",
+                "text": "Third potential answer"
+              },
+              {
+                "id": "d",
+                "text": "Fourth potential answer"
+              }
+            ],
+            "correct_answer": "a",
+            "explanation": "Explanation for the correct answer"
+          }
+        ],
+        "passing_score": 80
+      }
+    },
+    {
+      "id": "module_8e1734dc",
+      "title": "Module 2: Core Concepts of Advanced JavaScript Frameworks",
+      "sequence_order": 2,
+      "content": {
+        "introduction": "In this module, you'll learn about module 2: core concepts of advanced javascript frameworks.",
+        "sections": [
+          {
+            "title": "Section 1: Key Concepts",
+            "content": [
+              {
+                "type": "text",
+                "value": "This section explains important concepts related to Module 2: Core Concepts of Advanced JavaScript Frameworks."
+              },
+              {
+                "type": "image",
+                "value": "Diagram illustrating the concept"
+              },
+              {
+                "type": "text",
+                "value": "After studying this section, you'll be able to apply these concepts in real-world scenarios."
+              }
+            ]
+          },
+          {
+            "title": "Section 2: Practical Examples",
+            "content": [
+              {
+                "type": "text",
+                "value": "This section explains important concepts related to Module 2: Core Concepts of Advanced JavaScript Frameworks."
+              },
+              {
+                "type": "image",
+                "value": "Diagram illustrating the concept"
+              },
+              {
+                "type": "text",
+                "value": "After studying this section, you'll be able to apply these concepts in real-world scenarios."
+              }
+            ]
+          },
+          {
+            "title": "Section 3: Hands-on Exercise",
+            "content": [
+              {
+                "type": "text",
+                "value": "This section explains important concepts related to Module 2: Core Concepts of Advanced JavaScript Frameworks."
+              },
+              {
+                "type": "image",
+                "value": "Diagram illustrating the concept"
+              },
+              {
+                "type": "text",
+                "value": "After studying this section, you'll be able to apply these concepts in real-world scenarios."
+              }
+            ]
+          },
+          {
+            "title": "Section 4: Advanced Techniques",
+            "content": [
+              {
+                "type": "text",
+                "value": "This section explains important concepts related to Module 2: Core Concepts of Advanced JavaScript Frameworks."
+              },
+              {
+                "type": "image",
+                "value": "Diagram illustrating the concept"
+              },
+              {
+                "type": "text",
+                "value": "After studying this section, you'll be able to apply these concepts in real-world scenarios."
+              }
+            ]
+          }
+        ],
+        "summary": "You've completed Module 2! You should now understand the key concepts of module 2: core concepts of advanced javascript frameworks."
+      },
+      "estimated_duration": "45 minutes",
+      "quiz": {
+        "title": "Quiz: Module 2: Core Concepts of Advanced JavaScript Frameworks",
+        "description": "Test your understanding of module 2: core concepts of advanced javascript frameworks",
+        "questions": [
+          {
+            "id": "q_e68cde99",
+            "text": "Question 1 about Module 2: Core Concepts of Advanced JavaScript Frameworks",
+            "type": "multiple_choice",
+            "options": [
+              {
+                "id": "a",
+                "text": "First potential answer"
+              },
+              {
+                "id": "b",
+                "text": "Second potential answer"
+              },
+              {
+                "id": "c",
+                "text": "Third potential answer"
+              },
+              {
+                "id": "d",
+                "text": "Fourth potential answer"
+              }
+            ],
+            "correct_answer": "a",
+            "explanation": "Explanation for the correct answer"
+          },
+          {
+            "id": "q_96d950f1",
+            "text": "Question 2 about Module 2: Core Concepts of Advanced JavaScript Frameworks",
+            "type": "multiple_choice",
+            "options": [
+              {
+                "id": "a",
+                "text": "First potential answer"
+              },
+              {
+                "id": "b",
+                "text": "Second potential answer"
+              },
+              {
+                "id": "c",
+                "text": "Third potential answer"
+              },
+              {
+                "id": "d",
+                "text": "Fourth potential answer"
+              }
+            ],
+            "correct_answer": "a",
+            "explanation": "Explanation for the correct answer"
+          },
+          {
+            "id": "q_6f4bbe81",
+            "text": "Question 3 about Module 2: Core Concepts of Advanced JavaScript Frameworks",
+            "type": "multiple_choice",
+            "options": [
+              {
+                "id": "a",
+                "text": "First potential answer"
+              },
+              {
+                "id": "b",
+                "text": "Second potential answer"
+              },
+              {
+                "id": "c",
+                "text": "Third potential answer"
+              },
+              {
+                "id": "d",
+                "text": "Fourth potential answer"
+              }
+            ],
+            "correct_answer": "a",
+            "explanation": "Explanation for the correct answer"
+          },
+          {
+            "id": "q_39e8ff58",
+            "text": "Question 4 about Module 2: Core Concepts of Advanced JavaScript Frameworks",
+            "type": "multiple_choice",
+            "options": [
+              {
+                "id": "a",
+                "text": "First potential answer"
+              },
+              {
+                "id": "b",
+                "text": "Second potential answer"
+              },
+              {
+                "id": "c",
+                "text": "Third potential answer"
+              },
+              {
+                "id": "d",
+                "text": "Fourth potential answer"
+              }
+            ],
+            "correct_answer": "a",
+            "explanation": "Explanation for the correct answer"
+          },
+          {
+            "id": "q_706098f7",
+            "text": "Question 5 about Module 2: Core Concepts of Advanced JavaScript Frameworks",
+            "type": "multiple_choice",
+            "options": [
+              {
+                "id": "a",
+                "text": "First potential answer"
+              },
+              {
+                "id": "b",
+                "text": "Second potential answer"
+              },
+              {
+                "id": "c",
+                "text": "Third potential answer"
+              },
+              {
+                "id": "d",
+                "text": "Fourth potential answer"
+              }
+            ],
+            "correct_answer": "a",
+            "explanation": "Explanation for the correct answer"
+          }
+        ],
+        "passing_score": 80
+      }
+    },
+    {
+      "id": "module_90ad521e",
+      "title": "Module 3: Working with Advanced JavaScript Frameworks - Part 2",
+      "sequence_order": 3,
+      "content": {
+        "introduction": "In this module, you'll learn about module 3: working with advanced javascript frameworks - part 2.",
+        "sections": [
+          {
+            "title": "Section 1: Key Concepts",
+            "content": [
+              {
+                "type": "text",
+                "value": "This section explains important concepts related to Module 3: Working with Advanced JavaScript Frameworks - Part 2."
+              },
+              {
+                "type": "image",
+                "value": "Diagram illustrating the concept"
+              },
+              {
+                "type": "text",
+                "value": "After studying this section, you'll be able to apply these concepts in real-world scenarios."
+              }
+            ]
+          },
+          {
+            "title": "Section 2: Practical Examples",
+            "content": [
+              {
+                "type": "text",
+                "value": "This section explains important concepts related to Module 3: Working with Advanced JavaScript Frameworks - Part 2."
+              },
+              {
+                "type": "image",
+                "value": "Diagram illustrating the concept"
+              },
+              {
+                "type": "text",
+                "value": "After studying this section, you'll be able to apply these concepts in real-world scenarios."
+              }
+            ]
+          },
+          {
+            "title": "Section 3: Hands-on Exercise",
+            "content": [
+              {
+                "type": "text",
+                "value": "This section explains important concepts related to Module 3: Working with Advanced JavaScript Frameworks - Part 2."
+              },
+              {
+                "type": "image",
+                "value": "Diagram illustrating the concept"
+              },
+              {
+                "type": "text",
+                "value": "After studying this section, you'll be able to apply these concepts in real-world scenarios."
+              }
+            ]
+          },
+          {
+            "title": "Section 4: Advanced Techniques",
+            "content": [
+              {
+                "type": "text",
+                "value": "This section explains important concepts related to Module 3: Working with Advanced JavaScript Frameworks - Part 2."
+              },
+              {
+                "type": "image",
+                "value": "Diagram illustrating the concept"
+              },
+              {
+                "type": "text",
+                "value": "After studying this section, you'll be able to apply these concepts in real-world scenarios."
+              }
+            ]
+          },
+          {
+            "title": "Section 5: Advanced Techniques",
+            "content": [
+              {
+                "type": "text",
+                "value": "This section explains important concepts related to Module 3: Working with Advanced JavaScript Frameworks - Part 2."
+              },
+              {
+                "type": "image",
+                "value": "Diagram illustrating the concept"
+              },
+              {
+                "type": "text",
+                "value": "After studying this section, you'll be able to apply these concepts in real-world scenarios."
+              }
+            ]
+          }
+        ],
+        "summary": "You've completed Module 3! You should now understand the key concepts of module 3: working with advanced javascript frameworks - part 2."
+      },
+      "estimated_duration": "60 minutes",
+      "quiz": {
+        "title": "Quiz: Module 3: Working with Advanced JavaScript Frameworks - Part 2",
+        "description": "Test your understanding of module 3: working with advanced javascript frameworks - part 2",
+        "questions": [
+          {
+            "id": "q_c7db55d3",
+            "text": "Question 1 about Module 3: Working with Advanced JavaScript Frameworks - Part 2",
+            "type": "multiple_choice",
+            "options": [
+              {
+                "id": "a",
+                "text": "First potential answer"
+              },
+              {
+                "id": "b",
+                "text": "Second potential answer"
+              },
+              {
+                "id": "c",
+                "text": "Third potential answer"
+              },
+              {
+                "id": "d",
+                "text": "Fourth potential answer"
+              }
+            ],
+            "correct_answer": "a",
+            "explanation": "Explanation for the correct answer"
+          },
+          {
+            "id": "q_9860eacd",
+            "text": "Question 2 about Module 3: Working with Advanced JavaScript Frameworks - Part 2",
+            "type": "multiple_choice",
+            "options": [
+              {
+                "id": "a",
+                "text": "First potential answer"
+              },
+              {
+                "id": "b",
+                "text": "Second potential answer"
+              },
+              {
+                "id": "c",
+                "text": "Third potential answer"
+              },
+              {
+                "id": "d",
+                "text": "Fourth potential answer"
+              }
+            ],
+            "correct_answer": "a",
+            "explanation": "Explanation for the correct answer"
+          },
+          {
+            "id": "q_74ce18a0",
+            "text": "Question 3 about Module 3: Working with Advanced JavaScript Frameworks - Part 2",
+            "type": "multiple_choice",
+            "options": [
+              {
+                "id": "a",
+                "text": "First potential answer"
+              },
+              {
+                "id": "b",
+                "text": "Second potential answer"
+              },
+              {
+                "id": "c",
+                "text": "Third potential answer"
+              },
+              {
+                "id": "d",
+                "text": "Fourth potential answer"
+              }
+            ],
+            "correct_answer": "a",
+            "explanation": "Explanation for the correct answer"
+          },
+          {
+            "id": "q_cf12e59e",
+            "text": "Question 4 about Module 3: Working with Advanced JavaScript Frameworks - Part 2",
+            "type": "multiple_choice",
+            "options": [
+              {
+                "id": "a",
+                "text": "First potential answer"
+              },
+              {
+                "id": "b",
+                "text": "Second potential answer"
+              },
+              {
+                "id": "c",
+                "text": "Third potential answer"
+              },
+              {
+                "id": "d",
+                "text": "Fourth potential answer"
+              }
+            ],
+            "correct_answer": "a",
+            "explanation": "Explanation for the correct answer"
+          },
+          {
+            "id": "q_8e3cc48e",
+            "text": "Question 5 about Module 3: Working with Advanced JavaScript Frameworks - Part 2",
+            "type": "multiple_choice",
+            "options": [
+              {
+                "id": "a",
+                "text": "First potential answer"
+              },
+              {
+                "id": "b",
+                "text": "Second potential answer"
+              },
+              {
+                "id": "c",
+                "text": "Third potential answer"
+              },
+              {
+                "id": "d",
+                "text": "Fourth potential answer"
+              }
+            ],
+            "correct_answer": "a",
+            "explanation": "Explanation for the correct answer"
+          }
+        ],
+        "passing_score": 80
+      }
+    },
+    {
+      "id": "module_8dba3af4",
+      "title": "Module 4: Working with Advanced JavaScript Frameworks - Part 3",
+      "sequence_order": 4,
+      "content": {
+        "introduction": "In this module, you'll learn about module 4: working with advanced javascript frameworks - part 3.",
+        "sections": [
+          {
+            "title": "Section 1: Key Concepts",
+            "content": [
+              {
+                "type": "text",
+                "value": "This section explains important concepts related to Module 4: Working with Advanced JavaScript Frameworks - Part 3."
+              },
+              {
+                "type": "image",
+                "value": "Diagram illustrating the concept"
+              },
+              {
+                "type": "text",
+                "value": "After studying this section, you'll be able to apply these concepts in real-world scenarios."
+              }
+            ]
+          },
+          {
+            "title": "Section 2: Practical Examples",
+            "content": [
+              {
+                "type": "text",
+                "value": "This section explains important concepts related to Module 4: Working with Advanced JavaScript Frameworks - Part 3."
+              },
+              {
+                "type": "image",
+                "value": "Diagram illustrating the concept"
+              },
+              {
+                "type": "text",
+                "value": "After studying this section, you'll be able to apply these concepts in real-world scenarios."
+              }
+            ]
+          },
+          {
+            "title": "Section 3: Hands-on Exercise",
+            "content": [
+              {
+                "type": "text",
+                "value": "This section explains important concepts related to Module 4: Working with Advanced JavaScript Frameworks - Part 3."
+              },
+              {
+                "type": "image",
+                "value": "Diagram illustrating the concept"
+              },
+              {
+                "type": "text",
+                "value": "After studying this section, you'll be able to apply these concepts in real-world scenarios."
+              }
+            ]
+          }
+        ],
+        "summary": "You've completed Module 4! You should now understand the key concepts of module 4: working with advanced javascript frameworks - part 3."
+      },
+      "estimated_duration": "75 minutes",
+      "quiz": {
+        "title": "Quiz: Module 4: Working with Advanced JavaScript Frameworks - Part 3",
+        "description": "Test your understanding of module 4: working with advanced javascript frameworks - part 3",
+        "questions": [
+          {
+            "id": "q_4ee3e152",
+            "text": "Question 1 about Module 4: Working with Advanced JavaScript Frameworks - Part 3",
+            "type": "multiple_choice",
+            "options": [
+              {
+                "id": "a",
+                "text": "First potential answer"
+              },
+              {
+                "id": "b",
+                "text": "Second potential answer"
+              },
+              {
+                "id": "c",
+                "text": "Third potential answer"
+              },
+              {
+                "id": "d",
+                "text": "Fourth potential answer"
+              }
+            ],
+            "correct_answer": "a",
+            "explanation": "Explanation for the correct answer"
+          },
+          {
+            "id": "q_a27d0016",
+            "text": "Question 2 about Module 4: Working with Advanced JavaScript Frameworks - Part 3",
+            "type": "multiple_choice",
+            "options": [
+              {
+                "id": "a",
+                "text": "First potential answer"
+              },
+              {
+                "id": "b",
+                "text": "Second potential answer"
+              },
+              {
+                "id": "c",
+                "text": "Third potential answer"
+              },
+              {
+                "id": "d",
+                "text": "Fourth potential answer"
+              }
+            ],
+            "correct_answer": "a",
+            "explanation": "Explanation for the correct answer"
+          },
+          {
+            "id": "q_65fab507",
+            "text": "Question 3 about Module 4: Working with Advanced JavaScript Frameworks - Part 3",
+            "type": "multiple_choice",
+            "options": [
+              {
+                "id": "a",
+                "text": "First potential answer"
+              },
+              {
+                "id": "b",
+                "text": "Second potential answer"
+              },
+              {
+                "id": "c",
+                "text": "Third potential answer"
+              },
+              {
+                "id": "d",
+                "text": "Fourth potential answer"
+              }
+            ],
+            "correct_answer": "a",
+            "explanation": "Explanation for the correct answer"
+          },
+          {
+            "id": "q_61dbe8d9",
+            "text": "Question 4 about Module 4: Working with Advanced JavaScript Frameworks - Part 3",
+            "type": "multiple_choice",
+            "options": [
+              {
+                "id": "a",
+                "text": "First potential answer"
+              },
+              {
+                "id": "b",
+                "text": "Second potential answer"
+              },
+              {
+                "id": "c",
+                "text": "Third potential answer"
+              },
+              {
+                "id": "d",
+                "text": "Fourth potential answer"
+              }
+            ],
+            "correct_answer": "a",
+            "explanation": "Explanation for the correct answer"
+          },
+          {
+            "id": "q_6b4b050c",
+            "text": "Question 5 about Module 4: Working with Advanced JavaScript Frameworks - Part 3",
+            "type": "multiple_choice",
+            "options": [
+              {
+                "id": "a",
+                "text": "First potential answer"
+              },
+              {
+                "id": "b",
+                "text": "Second potential answer"
+              },
+              {
+                "id": "c",
+                "text": "Third potential answer"
+              },
+              {
+                "id": "d",
+                "text": "Fourth potential answer"
+              }
+            ],
+            "correct_answer": "a",
+            "explanation": "Explanation for the correct answer"
+          }
+        ],
+        "passing_score": 80
+      }
+    },
+    {
+      "id": "module_bcf5cca0",
+      "title": "Module 5: Advanced Topics and Case Studies",
+      "sequence_order": 5,
+      "content": {
+        "introduction": "In this module, you'll learn about module 5: advanced topics and case studies.",
+        "sections": [
+          {
+            "title": "Section 1: Key Concepts",
+            "content": [
+              {
+                "type": "text",
+                "value": "This section explains important concepts related to Module 5: Advanced Topics and Case Studies."
+              },
+              {
+                "type": "image",
+                "value": "Diagram illustrating the concept"
+              },
+              {
+                "type": "text",
+                "value": "After studying this section, you'll be able to apply these concepts in real-world scenarios."
+              }
+            ]
+          },
+          {
+            "title": "Section 2: Practical Examples",
+            "content": [
+              {
+                "type": "text",
+                "value": "This section explains important concepts related to Module 5: Advanced Topics and Case Studies."
+              },
+              {
+                "type": "image",
+                "value": "Diagram illustrating the concept"
+              },
+              {
+                "type": "text",
+                "value": "After studying this section, you'll be able to apply these concepts in real-world scenarios."
+              }
+            ]
+          },
+          {
+            "title": "Section 3: Hands-on Exercise",
+            "content": [
+              {
+                "type": "text",
+                "value": "This section explains important concepts related to Module 5: Advanced Topics and Case Studies."
+              },
+              {
+                "type": "image",
+                "value": "Diagram illustrating the concept"
+              },
+              {
+                "type": "text",
+                "value": "After studying this section, you'll be able to apply these concepts in real-world scenarios."
+              }
+            ]
+          },
+          {
+            "title": "Section 4: Advanced Techniques",
+            "content": [
+              {
+                "type": "text",
+                "value": "This section explains important concepts related to Module 5: Advanced Topics and Case Studies."
+              },
+              {
+                "type": "image",
+                "value": "Diagram illustrating the concept"
+              },
+              {
+                "type": "text",
+                "value": "After studying this section, you'll be able to apply these concepts in real-world scenarios."
+              }
+            ]
+          }
+        ],
+        "summary": "You've completed Module 5! You should now understand the key concepts of module 5: advanced topics and case studies."
+      },
+      "estimated_duration": "90 minutes",
+      "quiz": {
+        "title": "Quiz: Module 5: Advanced Topics and Case Studies",
+        "description": "Test your understanding of module 5: advanced topics and case studies",
+        "questions": [
+          {
+            "id": "q_98db94cc",
+            "text": "Question 1 about Module 5: Advanced Topics and Case Studies",
+            "type": "multiple_choice",
+            "options": [
+              {
+                "id": "a",
+                "text": "First potential answer"
+              },
+              {
+                "id": "b",
+                "text": "Second potential answer"
+              },
+              {
+                "id": "c",
+                "text": "Third potential answer"
+              },
+              {
+                "id": "d",
+                "text": "Fourth potential answer"
+              }
+            ],
+            "correct_answer": "a",
+            "explanation": "Explanation for the correct answer"
+          },
+          {
+            "id": "q_01765ef0",
+            "text": "Question 2 about Module 5: Advanced Topics and Case Studies",
+            "type": "multiple_choice",
+            "options": [
+              {
+                "id": "a",
+                "text": "First potential answer"
+              },
+              {
+                "id": "b",
+                "text": "Second potential answer"
+              },
+              {
+                "id": "c",
+                "text": "Third potential answer"
+              },
+              {
+                "id": "d",
+                "text": "Fourth potential answer"
+              }
+            ],
+            "correct_answer": "a",
+            "explanation": "Explanation for the correct answer"
+          },
+          {
+            "id": "q_89c0da73",
+            "text": "Question 3 about Module 5: Advanced Topics and Case Studies",
+            "type": "multiple_choice",
+            "options": [
+              {
+                "id": "a",
+                "text": "First potential answer"
+              },
+              {
+                "id": "b",
+                "text": "Second potential answer"
+              },
+              {
+                "id": "c",
+                "text": "Third potential answer"
+              },
+              {
+                "id": "d",
+                "text": "Fourth potential answer"
+              }
+            ],
+            "correct_answer": "a",
+            "explanation": "Explanation for the correct answer"
+          },
+          {
+            "id": "q_936de389",
+            "text": "Question 4 about Module 5: Advanced Topics and Case Studies",
+            "type": "multiple_choice",
+            "options": [
+              {
+                "id": "a",
+                "text": "First potential answer"
+              },
+              {
+                "id": "b",
+                "text": "Second potential answer"
+              },
+              {
+                "id": "c",
+                "text": "Third potential answer"
+              },
+              {
+                "id": "d",
+                "text": "Fourth potential answer"
+              }
+            ],
+            "correct_answer": "a",
+            "explanation": "Explanation for the correct answer"
+          },
+          {
+            "id": "q_670435e8",
+            "text": "Question 5 about Module 5: Advanced Topics and Case Studies",
+            "type": "multiple_choice",
+            "options": [
+              {
+                "id": "a",
+                "text": "First potential answer"
+              },
+              {
+                "id": "b",
+                "text": "Second potential answer"
+              },
+              {
+                "id": "c",
+                "text": "Third potential answer"
+              },
+              {
+                "id": "d",
+                "text": "Fourth potential answer"
+              }
+            ],
+            "correct_answer": "a",
+            "explanation": "Explanation for the correct answer"
+          }
+        ],
+        "passing_score": 80
+      }
+    }
+  ],
+  "employee_id": "emp001",
+  "learning_objectives": [
+    "Master React hooks and patterns",
+    "Build scalable frontend applications",
+    "Implement state management"
+  ],
+  "metadata": {
+    "course_id": "cb3c2051-5eb5-41be-995d-5f8170bc853b",
+    "created_at": "2025-02-28T13:03:00.042568",
+    "updated_at": "2025-02-28T13:03:00.042572",
+    "generated_for": "emp001"
+  }
+}

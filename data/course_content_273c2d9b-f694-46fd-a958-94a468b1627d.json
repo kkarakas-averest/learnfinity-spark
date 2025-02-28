@@ -1,0 +1,1076 @@
+{
+  "id": "273c2d9b-f694-46fd-a958-94a468b1627d",
+  "title": "DevOps Practices",
+  "description": "Learn essential DevOps tools and methodologies.",
+  "overview": {
+    "summary": "This course covers DevOps Practices with a focus on practical applications.",
+    "key_concepts": [
+      "Understanding core principles",
+      "Practical application techniques",
+      "Advanced topics in DevOps Practices"
+    ],
+    "prerequisites": [],
+    "target_audience": [
+      "Software Developers"
+    ],
+    "difficulty_level": "Intermediate",
+    "estimated_completion_time": "15 hours"
+  },
+  "modules": [
+    {
+      "id": "module_42b3be9b",
+      "title": "Module 1: Introduction to DevOps Practices",
+      "sequence_order": 1,
+      "content": {
+        "introduction": "In this module, you'll learn about module 1: introduction to devops practices.",
+        "sections": [
+          {
+            "title": "Section 1: Key Concepts",
+            "content": [
+              {
+                "type": "text",
+                "value": "This section explains important concepts related to Module 1: Introduction to DevOps Practices."
+              },
+              {
+                "type": "image",
+                "value": "Diagram illustrating the concept"
+              },
+              {
+                "type": "text",
+                "value": "After studying this section, you'll be able to apply these concepts in real-world scenarios."
+              }
+            ]
+          },
+          {
+            "title": "Section 2: Practical Examples",
+            "content": [
+              {
+                "type": "text",
+                "value": "This section explains important concepts related to Module 1: Introduction to DevOps Practices."
+              },
+              {
+                "type": "image",
+                "value": "Diagram illustrating the concept"
+              },
+              {
+                "type": "text",
+                "value": "After studying this section, you'll be able to apply these concepts in real-world scenarios."
+              }
+            ]
+          },
+          {
+            "title": "Section 3: Hands-on Exercise",
+            "content": [
+              {
+                "type": "text",
+                "value": "This section explains important concepts related to Module 1: Introduction to DevOps Practices."
+              },
+              {
+                "type": "image",
+                "value": "Diagram illustrating the concept"
+              },
+              {
+                "type": "text",
+                "value": "After studying this section, you'll be able to apply these concepts in real-world scenarios."
+              }
+            ]
+          }
+        ],
+        "summary": "You've completed Module 1! You should now understand the key concepts of module 1: introduction to devops practices."
+      },
+      "estimated_duration": "30 minutes",
+      "quiz": {
+        "title": "Quiz: Module 1: Introduction to DevOps Practices",
+        "description": "Test your understanding of module 1: introduction to devops practices",
+        "questions": [
+          {
+            "id": "q_192ac8ba",
+            "text": "Question 1 about Module 1: Introduction to DevOps Practices",
+            "type": "multiple_choice",
+            "options": [
+              {
+                "id": "a",
+                "text": "First potential answer"
+              },
+              {
+                "id": "b",
+                "text": "Second potential answer"
+              },
+              {
+                "id": "c",
+                "text": "Third potential answer"
+              },
+              {
+                "id": "d",
+                "text": "Fourth potential answer"
+              }
+            ],
+            "correct_answer": "a",
+            "explanation": "Explanation for the correct answer"
+          },
+          {
+            "id": "q_2b96c842",
+            "text": "Question 2 about Module 1: Introduction to DevOps Practices",
+            "type": "multiple_choice",
+            "options": [
+              {
+                "id": "a",
+                "text": "First potential answer"
+              },
+              {
+                "id": "b",
+                "text": "Second potential answer"
+              },
+              {
+                "id": "c",
+                "text": "Third potential answer"
+              },
+              {
+                "id": "d",
+                "text": "Fourth potential answer"
+              }
+            ],
+            "correct_answer": "a",
+            "explanation": "Explanation for the correct answer"
+          },
+          {
+            "id": "q_6fcd468a",
+            "text": "Question 3 about Module 1: Introduction to DevOps Practices",
+            "type": "multiple_choice",
+            "options": [
+              {
+                "id": "a",
+                "text": "First potential answer"
+              },
+              {
+                "id": "b",
+                "text": "Second potential answer"
+              },
+              {
+                "id": "c",
+                "text": "Third potential answer"
+              },
+              {
+                "id": "d",
+                "text": "Fourth potential answer"
+              }
+            ],
+            "correct_answer": "a",
+            "explanation": "Explanation for the correct answer"
+          },
+          {
+            "id": "q_50c51aea",
+            "text": "Question 4 about Module 1: Introduction to DevOps Practices",
+            "type": "multiple_choice",
+            "options": [
+              {
+                "id": "a",
+                "text": "First potential answer"
+              },
+              {
+                "id": "b",
+                "text": "Second potential answer"
+              },
+              {
+                "id": "c",
+                "text": "Third potential answer"
+              },
+              {
+                "id": "d",
+                "text": "Fourth potential answer"
+              }
+            ],
+            "correct_answer": "a",
+            "explanation": "Explanation for the correct answer"
+          },
+          {
+            "id": "q_ec899130",
+            "text": "Question 5 about Module 1: Introduction to DevOps Practices",
+            "type": "multiple_choice",
+            "options": [
+              {
+                "id": "a",
+                "text": "First potential answer"
+              },
+              {
+                "id": "b",
+                "text": "Second potential answer"
+              },
+              {
+                "id": "c",
+                "text": "Third potential answer"
+              },
+              {
+                "id": "d",
+                "text": "Fourth potential answer"
+              }
+            ],
+            "correct_answer": "a",
+            "explanation": "Explanation for the correct answer"
+          }
+        ],
+        "passing_score": 80
+      }
+    },
+    {
+      "id": "module_84515310",
+      "title": "Module 2: Core Concepts of DevOps Practices",
+      "sequence_order": 2,
+      "content": {
+        "introduction": "In this module, you'll learn about module 2: core concepts of devops practices.",
+        "sections": [
+          {
+            "title": "Section 1: Key Concepts",
+            "content": [
+              {
+                "type": "text",
+                "value": "This section explains important concepts related to Module 2: Core Concepts of DevOps Practices."
+              },
+              {
+                "type": "image",
+                "value": "Diagram illustrating the concept"
+              },
+              {
+                "type": "text",
+                "value": "After studying this section, you'll be able to apply these concepts in real-world scenarios."
+              }
+            ]
+          },
+          {
+            "title": "Section 2: Practical Examples",
+            "content": [
+              {
+                "type": "text",
+                "value": "This section explains important concepts related to Module 2: Core Concepts of DevOps Practices."
+              },
+              {
+                "type": "image",
+                "value": "Diagram illustrating the concept"
+              },
+              {
+                "type": "text",
+                "value": "After studying this section, you'll be able to apply these concepts in real-world scenarios."
+              }
+            ]
+          },
+          {
+            "title": "Section 3: Hands-on Exercise",
+            "content": [
+              {
+                "type": "text",
+                "value": "This section explains important concepts related to Module 2: Core Concepts of DevOps Practices."
+              },
+              {
+                "type": "image",
+                "value": "Diagram illustrating the concept"
+              },
+              {
+                "type": "text",
+                "value": "After studying this section, you'll be able to apply these concepts in real-world scenarios."
+              }
+            ]
+          },
+          {
+            "title": "Section 4: Advanced Techniques",
+            "content": [
+              {
+                "type": "text",
+                "value": "This section explains important concepts related to Module 2: Core Concepts of DevOps Practices."
+              },
+              {
+                "type": "image",
+                "value": "Diagram illustrating the concept"
+              },
+              {
+                "type": "text",
+                "value": "After studying this section, you'll be able to apply these concepts in real-world scenarios."
+              }
+            ]
+          }
+        ],
+        "summary": "You've completed Module 2! You should now understand the key concepts of module 2: core concepts of devops practices."
+      },
+      "estimated_duration": "45 minutes",
+      "quiz": {
+        "title": "Quiz: Module 2: Core Concepts of DevOps Practices",
+        "description": "Test your understanding of module 2: core concepts of devops practices",
+        "questions": [
+          {
+            "id": "q_59770615",
+            "text": "Question 1 about Module 2: Core Concepts of DevOps Practices",
+            "type": "multiple_choice",
+            "options": [
+              {
+                "id": "a",
+                "text": "First potential answer"
+              },
+              {
+                "id": "b",
+                "text": "Second potential answer"
+              },
+              {
+                "id": "c",
+                "text": "Third potential answer"
+              },
+              {
+                "id": "d",
+                "text": "Fourth potential answer"
+              }
+            ],
+            "correct_answer": "a",
+            "explanation": "Explanation for the correct answer"
+          },
+          {
+            "id": "q_905c6f71",
+            "text": "Question 2 about Module 2: Core Concepts of DevOps Practices",
+            "type": "multiple_choice",
+            "options": [
+              {
+                "id": "a",
+                "text": "First potential answer"
+              },
+              {
+                "id": "b",
+                "text": "Second potential answer"
+              },
+              {
+                "id": "c",
+                "text": "Third potential answer"
+              },
+              {
+                "id": "d",
+                "text": "Fourth potential answer"
+              }
+            ],
+            "correct_answer": "a",
+            "explanation": "Explanation for the correct answer"
+          },
+          {
+            "id": "q_8e992dbb",
+            "text": "Question 3 about Module 2: Core Concepts of DevOps Practices",
+            "type": "multiple_choice",
+            "options": [
+              {
+                "id": "a",
+                "text": "First potential answer"
+              },
+              {
+                "id": "b",
+                "text": "Second potential answer"
+              },
+              {
+                "id": "c",
+                "text": "Third potential answer"
+              },
+              {
+                "id": "d",
+                "text": "Fourth potential answer"
+              }
+            ],
+            "correct_answer": "a",
+            "explanation": "Explanation for the correct answer"
+          },
+          {
+            "id": "q_49b6d699",
+            "text": "Question 4 about Module 2: Core Concepts of DevOps Practices",
+            "type": "multiple_choice",
+            "options": [
+              {
+                "id": "a",
+                "text": "First potential answer"
+              },
+              {
+                "id": "b",
+                "text": "Second potential answer"
+              },
+              {
+                "id": "c",
+                "text": "Third potential answer"
+              },
+              {
+                "id": "d",
+                "text": "Fourth potential answer"
+              }
+            ],
+            "correct_answer": "a",
+            "explanation": "Explanation for the correct answer"
+          },
+          {
+            "id": "q_e87d83f8",
+            "text": "Question 5 about Module 2: Core Concepts of DevOps Practices",
+            "type": "multiple_choice",
+            "options": [
+              {
+                "id": "a",
+                "text": "First potential answer"
+              },
+              {
+                "id": "b",
+                "text": "Second potential answer"
+              },
+              {
+                "id": "c",
+                "text": "Third potential answer"
+              },
+              {
+                "id": "d",
+                "text": "Fourth potential answer"
+              }
+            ],
+            "correct_answer": "a",
+            "explanation": "Explanation for the correct answer"
+          }
+        ],
+        "passing_score": 80
+      }
+    },
+    {
+      "id": "module_889480b7",
+      "title": "Module 3: Working with DevOps Practices - Part 2",
+      "sequence_order": 3,
+      "content": {
+        "introduction": "In this module, you'll learn about module 3: working with devops practices - part 2.",
+        "sections": [
+          {
+            "title": "Section 1: Key Concepts",
+            "content": [
+              {
+                "type": "text",
+                "value": "This section explains important concepts related to Module 3: Working with DevOps Practices - Part 2."
+              },
+              {
+                "type": "image",
+                "value": "Diagram illustrating the concept"
+              },
+              {
+                "type": "text",
+                "value": "After studying this section, you'll be able to apply these concepts in real-world scenarios."
+              }
+            ]
+          },
+          {
+            "title": "Section 2: Practical Examples",
+            "content": [
+              {
+                "type": "text",
+                "value": "This section explains important concepts related to Module 3: Working with DevOps Practices - Part 2."
+              },
+              {
+                "type": "image",
+                "value": "Diagram illustrating the concept"
+              },
+              {
+                "type": "text",
+                "value": "After studying this section, you'll be able to apply these concepts in real-world scenarios."
+              }
+            ]
+          },
+          {
+            "title": "Section 3: Hands-on Exercise",
+            "content": [
+              {
+                "type": "text",
+                "value": "This section explains important concepts related to Module 3: Working with DevOps Practices - Part 2."
+              },
+              {
+                "type": "image",
+                "value": "Diagram illustrating the concept"
+              },
+              {
+                "type": "text",
+                "value": "After studying this section, you'll be able to apply these concepts in real-world scenarios."
+              }
+            ]
+          },
+          {
+            "title": "Section 4: Advanced Techniques",
+            "content": [
+              {
+                "type": "text",
+                "value": "This section explains important concepts related to Module 3: Working with DevOps Practices - Part 2."
+              },
+              {
+                "type": "image",
+                "value": "Diagram illustrating the concept"
+              },
+              {
+                "type": "text",
+                "value": "After studying this section, you'll be able to apply these concepts in real-world scenarios."
+              }
+            ]
+          },
+          {
+            "title": "Section 5: Advanced Techniques",
+            "content": [
+              {
+                "type": "text",
+                "value": "This section explains important concepts related to Module 3: Working with DevOps Practices - Part 2."
+              },
+              {
+                "type": "image",
+                "value": "Diagram illustrating the concept"
+              },
+              {
+                "type": "text",
+                "value": "After studying this section, you'll be able to apply these concepts in real-world scenarios."
+              }
+            ]
+          }
+        ],
+        "summary": "You've completed Module 3! You should now understand the key concepts of module 3: working with devops practices - part 2."
+      },
+      "estimated_duration": "60 minutes",
+      "quiz": {
+        "title": "Quiz: Module 3: Working with DevOps Practices - Part 2",
+        "description": "Test your understanding of module 3: working with devops practices - part 2",
+        "questions": [
+          {
+            "id": "q_df69e4a0",
+            "text": "Question 1 about Module 3: Working with DevOps Practices - Part 2",
+            "type": "multiple_choice",
+            "options": [
+              {
+                "id": "a",
+                "text": "First potential answer"
+              },
+              {
+                "id": "b",
+                "text": "Second potential answer"
+              },
+              {
+                "id": "c",
+                "text": "Third potential answer"
+              },
+              {
+                "id": "d",
+                "text": "Fourth potential answer"
+              }
+            ],
+            "correct_answer": "a",
+            "explanation": "Explanation for the correct answer"
+          },
+          {
+            "id": "q_9a5c90ef",
+            "text": "Question 2 about Module 3: Working with DevOps Practices - Part 2",
+            "type": "multiple_choice",
+            "options": [
+              {
+                "id": "a",
+                "text": "First potential answer"
+              },
+              {
+                "id": "b",
+                "text": "Second potential answer"
+              },
+              {
+                "id": "c",
+                "text": "Third potential answer"
+              },
+              {
+                "id": "d",
+                "text": "Fourth potential answer"
+              }
+            ],
+            "correct_answer": "a",
+            "explanation": "Explanation for the correct answer"
+          },
+          {
+            "id": "q_b633a408",
+            "text": "Question 3 about Module 3: Working with DevOps Practices - Part 2",
+            "type": "multiple_choice",
+            "options": [
+              {
+                "id": "a",
+                "text": "First potential answer"
+              },
+              {
+                "id": "b",
+                "text": "Second potential answer"
+              },
+              {
+                "id": "c",
+                "text": "Third potential answer"
+              },
+              {
+                "id": "d",
+                "text": "Fourth potential answer"
+              }
+            ],
+            "correct_answer": "a",
+            "explanation": "Explanation for the correct answer"
+          },
+          {
+            "id": "q_8f37d22e",
+            "text": "Question 4 about Module 3: Working with DevOps Practices - Part 2",
+            "type": "multiple_choice",
+            "options": [
+              {
+                "id": "a",
+                "text": "First potential answer"
+              },
+              {
+                "id": "b",
+                "text": "Second potential answer"
+              },
+              {
+                "id": "c",
+                "text": "Third potential answer"
+              },
+              {
+                "id": "d",
+                "text": "Fourth potential answer"
+              }
+            ],
+            "correct_answer": "a",
+            "explanation": "Explanation for the correct answer"
+          },
+          {
+            "id": "q_dd132f9b",
+            "text": "Question 5 about Module 3: Working with DevOps Practices - Part 2",
+            "type": "multiple_choice",
+            "options": [
+              {
+                "id": "a",
+                "text": "First potential answer"
+              },
+              {
+                "id": "b",
+                "text": "Second potential answer"
+              },
+              {
+                "id": "c",
+                "text": "Third potential answer"
+              },
+              {
+                "id": "d",
+                "text": "Fourth potential answer"
+              }
+            ],
+            "correct_answer": "a",
+            "explanation": "Explanation for the correct answer"
+          }
+        ],
+        "passing_score": 80
+      }
+    },
+    {
+      "id": "module_bba2b48a",
+      "title": "Module 4: Working with DevOps Practices - Part 3",
+      "sequence_order": 4,
+      "content": {
+        "introduction": "In this module, you'll learn about module 4: working with devops practices - part 3.",
+        "sections": [
+          {
+            "title": "Section 1: Key Concepts",
+            "content": [
+              {
+                "type": "text",
+                "value": "This section explains important concepts related to Module 4: Working with DevOps Practices - Part 3."
+              },
+              {
+                "type": "image",
+                "value": "Diagram illustrating the concept"
+              },
+              {
+                "type": "text",
+                "value": "After studying this section, you'll be able to apply these concepts in real-world scenarios."
+              }
+            ]
+          },
+          {
+            "title": "Section 2: Practical Examples",
+            "content": [
+              {
+                "type": "text",
+                "value": "This section explains important concepts related to Module 4: Working with DevOps Practices - Part 3."
+              },
+              {
+                "type": "image",
+                "value": "Diagram illustrating the concept"
+              },
+              {
+                "type": "text",
+                "value": "After studying this section, you'll be able to apply these concepts in real-world scenarios."
+              }
+            ]
+          },
+          {
+            "title": "Section 3: Hands-on Exercise",
+            "content": [
+              {
+                "type": "text",
+                "value": "This section explains important concepts related to Module 4: Working with DevOps Practices - Part 3."
+              },
+              {
+                "type": "image",
+                "value": "Diagram illustrating the concept"
+              },
+              {
+                "type": "text",
+                "value": "After studying this section, you'll be able to apply these concepts in real-world scenarios."
+              }
+            ]
+          }
+        ],
+        "summary": "You've completed Module 4! You should now understand the key concepts of module 4: working with devops practices - part 3."
+      },
+      "estimated_duration": "75 minutes",
+      "quiz": {
+        "title": "Quiz: Module 4: Working with DevOps Practices - Part 3",
+        "description": "Test your understanding of module 4: working with devops practices - part 3",
+        "questions": [
+          {
+            "id": "q_adb55d0f",
+            "text": "Question 1 about Module 4: Working with DevOps Practices - Part 3",
+            "type": "multiple_choice",
+            "options": [
+              {
+                "id": "a",
+                "text": "First potential answer"
+              },
+              {
+                "id": "b",
+                "text": "Second potential answer"
+              },
+              {
+                "id": "c",
+                "text": "Third potential answer"
+              },
+              {
+                "id": "d",
+                "text": "Fourth potential answer"
+              }
+            ],
+            "correct_answer": "a",
+            "explanation": "Explanation for the correct answer"
+          },
+          {
+            "id": "q_e5721fd7",
+            "text": "Question 2 about Module 4: Working with DevOps Practices - Part 3",
+            "type": "multiple_choice",
+            "options": [
+              {
+                "id": "a",
+                "text": "First potential answer"
+              },
+              {
+                "id": "b",
+                "text": "Second potential answer"
+              },
+              {
+                "id": "c",
+                "text": "Third potential answer"
+              },
+              {
+                "id": "d",
+                "text": "Fourth potential answer"
+              }
+            ],
+            "correct_answer": "a",
+            "explanation": "Explanation for the correct answer"
+          },
+          {
+            "id": "q_914b8667",
+            "text": "Question 3 about Module 4: Working with DevOps Practices - Part 3",
+            "type": "multiple_choice",
+            "options": [
+              {
+                "id": "a",
+                "text": "First potential answer"
+              },
+              {
+                "id": "b",
+                "text": "Second potential answer"
+              },
+              {
+                "id": "c",
+                "text": "Third potential answer"
+              },
+              {
+                "id": "d",
+                "text": "Fourth potential answer"
+              }
+            ],
+            "correct_answer": "a",
+            "explanation": "Explanation for the correct answer"
+          },
+          {
+            "id": "q_2ca7187f",
+            "text": "Question 4 about Module 4: Working with DevOps Practices - Part 3",
+            "type": "multiple_choice",
+            "options": [
+              {
+                "id": "a",
+                "text": "First potential answer"
+              },
+              {
+                "id": "b",
+                "text": "Second potential answer"
+              },
+              {
+                "id": "c",
+                "text": "Third potential answer"
+              },
+              {
+                "id": "d",
+                "text": "Fourth potential answer"
+              }
+            ],
+            "correct_answer": "a",
+            "explanation": "Explanation for the correct answer"
+          },
+          {
+            "id": "q_77b0fb16",
+            "text": "Question 5 about Module 4: Working with DevOps Practices - Part 3",
+            "type": "multiple_choice",
+            "options": [
+              {
+                "id": "a",
+                "text": "First potential answer"
+              },
+              {
+                "id": "b",
+                "text": "Second potential answer"
+              },
+              {
+                "id": "c",
+                "text": "Third potential answer"
+              },
+              {
+                "id": "d",
+                "text": "Fourth potential answer"
+              }
+            ],
+            "correct_answer": "a",
+            "explanation": "Explanation for the correct answer"
+          }
+        ],
+        "passing_score": 80
+      }
+    },
+    {
+      "id": "module_8a24d178",
+      "title": "Module 5: Advanced Topics and Case Studies",
+      "sequence_order": 5,
+      "content": {
+        "introduction": "In this module, you'll learn about module 5: advanced topics and case studies.",
+        "sections": [
+          {
+            "title": "Section 1: Key Concepts",
+            "content": [
+              {
+                "type": "text",
+                "value": "This section explains important concepts related to Module 5: Advanced Topics and Case Studies."
+              },
+              {
+                "type": "image",
+                "value": "Diagram illustrating the concept"
+              },
+              {
+                "type": "text",
+                "value": "After studying this section, you'll be able to apply these concepts in real-world scenarios."
+              }
+            ]
+          },
+          {
+            "title": "Section 2: Practical Examples",
+            "content": [
+              {
+                "type": "text",
+                "value": "This section explains important concepts related to Module 5: Advanced Topics and Case Studies."
+              },
+              {
+                "type": "image",
+                "value": "Diagram illustrating the concept"
+              },
+              {
+                "type": "text",
+                "value": "After studying this section, you'll be able to apply these concepts in real-world scenarios."
+              }
+            ]
+          },
+          {
+            "title": "Section 3: Hands-on Exercise",
+            "content": [
+              {
+                "type": "text",
+                "value": "This section explains important concepts related to Module 5: Advanced Topics and Case Studies."
+              },
+              {
+                "type": "image",
+                "value": "Diagram illustrating the concept"
+              },
+              {
+                "type": "text",
+                "value": "After studying this section, you'll be able to apply these concepts in real-world scenarios."
+              }
+            ]
+          },
+          {
+            "title": "Section 4: Advanced Techniques",
+            "content": [
+              {
+                "type": "text",
+                "value": "This section explains important concepts related to Module 5: Advanced Topics and Case Studies."
+              },
+              {
+                "type": "image",
+                "value": "Diagram illustrating the concept"
+              },
+              {
+                "type": "text",
+                "value": "After studying this section, you'll be able to apply these concepts in real-world scenarios."
+              }
+            ]
+          }
+        ],
+        "summary": "You've completed Module 5! You should now understand the key concepts of module 5: advanced topics and case studies."
+      },
+      "estimated_duration": "90 minutes",
+      "quiz": {
+        "title": "Quiz: Module 5: Advanced Topics and Case Studies",
+        "description": "Test your understanding of module 5: advanced topics and case studies",
+        "questions": [
+          {
+            "id": "q_1a61e016",
+            "text": "Question 1 about Module 5: Advanced Topics and Case Studies",
+            "type": "multiple_choice",
+            "options": [
+              {
+                "id": "a",
+                "text": "First potential answer"
+              },
+              {
+                "id": "b",
+                "text": "Second potential answer"
+              },
+              {
+                "id": "c",
+                "text": "Third potential answer"
+              },
+              {
+                "id": "d",
+                "text": "Fourth potential answer"
+              }
+            ],
+            "correct_answer": "a",
+            "explanation": "Explanation for the correct answer"
+          },
+          {
+            "id": "q_6a0759d0",
+            "text": "Question 2 about Module 5: Advanced Topics and Case Studies",
+            "type": "multiple_choice",
+            "options": [
+              {
+                "id": "a",
+                "text": "First potential answer"
+              },
+              {
+                "id": "b",
+                "text": "Second potential answer"
+              },
+              {
+                "id": "c",
+                "text": "Third potential answer"
+              },
+              {
+                "id": "d",
+                "text": "Fourth potential answer"
+              }
+            ],
+            "correct_answer": "a",
+            "explanation": "Explanation for the correct answer"
+          },
+          {
+            "id": "q_f5ed88d5",
+            "text": "Question 3 about Module 5: Advanced Topics and Case Studies",
+            "type": "multiple_choice",
+            "options": [
+              {
+                "id": "a",
+                "text": "First potential answer"
+              },
+              {
+                "id": "b",
+                "text": "Second potential answer"
+              },
+              {
+                "id": "c",
+                "text": "Third potential answer"
+              },
+              {
+                "id": "d",
+                "text": "Fourth potential answer"
+              }
+            ],
+            "correct_answer": "a",
+            "explanation": "Explanation for the correct answer"
+          },
+          {
+            "id": "q_ad1bad61",
+            "text": "Question 4 about Module 5: Advanced Topics and Case Studies",
+            "type": "multiple_choice",
+            "options": [
+              {
+                "id": "a",
+                "text": "First potential answer"
+              },
+              {
+                "id": "b",
+                "text": "Second potential answer"
+              },
+              {
+                "id": "c",
+                "text": "Third potential answer"
+              },
+              {
+                "id": "d",
+                "text": "Fourth potential answer"
+              }
+            ],
+            "correct_answer": "a",
+            "explanation": "Explanation for the correct answer"
+          },
+          {
+            "id": "q_806fcc8b",
+            "text": "Question 5 about Module 5: Advanced Topics and Case Studies",
+            "type": "multiple_choice",
+            "options": [
+              {
+                "id": "a",
+                "text": "First potential answer"
+              },
+              {
+                "id": "b",
+                "text": "Second potential answer"
+              },
+              {
+                "id": "c",
+                "text": "Third potential answer"
+              },
+              {
+                "id": "d",
+                "text": "Fourth potential answer"
+              }
+            ],
+            "correct_answer": "a",
+            "explanation": "Explanation for the correct answer"
+          }
+        ],
+        "passing_score": 80
+      }
+    }
+  ],
+  "employee_id": "emp001",
+  "learning_objectives": [
+    "Understand CI/CD pipelines",
+    "Use Docker for containerization",
+    "Implement automated testing"
+  ],
+  "metadata": {
+    "course_id": "273c2d9b-f694-46fd-a958-94a468b1627d",
+    "created_at": "2025-02-28T13:03:00.040664",
+    "updated_at": "2025-02-28T13:03:00.040673",
+    "generated_for": "emp001"
+  }
+}

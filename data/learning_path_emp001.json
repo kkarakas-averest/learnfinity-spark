@@ -1,0 +1,64 @@
+{
+  "employee_id": "emp001",
+  "recommended_courses": [
+    {
+      "course_id": "a3294e44-d97a-4412-901c-a56611c5a255",
+      "title": "Cloud Computing Fundamentals",
+      "description": "Introduction to cloud computing concepts, services, and providers.",
+      "learning_objectives": [
+        "Understand cloud service models",
+        "Compare major cloud providers",
+        "Deploy basic applications to the cloud"
+      ],
+      "estimated_duration": "10 hours",
+      "relevance": "Essential for modern software development",
+      "content_type": [
+        "video",
+        "interactive"
+      ]
+    },
+    {
+      "course_id": "273c2d9b-f694-46fd-a958-94a468b1627d",
+      "title": "DevOps Practices",
+      "description": "Learn essential DevOps tools and methodologies.",
+      "learning_objectives": [
+        "Understand CI/CD pipelines",
+        "Use Docker for containerization",
+        "Implement automated testing"
+      ],
+      "estimated_duration": "15 hours",
+      "relevance": "Critical for efficient development workflows",
+      "content_type": [
+        "hands-on",
+        "case studies"
+      ]
+    },
+    {
+      "course_id": "cb3c2051-5eb5-41be-995d-5f8170bc853b",
+      "title": "Advanced JavaScript Frameworks",
+      "description": "Deep dive into modern JavaScript frameworks.",
+      "learning_objectives": [
+        "Master React hooks and patterns",
+        "Build scalable frontend applications",
+        "Implement state management"
+      ],
+      "estimated_duration": "20 hours",
+      "relevance": "Enhances frontend development capabilities",
+      "content_type": [
+        "projects",
+        "tutorials"
+      ]
+    }
+  ],
+  "sequence": [
+    "Cloud Computing Fundamentals",
+    "DevOps Practices",
+    "Advanced JavaScript Frameworks"
+  ],
+  "total_duration": "45 hours",
+  "metadata": {
+    "path_id": "fda03a17-e83a-4302-9da9-868280dd0241",
+    "created_at": "2025-02-28T12:44:42.345881",
+    "updated_at": "2025-02-28T12:44:42.345883"
+  }
+}

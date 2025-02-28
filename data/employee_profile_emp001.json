@@ -1,0 +1,17 @@
+{
+  "employee_id": "emp001",
+  "name": "John Doe",
+  "professional_background": "Software developer with 3 years of experience in Python and JavaScript.",
+  "skill_assessment": "Mid-level developer with solid programming fundamentals. Could benefit from advanced frameworks and DevOps practices.",
+  "recommended_learning_areas": [
+    "Cloud Computing",
+    "DevOps",
+    "Advanced JavaScript Frameworks"
+  ],
+  "learning_preferences": "Hands-on learning with practical exercises",
+  "time_availability": "5-7 hours per week",
+  "metadata": {
+    "created_at": "2025-02-28T12:44:42.345629",
+    "updated_at": "2025-02-28T12:44:42.345636"
+  }
+}
