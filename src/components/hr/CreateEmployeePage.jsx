@@ -34,33 +34,54 @@ const CreateEmployeePage = () => {
   const [enrolledCourses, setEnrolledCourses] = useState([]);
 
   useEffect(() => {
-    const fetchFormData = async () => {
+    const checkDatabaseAndFetchData = async () => {
       try {
         setIsDataLoading(true);
+        
+        // Check if all HR tables exist
+        const { exists, missingTables } = await hrEmployeeService.checkHRTablesExist();
+        if (!exists) {
+          toast.error(
+            `Database tables missing: ${missingTables.join(', ')}`,
+            { 
+              description: 'Please run the SQL initialization script in Supabase', 
+              duration: 10000 
+            }
+          );
+          return;
+        }
         
         // Fetch departments
         const { data: departmentsData, error: departmentsError } = 
           await hrDepartmentService.getDepartments();
         
-        if (departmentsError) throw departmentsError;
+        if (departmentsError) {
+          console.error('Error fetching departments:', departmentsError);
+          toast.error('Failed to load departments. Please check the console for details.');
+          throw departmentsError;
+        }
         setDepartments(departmentsData || []);
         
         // Fetch positions
         const { data: positionsData, error: positionsError } = 
           await hrDepartmentService.getPositions();
         
-        if (positionsError) throw positionsError;
+        if (positionsError) {
+          console.error('Error fetching positions:', positionsError);
+          toast.error('Failed to load positions. Please check the console for details.');
+          throw positionsError;
+        }
         setPositions(positionsData || []);
         
       } catch (error) {
-        console.error('Error fetching form data:', error);
-        toast.error('Failed to load form data. Please try again.');
+        console.error('Error in checkDatabaseAndFetchData:', error);
+        toast.error('Failed to initialize. Please check the console for details.');
       } finally {
         setIsDataLoading(false);
       }
     };
     
-    fetchFormData();
+    checkDatabaseAndFetchData();
   }, []);
 
   const handleSubmit = async (formData) => {

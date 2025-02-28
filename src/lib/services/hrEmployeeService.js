@@ -5,7 +5,54 @@ import { generateSecurePassword } from '@/lib/utils';
 const DEFAULT_COMPANY_ID = import.meta.env.VITE_DEFAULT_COMPANY_ID || 'default-company-id';
 const TABLE_NAME = 'hr_employees';
 
+// List of all HR tables that should exist
+const HR_TABLES = [
+  'hr_departments',
+  'hr_positions', 
+  'hr_employees',
+  'hr_courses',
+  'hr_course_enrollments',
+  'hr_employee_activities',
+  'hr_learning_paths',
+  'hr_learning_path_courses',
+  'hr_learning_path_enrollments'
+];
+
 export const hrEmployeeService = {
+  /**
+   * Check if all required HR tables exist in the database
+   * @returns {Promise<{exists: boolean, missingTables: string[]}>}
+   */
+  async checkHRTablesExist() {
+    console.log('Checking if HR tables exist...');
+    const missingTables = [];
+    
+    for (const table of HR_TABLES) {
+      try {
+        const { error } = await supabase
+          .from(table)
+          .select('id')
+          .limit(1);
+          
+        if (error && error.code === '42P01') {
+          console.warn(`Table ${table} does not exist`);
+          missingTables.push(table);
+        }
+      } catch (error) {
+        console.error(`Error checking table ${table}:`, error);
+        missingTables.push(table);
+      }
+    }
+    
+    const allExist = missingTables.length === 0;
+    console.log(`HR tables check: ${allExist ? 'All exist' : 'Some missing'}`);
+    if (!allExist) {
+      console.log('Missing tables:', missingTables);
+    }
+    
+    return { exists: allExist, missingTables };
+  },
+
   /**
    * Ensure the resume_url column exists in the hr_employees table
    * This will be called once during initialization
@@ -136,15 +183,25 @@ export const hrEmployeeService = {
    */
   async createEmployee(employee) {
     try {
+      console.log('Attempting to create employee with data:', JSON.stringify(employee, null, 2));
       const { data, error } = await supabase
         .from(TABLE_NAME)
         .insert([employee])
         .select()
         .single();
 
+      if (error) {
+        console.error('Detailed error creating employee:', {
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint
+        });
+      }
+
       return { data, error };
     } catch (error) {
-      console.error('Error in createEmployee:', error);
+      console.error('Exception in createEmployee:', error);
       return { data: null, error };
     }
   },
@@ -175,21 +232,12 @@ export const hrEmployeeService = {
         throw new Error('Company ID is required for employee creation');
       }
       
-      // Check if hr_employees table exists first
-      const { error: tableCheckError } = await supabase
-        .from(TABLE_NAME)
-        .select('id')
-        .limit(1);
-        
-      if (tableCheckError) {
-        console.warn('HR employees table check error:', tableCheckError);
-        
-        // Instead of trying to create the table dynamically, guide the user
-        if (tableCheckError.message.includes('relation "hr_employees" does not exist')) {
-          throw new Error('The HR employees table does not exist. Please run the database initialization script from src/lib/database/hr-schema.sql in your Supabase SQL editor.');
-        } else {
-          throw tableCheckError;
-        }
+      // Check if all HR tables exist
+      const { exists, missingTables } = await this.checkHRTablesExist();
+      if (!exists) {
+        const errorMsg = `Cannot create employee because required tables are missing: ${missingTables.join(', ')}. Please run the database initialization script.`;
+        console.error(errorMsg);
+        throw new Error(errorMsg);
       }
       
       // First create the employee record
