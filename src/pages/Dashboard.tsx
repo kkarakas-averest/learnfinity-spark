@@ -18,7 +18,17 @@ const Dashboard = () => {
   const { user, userDetails, isLoading } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("overview");
-  const { getActiveCourses, getLearningPaths, coursesLoading } = useLearningData();
+  const { getActiveCourses, getLearningPaths, coursesLoading, learnerCourses } = useLearningData();
+
+  // Log the auth and learning state for debugging
+  useEffect(() => {
+    console.log("Dashboard - Auth State:", { user, userDetails, isLoading });
+    console.log("Dashboard - Learning Data:", { 
+      courses: getActiveCourses(), 
+      paths: getLearningPaths(),
+      rawCourses: learnerCourses
+    });
+  }, [user, userDetails, isLoading, learnerCourses]);
 
   // Mock data (would come from the backend in a real app)
   const recentActivities = [
@@ -63,6 +73,10 @@ const Dashboard = () => {
     );
   }
 
+  // Get active courses - ensure we have data even if API fails
+  const activeCourses = getActiveCourses();
+  console.log("Active courses:", activeCourses);
+
   return (
     <DashboardLayout>
       <div className="space-y-8">
@@ -82,7 +96,7 @@ const Dashboard = () => {
           <TabsContent value="overview" className="space-y-6">
             {/* Top Stats Row */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <Card className="animate-fade-in opacity-0" style={{ animationDelay: "100ms", animationFillMode: "forwards" }}>
+              <Card className="opacity-100">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium flex items-center gap-2 text-muted-foreground">
                     <Clock className="h-4 w-4" />
@@ -95,7 +109,7 @@ const Dashboard = () => {
                 </CardContent>
               </Card>
               
-              <Card className="animate-fade-in opacity-0" style={{ animationDelay: "200ms", animationFillMode: "forwards" }}>
+              <Card className="opacity-100">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium flex items-center gap-2 text-muted-foreground">
                     <BookOpen className="h-4 w-4" />
@@ -108,7 +122,7 @@ const Dashboard = () => {
                 </CardContent>
               </Card>
               
-              <Card className="animate-fade-in opacity-0" style={{ animationDelay: "300ms", animationFillMode: "forwards" }}>
+              <Card className="opacity-100">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium flex items-center gap-2 text-muted-foreground">
                     <Target className="h-4 w-4" />
@@ -121,7 +135,7 @@ const Dashboard = () => {
                 </CardContent>
               </Card>
               
-              <Card className="animate-fade-in opacity-0" style={{ animationDelay: "400ms", animationFillMode: "forwards" }}>
+              <Card className="opacity-100">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium flex items-center gap-2 text-muted-foreground">
                     <Trophy className="h-4 w-4" />
@@ -138,7 +152,7 @@ const Dashboard = () => {
             {/* Middle Row */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Continue Learning */}
-              <Card className="lg:col-span-2 animate-fade-in opacity-0" style={{ animationDelay: "500ms", animationFillMode: "forwards" }}>
+              <Card className="lg:col-span-2 opacity-100">
                 <CardHeader>
                   <CardTitle>Continue Learning</CardTitle>
                   <CardDescription>Pick up where you left off</CardDescription>
@@ -148,8 +162,8 @@ const Dashboard = () => {
                     <div className="flex items-center justify-center h-32">
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                     </div>
-                  ) : (
-                    getActiveCourses().slice(0, 2).map((course, index) => (
+                  ) : activeCourses.length > 0 ? (
+                    activeCourses.slice(0, 2).map((course, index) => (
                       <div key={course.id} className="flex items-start gap-4 p-4 rounded-md border hover:bg-muted/50 transition-colors">
                         <div className="h-16 w-16 rounded-md overflow-hidden shrink-0">
                           <img src={course.image} alt={course.title} className="h-full w-full object-cover" />
@@ -164,12 +178,19 @@ const Dashboard = () => {
                         </Button>
                       </div>
                     ))
+                  ) : (
+                    <div className="p-4 text-center">
+                      <p className="text-muted-foreground">No courses found. Start your learning journey!</p>
+                      <Button className="mt-4" onClick={() => navigate('/courses')}>
+                        Browse Courses
+                      </Button>
+                    </div>
                   )}
                 </CardContent>
               </Card>
               
               {/* Learning Streak */}
-              <Card className="animate-fade-in opacity-0" style={{ animationDelay: "600ms", animationFillMode: "forwards" }}>
+              <Card className="opacity-100">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <CalendarDays className="h-5 w-5 text-amber-500" />
@@ -205,7 +226,7 @@ const Dashboard = () => {
             {/* Bottom Row */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Recent Activity */}
-              <Card className="lg:col-span-2 animate-fade-in opacity-0" style={{ animationDelay: "700ms", animationFillMode: "forwards" }}>
+              <Card className="lg:col-span-2 opacity-100">
                 <CardHeader>
                   <CardTitle>Recent Activity</CardTitle>
                   <CardDescription>Your learning activities</CardDescription>
@@ -226,7 +247,7 @@ const Dashboard = () => {
               </Card>
               
               {/* Upcoming Events */}
-              <Card className="animate-fade-in opacity-0" style={{ animationDelay: "800ms", animationFillMode: "forwards" }}>
+              <Card className="opacity-100">
                 <CardHeader>
                   <CardTitle>Upcoming Events</CardTitle>
                   <CardDescription>Schedule and deadlines</CardDescription>
