@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -34,6 +34,30 @@ const HRLogin = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  // Check if already logged in as HR
+  useEffect(() => {
+    const checkExistingLogin = () => {
+      try {
+        const userStr = localStorage.getItem("currentUser");
+        if (userStr) {
+          const user = JSON.parse(userStr);
+          console.log("Found existing user in localStorage:", user.role);
+          if (user.role === "hr") {
+            console.log("Already logged in as HR, redirecting to dashboard");
+            navigate('/hr');
+            return true;
+          }
+        }
+        return false;
+      } catch (error) {
+        console.error("Error checking existing login:", error);
+        return false;
+      }
+    };
+
+    checkExistingLogin();
+  }, [navigate]);
+
   const loginForm = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
@@ -47,6 +71,8 @@ const HRLogin = () => {
       setLoginError(null);
       setIsLoading(true);
       
+      console.log("Attempting HR login with username:", values.username);
+      
       // Add a small delay to simulate a real login process
       await new Promise(resolve => setTimeout(resolve, 800));
       
@@ -59,7 +85,13 @@ const HRLogin = () => {
           email: "hr@learnfinity.com",
           role: "hr"
         };
+        
+        console.log("Login successful, storing HR user in localStorage");
         localStorage.setItem("currentUser", JSON.stringify(hrUser));
+        
+        // Double-check the localStorage was set correctly
+        const storedUser = localStorage.getItem("currentUser");
+        console.log("Verification - localStorage currentUser set to:", storedUser);
         
         // Success message
         toast({
@@ -67,8 +99,12 @@ const HRLogin = () => {
           description: "Redirecting to HR dashboard...",
         });
         
+        // Add a small delay before redirecting to ensure localStorage is updated
+        await new Promise(resolve => setTimeout(resolve, 200));
+        
         // Redirect to HR dashboard
-        navigate('/hr');
+        console.log("Redirecting to HR dashboard");
+        navigate('/hr', { replace: true });
       } else {
         throw new Error("Invalid HR credentials");
       }
@@ -148,6 +184,11 @@ const HRLogin = () => {
             <div className="mt-6 text-center">
               <p className="text-sm text-muted-foreground">
                 This is a restricted area for HR administrators only.
+              </p>
+              <p className="text-sm text-muted-foreground mt-2">
+                <strong>Use the credentials:</strong><br/>
+                Username: adminhr<br/>
+                Password: adminhr
               </p>
               <Button 
                 variant="link" 

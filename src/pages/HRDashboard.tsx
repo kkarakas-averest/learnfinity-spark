@@ -1,495 +1,268 @@
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
+  LayoutDashboard, 
   Users, 
   BookOpen, 
-  BarChart3, 
-  FileSpreadsheet,
-  Clock,
-  ArrowUpRight,
-  Upload,
-  UserPlus,
-  Search,
-  Download,
-  Bot
-} from "lucide-react";
-import DashboardLayout from "@/components/DashboardLayout";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
-import ProgressIndicator from "@/components/ProgressIndicator";
-import AgentStatusPanel from "@/components/dashboard/AgentStatusPanel";
+  Settings, 
+  BellRing,
+  LogOut 
+} from 'lucide-react';
 
-// Mock data
-const mockStats = [
-  {
-    title: "Total Employees",
-    value: "248",
-    change: "+12 this month",
-    trend: "up",
-    icon: Users,
-  },
-  {
-    title: "Active Courses",
-    value: "16",
-    change: "+3 this week",
-    trend: "up",
-    icon: BookOpen,
-  },
-  {
-    title: "Completion Rate",
-    value: "62%",
-    change: "+4% from last month",
-    trend: "up",
-    icon: BarChart3,
-  },
-  {
-    title: "Learning Hours",
-    value: "1,845",
-    change: "+142 this month",
-    trend: "up",
-    icon: Clock,
-  },
-];
+import { Button } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
+import {
+  Sheet,
+  SheetContent,
+  SheetTrigger,
+} from '@/components/ui/sheet';
 
-const mockEmployees = [
-  {
-    name: "Alex Johnson",
-    email: "alex.j@techcorp.com",
-    department: "Engineering",
-    courses: 4,
-    progress: 75,
-    status: "active",
-  },
-  {
-    name: "Sarah Miller",
-    email: "sarah.m@techcorp.com",
-    department: "Product",
-    courses: 3,
-    progress: 42,
-    status: "active",
-  },
-  {
-    name: "James Wilson",
-    email: "james.w@techcorp.com",
-    department: "Marketing",
-    courses: 2,
-    progress: 89,
-    status: "active",
-  },
-  {
-    name: "Emma Davis",
-    email: "emma.d@techcorp.com",
-    department: "HR",
-    courses: 5,
-    progress: 34,
-    status: "active",
-  },
-];
+import DashboardOverview from '@/components/hr/DashboardOverview';
+import EmployeeManagement from '@/components/hr/EmployeeManagement';
+import CourseManagement from '@/components/hr/CourseManagement';
+import AgentStatusPanel from '@/components/dashboard/AgentStatusPanel';
 
-const mockDepartments = [
-  {
-    name: "Engineering",
-    employees: 84,
-    activeCourses: 8,
-    completionRate: 68,
-  },
-  {
-    name: "Marketing",
-    employees: 42,
-    activeCourses: 5,
-    completionRate: 74,
-  },
-  {
-    name: "Product",
-    employees: 36,
-    activeCourses: 6,
-    completionRate: 59,
-  },
-  {
-    name: "Sales",
-    employees: 53,
-    activeCourses: 4,
-    completionRate: 45,
-  },
-  {
-    name: "HR",
-    employees: 15,
-    activeCourses: 7,
-    completionRate: 81,
-  },
-];
-
-const HRDashboard = () => {
-  const [userRole, setUserRole] = useState<string | null>(null);
+// Main Dashboard component
+const HRDashboard: React.FC = () => {
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [activeSection, setActiveSection] = useState('dashboard');
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
-  const [searchTerm, setSearchTerm] = useState("");
-  const [csvFile, setCsvFile] = useState<File | null>(null);
 
+  // Check authentication on mount
   useEffect(() => {
-    const userStr = localStorage.getItem("currentUser");
-    if (!userStr) {
-      navigate("/login");
-      return;
-    }
-    
-    try {
-      const user = JSON.parse(userStr);
-      setUserRole(user.role);
-      if (user.role !== "hr") {
-        navigate("/login");
+    const checkAuth = () => {
+      const userJSON = localStorage.getItem('currentUser');
+      
+      if (!userJSON) {
+        navigate('/hr-login');
+        return;
       }
-    } catch (error) {
-      console.error("Failed to parse user data", error);
-      navigate("/login");
-    }
+      
+      try {
+        const user = JSON.parse(userJSON);
+        
+        // Verify user has HR role
+        if (user.role !== 'hr') {
+          console.error('User does not have HR role');
+          localStorage.removeItem('currentUser');
+          navigate('/hr-login');
+          return;
+        }
+        
+        setCurrentUser(user);
+        setLoading(false);
+      } catch (error) {
+        console.error('Error parsing user from localStorage:', error);
+        localStorage.removeItem('currentUser');
+        navigate('/hr-login');
+      }
+    };
+    
+    checkAuth();
   }, [navigate]);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      setCsvFile(e.target.files[0]);
-    }
+  // Handle logout
+  const handleLogout = () => {
+    localStorage.removeItem('currentUser');
+    navigate('/hr-login');
   };
 
-  const filteredEmployees = mockEmployees.filter(
-    employee => 
-      employee.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      employee.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      employee.department.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Handle section change
+  const handleSectionChange = (section: string) => {
+    setActiveSection(section);
+  };
 
-  if (!userRole) {
-    return <div>Loading...</div>;
+  // Show loading indicator while checking authentication
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="flex flex-col items-center gap-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+          <p className="text-muted-foreground">Loading HR Dashboard...</p>
+        </div>
+      </div>
+    );
   }
 
-  return (
-    <DashboardLayout>
-      <div className="space-y-8">
-        <div>
-          <h1 className="text-3xl font-bold">HR Dashboard</h1>
-          <p className="text-muted-foreground mt-1">
-            Manage your organization's learning initiatives
-          </p>
-        </div>
+  // Define navigation items
+  const navItems = [
+    { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="h-5 w-5" /> },
+    { id: 'employees', label: 'Employees', icon: <Users className="h-5 w-5" /> },
+    { id: 'courses', label: 'Courses', icon: <BookOpen className="h-5 w-5" /> },
+    { id: 'ai-agents', label: 'AI Agents', icon: <BellRing className="h-5 w-5" /> },
+    { id: 'settings', label: 'Settings', icon: <Settings className="h-5 w-5" /> }
+  ];
 
-        {/* Stats Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {mockStats.map((stat, index) => (
-            <Card key={index}>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  {stat.title}
-                </CardTitle>
-                <stat.icon className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stat.value}</div>
-                <p className={`text-xs mt-1 ${
-                  stat.trend === "up" 
-                    ? "text-green-600" 
-                    : stat.trend === "down" 
-                    ? "text-red-600" 
-                    : "text-muted-foreground"
-                }`}>
-                  {stat.change}
-                </p>
-              </CardContent>
-            </Card>
+  return (
+    <div className="flex min-h-screen bg-background">
+      {/* Desktop Sidebar */}
+      <div className="hidden lg:flex w-64 flex-col border-r bg-background">
+        <div className="p-6">
+          <h2 className="text-2xl font-bold">HR Dashboard</h2>
+          <p className="text-sm text-muted-foreground mt-1">Learnfinity HR Admin</p>
+        </div>
+        
+        <div className="flex-1 px-4 space-y-2">
+          {navItems.map((item) => (
+            <Button
+              key={item.id}
+              variant={activeSection === item.id ? "secondary" : "ghost"}
+              className="w-full justify-start gap-3"
+              onClick={() => handleSectionChange(item.id)}
+            >
+              {item.icon}
+              {item.label}
+            </Button>
           ))}
         </div>
-
-        <Tabs defaultValue="employees" className="space-y-6">
-          <TabsList>
-            <TabsTrigger value="employees">Employees</TabsTrigger>
-            <TabsTrigger value="departments">Departments</TabsTrigger>
-            <TabsTrigger value="import">Onboarding</TabsTrigger>
-            <TabsTrigger value="agents">AI Agents</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="employees" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div>
-                    <CardTitle>Employee Management</CardTitle>
-                    <CardDescription>View and manage employees and their learning progress</CardDescription>
-                  </div>
-                  <Button size="sm" className="gap-1">
-                    <UserPlus className="h-4 w-4" />
-                    <span>Add Employee</span>
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center mb-4">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input 
-                      placeholder="Search employees..." 
-                      className="pl-10"
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                <div className="rounded-md border">
-                  <div className="grid grid-cols-1 md:grid-cols-6 p-3 text-sm font-medium text-muted-foreground bg-secondary/50">
-                    <div className="md:col-span-2">Employee</div>
-                    <div className="hidden md:block">Department</div>
-                    <div className="hidden md:block text-center">Courses</div>
-                    <div className="hidden md:block text-center">Progress</div>
-                    <div className="hidden md:block text-center">Actions</div>
-                  </div>
-                  
-                  {filteredEmployees.length > 0 ? (
-                    filteredEmployees.map((employee, index) => (
-                      <div key={index} className="grid grid-cols-1 md:grid-cols-6 p-3 text-sm border-t items-center">
-                        <div className="md:col-span-2">
-                          <div className="font-medium">{employee.name}</div>
-                          <div className="text-xs text-muted-foreground md:hidden mt-1">{employee.department}</div>
-                          <div className="text-xs text-muted-foreground">{employee.email}</div>
-                          <div className="flex items-center mt-2 md:hidden">
-                            <div className="text-xs mr-4">
-                              <span className="font-medium">{employee.courses}</span> courses
-                            </div>
-                            <ProgressIndicator 
-                              progress={employee.progress} 
-                              size="sm" 
-                              showLabel={false}
-                              className="flex-1" 
-                            />
-                          </div>
-                        </div>
-                        <div className="hidden md:block">{employee.department}</div>
-                        <div className="hidden md:block text-center">{employee.courses}</div>
-                        <div className="hidden md:block text-center">
-                          <ProgressIndicator 
-                            progress={employee.progress} 
-                            size="sm" 
-                            showLabel={false} 
-                            className="w-full" 
-                          />
-                        </div>
-                        <div className="hidden md:flex justify-center mt-2 md:mt-0">
-                          <Button variant="ghost" size="sm">
-                            View
-                          </Button>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="p-8 text-center text-muted-foreground">
-                      No employees match your search criteria
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-              <CardFooter className="flex justify-between border-t p-4">
-                <div className="text-sm text-muted-foreground">
-                  Showing {filteredEmployees.length} of {mockEmployees.length} employees
-                </div>
-                <Button variant="outline" size="sm" className="gap-1">
-                  <Download className="h-4 w-4" />
-                  <span>Export to CSV</span>
-                </Button>
-              </CardFooter>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="departments" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Department Performance</CardTitle>
-                <CardDescription>Learning metrics by department</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="rounded-md border">
-                  <div className="grid grid-cols-4 p-3 text-sm font-medium text-muted-foreground bg-secondary/50">
-                    <div>Department</div>
-                    <div className="text-center">Employees</div>
-                    <div className="text-center">Courses</div>
-                    <div className="text-center">Completion</div>
-                  </div>
-                  {mockDepartments.map((dept, index) => (
-                    <div key={index} className="grid grid-cols-4 p-3 text-sm border-t items-center">
-                      <div className="font-medium">{dept.name}</div>
-                      <div className="text-center">{dept.employees}</div>
-                      <div className="text-center">{dept.activeCourses}</div>
-                      <div className="text-center">
-                        <ProgressIndicator 
-                          progress={dept.completionRate} 
-                          size="sm" 
-                          showLabel={false} 
-                          className="w-24 mx-auto" 
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="import">
-            <Card>
-              <CardHeader>
-                <CardTitle>Employee Onboarding</CardTitle>
-                <CardDescription>Import employees and assign courses</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="bg-secondary/30 border rounded-lg p-6">
-                  <div className="flex flex-col items-center justify-center text-center">
-                    <Upload className="h-10 w-10 text-muted-foreground mb-2" />
-                    <h3 className="text-lg font-medium mb-1">Upload Employee CSV</h3>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Import multiple employees at once using a CSV file
-                    </p>
-                    
-                    <div className="space-y-4 w-full max-w-md">
-                      <div className="flex items-center justify-center w-full">
-                        <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-secondary/50 hover:bg-secondary/70">
-                          <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                            <Upload className="w-8 h-8 mb-3 text-muted-foreground" />
-                            <p className="mb-2 text-sm text-muted-foreground">
-                              <span className="font-semibold">Click to upload</span> or drag and drop
-                            </p>
-                            <p className="text-xs text-muted-foreground">CSV (MAX. 10MB)</p>
-                          </div>
-                          <input 
-                            type="file" 
-                            accept=".csv" 
-                            className="hidden" 
-                            onChange={handleFileChange}
-                          />
-                        </label>
-                      </div>
-                      
-                      {csvFile && (
-                        <div className="flex items-center justify-between p-2 bg-secondary rounded-md">
-                          <span className="text-sm truncate">{csvFile.name}</span>
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            onClick={() => setCsvFile(null)}
-                          >
-                            Remove
-                          </Button>
-                        </div>
-                      )}
-                      
-                      <div className="space-y-2">
-                        <div className="flex items-center space-x-2">
-                          <Checkbox id="assign-default" />
-                          <Label htmlFor="assign-default">
-                            Assign default learning paths based on role
-                          </Label>
-                        </div>
-                        
-                        <div className="flex items-center space-x-2">
-                          <Checkbox id="send-invite" defaultChecked />
-                          <Label htmlFor="send-invite">
-                            Send email invitations to new employees
-                          </Label>
-                        </div>
-                      </div>
-                      
-                      <Button className="w-full" disabled={!csvFile}>
-                        Import Employees
-                      </Button>
-                    </div>
-                    
-                    <div className="mt-4 text-xs text-muted-foreground">
-                      <a href="#" className="text-primary underline">Download sample CSV template</a>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="flex items-center">
-                  <div className="h-px flex-1 bg-border"></div>
-                  <span className="px-4 text-xs text-muted-foreground">OR</span>
-                  <div className="h-px flex-1 bg-border"></div>
-                </div>
-                
-                <div className="grid gap-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="manual-name">Employee Name</Label>
-                    <Input id="manual-name" placeholder="John Doe" />
-                  </div>
-                  
-                  <div className="grid gap-2">
-                    <Label htmlFor="manual-email">Work Email</Label>
-                    <Input id="manual-email" type="email" placeholder="john.doe@company.com" />
-                  </div>
-                  
-                  <div className="grid gap-2">
-                    <Label htmlFor="manual-department">Department</Label>
-                    <Input id="manual-department" placeholder="Engineering" />
-                  </div>
-                  
-                  <div className="grid gap-2">
-                    <Label htmlFor="manual-role">Job Role</Label>
-                    <Input id="manual-role" placeholder="Software Engineer" />
-                  </div>
-                  
-                  <Button>Add Employee & Send Invitation</Button>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="agents" className="space-y-6">
-            <AgentStatusPanel />
-            
-            <Card>
-              <CardHeader>
-                <CardTitle>AI Agent Management</CardTitle>
-                <CardDescription>Configure and control AI agents in your learning environment</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="border rounded-md p-4">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Bot className="h-5 w-5 text-primary" />
-                        <h3 className="font-medium">Personalization Agent</h3>
-                      </div>
-                      <p className="text-sm text-muted-foreground mb-3">
-                        Customizes learning content based on employee skills, preferences, and performance.
-                      </p>
-                      <Button variant="outline" size="sm">Configure</Button>
-                    </div>
-                    
-                    <div className="border rounded-md p-4">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Bot className="h-5 w-5 text-primary" />
-                        <h3 className="font-medium">RAG System Agent</h3>
-                      </div>
-                      <p className="text-sm text-muted-foreground mb-3">
-                        Monitors learner progress and triggers interventions when necessary.
-                      </p>
-                      <Button variant="outline" size="sm">Configure</Button>
-                    </div>
-                  </div>
-                  
-                  <div className="bg-muted/50 rounded-md p-4 text-sm">
-                    <p className="font-medium mb-2">About AI Agents</p>
-                    <p className="text-muted-foreground">
-                      AI agents work behind the scenes to enhance the learning experience. 
-                      They analyze data, personalize content, and provide timely interventions 
-                      to help employees succeed in their learning journey.
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+        
+        <div className="p-4 mt-auto">
+          <Separator className="mb-4" />
+          {currentUser && (
+            <div className="flex items-center mb-4">
+              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold mr-3">
+                {currentUser.username.charAt(0).toUpperCase()}
+              </div>
+              <div>
+                <p className="font-medium">{currentUser.username}</p>
+                <p className="text-xs text-muted-foreground">HR Administrator</p>
+              </div>
+            </div>
+          )}
+          <Button variant="outline" className="w-full gap-2" onClick={handleLogout}>
+            <LogOut className="h-4 w-4" />
+            Logout
+          </Button>
+        </div>
       </div>
-    </DashboardLayout>
+      
+      {/* Mobile Navigation */}
+      <Sheet>
+        <div className="lg:hidden flex items-center justify-between p-4 border-b">
+          <h2 className="font-bold">HR Dashboard</h2>
+          <SheetTrigger asChild>
+            <Button variant="outline" size="icon">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
+                <line x1="4" x2="20" y1="12" y2="12"></line>
+                <line x1="4" x2="20" y1="6" y2="6"></line>
+                <line x1="4" x2="20" y1="18" y2="18"></line>
+              </svg>
+            </Button>
+          </SheetTrigger>
+        </div>
+        <SheetContent side="left" className="flex flex-col">
+          <div className="py-4">
+            <h2 className="text-xl font-bold">HR Dashboard</h2>
+            <p className="text-sm text-muted-foreground">Learnfinity HR Admin</p>
+          </div>
+          
+          <div className="flex-1 space-y-2">
+            {navItems.map((item) => (
+              <Button
+                key={item.id}
+                variant={activeSection === item.id ? "secondary" : "ghost"}
+                className="w-full justify-start gap-3"
+                onClick={() => {
+                  handleSectionChange(item.id);
+                  
+                  // Close the sheet after navigation on mobile
+                  const closeButton = document.querySelector('[data-radix-collection-item]');
+                  if (closeButton instanceof HTMLElement) {
+                    closeButton.click();
+                  }
+                }}
+              >
+                {item.icon}
+                {item.label}
+              </Button>
+            ))}
+          </div>
+          
+          <div className="pt-4 mt-auto">
+            <Separator className="mb-4" />
+            {currentUser && (
+              <div className="flex items-center mb-4">
+                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold mr-3">
+                  {currentUser.username.charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <p className="font-medium">{currentUser.username}</p>
+                  <p className="text-xs text-muted-foreground">HR Administrator</p>
+                </div>
+              </div>
+            )}
+            <Button variant="outline" className="w-full gap-2" onClick={handleLogout}>
+              <LogOut className="h-4 w-4" />
+              Logout
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
+      
+      {/* Main Content */}
+      <div className="flex-1 overflow-auto">
+        <div className="container py-6 md:py-10 max-w-7xl">
+          {/* Dashboard Overview */}
+          {activeSection === 'dashboard' && (
+            <>
+              <h1 className="text-3xl font-bold mb-6">Dashboard Overview</h1>
+              <DashboardOverview />
+            </>
+          )}
+          
+          {/* Employees Section */}
+          {activeSection === 'employees' && (
+            <>
+              <h1 className="text-3xl font-bold mb-6">Employee Management</h1>
+              <EmployeeManagement />
+            </>
+          )}
+          
+          {/* Courses Section */}
+          {activeSection === 'courses' && (
+            <>
+              <h1 className="text-3xl font-bold mb-6">Course Management</h1>
+              <CourseManagement />
+            </>
+          )}
+          
+          {/* AI Agents Section */}
+          {activeSection === 'ai-agents' && (
+            <>
+              <h1 className="text-3xl font-bold mb-6">AI Agent Monitoring</h1>
+              <AgentStatusPanel />
+            </>
+          )}
+          
+          {/* Settings Section */}
+          {activeSection === 'settings' && (
+            <>
+              <h1 className="text-3xl font-bold mb-6">HR Dashboard Settings</h1>
+              <div className="grid gap-6">
+                <div className="border rounded-lg p-6">
+                  <h2 className="text-xl font-medium mb-4">General Settings</h2>
+                  <p className="text-muted-foreground mb-4">Configure general HR dashboard settings and preferences.</p>
+                  <Button variant="outline">Coming Soon</Button>
+                </div>
+                
+                <div className="border rounded-lg p-6">
+                  <h2 className="text-xl font-medium mb-4">Notifications</h2>
+                  <p className="text-muted-foreground mb-4">Configure notification preferences for employee activities and system alerts.</p>
+                  <Button variant="outline">Coming Soon</Button>
+                </div>
+                
+                <div className="border rounded-lg p-6">
+                  <h2 className="text-xl font-medium mb-4">Integrations</h2>
+                  <p className="text-muted-foreground mb-4">Manage integrations with HR tools and third-party services.</p>
+                  <Button variant="outline">Coming Soon</Button>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
   );
 };
 

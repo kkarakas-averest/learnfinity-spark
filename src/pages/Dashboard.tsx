@@ -273,7 +273,7 @@ const Dashboard = () => {
           
           {/* Courses Tab */}
           <TabsContent value="courses">
-            <DashboardTabs />
+          <DashboardTabs />
           </TabsContent>
           
           {/* Learning Paths Tab */}
@@ -393,10 +393,10 @@ const Dashboard = () => {
                   </div>
                 </CardContent>
               </Card>
-            </div>
+        </div>
           </TabsContent>
         </Tabs>
-      </div>
+    </div>
     </DashboardLayout>
   );
 };
