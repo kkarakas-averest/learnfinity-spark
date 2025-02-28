@@ -24,19 +24,31 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { UserRole } from "@/lib/database.types";
+import { isSupabaseConfigured } from "@/lib/supabase";
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { user, userDetails, signOut } = useAuth();
   const [isClient, setIsClient] = useState(false);
+  const [authVerified, setAuthVerified] = useState(false);
   
   // Use useEffect to ensure we're running in the client environment
   useEffect(() => {
     setIsClient(true);
+    
+    // Enhanced logging for debugging auth state
     console.log('Auth state in Navbar:', { 
       user: user ? 'User exists' : 'No user',
-      userDetails: userDetails ? `User details: ${userDetails.name}` : 'No details'
+      userDetails: userDetails ? `User details: ${userDetails.name}` : 'No details',
+      supabaseConfigured: isSupabaseConfigured() ? 'Yes' : 'No'
     });
+
+    // Mark auth as verified after the component has mounted
+    const timer = setTimeout(() => {
+      setAuthVerified(true);
+    }, 100);
+
+    return () => clearTimeout(timer);
   }, [user, userDetails]);
 
   // Navigation items that are shown to all users (including visitors)
@@ -51,7 +63,7 @@ const Navbar = () => {
   ];
 
   // Determine which nav items to show based on authentication status
-  const navItems = user 
+  const navItems = user && authVerified
     ? [...publicNavItems, ...authenticatedNavItems]
     : publicNavItems;
 
@@ -67,11 +79,14 @@ const Navbar = () => {
     setIsMenuOpen(!isMenuOpen);
   };
 
-  console.log('Current auth state:', user ? 'Logged in' : 'Not logged in');
+  // Only show content when we're sure we're on the client and auth state is verified
+  const showContent = isClient && authVerified;
+
+  console.log('Current auth state:', user ? 'Logged in' : 'Not logged in', 'Verified:', authVerified);
 
   return (
     <header className="fixed inset-x-0 top-0 z-30 h-16 border-b bg-background">
-      {isClient && (
+      {showContent && (
         <div className="absolute bottom-0 right-0 bg-red-500 text-white text-xs px-2 py-1 rounded-tl-md z-50">
           Auth: {user ? 'Logged In' : 'Logged Out'}
         </div>
@@ -82,7 +97,7 @@ const Navbar = () => {
             <Link to="/" className="flex items-center gap-2">
               <span className="text-xl font-semibold">Learnfinity</span>
             </Link>
-            {isClient && user && (
+            {showContent && user && (
               <nav className="hidden md:flex gap-6">
                 {navItems.map((item) => (
                   <Link
@@ -98,7 +113,7 @@ const Navbar = () => {
             )}
           </div>
           <div className="flex items-center gap-4">
-            {isClient && (user ? (
+            {showContent && (user ? (
               // AUTHENTICATED USER: Show profile dropdown
               <div className="flex items-center gap-4">
                 {userDetails?.role && userDetails.role !== "learner" && (
@@ -176,7 +191,7 @@ const Navbar = () => {
                 </Button>
               </Link>
             ))}
-            {isClient && user && (
+            {showContent && user && (
               <button
                 className="block md:hidden"
                 onClick={toggleMenu}
@@ -192,7 +207,7 @@ const Navbar = () => {
           </div>
         </div>
       </div>
-      {isClient && user && (
+      {showContent && user && (
         <div
           className={cn(
             "fixed inset-0 top-16 z-20 bg-background md:hidden",
