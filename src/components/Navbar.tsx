@@ -65,18 +65,20 @@ const Navbar = () => {
             <Link to="/" className="flex items-center gap-2">
               <span className="text-xl font-semibold">Learnfinity</span>
             </Link>
-            <nav className="hidden md:flex gap-6">
-              {navItems.map((item) => (
-                <Link
-                  key={item.name}
-                  to={item.href}
-                  className="flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-                >
-                  <item.icon className="h-4 w-4" />
-                  {item.name}
-                </Link>
-              ))}
-            </nav>
+            {user && (
+              <nav className="hidden md:flex gap-6">
+                {navItems.map((item) => (
+                  <Link
+                    key={item.name}
+                    to={item.href}
+                    className="flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    <item.icon className="h-4 w-4" />
+                    {item.name}
+                  </Link>
+                ))}
+              </nav>
+            )}
           </div>
           <div className="flex items-center gap-4">
             {user ? (
@@ -180,20 +182,20 @@ const Navbar = () => {
       >
         <div className="container p-6">
           <nav className="flex flex-col gap-6">
-            {navItems.map((item) => (
-              <Link
-                key={item.name}
-                to={item.href}
-                className="flex items-center gap-2 text-lg font-medium"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                <item.icon className="h-5 w-5" />
-                {item.name}
-              </Link>
-            ))}
             {user ? (
-              // AUTHENTICATED USER: Show profile links in mobile menu
+              // AUTHENTICATED USER: Show navigation and profile links in mobile menu
               <>
+                {navItems.map((item) => (
+                  <Link
+                    key={item.name}
+                    to={item.href}
+                    className="flex items-center gap-2 text-lg font-medium"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    <item.icon className="h-5 w-5" />
+                    {item.name}
+                  </Link>
+                ))}
                 <Link
                   to="/profile"
                   className="flex items-center gap-2 text-lg font-medium"
