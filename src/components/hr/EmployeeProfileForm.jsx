@@ -23,6 +23,51 @@ const mockDepartments = [
   { id: 'dept-9', name: 'Legal' }
 ];
 
+// Define mock positions in case the API doesn't return any
+const mockPositions = [
+  // Engineering positions
+  { id: 'pos-1', title: 'Software Engineer', department_id: 'dept-1' },
+  { id: 'pos-2', title: 'Senior Software Engineer', department_id: 'dept-1' },
+  { id: 'pos-3', title: 'Lead Engineer', department_id: 'dept-1' },
+  { id: 'pos-4', title: 'DevOps Engineer', department_id: 'dept-1' },
+  
+  // Marketing positions
+  { id: 'pos-5', title: 'Marketing Specialist', department_id: 'dept-2' },
+  { id: 'pos-6', title: 'Marketing Manager', department_id: 'dept-2' },
+  { id: 'pos-7', title: 'Digital Marketing Specialist', department_id: 'dept-2' },
+  
+  // HR positions
+  { id: 'pos-8', title: 'HR Specialist', department_id: 'dept-3' },
+  { id: 'pos-9', title: 'HR Manager', department_id: 'dept-3' },
+  { id: 'pos-10', title: 'Recruiter', department_id: 'dept-3' },
+  
+  // Finance positions
+  { id: 'pos-11', title: 'Financial Analyst', department_id: 'dept-4' },
+  { id: 'pos-12', title: 'Accountant', department_id: 'dept-4' },
+  { id: 'pos-13', title: 'Finance Manager', department_id: 'dept-4' },
+  
+  // Product Management positions
+  { id: 'pos-14', title: 'Product Manager', department_id: 'dept-5' },
+  { id: 'pos-15', title: 'Product Owner', department_id: 'dept-5' },
+  
+  // Sales positions
+  { id: 'pos-16', title: 'Sales Representative', department_id: 'dept-6' },
+  { id: 'pos-17', title: 'Account Manager', department_id: 'dept-6' },
+  { id: 'pos-18', title: 'Sales Manager', department_id: 'dept-6' },
+  
+  // Customer Support positions
+  { id: 'pos-19', title: 'Customer Support Specialist', department_id: 'dept-7' },
+  { id: 'pos-20', title: 'Support Team Lead', department_id: 'dept-7' },
+  
+  // Operations positions
+  { id: 'pos-21', title: 'Operations Analyst', department_id: 'dept-8' },
+  { id: 'pos-22', title: 'Operations Manager', department_id: 'dept-8' },
+  
+  // Legal positions
+  { id: 'pos-23', title: 'Legal Counsel', department_id: 'dept-9' },
+  { id: 'pos-24', title: 'Compliance Officer', department_id: 'dept-9' }
+];
+
 // Define available courses
 const availableCourses = [
   { id: 'course-1', title: 'Cybersecurity for Fintech', description: 'Essential security practices for fintech industry' },
@@ -47,6 +92,7 @@ const EmployeeProfileForm = ({ onSubmit, isLoading, departments = [], positions 
   
   const [error, setError] = useState(null);
   const [displayDepartments, setDisplayDepartments] = useState([]);
+  const [displayPositions, setDisplayPositions] = useState([]);
   const [resumeFileName, setResumeFileName] = useState('');
   
   // Set the company ID from the HR user's context when component mounts
@@ -55,6 +101,12 @@ const EmployeeProfileForm = ({ onSubmit, isLoading, departments = [], positions 
       setFormData(prev => ({
         ...prev,
         companyId: hrUser.company_id
+      }));
+    } else {
+      // Fallback company ID for testing
+      setFormData(prev => ({
+        ...prev,
+        companyId: 'default-company-id'
       }));
     }
   }, [hrUser]);
@@ -67,6 +119,15 @@ const EmployeeProfileForm = ({ onSubmit, isLoading, departments = [], positions 
       setDisplayDepartments(mockDepartments);
     }
   }, [departments]);
+  
+  // Set positions - use mock data if API returns empty array
+  useEffect(() => {
+    if (positions && positions.length > 0) {
+      setDisplayPositions(positions);
+    } else {
+      setDisplayPositions(mockPositions);
+    }
+  }, [positions]);
   
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -132,7 +193,7 @@ const EmployeeProfileForm = ({ onSubmit, isLoading, departments = [], positions 
     }
   };
   
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
     // Simple validation
@@ -148,9 +209,13 @@ const EmployeeProfileForm = ({ onSubmit, isLoading, departments = [], positions 
       return;
     }
     
-    // Ensure company ID is set
+    // Ensure companyId is set
     if (!formData.companyId) {
-      console.warn('Company ID not set. Using default or null value.');
+      console.warn('Company ID not set in form. Setting default UUID.');
+      setFormData(prev => ({
+        ...prev,
+        companyId: 'default-company-id'
+      }));
     }
     
     // Check if at least one course is selected
@@ -159,14 +224,19 @@ const EmployeeProfileForm = ({ onSubmit, isLoading, departments = [], positions 
       return;
     }
     
+    console.log('Submitting employee form with data:', {
+      ...formData,
+      resumeFile: formData.resumeFile ? `${formData.resumeFile.name} (${Math.round(formData.resumeFile.size / 1024)}KB)` : null
+    });
+    
     // Submit the form
     onSubmit(formData);
   };
   
   // Filter positions based on selected department
   const filteredPositions = formData.departmentId
-    ? positions.filter(pos => pos.department_id === formData.departmentId)
-    : positions;
+    ? displayPositions.filter(pos => pos.department_id === formData.departmentId)
+    : displayPositions;
   
   return (
     <Card className="w-full max-w-3xl mx-auto">

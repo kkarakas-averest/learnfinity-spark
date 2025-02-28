@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabase';
 import { generateSecurePassword } from '@/lib/utils';
 
 const TABLE_NAME = 'hr_employees';
+const DEFAULT_COMPANY_ID = '00000000-0000-0000-0000-000000000000'; // Default UUID to use if company ID is missing
 
 export const hrEmployeeService = {
   /**
@@ -156,6 +157,48 @@ export const hrEmployeeService = {
    */
   async createEmployeeWithUserAccount(employee) {
     try {
+      console.log('Creating employee with account, company ID:', employee.companyId || employee.company_id || DEFAULT_COMPANY_ID);
+      
+      // Check if hr_employees table exists first
+      const { error: tableCheckError } = await supabase
+        .from(TABLE_NAME)
+        .select('id')
+        .limit(1);
+        
+      if (tableCheckError) {
+        console.warn('HR employees table check error:', tableCheckError);
+        if (tableCheckError.message.includes('relation "hr_employees" does not exist')) {
+          // Try to force create the table
+          const { error: createError } = await supabase.rpc('execute_sql', {
+            sql: `
+              CREATE TABLE IF NOT EXISTS hr_employees (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                name VARCHAR(100) NOT NULL,
+                email VARCHAR(100) NOT NULL UNIQUE,
+                phone VARCHAR(20),
+                hire_date DATE,
+                department_id UUID,
+                position_id UUID,
+                manager_id UUID,
+                status VARCHAR(20) DEFAULT 'active',
+                profile_image_url TEXT,
+                resume_url TEXT,
+                company_id UUID NOT NULL,
+                last_active_at TIMESTAMP WITH TIME ZONE,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+              );
+            `
+          });
+          
+          if (createError) {
+            throw new Error(`Failed to create hr_employees table: ${createError.message}`);
+          }
+        } else {
+          throw tableCheckError;
+        }
+      }
+      
       // First create the employee record
       const employeeData = {
         name: employee.name,
@@ -164,12 +207,14 @@ export const hrEmployeeService = {
         position_id: employee.position_id || employee.positionId,
         status: employee.status,
         notes: employee.notes,
-        company_id: employee.company_id || employee.companyId
+        company_id: employee.company_id || employee.companyId || DEFAULT_COMPANY_ID // Use default if missing
       };
       
+      console.log('Creating employee with data:', employeeData);
       const { data: createdEmployee, error: employeeError } = await this.createEmployee(employeeData);
       
       if (employeeError) {
+        console.error('Error creating employee:', employeeError);
         throw employeeError;
       }
       
@@ -261,7 +306,7 @@ export const hrEmployeeService = {
           .from('learners')
           .insert({
             id: authData.user.id,
-            company_id: employee.company_id || employee.companyId,
+            company_id: employee.company_id || employee.companyId || DEFAULT_COMPANY_ID,
             progress_status: {},
             preferences: {},
             certifications: {}

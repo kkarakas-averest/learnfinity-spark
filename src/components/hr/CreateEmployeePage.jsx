@@ -67,6 +67,11 @@ const CreateEmployeePage = () => {
     try {
       setIsLoading(true);
       
+      // Validate company ID
+      if (!formData.companyId) {
+        console.warn('Company ID not set. Using default or null value.');
+      }
+      
       // Update toast to show resume processing if a file is included
       const hasResume = formData.resumeFile !== null;
       
@@ -83,6 +88,15 @@ const CreateEmployeePage = () => {
       
       setEnrolledCourses(selectedCourses);
       
+      console.log('Submitting employee data:', {
+        name: formData.name,
+        email: formData.email,
+        departmentId: formData.departmentId,
+        positionId: formData.positionId,
+        companyId: formData.companyId,
+        courseCount: formData.courseIds?.length || 0
+      });
+      
       // Create employee using HR service with user account creation
       const { data, error, userAccount, authError } = await hrEmployeeService.createEmployeeWithUserAccount({
         name: formData.name,
@@ -96,7 +110,10 @@ const CreateEmployeePage = () => {
         courseIds: formData.courseIds // Add course IDs
       });
       
-      if (error) throw error;
+      if (error) {
+        console.error('Employee creation error:', error);
+        throw error;
+      }
       
       if (userAccount) {
         setCredentials(userAccount);

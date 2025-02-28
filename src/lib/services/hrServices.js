@@ -5,13 +5,184 @@ import { hrEmployeeService } from './hrEmployeeService';
 // High-level HR services for dashboard functionality
 export const hrServices = {
   /**
+   * Create HR database tables if they don't exist
+   */
+  async createHRTablesIfNotExist() {
+    try {
+      console.log('Checking if HR database tables exist...');
+      
+      // Check if hr_departments table exists
+      const { error: checkError } = await supabase
+        .from('hr_departments')
+        .select('id')
+        .limit(1);
+        
+      // If the table doesn't exist, we'll create the basic schema
+      if (checkError && checkError.message.includes('relation "hr_departments" does not exist')) {
+        console.log('HR database tables do not exist. Creating them...');
+        
+        // Create departments table
+        const { error: deptError } = await supabase.rpc('create_hr_departments_table');
+        if (deptError) {
+          console.error('Error creating hr_departments table:', deptError);
+          
+          // Let's create it directly with SQL
+          const { error: sqlError } = await supabase.rpc('execute_sql', {
+            sql: `
+              CREATE TABLE IF NOT EXISTS hr_departments (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                name VARCHAR(100) NOT NULL UNIQUE,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+              );
+            `
+          });
+          
+          if (sqlError) {
+            console.error('Error creating hr_departments table with SQL:', sqlError);
+            return { success: false, error: sqlError };
+          }
+        }
+        
+        // Create positions table
+        const { error: posError } = await supabase.rpc('execute_sql', {
+          sql: `
+            CREATE TABLE IF NOT EXISTS hr_positions (
+              id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+              title VARCHAR(100) NOT NULL,
+              department_id UUID,
+              salary_range_min DECIMAL(10,2),
+              salary_range_max DECIMAL(10,2),
+              created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+              updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+              UNIQUE(title, department_id)
+            );
+          `
+        });
+        
+        if (posError) {
+          console.error('Error creating hr_positions table:', posError);
+          return { success: false, error: posError };
+        }
+        
+        // Create employees table
+        const { error: empError } = await supabase.rpc('execute_sql', {
+          sql: `
+            CREATE TABLE IF NOT EXISTS hr_employees (
+              id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+              name VARCHAR(100) NOT NULL,
+              email VARCHAR(100) NOT NULL UNIQUE,
+              phone VARCHAR(20),
+              hire_date DATE,
+              department_id UUID,
+              position_id UUID,
+              manager_id UUID,
+              status VARCHAR(20) DEFAULT 'active',
+              profile_image_url TEXT,
+              resume_url TEXT,
+              company_id UUID NOT NULL,
+              last_active_at TIMESTAMP WITH TIME ZONE,
+              created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+              updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+          `
+        });
+        
+        if (empError) {
+          console.error('Error creating hr_employees table:', empError);
+          return { success: false, error: empError };
+        }
+        
+        // Create courses table
+        const { error: courseError } = await supabase.rpc('execute_sql', {
+          sql: `
+            CREATE TABLE IF NOT EXISTS hr_courses (
+              id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+              title VARCHAR(200) NOT NULL,
+              description TEXT,
+              department_id UUID,
+              skill_level VARCHAR(20) DEFAULT 'beginner',
+              duration INTEGER,
+              status VARCHAR(20) DEFAULT 'active',
+              created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+              updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+          `
+        });
+        
+        if (courseError) {
+          console.error('Error creating hr_courses table:', courseError);
+          return { success: false, error: courseError };
+        }
+        
+        // Create course enrollments table
+        const { error: enrollError } = await supabase.rpc('execute_sql', {
+          sql: `
+            CREATE TABLE IF NOT EXISTS hr_course_enrollments (
+              id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+              employee_id UUID NOT NULL,
+              course_id UUID NOT NULL,
+              status VARCHAR(20) DEFAULT 'enrolled',
+              progress INTEGER DEFAULT 0,
+              score DECIMAL(5,2),
+              enrollment_date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+              completion_date TIMESTAMP WITH TIME ZONE,
+              UNIQUE(employee_id, course_id)
+            );
+          `
+        });
+        
+        if (enrollError) {
+          console.error('Error creating hr_course_enrollments table:', enrollError);
+          return { success: false, error: enrollError };
+        }
+        
+        // Create activities table
+        const { error: actError } = await supabase.rpc('execute_sql', {
+          sql: `
+            CREATE TABLE IF NOT EXISTS hr_employee_activities (
+              id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+              employee_id UUID NOT NULL,
+              activity_type VARCHAR(50) NOT NULL,
+              description TEXT,
+              course_id UUID,
+              timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+          `
+        });
+        
+        if (actError) {
+          console.error('Error creating hr_employee_activities table:', actError);
+          return { success: false, error: actError };
+        }
+        
+        console.log('Successfully created HR database tables');
+      } else {
+        console.log('HR database tables already exist');
+      }
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Error creating HR database tables:', error);
+      return { success: false, error };
+    }
+  },
+
+  /**
    * Initialize the HR database
    * This checks if seeding is needed and performs the seeding if necessary
    * Also ensures required storage buckets exist
    */
   async initializeHRDatabase() {
     try {
-      // First, ensure the hr-documents storage bucket exists
+      // First, create tables if they don't exist
+      const { success: tablesSuccess, error: tablesError } = await this.createHRTablesIfNotExist();
+      
+      if (!tablesSuccess) {
+        console.warn('Failed to create HR tables:', tablesError);
+      }
+    
+      // Next, ensure the hr-documents storage bucket exists
       try {
         const { data: buckets } = await supabase.storage.listBuckets();
         const hrDocumentsBucket = buckets?.find(bucket => bucket.name === 'hr-documents');
