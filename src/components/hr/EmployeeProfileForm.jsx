@@ -103,10 +103,10 @@ const EmployeeProfileForm = ({ onSubmit, isLoading, departments = [], positions 
         companyId: hrUser.company_id
       }));
     } else {
-      // Fallback company ID for testing
+      // Fallback company ID - use valid UUID
       setFormData(prev => ({
         ...prev,
-        companyId: 'default-company-id'
+        companyId: '4fb1a692-3995-40ee-8aa5-292fd8ebf029'
       }));
     }
   }, [hrUser]);
@@ -214,7 +214,7 @@ const EmployeeProfileForm = ({ onSubmit, isLoading, departments = [], positions 
       console.warn('Company ID not set in form. Setting default UUID.');
       setFormData(prev => ({
         ...prev,
-        companyId: 'default-company-id'
+        companyId: '4fb1a692-3995-40ee-8aa5-292fd8ebf029'
       }));
     }
     
