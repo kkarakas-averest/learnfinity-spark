@@ -58,45 +58,48 @@ declare module 'react-router-dom' {
   export const BrowserRouter: React.FC<{
     children: React.ReactNode;
   }>;
+  export const Outlet: React.FC;
 }
 
-// Declare lucide-react with needed icons
-declare module 'lucide-react' {
-  import * as React from 'react';
-  export type Icon = React.FC<React.SVGProps<SVGSVGElement>>;
+// Fix Badge component type issues
+declare module '@/components/ui/badge' {
+  export interface BadgeProps {
+    className?: string;
+    variant?: "default" | "secondary" | "destructive" | "outline";
+    children?: React.ReactNode;
+  }
   
-  export const Menu: Icon;
-  export const X: Icon;
-  export const Book: Icon;
-  export const GraduationCap: Icon;
-  export const Settings: Icon;
-  export const Home: Icon;
-  export const User: Icon;
-  export const UserPlus: Icon;
-  export const LogOut: Icon;
-  export const ArrowLeft: Icon;
-  export const Loader2: Icon;
-  export const AlertCircle: Icon;
-  export const AlertTriangle: Icon;
-  export const CheckCircle: Icon;
-  export const Info: Icon;
-  export const Check: Icon;
-  export const BarChart2: Icon;
-  export const Users: Icon;
-  export const Building: Icon;
-  export const BrainCircuit: Icon;
-  export const FileSpreadsheet: Icon;
-  export const Clock: Icon;
-  export const Copy: Icon;
-  export const Wrench: Icon;
-  export const Filter: Icon;
-  export const Activity: Icon;
-  export const Award: Icon;
-  export const Upload: Icon;
-  export const Download: Icon;
-  export const Layers: Icon;
-  export const Bookmark: Icon;
-  export const Zap: Icon;
+  export const Badge: React.FC<BadgeProps>;
+  export const badgeVariants: (props: { variant?: BadgeProps['variant'], className?: string }) => string;
+}
+
+// Fix ProtectedRoute component type issues
+declare module '@/components/ProtectedRoute' {
+  export interface ProtectedRouteProps {
+    children: React.ReactNode;
+    allowedRoles?: string[];
+  }
+  
+  export default function ProtectedRoute(props: ProtectedRouteProps): JSX.Element;
+}
+
+// Declare Sheet component types
+declare module '@/components/ui/sheet' {
+  export interface SheetProps {
+    side?: "top" | "right" | "bottom" | "left";
+    open?: boolean;
+    onOpenChange?: (open: boolean) => void;
+    children?: React.ReactNode;
+  }
+  
+  export const Sheet: React.FC<SheetProps>;
+  export const SheetTrigger: React.FC<React.HTMLAttributes<HTMLButtonElement>>;
+  export const SheetContent: React.FC<React.HTMLAttributes<HTMLDivElement> & { side?: SheetProps['side'] }>;
+  export const SheetHeader: React.FC<React.HTMLAttributes<HTMLDivElement>>;
+  export const SheetTitle: React.FC<React.HTMLAttributes<HTMLHeadingElement>>;
+  export const SheetDescription: React.FC<React.HTMLAttributes<HTMLParagraphElement>>;
+  export const SheetFooter: React.FC<React.HTMLAttributes<HTMLDivElement>>;
+  export const SheetClose: React.FC<React.HTMLAttributes<HTMLButtonElement>>;
 }
 
 // Declare @hookform/resolvers/zod
@@ -135,27 +138,6 @@ declare module 'zod' {
   export function nativeEnum(values: any): any;
   export function boolean(): any;
   export function literal(value: any, options?: any): any;
-}
-
-// Fix Badge component type issues
-declare module '@/components/ui/badge' {
-  export interface BadgeProps {
-    className?: string;
-    variant?: string;
-    children?: React.ReactNode;
-  }
-  
-  export const Badge: React.FC<BadgeProps>;
-}
-
-// Fix ProtectedRoute component type issues
-declare module '@/components/ProtectedRoute' {
-  export interface ProtectedRouteProps {
-    children: React.ReactNode;
-    allowedRoles?: string[];
-  }
-  
-  export default function ProtectedRoute(props: ProtectedRouteProps): JSX.Element;
 }
 
 // Declare global process variable for NODE_ENV
