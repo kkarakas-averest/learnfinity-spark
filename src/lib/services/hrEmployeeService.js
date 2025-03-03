@@ -776,11 +776,13 @@ export const hrEmployeeService = {
       // 7. Create user account
       // Generate a secure random password for the new account
       const password = generateSecurePassword({
-        length: 10,
-        includeSpecial: false // Avoid special chars for simplicity in initial password
+        length: 12,
+        includeSpecial: true // Include special characters for better security
       });
 
-      // Create user account with Supabase Auth
+      console.log('Creating user account with email:', standardizedEmployee.email);
+      
+      // Create new user with signUp
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: standardizedEmployee.email,
         password,
@@ -840,15 +842,9 @@ export const hrEmployeeService = {
         console.warn('Exception when creating learner record:', learnerError);
       }
 
-      // Immediately sign in with the created credentials
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: standardizedEmployee.email,
-        password: password
-      });
-
-      if (signInError) {
-        console.warn('Created user but could not sign in:', signInError);
-      }
+      // Store the credentials temporarily in localStorage for auto-login
+      localStorage.setItem('temp_login_email', standardizedEmployee.email);
+      localStorage.setItem('temp_login_password', password);
       
       return { 
         data: createdEmployee, 

@@ -51,6 +51,51 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           
           // Fetch additional user details from the database
           await fetchUserDetails(session.user.id);
+        } else {
+          // Check for stored credentials from HR employee creation
+          const storedEmail = localStorage.getItem('temp_login_email');
+          const storedPassword = localStorage.getItem('temp_login_password');
+          
+          if (storedEmail && storedPassword) {
+            console.log('Found stored credentials, attempting auto-login...');
+            
+            try {
+              const { data, error } = await supabase.auth.signInWithPassword({
+                email: storedEmail,
+                password: storedPassword
+              });
+              
+              if (error) {
+                console.error('Auto-login failed:', error);
+                toast({
+                  title: 'Auto-login Failed',
+                  description: error.message || 'Please try logging in manually.',
+                  variant: 'destructive',
+                });
+              } else if (data.user) {
+                console.log('Auto-login successful, setting session');
+                setSession(data.session);
+                setUser(data.user);
+                await fetchUserDetails(data.user.id);
+                
+                toast({
+                  title: 'Welcome!',
+                  description: 'You have been automatically logged in.',
+                });
+              }
+            } catch (error) {
+              console.error('Error during auto-login:', error);
+              toast({
+                title: 'Auto-login Error',
+                description: 'An unexpected error occurred. Please try logging in manually.',
+                variant: 'destructive',
+              });
+            } finally {
+              // Always remove stored credentials after attempt
+              localStorage.removeItem('temp_login_email');
+              localStorage.removeItem('temp_login_password');
+            }
+          }
         }
       } catch (error) {
         console.error('Error getting initial session:', error);
