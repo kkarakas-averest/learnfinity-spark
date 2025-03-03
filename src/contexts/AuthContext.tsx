@@ -1,10 +1,13 @@
-import React, { type ReactNode } from 'react';
+import React from 'react';
+// Create local constants for React hooks
 const { createContext, useContext, useEffect, useState } = React;
+// Use React.ReactNode instead of importing it separately
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
-import { UserRole } from '@/lib/database.types';
 import { useNavigate } from 'react-router-dom';
+import { UserRole } from '@/lib/database.types';
+import { ROUTES } from '@/lib/routes';
 
 interface AuthContextProps {
   user: User | null;
@@ -26,7 +29,7 @@ interface UserDetails {
 
 const AuthContext = createContext<AuthContextProps | undefined>(undefined);
 
-export const AuthProvider = ({ children }: { children: ReactNode }) => {
+export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [userDetails, setUserDetails] = useState<UserDetails | null>(null);
