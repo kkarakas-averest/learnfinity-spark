@@ -13,12 +13,30 @@ import { toast } from '@/hooks/use-toast';
 import { Check, Clock, BookOpen, FileText, Award, ArrowLeft, PlayCircle, Star } from 'lucide-react';
 import { useCoursesData } from '@/hooks/useCoursesData';
 import { useLearningData } from '@/hooks/useLearningData';
-import { formatDuration, calculateProgress } from '@/lib/utils';
 import { AlertDialogTrigger, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, 
   AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialog, AlertDialogAction } from '@/components/ui/alert-dialog';
 
 // Create local constants for React hooks
 const { useState, useEffect } = React;
+
+// Local utility functions
+const formatDuration = (seconds: number): string => {
+  if (!seconds || isNaN(seconds)) return "0m";
+  
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  
+  if (hours > 0) {
+    return `${hours}h ${minutes > 0 ? `${minutes}m` : ""}`;
+  }
+  
+  return `${minutes}m`;
+};
+
+const calculateProgress = (completed: number, total: number): number => {
+  if (total === 0) return 0;
+  return Math.round((completed / total) * 100);
+};
 
 // Types
 interface Module {
