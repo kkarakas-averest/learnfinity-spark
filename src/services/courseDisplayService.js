@@ -1,6 +1,5 @@
 
-// Remove any Node.js specific imports like 'url' or 'path'
-// and replace with browser-compatible alternatives
+// Browser-compatible implementation of the course display service
 
 const courseDisplayService = {
   /**
@@ -10,6 +9,7 @@ const courseDisplayService = {
    */
   async getCourseDetails(courseId) {
     try {
+      console.log('Fetching course details for ID:', courseId);
       // Simulate fetching course data
       // In a real app, this would call an API or Supabase
       return {
@@ -31,8 +31,12 @@ const courseDisplayService = {
    */
   async getCourseContent(courseId) {
     try {
+      console.log('Fetching course content for ID:', courseId);
       // Use a simple fetch instead of requiring node modules
       const response = await fetch(`/data/course_content_${courseId}.json`);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch course content: ${response.status}`);
+      }
       const data = await response.json();
       return data;
     } catch (error) {

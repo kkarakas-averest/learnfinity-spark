@@ -20,6 +20,7 @@ try {
     <div style="color: red; padding: 20px; text-align: center;">
       <h1>Application Error</h1>
       <p>Sorry, there was a problem loading the application. Please check the console for details.</p>
+      <pre style="text-align: left; background: #f7f7f7; padding: 10px; border-radius: 5px; max-width: 800px; margin: 0 auto; overflow: auto;">${error instanceof Error ? error.message : String(error)}</pre>
     </div>
   `;
 }
