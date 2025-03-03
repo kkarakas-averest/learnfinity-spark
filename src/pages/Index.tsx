@@ -1,3 +1,4 @@
+import * as React from "react";
 import { cn } from "@/lib/utils";
 import { ArrowRight, Bookmark, Layers, Zap } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -6,6 +7,15 @@ import Navbar from "@/components/Navbar";
 import Hero from "@/components/Hero";
 
 const Index = () => {
+  React.useEffect(() => {
+    console.log("[Index] Component mounted");
+    return () => {
+      console.log("[Index] Component unmounting");
+    };
+  }, []);
+
+  console.log("[Index] Component rendering started");
+
   const features = [
     {
       icon: <Layers className="h-6 w-6 text-primary" />,
@@ -51,7 +61,6 @@ const Index = () => {
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
-
       <main className="flex-1">
         <Hero />
 

@@ -1,9 +1,19 @@
+import * as React from "react";
 import { cn } from "@/lib/utils";
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 
 const Hero = () => {
+  React.useEffect(() => {
+    console.log("[Hero] Component mounted");
+    return () => {
+      console.log("[Hero] Component unmounting");
+    };
+  }, []);
+
+  console.log("[Hero] Component rendering");
+
   return (
     <section className="relative overflow-hidden pt-32 pb-20 md:pt-40 md:pb-24">
       <div className="absolute inset-0 -z-10 bg-[linear-gradient(to_right,#f0f0f0_1px,transparent_1px),linear-gradient(to_bottom,#f0f0f0_1px,transparent_1px)] bg-[size:4rem_4rem]"></div>
