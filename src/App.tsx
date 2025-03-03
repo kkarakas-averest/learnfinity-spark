@@ -20,6 +20,7 @@ import OnboardingWizard from "@/pages/OnboardingWizard";
 import ProfileSettings from "@/pages/ProfileSettings";
 import Billing from "@/pages/Billing";
 import CreateEmployeePage from "@/components/hr/CreateEmployeePage";
+import EditEmployeePage from "@/components/hr/EditEmployeePage";
 
 import "./App.css";
 
@@ -74,6 +75,11 @@ function App() {
               <Route path={ROUTES.HR_DASHBOARD_EMPLOYEES_NEW} element={
                 <HRAuthProvider>
                   <CreateEmployeePage />
+                </HRAuthProvider>
+              } />
+              <Route path={ROUTES.HR_DASHBOARD_EMPLOYEES_EDIT} element={
+                <HRAuthProvider>
+                  <EditEmployeePage />
                 </HRAuthProvider>
               } />
               <Route 
