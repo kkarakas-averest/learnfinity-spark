@@ -20,6 +20,110 @@ const HR_TABLES = [
 
 export const hrEmployeeService = {
   /**
+   * Initialize the HR system
+   * @returns {Promise<{success: boolean, error?: Error}>}
+   */
+  async initialize() {
+    try {
+      console.log('Initializing HR system...');
+      
+      // First check if Supabase is configured
+      if (!supabase || typeof supabase.from !== 'function') {
+        throw new Error('Supabase client is not properly initialized');
+      }
+      
+      // Check tables existence
+      const { exists, missingTables } = await this.checkHRTablesExist();
+      
+      if (!exists) {
+        console.log('Some HR tables are missing:', missingTables);
+        // Try to create missing tables
+        const createResult = await this.createMissingTables(missingTables);
+        if (!createResult.success) {
+          throw new Error(`Failed to create missing tables: ${createResult.error}`);
+        }
+      }
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Failed to initialize HR system:', error);
+      return { success: false, error };
+    }
+  },
+  
+  /**
+   * Create missing HR tables
+   * @param {string[]} missingTables
+   * @returns {Promise<{success: boolean, error?: Error}>}
+   */
+  async createMissingTables(missingTables) {
+    try {
+      console.log('Creating missing HR tables:', missingTables);
+      
+      for (const table of missingTables) {
+        let sql = '';
+        switch (table) {
+          case 'hr_departments':
+            sql = `
+              CREATE TABLE IF NOT EXISTS hr_departments (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                name VARCHAR(100) NOT NULL UNIQUE,
+                description TEXT,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+              );
+            `;
+            break;
+            
+          case 'hr_positions':
+            sql = `
+              CREATE TABLE IF NOT EXISTS hr_positions (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                title VARCHAR(100) NOT NULL,
+                department_id UUID REFERENCES hr_departments(id),
+                description TEXT,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+              );
+            `;
+            break;
+            
+          case 'hr_employees':
+            sql = `
+              CREATE TABLE IF NOT EXISTS hr_employees (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                name VARCHAR(100) NOT NULL,
+                email VARCHAR(100) NOT NULL UNIQUE,
+                department_id UUID REFERENCES hr_departments(id),
+                position_id UUID REFERENCES hr_positions(id),
+                status VARCHAR(20) DEFAULT 'active',
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+              );
+            `;
+            break;
+            
+          default:
+            console.warn(`No SQL definition for table: ${table}`);
+            continue;
+        }
+        
+        if (sql) {
+          const { error } = await supabase.rpc('execute_sql', { sql });
+          if (error) {
+            throw new Error(`Failed to create table ${table}: ${error.message}`);
+          }
+        }
+      }
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Failed to create missing tables:', error);
+      return { success: false, error };
+    }
+  },
+
+  /**
    * Check if all required HR tables exist in the database
    * @returns {Promise<{exists: boolean, missingTables: string[]}>}
    */

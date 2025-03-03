@@ -1,3 +1,4 @@
+import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from "@/contexts/AuthContext";
@@ -21,10 +22,26 @@ import ProfileSettings from "@/pages/ProfileSettings";
 import Billing from "@/pages/Billing";
 import CreateEmployeePage from "@/components/hr/CreateEmployeePage";
 import EditEmployeePage from "@/components/hr/EditEmployeePage";
+import { hrEmployeeService } from '@/lib/services/hrEmployeeService';
 
 import "./App.css";
 
 function App() {
+  React.useEffect(() => {
+    const initializeHR = async () => {
+      try {
+        const result = await hrEmployeeService.initialize();
+        if (!result.success) {
+          console.error('Failed to initialize HR system:', result.error);
+        }
+      } catch (error) {
+        console.error('Error during HR system initialization:', error);
+      }
+    };
+    
+    initializeHR();
+  }, []);
+
   return (
     <ThemeProvider defaultTheme="light" storageKey="vite-ui-theme">
       <Router>
