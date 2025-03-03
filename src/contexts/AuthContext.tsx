@@ -1,5 +1,4 @@
-import * as React from 'react';
-type ReactNode = React.ReactNode;
+import React, { type ReactNode } from 'react';
 const { createContext, useContext, useEffect, useState } = React;
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
@@ -139,6 +138,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signIn = async (email: string, password: string) => {
     try {
       setIsLoading(true);
+      console.log("Attempting login with:", email);
       
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
@@ -149,15 +149,34 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         throw error;
       }
 
+      // Fetch user details and set them in context
+      if (data.user) {
+        const { data: userDetails, error: userError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', data.user.id)
+          .single();
+
+        if (!userError && userDetails) {
+          setUserDetails(userDetails);
+        } else {
+          // If we can't get user details, set defaults
+          setUserDetails({
+            id: data.user.id,
+            name: data.user.user_metadata?.name || email,
+            email: email,
+            role: data.user.user_metadata?.role || 'learner'
+          });
+        }
+
+        // Redirect based on role
+        redirectBasedOnRole();
+      }
+
       toast({
         title: 'Welcome back!',
         description: 'You have successfully signed in.',
       });
-
-      // Redirect based on role
-      if (data.user) {
-        await fetchUserDetails(data.user.id);
-      }
     } catch (error: any) {
       console.error('Error signing in:', error);
       toast({

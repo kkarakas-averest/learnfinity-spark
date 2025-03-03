@@ -779,14 +779,16 @@ export const hrEmployeeService = {
         length: 10,
         includeSpecial: false // Avoid special chars for simplicity in initial password
       });
-      
-      // Create user account with Supabase Auth using server RPC
-      const { data: authData, error: authError } = await supabase.rpc('create_confirmed_user', {
-        user_email: standardizedEmployee.email,
-        user_password: password,
-        user_data: {
-          name: standardizedEmployee.name,
-          role: 'learner'
+
+      // Create user account with Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: standardizedEmployee.email,
+        password,
+        options: {
+          data: {
+            name: standardizedEmployee.name,
+            role: 'learner'
+          }
         }
       });
 
@@ -799,9 +801,7 @@ export const hrEmployeeService = {
           authError
         };
       }
-      
-      // No need to sign in immediately as the account is already confirmed
-      
+
       // Try to insert user into users table
       try {
         const { error: insertError } = await supabase
@@ -838,6 +838,16 @@ export const hrEmployeeService = {
         }
       } catch (learnerError) {
         console.warn('Exception when creating learner record:', learnerError);
+      }
+
+      // Immediately sign in with the created credentials
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: standardizedEmployee.email,
+        password: password
+      });
+
+      if (signInError) {
+        console.warn('Created user but could not sign in:', signInError);
       }
       
       return { 
