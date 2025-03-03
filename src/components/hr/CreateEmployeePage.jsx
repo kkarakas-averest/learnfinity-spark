@@ -22,30 +22,29 @@ import {
   AlertDescription 
 } from '@/components/ui/alert';
 import { Copy, Info, Wrench, AlertCircle } from 'lucide-react';
-import SupabaseDiagnostic from '@/SupabaseDiagnostic';
 import { supabase } from '@/lib/supabase';
 
 const CreateEmployeePage = () => {
   // For debugging
-  console.log('=== Rendering CreateEmployeePage with diagnostic button ===');
+  console.log('=== Rendering CreateEmployeePage ===');
   
   const navigate = useNavigate();
-  const [isLoading, setIsLoading] = useState(false);
   const [departments, setDepartments] = useState([]);
   const [positions, setPositions] = useState([]);
-  const [isDataLoading, setIsDataLoading] = useState(true);
-  const [showCredentials, setShowCredentials] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [credentials, setCredentials] = useState(null);
+  const [showCredentials, setShowCredentials] = useState(false);
   const [enrolledCourses, setEnrolledCourses] = useState([]);
-  const [testResults, setTestResults] = useState(null);
-  const [isTestingApi, setIsTestingApi] = useState(false);
-  const [showDiagnostics, setShowDiagnostics] = useState(false);
+  const [errorDetails, setErrorDetails] = useState(null);
   const [retryCount, setRetryCount] = useState(0);
+  const [isErrorDialogOpen, setIsErrorDialogOpen] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [errorCode, setErrorCode] = useState('');
 
   useEffect(() => {
     const checkDatabaseAndFetchData = async () => {
       try {
-        setIsDataLoading(true);
+        setLoading(true);
         
         // Check if all HR tables exist
         const { exists, missingTables } = await hrEmployeeService.checkHRTablesExist();
@@ -85,18 +84,13 @@ const CreateEmployeePage = () => {
       } catch (error) {
         console.error('Error in checkDatabaseAndFetchData:', error);
         toast.error('Failed to initialize. Please check the console for details.');
+        setErrorMessage(error.message || 'Unknown error occurred');
+        setErrorCode(error.code || '');
+        setIsErrorDialogOpen(true);
       } finally {
-        setIsDataLoading(false);
+        setLoading(false);
       }
     };
-    
-    // Show diagnostic UI if we're in development
-    if (import.meta.env.DEV) {
-      const urlParams = new URLSearchParams(window.location.search);
-      if (urlParams.get('debug') === 'true') {
-        setShowDiagnostics(true);
-      }
-    }
     
     // Add a timer to ensure data loading is visible for at least 700ms
     // This gives better UX by preventing flashes of loading states
@@ -106,21 +100,10 @@ const CreateEmployeePage = () => {
     
     return () => clearTimeout(timer);
   }, [retryCount]);
-  
-  // Add an effect to run the API test once after a short delay
-  useEffect(() => {
-    // Wait 3 seconds then automatically run the API test
-    const timer = setTimeout(() => {
-      console.log('Automatically running API test on component mount...');
-      runApiTest();
-    }, 3000);
-    
-    return () => clearTimeout(timer);
-  }, []);
 
   const handleSubmit = async (formData) => {
     try {
-      setIsLoading(true);
+      setLoading(true);
       
       // Create the employee data object
       const employeeData = {
@@ -137,7 +120,7 @@ const CreateEmployeePage = () => {
       
       // Abort if the operation failed after retries
       if (!result) {
-        setIsLoading(false);
+        setLoading(false);
         return;
       }
       
@@ -153,10 +136,13 @@ const CreateEmployeePage = () => {
       // Display success and show credentials dialog
       toast.success('Employee created successfully');
       setShowCredentials(true);
-      setIsLoading(false);
+      setLoading(false);
     } catch (error) {
       console.error('Error handling form submission:', error);
-      setIsLoading(false);
+      setLoading(false);
+      setErrorMessage(error.message || 'Unknown error occurred');
+      setErrorCode(error.code || '');
+      setIsErrorDialogOpen(true);
       toast.error('An unexpected error occurred while creating the employee');
     }
   };
@@ -225,6 +211,9 @@ const CreateEmployeePage = () => {
       }
     }
     toast.error(errorMessage);
+    setErrorMessage(errorMessage);
+    setErrorCode(lastError?.code || '');
+    setIsErrorDialogOpen(true);
     
     return null;
   };
@@ -245,236 +234,151 @@ const CreateEmployeePage = () => {
     navigate(ROUTES.HR_DASHBOARD + '?tab=employees');
   };
 
-  const handleGoToLearnerDashboard = () => {
-    if (credentials) {
-      // Store the credentials in localStorage for the login page to use
-      localStorage.setItem('pendingAutoLogin', JSON.stringify({
-        email: credentials.email,
-        password: credentials.tempPassword
-      }));
-      
-      // Close the dialog and redirect to the login page
-      setShowCredentials(false);
-      navigate(ROUTES.LOGIN);
-    }
+  const handleRetry = () => {
+    setErrorDetails(null);
+    setIsErrorDialogOpen(false);
+    setRetryCount(prevCount => prevCount + 1);
+    toast.info('Retrying operation...');
   };
-
-  const runApiTest = async () => {
-    setIsTestingApi(true);
-    setTestResults(null);
-    
-    try {
-      // Test Supabase connection
-      const results = [];
-      
-      // Test 1: Check auth status
-      results.push({
-        name: 'Get Auth Session',
-        startTime: new Date().toISOString(),
-      });
-      
-      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-      
-      results[0].endTime = new Date().toISOString();
-      results[0].success = !sessionError;
-      results[0].data = sessionData ? 'Session data retrieved' : 'No session';
-      results[0].error = sessionError ? sessionError.message : null;
-      
-      // Test 2: Check departments table
-      results.push({
-        name: 'Get Departments',
-        startTime: new Date().toISOString(),
-      });
-      
-      const { data: deptData, error: deptError } = await supabase
-        .from('hr_departments')
-        .select('id, name')
-        .limit(3);
-      
-      results[1].endTime = new Date().toISOString();
-      results[1].success = !deptError;
-      results[1].data = deptData ? `Retrieved ${deptData.length} departments` : 'No data';
-      results[1].error = deptError ? deptError.message : null;
-      
-      // Test 3: Check users table
-      results.push({
-        name: 'Get Users',
-        startTime: new Date().toISOString(),
-      });
-      
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('id, email, role')
-        .limit(3);
-      
-      results[2].endTime = new Date().toISOString();
-      results[2].success = !userError;
-      results[2].data = userData ? `Retrieved ${userData.length} users` : 'No data';
-      results[2].error = userError ? userError.message : null;
-      
-      setTestResults(results);
-    } catch (error) {
-      setTestResults([{
-        name: 'API Test',
-        success: false,
-        error: error.message
-      }]);
-    } finally {
-      setIsTestingApi(false);
-    }
-  };
-
-  // Force refresh data
-  const handleRefreshData = () => {
-    setRetryCount(prev => prev + 1);
-    toast.info('Refreshing data...');
-  };
-
-  // If data is still loading, show a loading indicator
-  if (isDataLoading) {
-    return (
-      <div className="container mx-auto p-4">
-        <PageHeader 
-          title="Create Employee" 
-          description="Create a new employee account and profile" 
-        />
-        <div className="flex items-center justify-center p-12">
-          <LoadingSpinner size="lg" />
-          <span className="ml-3 text-lg">Loading data...</span>
-        </div>
-      </div>
-    );
-  }
-
+  
   return (
-    <div className="container mx-auto p-4">
-      <PageHeader
-        title="Create New Employee"
-        description="Add a new employee to the HR system"
-        backButton={{
-          label: 'Back to Employees',
-          to: ROUTES.HR_DASHBOARD_EMPLOYEES
-        }}
-      />
-      
-      {/* Show diagnostics panel in development or if debug is enabled */}
-      {showDiagnostics && (
-        <div className="mb-8">
-          <SupabaseDiagnostic />
-        </div>
-      )}
-      
-      {/* Test API Results */}
-      {testResults && (
-        <Alert className="mb-6">
-          <AlertTitle>API Test Results</AlertTitle>
-          <AlertDescription>
-            <div className="mt-2 text-sm">
-              {testResults.map((test, index) => (
-                <div key={index} className="mb-2 p-2 border rounded">
-                  <div className="font-medium">{test.name}: {test.success ? '✅ Success' : '❌ Failed'}</div>
-                  {test.data && <div className="text-gray-600">{test.data}</div>}
-                  {test.error && <div className="text-red-600">{test.error}</div>}
+    <div className="min-h-screen bg-gray-50 pb-12">
+      {/* Main content */}
+      <div className="container mx-auto px-4 py-8 max-w-5xl">
+        <PageHeader 
+          title="Create New Employee"
+          description="Add a new employee to the system"
+          backUrl={ROUTES.HR_DASHBOARD + '?tab=employees'}
+        />
+        
+        {errorDetails && (
+          <Alert variant="destructive" className="mb-6">
+            <AlertCircle className="h-4 w-4 mr-2" />
+            <AlertTitle>Error Creating Employee</AlertTitle>
+            <AlertDescription>
+              {errorDetails.message}
+              {errorDetails.hint && (
+                <div className="mt-2 text-sm">
+                  <strong>Hint:</strong> {errorDetails.hint}
                 </div>
-              ))}
-            </div>
-          </AlertDescription>
-        </Alert>
-      )}
-      
-      {/* Debug actions */}
-      {import.meta.env.DEV && (
-        <div className="mb-6 flex space-x-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowDiagnostics(!showDiagnostics)}
-          >
-            {showDiagnostics ? 'Hide Diagnostics' : 'Show Diagnostics'}
-          </Button>
-          
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={runApiTest}
-            disabled={isTestingApi}
-          >
-            {isTestingApi ? 'Testing API...' : 'Test API Endpoints'}
-          </Button>
-          
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleRefreshData}
-          >
-            Refresh Data
-          </Button>
-        </div>
-      )}
-      
-      <EmployeeProfileForm 
-        onSubmit={handleSubmit} 
-        isLoading={isLoading}
-        departments={departments}
-        positions={positions}
-      />
+              )}
+            </AlertDescription>
+          </Alert>
+        )}
+        
+        {loading ? (
+          <div className="flex items-center justify-center h-64">
+            <LoadingSpinner />
+          </div>
+        ) : (
+          <EmployeeProfileForm 
+            departments={departments}
+            positions={positions}
+            onSubmit={handleSubmit}
+            isCreating={true}
+          />
+        )}
+      </div>
 
+      {/* Credentials Dialog */}
       <Dialog open={showCredentials} onOpenChange={setShowCredentials}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Employee Account Created</DialogTitle>
+            <DialogTitle>Employee Created Successfully</DialogTitle>
             <DialogDescription>
-              An account has been created for the employee. You can share these login credentials with them.
+              The new employee account has been created. Here are the login credentials:
             </DialogDescription>
           </DialogHeader>
           
-          {credentials && (
-            <div className="space-y-4">
-              <div className="p-4 bg-gray-50 rounded-md">
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="font-medium text-gray-500">Email:</div>
-                  <div className="col-span-2">{credentials.email}</div>
-                  
-                  <div className="font-medium text-gray-500">Password:</div>
-                  <div className="col-span-2 font-mono">{credentials.tempPassword}</div>
-                </div>
+          <div className="p-4 bg-gray-50 rounded-md my-3">
+            <div className="space-y-3">
+              <div>
+                <span className="font-semibold">Email:</span> 
+                <span className="ml-2">{credentials?.email}</span>
               </div>
-              
-              {enrolledCourses.length > 0 && (
-                <div>
-                  <h4 className="text-sm font-medium mb-2">Auto-enrolled in courses:</h4>
-                  <ul className="text-sm list-disc pl-5">
-                    {enrolledCourses.map((course, index) => (
-                      <li key={index}>{course.title}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+              <div>
+                <span className="font-semibold">Temporary Password:</span> 
+                <span className="ml-2 font-mono">{credentials?.tempPassword}</span>
+              </div>
+            </div>
+            
+            <Button 
+              onClick={handleCopyCredentials}
+              size="sm" 
+              variant="outline" 
+              className="mt-3"
+            >
+              <Copy className="h-3.5 w-3.5 mr-1.5" />
+              Copy Credentials
+            </Button>
+          </div>
+          
+          {enrolledCourses?.length > 0 && (
+            <div className="mb-3">
+              <h4 className="font-medium mb-2 flex items-center">
+                <Info className="h-4 w-4 mr-2" />
+                Auto-enrolled Courses
+              </h4>
+              <ul className="space-y-1 text-sm">
+                {enrolledCourses.map(course => (
+                  <li key={course.id} className="flex items-start">
+                    <span className="mr-2">•</span>
+                    {course.title}
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
           
-          <DialogFooter className="flex sm:justify-between">
-            <div className="flex space-x-2">
-              <Button variant="outline" onClick={handleCopyCredentials}>
-                Copy Credentials
-              </Button>
-              <Button variant="outline" onClick={handleGoToLearnerDashboard}>
-                Login as User
-              </Button>
+          <DialogFooter className="sm:justify-between">
+            <Button 
+              variant="outline" 
+              onClick={handleCloseCredentialsDialog}
+            >
+              Return to Dashboard
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Error Dialog */}
+      <Dialog open={isErrorDialogOpen} onOpenChange={setIsErrorDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center">
+              <AlertCircle className="h-5 w-5 mr-2 text-red-500" />
+              Database Error
+            </DialogTitle>
+            <DialogDescription>
+              There was an error communicating with the database. This could be due to a connectivity issue or a problem with the database itself.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Error Details</AlertTitle>
+              <AlertDescription className="break-words">
+                {errorMessage}
+              </AlertDescription>
+            </Alert>
+            <div className="mt-4">
+              <p className="text-sm text-muted-foreground">Error Code: {errorCode || 'Unknown'}</p>
+              <p className="text-sm text-muted-foreground mt-1">Timestamp: {new Date().toLocaleString()}</p>
             </div>
-            <Button onClick={handleCloseCredentialsDialog}>Continue</Button>
+          </div>
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => setIsErrorDialogOpen(false)}>
+              Close
+            </Button>
+            <Button onClick={handleRetry}>
+              <Wrench className="h-4 w-4 mr-2" />
+              Try Again
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
   );
 };
-
-// Make availableCourses accessible for the component
-const availableCourses = [
-  { id: 'course-1', title: 'Cybersecurity for Fintech', description: 'Essential security practices for fintech industry' },
-  { id: 'course-2', title: 'New Employee Orientation', description: 'Introduction to company policies and procedures' },
-  { id: 'course-3', title: 'Leadership Fundamentals', description: 'Core principles for effective leadership' }
-];
 
 export default CreateEmployeePage; 
