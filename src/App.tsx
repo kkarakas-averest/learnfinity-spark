@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { Toaster } from "@/components/ui/toaster";
@@ -23,6 +24,7 @@ import Billing from "@/pages/Billing";
 import CreateEmployeePage from "@/components/hr/CreateEmployeePage";
 import EditEmployeePage from "@/components/hr/EditEmployeePage";
 import { hrEmployeeService } from '@/lib/services/hrEmployeeService';
+import { toast } from "@/components/ui/use-toast";
 
 import "./App.css";
 
@@ -30,16 +32,30 @@ function App() {
   React.useEffect(() => {
     const initializeHR = async () => {
       try {
+        console.log('Starting HR system initialization...');
         const result = await hrEmployeeService.initialize();
         if (!result.success) {
           console.error('Failed to initialize HR system:', result.error);
+          toast({
+            title: "HR System Initialization Warning",
+            description: "Some HR features may be limited.",
+            variant: "destructive"
+          });
+        } else {
+          console.log('HR system initialized successfully');
         }
       } catch (error) {
         console.error('Error during HR system initialization:', error);
+        // Don't block the app from loading if HR fails to initialize
       }
     };
     
-    initializeHR();
+    // Wrap in a try-catch to prevent app from breaking if initialization fails
+    try {
+      initializeHR();
+    } catch (error) {
+      console.error('Critical error during HR initialization:', error);
+    }
   }, []);
 
   return (
