@@ -1,0 +1,14 @@
+{
+  "version": "1.0",
+  "created": "2025-03-03T10:29:38.306Z",
+  "mappings": [
+    {
+      "originalEmail": "kkarakas@averesttraining.com",
+      "originalName": "Kubilay Karakas2",
+      "originalRole": "learner",
+      "testEmail": "test1740997540466@example.com",
+      "testPassword": "Test123!",
+      "createdAt": "2025-03-03T10:29:38.305Z"
+    }
+  ]
+}
