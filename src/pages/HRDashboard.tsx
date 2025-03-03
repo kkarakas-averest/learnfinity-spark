@@ -1,5 +1,5 @@
-import * as React from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
+import React from "react";
+import { Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useHRAuth } from '@/contexts/HRAuthContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from '@/components/ui/button';
@@ -7,18 +7,30 @@ import { LogOut, Users, BookOpen, BarChart2 } from 'lucide-react';
 import { HRDashboardTab } from '@/types/hr.types';
 import { useToast } from '@/components/ui/use-toast';
 import { hrServices } from '@/services/hrServices';
+import { useAuth } from '../contexts/AuthContext';
 
 // Import HR components
 const DashboardOverview = React.lazy(() => import('@/components/hr/DashboardOverview'));
 const EmployeeManagement = React.lazy(() => import('@/components/hr/EmployeeManagement'));
 
 export default function HRDashboard() {
-  const navigate = useNavigate();
   const { toast } = useToast();
   const { user, isAuthenticated, isLoading, logout } = useHRAuth();
+  const { signOut } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [activeTab, setActiveTab] = React.useState<HRDashboardTab>('overview');
   const [initializing, setInitializing] = React.useState(true);
   
+  // Parse the query parameters to get the tab
+  React.useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tabParam = params.get('tab');
+    if (tabParam && ['overview', 'employees', 'courses', 'reports'].includes(tabParam)) {
+      setActiveTab(tabParam as HRDashboardTab);
+    }
+  }, [location]);
+
   // Initialize database if needed
   React.useEffect(() => {
     const initializeDatabase = async () => {
@@ -54,6 +66,7 @@ export default function HRDashboard() {
 
   const handleLogout = () => {
     logout();
+    signOut();
     navigate('/hr-login');
   };
 

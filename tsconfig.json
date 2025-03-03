@@ -18,6 +18,7 @@
     "types": ["node", "react", "react-dom"],
     "jsx": "react-jsx",
     "jsxImportSource": "react",
-    "allowSyntheticDefaultImports": true
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true
   }
 }
