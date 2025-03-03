@@ -1,3 +1,4 @@
+import { cn } from "@/lib/utils";
 import { ArrowRight, Bookmark, Layers, Zap } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -57,7 +58,10 @@ const Index = () => {
         {/* Features Section */}
         <section className="py-20 bg-secondary/50">
           <div className="container px-4 md:px-6">
-            <div className="text-center max-w-[800px] mx-auto mb-12 md:mb-16 animate-fade-in">
+            <div className={cn(
+              "text-center max-w-[800px] mx-auto mb-12 md:mb-16",
+              "animate-fade-in"
+            )}>
               <h2 className="text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl">
                 Revolutionize Your Learning Experience
               </h2>
@@ -70,7 +74,9 @@ const Index = () => {
               {features.map((feature, i) => (
                 <div
                   key={i}
-                  className="bg-white rounded-xl p-8 shadow-sm transition-all duration-200 hover:shadow-md"
+                  className={cn(
+                    "bg-white rounded-xl p-8 shadow-sm transition-all duration-200 hover:shadow-md"
+                  )}
                 >
                   <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mb-6">
                     {feature.icon}
@@ -86,7 +92,10 @@ const Index = () => {
         {/* Testimonials Section */}
         <section className="py-20">
           <div className="container px-4 md:px-6">
-            <div className="text-center max-w-[800px] mx-auto mb-12 md:mb-16 animate-fade-in">
+            <div className={cn(
+              "text-center max-w-[800px] mx-auto mb-12 md:mb-16",
+              "animate-fade-in"
+            )}>
               <h2 className="text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl">
                 What Our Learners Say
               </h2>
@@ -99,7 +108,9 @@ const Index = () => {
               {testimonials.map((testimonial, i) => (
                 <div
                   key={i}
-                  className="bg-secondary/30 rounded-xl p-8 border border-secondary relative"
+                  className={cn(
+                    "bg-secondary/30 rounded-xl p-8 border border-secondary relative"
+                  )}
                 >
                   <div className="absolute -top-3 -left-3 text-4xl text-primary opacity-50">"</div>
                   <p className="mb-6 relative z-10 text-muted-foreground">
@@ -118,7 +129,10 @@ const Index = () => {
         {/* CTA Section */}
         <section className="py-20 bg-primary text-white">
           <div className="container px-4 md:px-6">
-            <div className="max-w-[800px] mx-auto text-center animate-fade-in">
+            <div className={cn(
+              "max-w-[800px] mx-auto text-center",
+              "animate-fade-in"
+            )}>
               <h2 className="text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl mb-6">
                 Start Your Personalized Learning Journey Today
               </h2>

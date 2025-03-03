@@ -1,4 +1,3 @@
-
 import React from "react";
 import { Link } from "react-router-dom";
 import { 
@@ -213,7 +212,10 @@ const Navbar = () => {
         <div
           className={cn(
             "fixed inset-0 top-16 z-20 bg-background md:hidden",
-            isMenuOpen ? "block" : "hidden"
+            {
+              "block": isMenuOpen,
+              "hidden": !isMenuOpen
+            }
           )}
         >
           <div className="container p-6">
