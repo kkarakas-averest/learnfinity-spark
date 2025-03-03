@@ -1,4 +1,5 @@
-import { useState } from "react";
+
+import React from "react";
 import { Link } from "react-router-dom";
 import { Clock, BarChart2, Users } from "lucide-react";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
@@ -28,7 +29,7 @@ const CourseCard = ({
   image,
   progress,
 }: CourseCardProps) => {
-  const [isHovered, setIsHovered] = useState(false);
+  const [isHovered, setIsHovered] = React.useState(false);
 
   const getLevelColor = (level: string) => {
     switch (level) {

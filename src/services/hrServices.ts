@@ -87,5 +87,91 @@ export const hrServices = {
         error: error instanceof Error ? error.message : "Unknown error initializing database" 
       };
     }
+  },
+  
+  // Add missing dashboard functions
+  getDashboardMetrics: async () => {
+    try {
+      // Get total number of employees
+      const { data: employeesData, error: employeesError } = await supabase
+        .from('hr_employees')
+        .select('id, status')
+        .order('created_at', { ascending: false });
+        
+      if (employeesError) throw employeesError;
+      
+      const employeeCount = employeesData?.length || 0;
+      const activeEmployees = employeesData?.filter(e => e.status === 'active').length || 0;
+      const inactiveEmployees = employeesData?.filter(e => e.status !== 'active').length || 0;
+      
+      // Get departments count
+      const { data: departmentsData, error: departmentsError } = await supabase
+        .from('hr_departments')
+        .select('id');
+        
+      if (departmentsError) throw departmentsError;
+      
+      // Get recent hires (last 30 days)
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      
+      const { data: recentHiresData, error: recentHiresError } = await supabase
+        .from('hr_employees')
+        .select('id')
+        .gte('created_at', thirtyDaysAgo.toISOString());
+        
+      if (recentHiresError) throw recentHiresError;
+      
+      return {
+        success: true,
+        metrics: {
+          totalEmployees: employeeCount,
+          activeEmployees,
+          inactiveEmployees,
+          totalDepartments: departmentsData?.length || 0,
+          recentHires: recentHiresData?.length || 0
+        }
+      };
+    } catch (error) {
+      console.error("Error fetching dashboard metrics:", error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error fetching metrics"
+      };
+    }
+  },
+  
+  getRecentActivities: async () => {
+    try {
+      // Get recent employees (created in the last 30 days)
+      const { data: recentEmployees, error: employeesError } = await supabase
+        .from('hr_employees')
+        .select('id, first_name, last_name, email, status, position, department, created_at')
+        .order('created_at', { ascending: false })
+        .limit(10);
+        
+      if (employeesError) throw employeesError;
+      
+      // Transform to activities format
+      const activities = recentEmployees?.map(employee => ({
+        id: employee.id,
+        type: 'employee_created',
+        subject: `${employee.first_name} ${employee.last_name}`,
+        description: `New employee added as ${employee.position} in ${employee.department}`,
+        timestamp: employee.created_at,
+        status: employee.status
+      })) || [];
+      
+      return {
+        success: true,
+        activities
+      };
+    } catch (error) {
+      console.error("Error fetching recent activities:", error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error fetching activities"
+      };
+    }
   }
 };
