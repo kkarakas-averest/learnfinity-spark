@@ -782,42 +782,85 @@ export const hrEmployeeService = {
 
       console.log('Creating user account with email:', standardizedEmployee.email);
       
-      // Create new user with signUp
-      const { data: authData, error: authError } = await supabase.auth.signUp({
+      // First try to sign in with password to check if user exists
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
         email: standardizedEmployee.email,
-        password,
-        options: {
-          data: {
-            name: standardizedEmployee.name,
-            role: 'learner'
-          }
-        }
+        password: 'temp-password-that-will-fail'
       });
 
-      if (authError) {
-        console.error('Error creating user account:', authError);
-        return { 
-          data: createdEmployee, 
-          error: null, 
-          userAccount: null,
-          authError
-        };
+      let authData;
+      
+      if (signInError?.message === 'Invalid login credentials') {
+        // User doesn't exist, create new account
+        console.log('User does not exist, creating new account...');
+        const { data: newAuthData, error: authError } = await supabase.auth.signUp({
+          email: standardizedEmployee.email,
+          password,
+          options: {
+            data: {
+              name: standardizedEmployee.name,
+              role: 'learner'
+            }
+          }
+        });
+
+        if (authError) {
+          console.error('Error creating user account:', authError);
+          return { 
+            data: createdEmployee, 
+            error: null, 
+            userAccount: null,
+            authError
+          };
+        }
+        
+        authData = newAuthData;
+      } else {
+        // User exists, update their password
+        console.log('User exists, updating password...');
+        const { data: resetData, error: resetError } = await supabase.auth.resetPasswordForEmail(
+          standardizedEmployee.email,
+          {
+            redirectTo: `${window.location.origin}/auth/reset-password`
+          }
+        );
+
+        if (resetError) {
+          console.error('Error sending password reset email:', resetError);
+          return {
+            data: createdEmployee,
+            error: resetError,
+            userAccount: null
+          };
+        }
+
+        // Use the existing user's data
+        authData = { user: { id: signInData?.user?.id } };
       }
 
       // Try to insert user into users table
       try {
-        const { error: insertError } = await supabase
+        // First check if user already exists in users table
+        const { data: existingUser } = await supabase
           .from('users')
-          .insert({
-            id: authData.user.id,
-            name: standardizedEmployee.name,
-            email: standardizedEmployee.email,
-            password: 'hashed-in-rpc', // The actual password is handled by Supabase Auth
-            role: 'learner',
-          });
+          .select('id')
+          .eq('email', standardizedEmployee.email)
+          .single();
 
-        if (insertError) {
-          console.warn('Failed to create user profile, but auth user was created:', insertError);
+        if (!existingUser) {
+          const { error: insertError } = await supabase
+            .from('users')
+            .insert({
+              id: authData.user.id,
+              name: standardizedEmployee.name,
+              email: standardizedEmployee.email,
+              password: 'hashed-in-rpc',
+              role: 'learner',
+            });
+
+          if (insertError) {
+            console.warn('Failed to create user profile:', insertError);
+          }
         }
       } catch (insertError) {
         console.warn('Exception when creating user profile:', insertError);
@@ -825,18 +868,27 @@ export const hrEmployeeService = {
       
       // Also create a learner record associated with the user
       try {
-        const { error: learnerError } = await supabase
+        // First check if learner record exists
+        const { data: existingLearner } = await supabase
           .from('learners')
-          .insert({
-            id: authData.user.id,
-            company_id: standardizedEmployee.company_id,
-            progress_status: {},
-            preferences: {},
-            certifications: {}
-          });
-          
-        if (learnerError) {
-          console.warn('Failed to create learner record:', learnerError);
+          .select('id')
+          .eq('id', authData.user.id)
+          .single();
+
+        if (!existingLearner) {
+          const { error: learnerError } = await supabase
+            .from('learners')
+            .insert({
+              id: authData.user.id,
+              company_id: standardizedEmployee.company_id,
+              progress_status: {},
+              preferences: {},
+              certifications: {}
+            });
+            
+          if (learnerError) {
+            console.warn('Failed to create learner record:', learnerError);
+          }
         }
       } catch (learnerError) {
         console.warn('Exception when creating learner record:', learnerError);
@@ -873,13 +925,42 @@ export const hrEmployeeService = {
         return { url: null, error: null };
       }
       
-      const fileName = `${Date.now()}-${resumeFile.name}`;
+      // Create a safe filename
+      const fileExt = resumeFile.name.split('.').pop();
+      const fileName = `${Date.now()}-${employeeId}.${fileExt}`;
       const filePath = `resumes/${employeeId}/${fileName}`;
+      
+      console.log('Attempting to upload resume:', {
+        fileName,
+        filePath,
+        fileSize: resumeFile.size,
+        fileType: resumeFile.type
+      });
+
+      // First ensure the bucket exists and is accessible
+      const { data: buckets, error: bucketsError } = await supabase
+        .storage
+        .listBuckets();
+
+      if (bucketsError) {
+        console.error('Error checking storage buckets:', bucketsError);
+        return { url: null, error: bucketsError };
+      }
+
+      const hrBucket = buckets.find(b => b.name === 'hr-documents');
+      if (!hrBucket) {
+        console.error('HR documents bucket not found');
+        return { url: null, error: new Error('Storage bucket not found') };
+      }
       
       // Upload file to Supabase Storage
       const { data: fileData, error: uploadError } = await supabase.storage
         .from('hr-documents')
-        .upload(filePath, resumeFile);
+        .upload(filePath, resumeFile, {
+          cacheControl: '3600',
+          upsert: true,
+          contentType: resumeFile.type
+        });
         
       if (uploadError) {
         console.error('Error uploading resume:', uploadError);
@@ -893,11 +974,24 @@ export const hrEmployeeService = {
         
       const resumeUrl = urlData?.publicUrl;
       
+      if (!resumeUrl) {
+        console.error('Failed to get public URL for uploaded file');
+        return { url: null, error: new Error('Failed to get file URL') };
+      }
+
+      console.log('Resume uploaded successfully:', resumeUrl);
+      
       // Update employee record with resume URL
-      if (resumeUrl) {
-        await this.updateEmployee(employeeId, {
+      try {
+        const { error: updateError } = await this.updateEmployee(employeeId, {
           resume_url: resumeUrl
         });
+
+        if (updateError) {
+          console.warn('Failed to update employee with resume URL:', updateError);
+        }
+      } catch (updateError) {
+        console.warn('Exception updating employee with resume URL:', updateError);
       }
       
       return { url: resumeUrl, error: null };
@@ -919,60 +1013,123 @@ export const hrEmployeeService = {
         return { success: true, error: null };
       }
       
-      // Filter out invalid course IDs
+      console.log('Attempting to enroll employee in courses:', {
+        employeeId,
+        courseIds
+      });
+
+      // First validate the employee ID exists
+      const { data: employee, error: employeeError } = await supabase
+        .from('hr_employees')
+        .select('id')
+        .eq('id', employeeId)
+        .single();
+
+      if (employeeError || !employee) {
+        console.error('Invalid employee ID for enrollment:', employeeError);
+        return { success: false, error: new Error('Invalid employee ID') };
+      }
+      
+      // Filter out invalid course IDs and check for existing enrollments
       const validCourseIds = courseIds.filter(id => {
+        // Accept both UUID format and 'course-X' format
         const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-        return uuidRegex.test(id) || id.startsWith('course-');
+        return uuidRegex.test(id) || /^course-\d+$/.test(id);
       });
       
       if (validCourseIds.length === 0) {
         console.warn('No valid course IDs to enroll employee in');
         return { success: false, error: new Error('No valid course IDs') };
       }
+
+      // Check for existing enrollments to avoid duplicates
+      const { data: existingEnrollments, error: checkError } = await supabase
+        .from('hr_course_enrollments')
+        .select('course_id')
+        .eq('employee_id', employeeId)
+        .in('course_id', validCourseIds);
+
+      if (checkError) {
+        console.warn('Error checking existing enrollments:', checkError);
+      }
+
+      const existingCourseIds = new Set(existingEnrollments?.map(e => e.course_id) || []);
+      const newCourseIds = validCourseIds.filter(id => !existingCourseIds.has(id));
+      
+      if (newCourseIds.length === 0) {
+        console.log('All courses are already enrolled');
+        return { success: true, error: null };
+      }
       
       // Try to insert enrollments one by one
       let enrollmentErrors = [];
+      let successfulEnrollments = [];
       
-      for (const courseId of validCourseIds) {
-        const { error: enrollmentError } = await supabase
-          .from('hr_course_enrollments')
-          .insert({
+      for (const courseId of newCourseIds) {
+        try {
+          const enrollment = {
             employee_id: employeeId,
             course_id: courseId,
             status: 'enrolled',
             progress: 0,
             enrollment_date: new Date().toISOString()
-          });
-          
-        if (enrollmentError) {
-          console.warn(`Failed to enroll employee in course ${courseId}:`, enrollmentError);
+          };
+
+          const { error: enrollmentError } = await supabase
+            .from('hr_course_enrollments')
+            .insert(enrollment);
+            
+          if (enrollmentError) {
+            console.warn(`Failed to enroll employee in course ${courseId}:`, enrollmentError);
+            enrollmentErrors.push({
+              course_id: courseId,
+              error: enrollmentError
+            });
+          } else {
+            successfulEnrollments.push(courseId);
+            
+            // Create activity record for successful enrollment
+            try {
+              await supabase
+                .from('hr_employee_activities')
+                .insert({
+                  employee_id: employeeId,
+                  activity_type: 'enrollment',
+                  description: `Enrolled in course ${courseId}`,
+                  course_id: courseId,
+                  timestamp: new Date().toISOString()
+                });
+            } catch (activityError) {
+              console.warn(`Failed to create activity record for course ${courseId}:`, activityError);
+            }
+          }
+        } catch (error) {
+          console.warn(`Exception enrolling in course ${courseId}:`, error);
           enrollmentErrors.push({
             course_id: courseId,
-            error: enrollmentError
+            error
           });
-        } else {
-          // Create activity record for successful enrollment
-          await supabase
-            .from('hr_employee_activities')
-            .insert({
-              employee_id: employeeId,
-              activity_type: 'enrollment',
-              description: `Enrolled in course ${courseId}`,
-              course_id: courseId,
-              timestamp: new Date().toISOString()
-            });
         }
       }
       
       if (enrollmentErrors.length > 0) {
         console.warn(`${enrollmentErrors.length} course enrollments failed:`, enrollmentErrors);
+        if (successfulEnrollments.length > 0) {
+          console.log(`${successfulEnrollments.length} enrollments succeeded:`, successfulEnrollments);
+        }
         return { 
-          success: enrollmentErrors.length < validCourseIds.length, 
-          error: new Error(`${enrollmentErrors.length} enrollments failed`)
+          success: successfulEnrollments.length > 0,
+          error: new Error(`${enrollmentErrors.length} enrollments failed`),
+          successfulEnrollments,
+          failedEnrollments: enrollmentErrors.map(e => e.course_id)
         };
       }
       
-      return { success: true, error: null };
+      return { 
+        success: true, 
+        error: null,
+        successfulEnrollments
+      };
     } catch (error) {
       console.error('Error in enrollEmployeeInCourses:', error);
       return { success: false, error };
