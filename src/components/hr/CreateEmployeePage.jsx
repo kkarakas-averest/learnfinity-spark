@@ -200,6 +200,26 @@ const CreateEmployeePage = () => {
     navigate(ROUTES.HR_DASHBOARD_EMPLOYEES);
   };
 
+  const handleGoToLearnerDashboard = () => {
+    if (credentials) {
+      // Store the credentials in localStorage for the login page to use
+      localStorage.setItem('pendingAutoLogin', JSON.stringify({
+        email: credentials.email,
+        password: credentials.password
+      }));
+      
+      // Close the dialog and redirect to the login page
+      setShowCredentials(false);
+      setCredentials(null);
+      
+      // Show a toast indicating what's happening
+      toast.info('Redirecting to login page for learner access...');
+      
+      // Navigate to the login page, which will detect and use the stored credentials
+      window.location.href = '/login?autoLogin=true';
+    }
+  };
+
   const runApiTest = async () => {
     try {
       console.log('API test button clicked!');
@@ -347,6 +367,10 @@ const CreateEmployeePage = () => {
             <Button variant="outline" onClick={handleCopyCredentials} className="flex gap-2">
               <Copy className="h-4 w-4" />
               Copy Credentials
+            </Button>
+            <Button variant="outline" onClick={handleGoToLearnerDashboard} className="flex gap-2">
+              <Info className="h-4 w-4" />
+              Go to Learner Dashboard
             </Button>
             <Button onClick={handleCloseCredentialsDialog}>Continue</Button>
           </DialogFooter>

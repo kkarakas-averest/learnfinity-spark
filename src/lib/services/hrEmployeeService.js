@@ -400,7 +400,6 @@ export const hrEmployeeService = {
         email: employee.email,
         password,
         options: {
-          emailRedirectTo: window.location.origin,
           data: {
             name: employee.name,
             role: 'learner'
@@ -416,6 +415,16 @@ export const hrEmployeeService = {
           userAccount: null,
           authError
         };
+      }
+      
+      // Immediately sign in the user to bypass email confirmation
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: employee.email,
+        password: password
+      });
+
+      if (signInError) {
+        console.warn('Created user but could not sign in:', signInError);
       }
       
       // Try to insert user into users table
@@ -505,11 +514,11 @@ export const hrEmployeeService = {
           let enrollmentErrors = [];
           
           for (const enrollment of enrollments) {
-            const { error: enrollmentError } = await supabase
-              .from('hr_course_enrollments')
+          const { error: enrollmentError } = await supabase
+            .from('hr_course_enrollments')
               .insert(enrollment);
-              
-            if (enrollmentError) {
+            
+          if (enrollmentError) {
               console.warn(`Failed to enroll employee in course ${enrollment.course_id}:`, enrollmentError);
               enrollmentErrors.push({
                 course_id: enrollment.course_id,
@@ -771,19 +780,16 @@ export const hrEmployeeService = {
         includeSpecial: false // Avoid special chars for simplicity in initial password
       });
       
-      // Create a user account with Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: employeeJSON.email,
-        password,
-        options: {
-          emailRedirectTo: window.location.origin,
-          data: {
-            name: employeeJSON.name,
-            role: 'learner'
-          }
+      // Create user account with Supabase Auth using server RPC
+      const { data: authData, error: authError } = await supabase.rpc('create_confirmed_user', {
+        user_email: standardizedEmployee.email,
+        user_password: password,
+        user_data: {
+          name: standardizedEmployee.name,
+          role: 'learner'
         }
       });
-      
+
       if (authError) {
         console.error('Error creating user account:', authError);
         return { 
@@ -794,14 +800,16 @@ export const hrEmployeeService = {
         };
       }
       
+      // No need to sign in immediately as the account is already confirmed
+      
       // Try to insert user into users table
       try {
         const { error: insertError } = await supabase
           .from('users')
           .insert({
             id: authData.user.id,
-            name: employeeJSON.name,
-            email: employeeJSON.email,
+            name: standardizedEmployee.name,
+            email: standardizedEmployee.email,
             password: 'hashed-in-rpc', // The actual password is handled by Supabase Auth
             role: 'learner',
           });
@@ -836,7 +844,7 @@ export const hrEmployeeService = {
         data: createdEmployee, 
         error: null, 
         userAccount: {
-          email: employeeJSON.email,
+          email: standardizedEmployee.email,
           password,
           id: authData.user.id
         }

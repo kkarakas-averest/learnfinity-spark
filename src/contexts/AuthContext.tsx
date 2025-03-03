@@ -1,4 +1,6 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import * as React from 'react';
+type ReactNode = React.ReactNode;
+const { createContext, useContext, useEffect, useState } = React;
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
@@ -100,12 +102,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         console.warn('Error fetching user details:', error);
         
         // Create default user details with learner role
-        setUserDetails({
+        const defaultDetails = {
           id: userId,
           name: 'User',
           email: user?.email || '',
           role: 'learner',
-        });
+        };
+        setUserDetails(defaultDetails);
+        redirectBasedOnRole();
         return;
       }
 
@@ -116,16 +120,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           email: data.email,
           role: data.role,
         });
+        redirectBasedOnRole();
       }
     } catch (error) {
       console.error('Error fetching user details:', error);
       // Create default user details with learner role
-      setUserDetails({
+      const defaultDetails = {
         id: userId,
         name: 'User',
         email: user?.email || '',
         role: 'learner',
-      });
+      };
+      setUserDetails(defaultDetails);
+      redirectBasedOnRole();
     }
   };
 
@@ -150,7 +157,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // Redirect based on role
       if (data.user) {
         await fetchUserDetails(data.user.id);
-        redirectBasedOnRole();
       }
     } catch (error: any) {
       console.error('Error signing in:', error);
