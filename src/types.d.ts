@@ -65,7 +65,7 @@ declare module 'react-router-dom' {
 declare module '@/components/ui/badge' {
   export interface BadgeProps {
     className?: string;
-    variant?: "default" | "secondary" | "destructive" | "outline";
+    variant?: "default" | "secondary" | "destructive" | "outline" | "success";
     children?: React.ReactNode;
   }
   
@@ -93,7 +93,7 @@ declare module '@/components/ui/sheet' {
   }
   
   export const Sheet: React.FC<SheetProps>;
-  export const SheetTrigger: React.FC<React.HTMLAttributes<HTMLButtonElement>>;
+  export const SheetTrigger: React.FC<React.HTMLAttributes<HTMLButtonElement> & { asChild?: boolean }>;
   export const SheetContent: React.FC<React.HTMLAttributes<HTMLDivElement> & { side?: SheetProps['side'] }>;
   export const SheetHeader: React.FC<React.HTMLAttributes<HTMLDivElement>>;
   export const SheetTitle: React.FC<React.HTMLAttributes<HTMLHeadingElement>>;
@@ -132,26 +132,101 @@ declare module 'zod' {
     boolean: () => any;
     literal: (value: any, options?: any) => any;
     infer: <T>(schema: T) => any;
+    enum: (values: any) => any;
   };
   export function object(schema: any): any;
   export function string(): any;
   export function nativeEnum(values: any): any;
   export function boolean(): any;
   export function literal(value: any, options?: any): any;
+  export function enum(values: any): any;
+  
+  export namespace z {
+    export function string(): any;
+    export function number(): any;
+    export function boolean(): any;
+    export function object(schema: any): any;
+    export function array(schema: any): any;
+    export function enum(values: any): any;
+  }
 }
 
-// Declare global process variable for NODE_ENV
-declare global {
-  namespace NodeJS {
-    interface ProcessEnv {
-      NODE_ENV: 'development' | 'production' | 'test';
-    }
+// Fix HR Dashboard Overview types
+declare module '/dev-server/src/services/hrEmployeeService' {
+  export const hrEmployeeService: {
+    getDashboardMetrics: () => Promise<{
+      success: boolean;
+      metrics: {
+        totalEmployees: any;
+        activeEmployees: any;
+        inactiveEmployees: any;
+        totalDepartments: any;
+        recentHires: any;
+        newEmployees: any;
+        completionRate: any;
+        completionRateChange: any;
+        skillGaps: any;
+        skillGapsChange: any;
+        learningHours: any;
+        learningHoursChange: any;
+      };
+      error?: string;
+    } | {
+      success: boolean;
+      error: string;
+      metrics?: undefined;
+    }>;
+    getRecentActivities: () => Promise<{
+      success: boolean;
+      activities: any[];
+      error?: string;
+    } | {
+      success: boolean;
+      error: string;
+      activities?: undefined;
+    }>;
+  };
+  
+  export interface Employee {
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+    status: string;
+    department: string;
+    hire_date: string;
+    location: string;
+    manager?: string;
+    skills?: string[];
+  }
+}
+
+// Define DashboardTabs type
+export interface Metadata {
+  title: string;
+  description: string;
+}
+
+// Fix Button type for asChild prop
+declare module '@/components/ui/button' {
+  export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+    variant?: "default" | "destructive" | "outline" | "secondary" | "ghost" | "link";
+    size?: "default" | "sm" | "lg" | "icon";
+    asChild?: boolean;
+    children?: React.ReactNode;
   }
   
-  var process: {
-    env: {
-      NODE_ENV: 'development' | 'production' | 'test';
-      [key: string]: string | undefined;
-    }
-  };
+  export const Button: React.FC<ButtonProps>;
+  export const buttonVariants: (props: { variant?: ButtonProps['variant'], size?: ButtonProps['size'], className?: string }) => string;
+}
+
+// Fix Alert type for success variant
+declare module '@/components/ui/alert' {
+  export interface AlertProps extends React.HTMLAttributes<HTMLDivElement> {
+    variant?: "default" | "destructive" | "outline" | "secondary" | "success";
+  }
+  
+  export const Alert: React.FC<AlertProps>;
+  export const AlertTitle: React.FC<React.HTMLAttributes<HTMLHeadingElement>>;
+  export const AlertDescription: React.FC<React.HTMLAttributes<HTMLDivElement>>;
 }

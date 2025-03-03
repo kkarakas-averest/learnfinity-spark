@@ -71,6 +71,121 @@ declare module 'lucide-react' {
   export const LayoutDashboard: Icon;
 }
 
+// Fix React imports by making React module correctly typed
+declare module 'react' {
+  import React from 'react';
+  
+  export = React;
+  export as namespace React;
+  
+  export interface ReactElement<P = any, T extends string | JSXElementConstructor<any> = string | JSXElementConstructor<any>> {
+    type: T;
+    props: P;
+    key: Key | null;
+  }
+  
+  export type ReactNode = 
+    | ReactElement
+    | ReactFragment
+    | ReactPortal
+    | boolean
+    | null
+    | undefined;
+    
+  export interface ReactFragment {}
+  export interface ReactPortal extends ReactElement {}
+  export type Key = string | number;
+  export type JSXElementConstructor<P> = ((props: P) => ReactElement | null) | (new (props: P) => Component<P, any>);
+  
+  export type SyntheticEvent<T = Element, E = Event> = {}
+  export type MouseEvent<T = Element> = SyntheticEvent<T, MouseEvent>;
+  export type ChangeEvent<T = Element> = SyntheticEvent<T>;
+  export type FormEvent<T = Element> = SyntheticEvent<T>;
+  
+  export type RefCallback<T> = (instance: T | null) => void;
+  export type RefObject<T> = { current: T | null };
+  export type Ref<T> = RefCallback<T> | RefObject<T> | null;
+
+  export type ComponentState = any;
+  export type ComponentType<P = {}> = ComponentClass<P> | FunctionComponent<P>;
+  export type ComponentClass<P = {}, S = ComponentState> = new (props: P) => Component<P, S>;
+  export type FunctionComponent<P = {}> = (props: P) => ReactElement<any, any> | null;
+  export type FC<P = {}> = FunctionComponent<P>;
+  export type HTMLAttributes<T> = {};
+  export type SVGProps<T> = {};
+  export type CSSProperties = {};
+  export type ForwardRefExoticComponent<P> = {};
+  export type RefAttributes<T> = {};
+  export type PropsWithRef<P> = {};
+  export type PropsWithChildren<P = {}> = P & { children?: ReactNode };
+  export type ClassAttributes<T> = {};
+  export type DetailedHTMLProps<E extends HTMLAttributes<T>, T> = {};
+  export type PropsWithoutRef<P> = {};
+  export type ElementRef<C> = {};
+
+  export interface Component<P = {}, S = {}, SS = any> {}
+  export abstract class Component<P, S> {}
+  export class PureComponent<P = {}, S = {}, SS = any> extends Component<P, S, SS> {}
+
+  // React hooks
+  export function useState<T>(initialState: T | (() => T)): [T, (newState: T | ((oldState: T) => T)) => void];
+  export function useEffect(effect: () => void | (() => void | undefined), deps?: ReadonlyArray<any>): void;
+  export function useContext<T>(context: React.Context<T>): T;
+  export function useReducer<R extends React.Reducer<any, any>, I>(
+    reducer: R,
+    initializerArg: I & React.ReducerState<R>,
+    initializer: (arg: I & React.ReducerState<R>) => React.ReducerState<R>
+  ): [React.ReducerState<R>, React.Dispatch<React.ReducerAction<R>>];
+  export function useCallback<T extends (...args: any[]) => any>(callback: T, deps: ReadonlyArray<any>): T;
+  export function useMemo<T>(factory: () => T, deps: ReadonlyArray<any> | undefined): T;
+  export function useRef<T = undefined>(initialValue: T): React.MutableRefObject<T>;
+  export function useImperativeHandle<T, R extends T>(ref: React.Ref<T>, init: () => R, deps?: ReadonlyArray<any>): void;
+  export function useLayoutEffect(effect: React.EffectCallback, deps?: ReadonlyArray<any>): void;
+  export function useDebugValue<T>(value: T, format?: (value: T) => any): void;
+  export function useId(): string;
+
+  // Context API
+  export interface ProviderProps<T> {
+    value: T;
+    children?: ReactNode;
+  }
+  export interface ConsumerProps<T> {
+    children: (value: T) => ReactNode;
+    unstable_observedBits?: number;
+  }
+  export interface Context<T> {
+    Provider: React.Provider<T>;
+    Consumer: React.Consumer<T>;
+    displayName?: string;
+  }
+  export interface Provider<T> {
+    (props: ProviderProps<T>): ReactElement<any> | null;
+  }
+  export interface Consumer<T> {
+    (props: ConsumerProps<T>): ReactElement<any> | null;
+  }
+  export function createContext<T>(defaultValue: T): Context<T>;
+  
+  // Lazy loading
+  export function lazy<T extends ComponentType<any>>(
+    factory: () => Promise<{ default: T }>
+  ): T;
+  
+  export interface SuspenseProps {
+    children?: ReactNode;
+    fallback: ReactNode;
+  }
+  export const Suspense: React.FC<SuspenseProps>;
+  
+  export type Reducer<S, A> = (prevState: S, action: A) => S;
+  export type ReducerState<R extends Reducer<any, any>> = R extends Reducer<infer S, any> ? S : never;
+  export type ReducerAction<R extends Reducer<any, any>> = R extends Reducer<any, infer A> ? A : never;
+  export interface MutableRefObject<T> {
+    current: T;
+  }
+  export type EffectCallback = () => (void | (() => void | undefined));
+}
+
 // Add additional TypeScript declarations as needed
 declare module 'react' {
   interface ImportMetaEnv {
@@ -83,16 +198,18 @@ declare module 'react' {
   }
 }
 
-// Fix React imports
-declare module 'react' {
-  import * as React from 'react';
-  export = React;
-  export as namespace React;
-}
-
-// Declare DOM types
+// Declare global process variable for NODE_ENV
 declare global {
-  interface Window {
-    // Add any window properties here
+  namespace NodeJS {
+    interface ProcessEnv {
+      NODE_ENV: 'development' | 'production' | 'test';
+    }
   }
+  
+  var process: {
+    env: {
+      NODE_ENV: 'development' | 'production' | 'test';
+      [key: string]: string | undefined;
+    }
+  };
 }

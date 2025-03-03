@@ -1,356 +1,384 @@
-import { supabase } from "@/lib/supabase";
-import { Employee } from "@/types/hr.types";
+export interface Employee {
+  id: string;
+  name: string;
+  email: string;
+  department: string;
+  role: string;
+  status: string;
+  hire_date: string;
+  position?: string;
+  salary?: number;
+  manager?: string;
+  location?: string;
+  phone?: string;
+  skills?: string[];
+  certifications?: string[];
+  performance_rating?: number;
+  profile_image?: string;
+}
+
+const mockEmployees: Employee[] = [
+  {
+    id: "1",
+    name: "John Smith",
+    email: "john.1@example.com",
+    department: "Marketing",
+    role: "Manager",
+    status: "Active",
+    hire_date: "2020-08-15",
+    position: "Marketing Manager",
+    salary: 90000,
+    manager: null,
+    location: "New York",
+    phone: "123-456-7890",
+    skills: ["Marketing Strategy", "Team Leadership", "Digital Marketing"],
+    certifications: ["Certified Marketing Professional"],
+    performance_rating: 4.5,
+    profile_image: "https://api.dicebear.com/7.x/avataaars/svg?seed=John",
+  },
+  {
+    id: "2",
+    name: "Alice Johnson",
+    email: "alice.j@example.com",
+    department: "Engineering",
+    role: "Engineer",
+    status: "Active",
+    hire_date: "2021-02-20",
+    position: "Software Engineer",
+    salary: 110000,
+    manager: "John Smith",
+    location: "San Francisco",
+    phone: "987-654-3210",
+    skills: ["JavaScript", "React", "Node.js"],
+    certifications: ["AWS Certified Developer"],
+    performance_rating: 4.8,
+    profile_image: "https://api.dicebear.com/7.x/avataaars/svg?seed=Alice",
+  },
+  {
+    id: "3",
+    name: "Bob Williams",
+    email: "bob.w@example.com",
+    department: "HR",
+    role: "HR Specialist",
+    status: "Active",
+    hire_date: "2022-05-10",
+    position: "HR Specialist",
+    salary: 75000,
+    manager: "John Smith",
+    location: "Chicago",
+    phone: "555-123-4567",
+    skills: ["Recruiting", "Employee Relations", "HR Management"],
+    certifications: ["SHRM-CP"],
+    performance_rating: 4.2,
+    profile_image: "https://api.dicebear.com/7.x/avataaars/svg?seed=Bob",
+  },
+  {
+    id: "4",
+    name: "Emily Davis",
+    email: "emily.d@example.com",
+    department: "Sales",
+    role: "Sales Representative",
+    status: "Active",
+    hire_date: "2023-01-05",
+    position: "Sales Representative",
+    salary: 80000,
+    manager: "John Smith",
+    location: "Los Angeles",
+    phone: "111-222-3333",
+    skills: ["Sales", "Customer Service", "Account Management"],
+    certifications: [],
+    performance_rating: 4.0,
+    profile_image: "https://api.dicebear.com/7.x/avataaars/svg?seed=Emily",
+  },
+  {
+    id: "5",
+    name: "David Garcia",
+    email: "david.g@example.com",
+    department: "Finance",
+    role: "Accountant",
+    status: "Inactive",
+    hire_date: "2020-11-30",
+    position: "Senior Accountant",
+    salary: 95000,
+    manager: "John Smith",
+    location: "Houston",
+    phone: "444-555-6666",
+    skills: ["Accounting", "Financial Analysis", "Tax Preparation"],
+    certifications: ["CPA"],
+    performance_rating: 4.6,
+    profile_image: "https://api.dicebear.com/7.x/avataaars/svg?seed=David",
+  },
+  {
+    id: "6",
+    name: "Linda Rodriguez",
+    email: "linda.r@example.com",
+    department: "Marketing",
+    role: "Marketing Coordinator",
+    status: "Active",
+    hire_date: "2021-07-12",
+    position: "Marketing Coordinator",
+    salary: 65000,
+    manager: "John Smith",
+    location: "Miami",
+    phone: "777-888-9999",
+    skills: ["Social Media Marketing", "Content Creation", "Event Planning"],
+    certifications: [],
+    performance_rating: 4.3,
+    profile_image: "https://api.dicebear.com/7.x/avataaars/svg?seed=Linda",
+  },
+  {
+    id: "7",
+    name: "Michael Brown",
+    email: "michael.b@example.com",
+    department: "Engineering",
+    role: "Software Developer",
+    status: "Active",
+    hire_date: "2022-03-01",
+    position: "Software Developer",
+    salary: 100000,
+    manager: "John Smith",
+    location: "Seattle",
+    phone: "333-444-5555",
+    skills: ["Java", "Spring", "SQL"],
+    certifications: ["Oracle Certified Professional"],
+    performance_rating: 4.7,
+    profile_image: "https://api.dicebear.com/7.x/avataaars/svg?seed=Michael",
+  },
+  {
+    id: "8",
+    name: "Jennifer Lee",
+    email: "jennifer.l@example.com",
+    department: "HR",
+    role: "Recruiter",
+    status: "Active",
+    hire_date: "2023-02-15",
+    position: "Recruiter",
+    salary: 70000,
+    manager: "John Smith",
+    location: "Austin",
+    phone: "666-777-8888",
+    skills: ["Recruiting", "Interviewing", "Talent Acquisition"],
+    certifications: [],
+    performance_rating: 4.1,
+    profile_image: "https://api.dicebear.com/7.x/avataaars/svg?seed=Jennifer",
+  },
+  {
+    id: "9",
+    name: "Christopher Wilson",
+    email: "christopher.w@example.com",
+    department: "Sales",
+    role: "Sales Manager",
+    status: "Active",
+    hire_date: "2021-10-01",
+    position: "Sales Manager",
+    salary: 120000,
+    manager: "John Smith",
+    location: "Dallas",
+    phone: "222-333-4444",
+    skills: ["Sales Management", "Business Development", "Negotiation"],
+    certifications: [],
+    performance_rating: 4.9,
+    profile_image: "https://api.dicebear.com/7.x/avataaars/svg?seed=Christopher",
+  },
+  {
+    id: "10",
+    name: "Angela Martinez",
+    email: "angela.m@example.com",
+    department: "Finance",
+    role: "Financial Analyst",
+    status: "Active",
+    hire_date: "2022-08-01",
+    position: "Financial Analyst",
+    salary: 85000,
+    manager: "John Smith",
+    location: "Denver",
+    phone: "888-999-0000",
+    skills: ["Financial Modeling", "Budgeting", "Forecasting"],
+    certifications: ["CFA"],
+    performance_rating: 4.4,
+    profile_image: "https://api.dicebear.com/7.x/avataaars/svg?seed=Angela",
+  },
+];
 
 export const hrEmployeeService = {
-  getEmployees: async () => {
+  getEmployees: async (): Promise<{ success: boolean; employees: Employee[]; error?: string }> => {
     try {
-      const { data, error } = await supabase
-        .from('hr_employees')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error("Error fetching employees:", error);
-        return { data: null, error: error.message };
-      }
-
-      return { data, error: null };
+      // Simulate API call delay
+      await new Promise(resolve => setTimeout(resolve, 500));
+      return { success: true, employees: mockEmployees };
     } catch (error) {
-      console.error("Error in getEmployees:", error);
-      return { data: null, error: "Failed to fetch employees" };
+      console.error("Error fetching employees:", error);
+      return { success: false, employees: [], error: "Failed to fetch employees" };
     }
   },
 
-  getEmployeeById: async (id: string) => {
+  getEmployee: async (id: string): Promise<{ success: boolean; employee?: Employee; error?: string }> => {
     try {
-      const { data, error } = await supabase
-        .from('hr_employees')
-        .select('*')
-        .eq('id', id)
-        .single();
-
-      if (error) {
-        console.error("Error fetching employee by ID:", error);
-        return { data: null, error: error.message };
+      // Simulate API call delay
+      await new Promise(resolve => setTimeout(resolve, 500));
+      const employee = mockEmployees.find(emp => emp.id === id);
+      if (employee) {
+        return { success: true, employee: employee };
+      } else {
+        return { success: false, error: "Employee not found" };
       }
-
-      return { data, error: null };
     } catch (error) {
-      console.error("Error in getEmployeeById:", error);
-      return { data: null, error: "Failed to fetch employee by ID" };
+      console.error("Error fetching employee:", error);
+      return { success: false, error: "Failed to fetch employee" };
     }
   },
 
-  createEmployeeFromJSON: async (employeeJSON: any) => {
+  getDashboardMetrics: async (): Promise<{
+    success: boolean;
+    metrics: {
+      totalEmployees: any;
+      activeEmployees: any;
+      inactiveEmployees: any;
+      totalDepartments: any;
+      recentHires: any;
+      newEmployees: any;
+      completionRate: any;
+      completionRateChange: any;
+      skillGaps: any;
+      skillGapsChange: any;
+      learningHours: any;
+      learningHoursChange: any;
+    };
+    error?: string;
+  } | {
+    success: boolean;
+    error: string;
+    metrics?: undefined;
+  }> => {
     try {
-      // Destructure the employee data from the JSON object
-      const {
-        name,
-        email,
-        departmentId,
-        positionId,
-        status,
-        companyId,
-        resumeFile,
-        courseIds
-      } = employeeJSON;
-      
-      // Validate required fields
-      if (!name || !email || !departmentId) {
-        throw new Error('Name, email, and departmentId are required fields.');
-      }
-      
-      // Prepare the employee data for insertion
-      const employeeData = {
-        first_name: name.split(' ')[0],
-        last_name: name.split(' ').slice(1).join(' ') || 'N/A',
-        email: email,
-        department: departmentId,
-        position: positionId || null,
-        status: status || 'active',
-        company_id: companyId || null,
-        course_ids: courseIds || [],
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
-      
-      // Attempt to create the employee record in Supabase
-      const { data: employee, error: employeeError } = await supabase
-        .from('hr_employees')
-        .insert([employeeData])
-        .select()
-        .single();
-      
-      if (employeeError) {
-        console.error('Error creating employee:', employeeError);
-        return { data: null, error: employeeError };
-      }
-      
-      // If resume file is provided, process it
-      if (resumeFile) {
-        console.log('Resume file detected, but processing is not implemented.');
-      }
-      
-      // Generate a random password for the new user
-      const password = Math.random().toString(36).slice(-8);
-      
-      // Attempt to create a user account in Supabase Auth
-      const { data: userAccount, error: authError } = await supabase.auth.signUp({
-        email: email,
-        password: password,
-        options: {
-          data: {
-            name: name,
-            role: 'learner'
-          }
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      const totalEmployees = mockEmployees.length;
+      const activeEmployees = mockEmployees.filter(emp => emp.status === 'Active').length;
+      const inactiveEmployees = totalEmployees - activeEmployees;
+      const totalDepartments = [...new Set(mockEmployees.map(emp => emp.department))].length;
+      const recentHires = mockEmployees.slice(-5); // Last 5 employees
+      const newEmployees = 10;
+      const completionRate = 75;
+      const completionRateChange = 5;
+      const skillGaps = 15;
+      const skillGapsChange = 2;
+      const learningHours = 120;
+      const learningHoursChange = 10;
+
+      return {
+        success: true,
+        metrics: {
+          totalEmployees,
+          activeEmployees,
+          inactiveEmployees,
+          totalDepartments,
+          recentHires,
+          newEmployees,
+          completionRate,
+          completionRateChange,
+          skillGaps,
+          skillGapsChange,
+          learningHours,
+          learningHoursChange,
         }
-      });
-      
-      if (authError) {
-        console.error('Auth error during sign up:', authError);
-        return { data: employee, error: null, userAccount: null, authError: authError };
-      }
-      
-      // Return the created employee data and the new user account
-      return { data: employee, error: null, userAccount: { email: email, password: password }, authError: null };
+      };
     } catch (error) {
-      console.error('Error in createEmployeeFromJSON:', error);
-      return { data: null, error: error instanceof Error ? error.message : 'Failed to create employee', userAccount: null, authError: null };
+      console.error("Error fetching dashboard metrics:", error);
+      return { success: false, error: "Failed to fetch dashboard metrics" };
     }
   },
 
-  updateEmployeeById: async (id: string, employee: Partial<Employee>) => {
+  getRecentActivities: async (): Promise<{
+    success: boolean;
+    activities: any[];
+    error?: string;
+  } | {
+    success: boolean;
+    error: string;
+    activities?: undefined;
+  }> => {
     try {
-      const employeeUpdates: any = {};
-      
-      // Convert departmentId to department if provided
-      if (employee.department) {
-        employeeUpdates.department = employee.department;
-      }
-      
-      // Convert positionId to position if provided
-      if (employee.position) {
-        employeeUpdates.position = employee.position;
-      }
-      
-      // Format dates properly if provided
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      const activities = [
+        { id: 1, employee: "John Smith", activity: "Completed Diversity Training", date: "2024-01-20" },
+        { id: 2, employee: "Alice Johnson", activity: "Updated Performance Goals", date: "2024-01-18" },
+        { id: 3, employee: "Bob Williams", activity: "Reviewed Compensation Plans", date: "2024-01-15" },
+      ];
+
+      return { success: true, activities: activities };
+    } catch (error) {
+      console.error("Error fetching recent activities:", error);
+      return { success: false, error: "Failed to fetch recent activities" };
+    }
+  },
+
+  addEmployee: async (employee: Partial<Employee>): Promise<{ success: boolean; message: string; employee?: Employee }> => {
+    try {
+      // Format hire_date if it exists
       if (employee.hire_date) {
-        employeeUpdates.hire_date = employee.hire_date;
+        // Ensure hire_date is a string
+        const formattedDate = new Date(employee.hire_date).toISOString().split('T')[0];
+        employee.hire_date = formattedDate;
       }
       
-      // Add any other fields from the employee object
-      for (const [key, value] of Object.entries(employee)) {
-        if (!['departmentId', 'positionId', 'hireDate', 'lastActivityDate'].includes(key)) {
-          employeeUpdates[key] = value;
-        }
-      }
-      
-      // Update the timestamp
-      employeeUpdates.updated_at = new Date().toISOString();
-      
-      // Update in Supabase
-      const { data, error } = await supabase
-        .from('hr_employees')
-        .update(employeeUpdates)
-        .eq('id', id)
-        .select();
-        
-      if (error) throw error;
-      
-      console.log(`Updated employee ${id}:`, data);
-      
-      return { data: data?.[0], error: null };
-    } catch (error) {
-      console.error(`Error updating employee ${id}:`, error);
-      return { 
-        data: null, 
-        error: error instanceof Error 
-          ? error.message 
-          : "Unknown error occurred while updating employee" 
+      const newEmployee: Employee = {
+        id: String(mockEmployees.length + 1),
+        name: employee.name || 'New Employee',
+        email: employee.email || 'new@example.com',
+        department: employee.department || 'Unknown',
+        role: employee.role || 'Employee',
+        status: employee.status || 'Active',
+        hire_date: employee.hire_date || new Date().toISOString().split('T')[0],
+        position: employee.position || 'Trainee',
+        salary: employee.salary || 50000,
+        manager: employee.manager || null,
+        location: employee.location || 'Remote',
+        phone: employee.phone || 'N/A',
+        skills: employee.skills || [],
+        certifications: employee.certifications || [],
+        performance_rating: employee.performance_rating || 3.0,
+        profile_image: employee.profile_image || 'https://api.dicebear.com/7.x/avataaars/svg?seed=New',
       };
+
+      mockEmployees.push(newEmployee);
+      return { success: true, message: "Employee added successfully", employee: newEmployee };
+    } catch (error) {
+      console.error("Error adding employee:", error);
+      return { success: false, message: "Failed to add employee" };
     }
   },
 
-  deleteEmployeeById: async (id: string) => {
+  updateEmployee: async (id: string, updates: Partial<Employee>): Promise<{ success: boolean; message: string }> => {
     try {
-      const { error } = await supabase
-        .from('hr_employees')
-        .delete()
-        .eq('id', id);
-
-      if (error) {
-        console.error("Error deleting employee:", error);
-        return { success: false, error: error.message };
+      const employeeIndex = mockEmployees.findIndex(emp => emp.id === id);
+      if (employeeIndex === -1) {
+        return { success: false, message: "Employee not found" };
       }
 
-      console.log(`Deleted employee ${id}`);
-      return { success: true, error: null };
+      // Update the employee properties
+      mockEmployees[employeeIndex] = { ...mockEmployees[employeeIndex], ...updates };
+
+      return { success: true, message: "Employee updated successfully" };
     } catch (error) {
-      console.error("Error in deleteEmployeeById:", error);
-      return { success: false, error: "Failed to delete employee" };
+      console.error("Error updating employee:", error);
+      return { success: false, message: "Failed to update employee" };
     }
   },
-  
-  checkHRTablesExist: async () => {
+
+  deleteEmployee: async (id: string): Promise<{ success: boolean; message: string }> => {
     try {
-      const tablesToCheck = ['hr_employees', 'hr_departments', 'hr_positions'];
-      const missingTables: string[] = [];
-      
-      for (const table of tablesToCheck) {
-        const { error } = await supabase
-          .from(table)
-          .select('id')
-          .limit(1);
-          
-        if (error) {
-          missingTables.push(table);
-        }
+      const employeeIndex = mockEmployees.findIndex(emp => emp.id === id);
+      if (employeeIndex === -1) {
+        return { success: false, message: "Employee not found" };
       }
-      
-      const exists = missingTables.length === 0;
-      return { exists, missingTables };
+
+      mockEmployees.splice(employeeIndex, 1);
+      return { success: true, message: "Employee deleted successfully" };
     } catch (error) {
-      console.error("Error checking HR tables:", error);
-      return { exists: false, missingTables: ['hr_employees', 'hr_departments', 'hr_positions'] };
+      console.error("Error deleting employee:", error);
+      return { success: false, message: "Failed to delete employee" };
     }
   },
-  
-  seedSampleData: async () => {
-    try {
-      // Check if there are any existing departments
-      const { data: existingDepartments, error: existingDepartmentsError } = await supabase
-        .from('hr_departments')
-        .select('id')
-        .limit(1);
-        
-      if (existingDepartmentsError) {
-        console.error('Error checking existing departments:', existingDepartmentsError);
-        throw existingDepartmentsError;
-      }
-      
-      if (existingDepartments && existingDepartments.length > 0) {
-        console.log('Sample data already exists. Skipping seeding.');
-        return { success: true };
-      }
-      
-      // Insert sample departments
-      const { data: departments, error: departmentsError } = await supabase
-        .from('hr_departments')
-        .insert([
-          { name: 'Engineering', code: 'ENG', description: 'Software and hardware development' },
-          { name: 'Human Resources', code: 'HR', description: 'Employee management and relations' },
-          { name: 'Marketing', code: 'MKT', description: 'Promotion and advertising' },
-        ])
-        .select();
-        
-      if (departmentsError) {
-        console.error('Error seeding departments:', departmentsError);
-        throw departmentsError;
-      }
-      
-      // Insert sample positions
-      const { data: positions, error: positionsError } = await supabase
-        .from('hr_positions')
-        .insert([
-          { title: 'Software Engineer', department_id: departments[0].id, level: 'Mid' },
-          { title: 'HR Manager', department_id: departments[1].id, level: 'Senior' },
-          { title: 'Marketing Specialist', department_id: departments[2].id, level: 'Junior' },
-        ])
-        .select();
-        
-      if (positionsError) {
-        console.error('Error seeding positions:', positionsError);
-        throw positionsError;
-      }
-      
-      // Insert sample employees
-      const { data: employees, error: employeesError } = await supabase
-        .from('hr_employees')
-        .insert([
-          {
-            first_name: 'John',
-            last_name: 'Doe',
-            email: 'john.doe@example.com',
-            department: 'Engineering',
-            position: 'Software Engineer',
-            hire_date: new Date(),
-          },
-          {
-            first_name: 'Jane',
-            last_name: 'Smith',
-            email: 'jane.smith@example.com',
-            department: 'Human Resources',
-            position: 'HR Manager',
-            hire_date: new Date(),
-          },
-        ])
-        .select();
-        
-      if (employeesError) {
-        console.error('Error seeding employees:', employeesError);
-        throw employeesError;
-      }
-      
-      console.log('Sample data seeded successfully!');
-      return { success: true };
-    } catch (error) {
-      console.error('Error seeding sample data:', error);
-      return { success: false, error: error instanceof Error ? error.message : 'Failed to seed sample data' };
-    }
-  },
-  
-  testMinimalApiRequest: async () => {
-    try {
-      console.log('Starting minimal API test...');
-      
-      // Await a very simple Supabase query
-      const { data, error, status, statusText } = await supabase
-        .from('hr_departments')
-        .select('id, name')
-        .limit(1);
-      
-      // Check for errors
-      if (error) {
-        console.error('API test query failed:', error);
-        return { 
-          success: false, 
-          error, 
-          status,
-          statusText,
-          responseText: `Error: ${error.message} (Status: ${status} ${statusText})`
-        };
-      }
-      
-      // If no data is returned, it might indicate a configuration issue
-      if (!data || data.length === 0) {
-        const message = 'No data returned. Possible misconfiguration.';
-        console.warn(message);
-        return { 
-          success: false, 
-          error: new Error(message),
-          status,
-          statusText,
-          responseText: `Warning: ${message} (Status: ${status} ${statusText})`
-        };
-      }
-      
-      console.log('API test successful, data received:', data);
-      return { 
-        success: true, 
-        data,
-        status,
-        statusText,
-        responseText: `Success: Data received (Status: ${status} ${statusText})`
-      };
-    } catch (error) {
-      console.error('API test failed with exception:', error);
-      return { 
-        success: false, 
-        error,
-        status: 500,
-        statusText: 'Internal Server Error',
-        responseText: `Exception: ${error.message || 'Unknown error'}`
-      };
-    }
-  }
-}
+};
