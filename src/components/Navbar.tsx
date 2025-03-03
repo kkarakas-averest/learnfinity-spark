@@ -210,13 +210,10 @@ const Navbar = () => {
       </div>
       {showContent && user && (
         <div
-          className={cn(
-            "fixed inset-0 top-16 z-20 bg-background md:hidden",
-            {
-              "block": isMenuOpen,
-              "hidden": !isMenuOpen
-            }
-          )}
+          className={cn("fixed inset-0 top-16 z-20 bg-background md:hidden", {
+            "block": isMenuOpen,
+            "hidden": !isMenuOpen
+          })}
         >
           <div className="container p-6">
             <nav className="flex flex-col gap-6">

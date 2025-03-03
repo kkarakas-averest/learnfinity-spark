@@ -23,26 +23,23 @@ const Hero = () => {
         <div className="grid gap-12 lg:grid-cols-[1fr_400px] lg:gap-16 xl:grid-cols-[1fr_600px]">
           <div className="flex flex-col justify-center space-y-4">
             <div className="space-y-2">
-              <h1 className={cn(
-                "text-4xl font-bold tracking-tighter sm:text-5xl md:text-6xl lg:text-7xl/none",
-                "animate-fade-in"
-              )}>
+              <h1 className={cn("text-4xl font-bold tracking-tighter sm:text-5xl md:text-6xl lg:text-7xl/none", {
+                "animate-fade-in": true
+              })}>
                 <span className="inline-block">Personalized Learning</span>{" "}
                 <span className="inline-block bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
                   Powered by AI
                 </span>
               </h1>
-              <p className={cn(
-                "max-w-[600px] text-muted-foreground md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed",
-                "animate-fade-in opacity-0"
-              )} style={{ animationDelay: "200ms", animationFillMode: "forwards" }}>
+              <p className={cn("max-w-[600px] text-muted-foreground md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed", {
+                "animate-fade-in opacity-0": true
+              })} style={{ animationDelay: "200ms", animationFillMode: "forwards" }}>
                 Discover a new way to learn with our AI-powered platform that adapts to your unique learning style and goals.
               </p>
             </div>
-            <div className={cn(
-              "flex flex-col gap-2 min-[400px]:flex-row",
-              "animate-fade-in opacity-0"
-            )} style={{ animationDelay: "400ms", animationFillMode: "forwards" }}>
+            <div className={cn("flex flex-col gap-2 min-[400px]:flex-row", {
+              "animate-fade-in opacity-0": true
+            })} style={{ animationDelay: "400ms", animationFillMode: "forwards" }}>
               <Button size="lg" asChild>
                 <Link to="/register">
                   Get Started <ArrowRight className="ml-2 h-4 w-4" />

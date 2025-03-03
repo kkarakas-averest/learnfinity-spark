@@ -67,10 +67,9 @@ const Index = () => {
         {/* Features Section */}
         <section className="py-20 bg-secondary/50">
           <div className="container px-4 md:px-6">
-            <div className={cn(
-              "text-center max-w-[800px] mx-auto mb-12 md:mb-16",
-              "animate-fade-in"
-            )}>
+            <div className={cn("text-center max-w-[800px] mx-auto mb-12 md:mb-16", {
+              "animate-fade-in": true
+            })}>
               <h2 className="text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl">
                 Revolutionize Your Learning Experience
               </h2>
@@ -83,9 +82,9 @@ const Index = () => {
               {features.map((feature, i) => (
                 <div
                   key={i}
-                  className={cn(
-                    "bg-white rounded-xl p-8 shadow-sm transition-all duration-200 hover:shadow-md"
-                  )}
+                  className={cn("bg-white rounded-xl p-8 shadow-sm transition-all duration-200", {
+                    "hover:shadow-md": true
+                  })}
                 >
                   <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mb-6">
                     {feature.icon}
