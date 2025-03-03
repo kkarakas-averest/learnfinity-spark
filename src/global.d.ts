@@ -1,125 +1,150 @@
 
-// Global type declarations for the application
-
-// React module declarations
+// React type declarations
 declare module 'react' {
-  // Re-export everything from React
-  export * from 'react';
-  
-  // Explicitly export hooks and types that are commonly used
-  export const useState: any;
-  export const useEffect: any;
-  export const useRef: any;
-  export const useCallback: any;
-  export const useMemo: any;
-  export const useContext: any;
-  export const createContext: any;
-  export type ReactNode = any;
-  export const Fragment: any;
-  export const Suspense: any;
-  export const lazy: any;
-  export const forwardRef: any;
-  
-  // Default export
-  const React: any;
   export default React;
+  export type ReactNode = React.ReactNode;
+  export const useState: typeof React.useState;
+  export const useEffect: typeof React.useEffect;
+  export const useContext: typeof React.useContext;
+  export const createContext: typeof React.createContext;
+  export const lazy: typeof React.lazy;
+  export const Suspense: typeof React.Suspense;
+  export const forwardRef: typeof React.forwardRef;
+  export const memo: typeof React.memo;
+  export const useCallback: typeof React.useCallback;
+  export const useMemo: typeof React.useMemo;
+  export const useRef: typeof React.useRef;
+  export const useReducer: typeof React.useReducer;
+  export const useImperativeHandle: typeof React.useImperativeHandle;
+  export const useLayoutEffect: typeof React.useLayoutEffect;
+  export const useDebugValue: typeof React.useDebugValue;
 }
 
-// Lucide React icon declarations
-declare module 'lucide-react' {
-  import * as React from 'react';
-  
-  // Base icon props
-  interface IconProps extends React.SVGProps<SVGSVGElement> {
-    size?: number | string;
-    color?: string;
-    strokeWidth?: number;
-    absoluteStrokeWidth?: boolean;
+// React Router DOM declarations
+declare module 'react-router-dom' {
+  export interface LinkProps {
+    to: string;
+    className?: string;
+    children?: React.ReactNode;
+    [key: string]: any;
   }
 
-  // Export all available icons
-  export const BarChart2: React.FC<IconProps>;
-  export const ChevronDown: React.FC<IconProps>;
-  export const ChevronLeft: React.FC<IconProps>;
-  export const ChevronRight: React.FC<IconProps>;
-  export const ChevronUp: React.FC<IconProps>;
-  export const Clock: React.FC<IconProps>;
-  export const Menu: React.FC<IconProps>;
-  export const X: React.FC<IconProps>;
-  export const Book: React.FC<IconProps>;
-  export const GraduationCap: React.FC<IconProps>;
-  export const Settings: React.FC<IconProps>;
-  export const Home: React.FC<IconProps>;
-  export const User: React.FC<IconProps>;
-  export const LogOut: React.FC<IconProps>;
-  export const ArrowLeft: React.FC<IconProps>;
-  export const Loader2: React.FC<IconProps>;
-  export const AlertCircle: React.FC<IconProps>;
-  export const Info: React.FC<IconProps>;
-  export const Check: React.FC<IconProps>;
-  export const Users: React.FC<IconProps>;
-  export const BookOpen: React.FC<IconProps>;
-  export const LayoutDashboard: React.FC<IconProps>;
-  export const Library: React.FC<IconProps>;
-  export const ArrowRight: React.FC<IconProps>;
-  export const Filter: React.FC<IconProps>;
-  export const Search: React.FC<IconProps>;
-  export const Calendar: React.FC<IconProps>;
-  export const CalendarDays: React.FC<IconProps>;
-  export const Target: React.FC<IconProps>;
-  export const Trophy: React.FC<IconProps>;
-  export const Star: React.FC<IconProps>;
-  export const Sparkles: React.FC<IconProps>;
-  export const FileText: React.FC<IconProps>;
-  export const Building: React.FC<IconProps>;
-  export const BrainCircuit: React.FC<IconProps>;
-  export const FileSpreadsheet: React.FC<IconProps>;
-  export const Circle: React.FC<IconProps>;
-  export const MessageSquare: React.FC<IconProps>;
-  export const Pencil: React.FC<IconProps>;
-  export const Save: React.FC<IconProps>;
-  export const Shield: React.FC<IconProps>;
-  export const Building2: React.FC<IconProps>;
-  export const PlayCircle: React.FC<IconProps>;
-  export const Dot: React.FC<IconProps>;
-  export const MoreHorizontal: React.FC<IconProps>;
-  export const PanelLeft: React.FC<IconProps>;
-  export const Bot: React.FC<IconProps>;
-  export const Edit: React.FC<IconProps>;
-  export const FileBadge: React.FC<IconProps>;
-}
-
-// React-hook-form declarations
-declare module 'react-hook-form' {
-  export const useForm: any;
-  export const Controller: any;
-  export interface ControllerProps {
-    name: string;
-    control: any;
-    defaultValue?: any;
-    rules?: any;
-    render: (props: any) => React.ReactNode;
-  }
-  export type FieldValues = Record<string, any>;
-  export type FieldPath<T> = string;
-  export const FormProvider: any;
-  export const useFormContext: any;
+  export const Link: React.FC<LinkProps>;
+  export const useNavigate: () => (path: string) => void;
+  export const useLocation: () => { pathname: string; search: string; hash: string; state: any };
+  export const useParams: () => Record<string, string>;
+  export const Navigate: React.FC<{ to: string; replace?: boolean; state?: any }>;
+  export const Outlet: React.FC;
+  export const Route: React.FC<{
+    path: string;
+    element: React.ReactNode;
+  }>;
+  export const Routes: React.FC<{
+    children: React.ReactNode;
+  }>;
+  export const BrowserRouter: React.FC<{
+    children: React.ReactNode;
+  }>;
 }
 
 // Zod declarations
 declare module 'zod' {
-  export const z: any;
-  export function object(schema: any): any;
-  export function string(): any;
-  export function number(): any;
-  export function boolean(): any;
-  export function array(schema: any): any;
-  export function nativeEnum(values: any): any;
-  export function literal(value: any): any;
-  export type infer<T> = any;
+  export const z: {
+    object: (schema: any) => any;
+    string: () => any;
+    number: () => any;
+    boolean: () => any;
+    array: (schema: any) => any;
+    enum: (values: any) => any;
+    nativeEnum: (values: any) => any;
+    literal: (value: any) => any;
+    infer: <T>(schema: any) => T;
+  };
+  
+  export type infer<T> = T;
 }
 
-// Clerk declarations
+// React Hook Form declarations
+declare module 'react-hook-form' {
+  export const useForm: any;
+  export const useFormContext: any;
+  export const FormProvider: any;
+  export const Controller: any;
+  export type ControllerProps<T = any> = any;
+  export type FieldValues = any;
+  export type FieldPath<T> = any;
+}
+
+// Lucide React declarations
+declare module 'lucide-react' {
+  import * as React from 'react';
+  
+  // Common properties for all icons
+  interface IconProps extends React.SVGProps<SVGSVGElement> {
+    size?: number | string;
+    strokeWidth?: number | string;
+    color?: string;
+  }
+
+  // Define all the icons used in the project
+  export const AlertCircle: React.FC<IconProps>;
+  export const AlertTriangle: React.FC<IconProps>;
+  export const ArrowLeft: React.FC<IconProps>;
+  export const ArrowRight: React.FC<IconProps>;
+  export const Activity: React.FC<IconProps>;
+  export const Award: React.FC<IconProps>;
+  export const BarChart2: React.FC<IconProps>;
+  export const Book: React.FC<IconProps>;
+  export const BookOpen: React.FC<IconProps>;
+  export const Bookmark: React.FC<IconProps>;
+  export const Building: React.FC<IconProps>;
+  export const Building2: React.FC<IconProps>;
+  export const BrainCircuit: React.FC<IconProps>;
+  export const Calendar: React.FC<IconProps>;
+  export const CalendarDays: React.FC<IconProps>;
+  export const Check: React.FC<IconProps>;
+  export const CheckCircle: React.FC<IconProps>;
+  export const ChevronDown: React.FC<IconProps>;
+  export const ChevronLeft: React.FC<IconProps>;
+  export const ChevronRight: React.FC<IconProps>;
+  export const ChevronUp: React.FC<IconProps>;
+  export const Circle: React.FC<IconProps>;
+  export const Clock: React.FC<IconProps>;
+  export const Download: React.FC<IconProps>;
+  export const Edit: React.FC<IconProps>;
+  export const FileText: React.FC<IconProps>;
+  export const FileBadge: React.FC<IconProps>;
+  export const FileSpreadsheet: React.FC<IconProps>;
+  export const GraduationCap: React.FC<IconProps>;
+  export const Home: React.FC<IconProps>;
+  export const Info: React.FC<IconProps>;
+  export const Layers: React.FC<IconProps>;
+  export const LayoutDashboard: React.FC<IconProps>;
+  export const Library: React.FC<IconProps>;
+  export const LogOut: React.FC<IconProps>;
+  export const Loader2: React.FC<IconProps>;
+  export const Menu: React.FC<IconProps>;
+  export const MessageSquare: React.FC<IconProps>;
+  export const MoreHorizontal: React.FC<IconProps>;
+  export const PanelLeft: React.FC<IconProps>;
+  export const Pencil: React.FC<IconProps>;
+  export const PlayCircle: React.FC<IconProps>;
+  export const Search: React.FC<IconProps>;
+  export const Settings: React.FC<IconProps>;
+  export const Shield: React.FC<IconProps>;
+  export const Star: React.FC<IconProps>;
+  export const Sparkles: React.FC<IconProps>;
+  export const Target: React.FC<IconProps>;
+  export const Trophy: React.FC<IconProps>;
+  export const Upload: React.FC<IconProps>;
+  export const User: React.FC<IconProps>;
+  export const UserPlus: React.FC<IconProps>;
+  export const Users: React.FC<IconProps>;
+  export const X: React.FC<IconProps>;
+  export const Zap: React.FC<IconProps>;
+}
+
+// Clerk React declarations
 declare module '@clerk/clerk-react' {
   export const useUser: () => {
     isLoaded: boolean;
@@ -128,7 +153,7 @@ declare module '@clerk/clerk-react' {
   };
 }
 
-// Enhanced Badge interface
+// Fix BadgeProps interface error
 declare module '@/components/ui/badge' {
   export interface BadgeProps extends React.HTMLAttributes<HTMLDivElement> {
     variant?: "default" | "secondary" | "destructive" | "outline" | "success";

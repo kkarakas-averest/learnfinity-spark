@@ -1,5 +1,4 @@
 
-// Update the Side type to only accept specific values
 import * as React from "react"
 import * as SheetPrimitive from "@radix-ui/react-dialog"
 import { cva, type VariantProps } from "class-variance-authority"
