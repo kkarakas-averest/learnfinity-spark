@@ -1,9 +1,5 @@
-import React, { useEffect, useState, lazy, Suspense } from "react";
+import React from "react";
 import { useNavigate } from "react-router-dom";
-import { useUser } from "@clerk/clerk-react";
-import { Metadata } from "@/types";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
 import { 
   BookOpen, 
   Clock, 
@@ -24,23 +20,24 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import Navbar from "@/components/Navbar";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import LoadingSpinner from "@/components/ui/loading-spinner";
 import WelcomeHeader from "@/components/dashboard/WelcomeHeader";
 import DashboardTabs from "@/components/dashboard/DashboardTabs";
 import { useAuth } from "@/contexts/AuthContext";
 import DashboardLayout from "@/components/DashboardLayout";
-import { Badge } from "@/components/ui/badge";
 import { useLearningData } from "@/hooks/useLearningData";
 import AgentGeneratedCourses from "@/components/learner/AgentGeneratedCourses";
 
 const Dashboard = () => {
   const { user, userDetails, isLoading } = useAuth();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = React.useState("overview");
   const { getActiveCourses, getLearningPaths, coursesLoading, learnerCourses } = useLearningData();
 
   // Log the auth and learning state for debugging
-  useEffect(() => {
+  React.useEffect(() => {
     console.log("Dashboard - Auth State:", { user, userDetails, isLoading });
     console.log("Dashboard - Learning Data:", { 
       courses: getActiveCourses(), 
@@ -76,18 +73,38 @@ const Dashboard = () => {
     total: 120,
   };
 
+  // Adding a timeout to prevent infinite loading
+  const [isInitialLoading, setIsInitialLoading] = React.useState(true);
+  
+  React.useEffect(() => {
+    // If regular auth loading finishes, or after 3 seconds, stop showing loading state
+    if (!isLoading || user) {
+      setIsInitialLoading(false);
+    } else {
+      const timer = setTimeout(() => {
+        setIsInitialLoading(false);
+        console.log("Dashboard loading timeout reached - forcing display");
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [isLoading, user]);
+
   // Check if user is authenticated
-  useEffect(() => {
+  React.useEffect(() => {
     if (!isLoading && !user) {
+      console.log("No user detected, redirecting to login");
       navigate('/login');
     }
   }, [user, isLoading, navigate]);
 
-  // Show loading state while checking authentication
-  if (isLoading) {
+  // Only show loading for initial load, not subsequent data fetches
+  if (isInitialLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-secondary/20">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        <div className="flex flex-col items-center gap-4">
+          <LoadingSpinner size="xl" />
+          <p className="text-muted-foreground">Loading your dashboard...</p>
+        </div>
       </div>
     );
   }
@@ -96,6 +113,7 @@ const Dashboard = () => {
   const activeCourses = getActiveCourses();
   console.log("Active courses:", activeCourses);
 
+  // Fallback to rendering the dashboard even if auth is still technically loading
   return (
     <DashboardLayout>
       <div className="space-y-8">
@@ -180,7 +198,7 @@ const Dashboard = () => {
                 <CardContent className="space-y-4">
                   {coursesLoading ? (
                     <div className="flex items-center justify-center h-32">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                      <LoadingSpinner size="md" />
                     </div>
                   ) : activeCourses.length > 0 ? (
                     activeCourses.slice(0, 2).map((course, index) => (
@@ -344,13 +362,13 @@ const Dashboard = () => {
 
           {/* Add new AI Generated tab */}
           <TabsContent value="ai-generated">
-            <Suspense fallback={
+            <React.Suspense fallback={
               <div className="flex items-center justify-center p-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                <LoadingSpinner size="lg" />
               </div>
             }>
               <AgentGeneratedCourses />
-            </Suspense>
+            </React.Suspense>
           </TabsContent>
           
           {/* Skills Tab */}
@@ -420,10 +438,10 @@ const Dashboard = () => {
                   </div>
                 </CardContent>
               </Card>
-        </div>
+            </div>
           </TabsContent>
         </Tabs>
-    </div>
+      </div>
     </DashboardLayout>
   );
 };
