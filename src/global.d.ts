@@ -1,4 +1,3 @@
-
 // React type declarations
 declare module 'react' {
   export default React;
@@ -30,7 +29,7 @@ declare module 'react-router-dom' {
   }
 
   export const Link: React.FC<LinkProps>;
-  export const useNavigate: () => (path: string) => void;
+  export const useNavigate: () => (path: string | number) => void;
   export const useLocation: () => { pathname: string; search: string; hash: string; state: any };
   export const useParams: () => Record<string, string>;
   export const Navigate: React.FC<{ to: string; replace?: boolean; state?: any }>;

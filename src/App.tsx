@@ -10,7 +10,7 @@ import RegisterPage from "@/pages/RegisterPage";
 import Dashboard from "@/pages/Dashboard";
 import ProfilePage from "@/pages/ProfilePage";
 import Courses from "@/pages/Courses";
-import CourseDetail from "@/pages/CourseDetail";
+import CourseDetailPage from "@/pages/CourseDetail";
 import HRDashboard from "@/pages/HRDashboard";
 import HRLogin from "@/pages/HRLogin";
 import SuperAdminDashboard from "@/pages/SuperAdminDashboard";
@@ -67,7 +67,7 @@ function App() {
               <Route path={ROUTES.LOGIN} element={<LoginPage />} />
               <Route path={ROUTES.REGISTER} element={<RegisterPage />} />
               <Route path={ROUTES.COURSES} element={<Courses />} />
-              <Route path="/course/:id" element={<CourseDetail />} />
+              <Route path="/course/:id" element={<CourseDetailPage />} />
               <Route path={ROUTES.ONBOARDING} element={<OnboardingWizard />} />
               <Route
                 path={ROUTES.DASHBOARD}
