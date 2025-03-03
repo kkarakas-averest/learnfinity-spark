@@ -1,4 +1,3 @@
-
 // Type declarations for missing modules and components
 
 // Declare React module with correct exports
@@ -132,14 +131,14 @@ declare module 'zod' {
     boolean: () => any;
     literal: (value: any, options?: any) => any;
     infer: <T>(schema: T) => any;
-    enum: (values: any) => any;
+    enumValues: (values: any) => any; // Changed from enum to enumValues
   };
   export function object(schema: any): any;
   export function string(): any;
   export function nativeEnum(values: any): any;
   export function boolean(): any;
   export function literal(value: any, options?: any): any;
-  export function enum(values: any): any;
+  export function enumValues(values: any): any; // Changed from enum to enumValues
   
   export namespace z {
     export function string(): any;
@@ -147,7 +146,7 @@ declare module 'zod' {
     export function boolean(): any;
     export function object(schema: any): any;
     export function array(schema: any): any;
-    export function enum(values: any): any;
+    export function enumValues(values: any): any; // Changed from enum to enumValues
   }
 }
 
