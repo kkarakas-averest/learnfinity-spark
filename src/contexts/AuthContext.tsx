@@ -3,12 +3,16 @@ import React from 'react';
 const { createContext, useContext, useEffect, useState } = React;
 // Use React.ReactNode instead of importing it separately
 import { User, Session } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js';
+import { Database } from '@/lib/database.types';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { UserRole } from '@/lib/database.types';
 import { ROUTES } from '@/lib/routes';
+import { isSupabaseConfigured } from '@/lib/supabase';
 
+// Type Definitions
 interface AuthContextProps {
   user: User | null;
   session: Session | null;
@@ -17,7 +21,7 @@ interface AuthContextProps {
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, name: string, role: UserRole) => Promise<void>;
   signOut: () => Promise<void>;
-  signupDisabled: boolean; // Added this property to expose signup status
+  signupDisabled: boolean;
 }
 
 interface UserDetails {
@@ -27,8 +31,31 @@ interface UserDetails {
   role: UserRole;
 }
 
+// Create context with default undefined value
 const AuthContext = createContext<AuthContextProps | undefined>(undefined);
 
+// Helper function to get user details from Supabase
+const fetchUserDetailsFromSupabase = async (userId: string) => {
+  try {
+    const { data, error } = await supabase
+      .from('users')
+      .select('id, name, email, role')
+      .eq('id', userId)
+      .single();
+
+    if (error) {
+      console.error('Error fetching user details:', error);
+      return null;
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Unexpected error fetching user details:', error);
+    return null;
+  }
+};
+
+// Auth Provider Component
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
@@ -117,6 +144,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     // Set up auth state change listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log("Auth state changed:", event, session ? "Session exists" : "No session");
         setSession(session);
         setUser(session?.user ?? null);
         
@@ -153,7 +181,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           id: userId,
           name: 'User',
           email: user?.email || '',
-          role: 'learner',
+          role: 'learner' as UserRole,
         };
         setUserDetails(defaultDetails);
         redirectBasedOnRole();
@@ -176,7 +204,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         id: userId,
         name: 'User',
         email: user?.email || '',
-        role: 'learner',
+        role: 'learner' as UserRole,
       };
       setUserDetails(defaultDetails);
       redirectBasedOnRole();
@@ -453,6 +481,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
+// Hook for easy context access
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {

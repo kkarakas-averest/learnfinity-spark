@@ -1,4 +1,96 @@
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
+import { toast } from '@/hooks/use-toast';
+import { Check, Clock, Video, File, Award, ArrowLeft, Play, LucideIcon } from 'lucide-react';
+import { useCoursesData } from '@/hooks/useCoursesData';
+import { useLearningData } from '@/hooks/useLearningData';
+import { formatDuration, calculateProgress } from '@/lib/utils';
+import { AlertDialogTrigger, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, 
+  AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialog, AlertDialogAction } from '@/components/ui/alert-dialog';
 
+// Types
+interface Module {
+  id: string;
+  title: string;
+  description: string;
+  order_number: number;
+  lessons: Lesson[];
+}
+
+interface Lesson {
+  id: string;
+  title: string;
+  description: string;
+  content_type: 'video' | 'document' | 'quiz';
+  content_url: string;
+  duration: number;
+  order_number: number;
+  is_completed?: boolean;
+}
+
+interface Course {
+  id: string;
+  title: string;
+  description: string;
+  level: 'Beginner' | 'Intermediate' | 'Advanced';
+  category: string;
+  duration: number;
+  thumbnail_url: string;
+  created_at: string;
+  updated_at: string;
+  modules: Module[];
+}
+
+// Header Component
+const CourseHeader = ({ course, onBack }: { course: Course; onBack: () => void }) => (
+  <div className="flex flex-col space-y-4 px-4 md:px-8 py-6 bg-card rounded-lg shadow-sm mb-6">
+    <div className="flex items-center gap-2 mb-2">
+      <Button variant="ghost" size="icon" onClick={onBack}>
+        <ArrowLeft className="h-4 w-4" />
+      </Button>
+      <Badge variant="outline" className="ml-2">{course.category}</Badge>
+      <Badge variant="secondary">{course.level}</Badge>
+    </div>
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="col-span-1 lg:col-span-2">
+        <h1 className="text-2xl md:text-3xl font-bold">{course.title}</h1>
+        <p className="mt-2 text-muted-foreground">{course.description}</p>
+      </div>
+      <div className="col-span-1 flex flex-col justify-end gap-2">
+        <div className="flex items-center gap-2">
+          <Clock className="h-4 w-4 text-muted-foreground" />
+          <span className="text-sm text-muted-foreground">
+            {formatDuration(course.duration)}
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+// Enrollment Section Component
+const EnrollmentSection = ({ 
+  course, 
+  isEnrolled, 
+  isLoading, 
+  onEnroll 
+}: { 
+  course: Course; 
+  isEnrolled: boolean; 
+  isLoading: boolean; 
+  onEnroll: () => void 
+}) => (
+  <Card className="mb-6">
+    <CardHeader>
 import React, { useState } from "react";
 import { useParams } from "react-router-dom";
 import {
