@@ -1,8 +1,7 @@
-
 import { ReactNode, useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { 
-  BarChart, 
+  BarChart2, 
   Users, 
   LogOut, 
   Menu, 
@@ -52,24 +51,24 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
     { title: "Profile", icon: User, href: "/profile", role: "all" },
     
     // Super Admin items
-    { title: "Dashboard", icon: BarChart, href: "/admin", role: "superadmin" },
+    { title: "Dashboard", icon: BarChart2, href: "/admin", role: "superadmin" },
     { title: "Organizations", icon: Building, href: "/admin/organizations", role: "superadmin" },
     { title: "Users", icon: Users, href: "/admin/users", role: "superadmin" },
     { title: "Course Management", icon: GraduationCap, href: "/admin/course", role: "superadmin" },
     { title: "AI Management", icon: BrainCircuit, href: "/admin/ai", role: "superadmin" },
     
     // HR items
-    { title: "Dashboard", icon: BarChart, href: "/hr", role: "hr" },
+    { title: "Dashboard", icon: BarChart2, href: "/hr", role: "hr" },
     { title: "Employees", icon: Users, href: "/hr/employees", role: "hr" },
     { title: "Learning Path", icon: GraduationCap, href: "/hr/learning-path", role: "hr" },
     { title: "Reports", icon: FileSpreadsheet, href: "/hr/reports", role: "hr" },
     
     // Learner items
-    { title: "Dashboard", icon: BarChart, href: "/dashboard", role: "learner" },
+    { title: "Dashboard", icon: BarChart2, href: "/dashboard", role: "learner" },
     { title: "My Learning", icon: GraduationCap, href: "/learning", role: "learner" },
     
     // Mentor items
-    { title: "Dashboard", icon: BarChart, href: "/mentor", role: "mentor" },
+    { title: "Dashboard", icon: BarChart2, href: "/mentor", role: "mentor" },
     { title: "My Learners", icon: Users, href: "/mentor/learners", role: "mentor" },
   ];
 

@@ -1,7 +1,6 @@
-
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Clock, BarChart, Users } from "lucide-react";
+import { Clock, BarChart2, Users } from "lucide-react";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -81,7 +80,7 @@ const CourseCard = ({
             <span>{duration}</span>
           </div>
           <div className="flex items-center gap-1 text-xs text-muted-foreground">
-            <BarChart size={14} />
+            <BarChart2 size={14} />
             <span className={`px-2 py-0.5 rounded-full ${getLevelColor(level)}`}>
               {level}
             </span>

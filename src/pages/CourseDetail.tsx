@@ -1,14 +1,15 @@
-
 import { useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
 import { 
-  Clock, 
-  BarChart, 
+  ArrowLeft, 
   Users, 
+  BarChart2, 
+  Clock, 
+  AlertCircle, 
   PlayCircle, 
-  BookOpen, 
+  Check, 
   FileText, 
-  CheckCircle, 
+  BookOpen, 
   Star, 
   ChevronDown, 
   ChevronUp 
@@ -288,7 +289,7 @@ const CourseDetail = () => {
                     <span>{course.duration}</span>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <BarChart size={16} className="text-muted-foreground" />
+                    <BarChart2 size={16} className="text-muted-foreground" />
                     <span>{course.level}</span>
                   </div>
                   <div className="flex items-center gap-1.5">

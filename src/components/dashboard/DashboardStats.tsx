@@ -1,5 +1,5 @@
 
-import { Clock, FileBadge, Calendar, BarChart } from "lucide-react";
+import { Clock, FileBadge, Calendar, BarChart2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 // Mock data
@@ -28,7 +28,7 @@ const mockStats = [
   {
     title: "Skills Mastered",
     value: "8",
-    icon: <BarChart className="h-4 w-4" />,
+    icon: <BarChart2 className="h-4 w-4" />,
     change: "4 in progress",
     trend: "neutral",
   },

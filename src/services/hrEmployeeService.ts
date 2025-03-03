@@ -1,344 +1,177 @@
+import { Database } from '@/lib/database.types';
 import { supabase } from '@/lib/supabase';
-import { toast } from '@/components/ui/use-toast';
-import { Employee } from '@/types/hr.types';
 
-// Error handling helper
-const handleError = (error: any, customMessage: string = 'An error occurred') => {
-  console.error(`${customMessage}:`, error);
-  toast({
-    title: 'Error',
-    description: customMessage,
-    variant: 'destructive',
-  });
-  return null;
-};
+type Employee = Database['public']['Tables']['employees']['Row'];
 
-// HR Employee service with specialized functions for employee operations
-const hrEmployeeService = {
+export const hrEmployeeService = {
   /**
-   * Get all employees with their department and position information
+   * Initialize the HR system by creating necessary tables if they don't exist.
+   * @returns {Promise<{ success: boolean; error?: any }>}
    */
-  async getAllEmployees() {
+  async initialize(): Promise<{ success: boolean; error?: any }> {
     try {
-      const { data, error } = await supabase
-        .from('hr_employees')
-        .select(`
-          *,
-          department:hr_departments(id, name),
-          position:hr_positions(id, title)
-        `)
-        .order('name');
-        
-      if (error) throw error;
-      
-      // Format the employee data to match our frontend Employee type
-      const employees: Employee[] = data.map(emp => ({
-        id: emp.id,
-        name: emp.name,
-        email: emp.email,
-        department: emp.department?.name || 'Unassigned',
-        position: emp.position?.title,
-        status: emp.status,
-        lastActivity: emp.last_activity ? new Date(emp.last_activity).toLocaleDateString() : 'Never',
-        // We'll fetch these in a separate query for better performance
-        courses: 0,
-        coursesCompleted: 0,
-        progress: 0
-      }));
-      
-      // For each employee, get their course enrollment data
-      for (const employee of employees) {
-        const { data: enrollments, error: enrollError } = await supabase
-          .from('hr_course_enrollments')
-          .select('*')
-          .eq('employee_id', employee.id);
-          
-        if (!enrollError && enrollments) {
-          employee.courses = enrollments.length;
-          employee.coursesCompleted = enrollments.filter(e => e.status === 'completed').length;
-          employee.progress = employee.courses > 0 
-            ? Math.round((employee.coursesCompleted / employee.courses) * 100) 
-            : 0;
+      // Check if the 'employees' table exists
+      const { data: existingTable, error: tableError } = await supabase.from('employees').select('*').limit(1);
+
+      if (tableError) {
+        console.error('Error checking for existing employees table:', tableError);
+        return { success: false, error: tableError };
+      }
+
+      // If the table doesn't exist, attempt to create it
+      if (!existingTable) {
+        console.log('Employees table does not exist. Attempting to create it...');
+
+        // SQL script to create the 'employees' table
+        const createTableSQL = `
+          CREATE TABLE IF NOT EXISTS employees (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()),
+            name TEXT,
+            email TEXT UNIQUE,
+            phone TEXT,
+            address TEXT,
+            department TEXT,
+            position TEXT,
+            salary NUMERIC,
+            hire_date DATE,
+            last_activity TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()),
+            is_active BOOLEAN DEFAULT TRUE,
+            profile_url TEXT NULL
+          );
+        `;
+
+        const { error: createError } = await supabase.rpc('execute_sql', { sql: createTableSQL });
+
+        if (createError) {
+          console.error('Error creating employees table:', createError);
+          return { success: false, error: createError };
         }
-      }
-      
-      return employees;
-    } catch (error) {
-      return handleError(error, 'Failed to fetch employees');
-    }
-  },
-  
-  /**
-   * Get an employee by ID with all related information
-   */
-  async getEmployeeById(id: string) {
-    try {
-      const { data, error } = await supabase
-        .from('hr_employees')
-        .select(`
-          *,
-          department:hr_departments(id, name),
-          position:hr_positions(id, title)
-        `)
-        .eq('id', id)
-        .single();
-        
-      if (error) throw error;
-      if (!data) return null;
-      
-      // Get course enrollments
-      const { data: enrollments, error: enrollError } = await supabase
-        .from('hr_course_enrollments')
-        .select(`
-          *,
-          course:hr_courses(id, title, description)
-        `)
-        .eq('employee_id', id);
-        
-      if (enrollError) throw enrollError;
-      
-      // Get activity history
-      const { data: activities, error: activityError } = await supabase
-        .from('hr_employee_activities')
-        .select(`
-          *,
-          course:hr_courses(id, title),
-          learning_path:hr_learning_paths(id, title)
-        `)
-        .eq('employee_id', id)
-        .order('created_at', { ascending: false })
-        .limit(10);
-        
-      if (activityError) throw activityError;
-      
-      return {
-        ...data,
-        enrollments: enrollments || [],
-        activities: activities || [],
-        courses: enrollments ? enrollments.length : 0,
-        coursesCompleted: enrollments ? enrollments.filter(e => e.status === 'completed').length : 0,
-      };
-    } catch (error) {
-      return handleError(error, `Failed to fetch employee with ID ${id}`);
-    }
-  },
-  
-  /**
-   * Create a new employee
-   */
-  async createEmployee(employeeData: Partial<Employee>) {
-    try {
-      // Validate required fields
-      if (!employeeData.name || !employeeData.email) {
-        throw new Error('Name and email are required');
-      }
-      
-      // Format data for insertion
-      const newEmployee = {
-        name: employeeData.name,
-        email: employeeData.email,
-        department_id: employeeData.departmentId,
-        position_id: employeeData.positionId,
-        status: employeeData.status || 'active',
-        hire_date: employeeData.hireDate ? new Date(employeeData.hireDate) : new Date(),
-      };
-      
-      const { data, error } = await supabase
-        .from('hr_employees')
-        .insert(newEmployee)
-        .select()
-        .single();
-        
-      if (error) throw error;
-      
-      // Add activity for new employee
-      await supabase
-        .from('hr_employee_activities')
-        .insert({
-          employee_id: data.id,
-          activity_type: 'alert',
-          description: 'New employee onboarded',
-        });
-        
-      toast({
-        title: 'Success',
-        description: `Employee ${data.name} created successfully`,
-      });
-      
-      return data;
-    } catch (error) {
-      return handleError(error, 'Failed to create employee');
-    }
-  },
-  
-  /**
-   * Update an existing employee
-   */
-  async updateEmployee(id: string, employeeData: Partial<Employee>) {
-    try {
-      // Format data for update
-      const updateData = {
-        name: employeeData.name,
-        email: employeeData.email,
-        department_id: employeeData.departmentId,
-        position_id: employeeData.positionId,
-        status: employeeData.status,
-        last_activity: employeeData.lastActivityDate ? new Date(employeeData.lastActivityDate) : undefined,
-      };
-      
-      // Remove undefined values
-      Object.keys(updateData).forEach(key => 
-        updateData[key] === undefined && delete updateData[key]
-      );
-      
-      const { data, error } = await supabase
-        .from('hr_employees')
-        .update(updateData)
-        .eq('id', id)
-        .select()
-        .single();
-        
-      if (error) throw error;
-      
-      toast({
-        title: 'Success',
-        description: `Employee ${data.name} updated successfully`,
-      });
-      
-      return data;
-    } catch (error) {
-      return handleError(error, 'Failed to update employee');
-    }
-  },
-  
-  /**
-   * Delete an employee
-   */
-  async deleteEmployee(id: string) {
-    try {
-      // Get employee name first for the success message
-      const { data: employee } = await supabase
-        .from('hr_employees')
-        .select('name')
-        .eq('id', id)
-        .single();
-      
-      // Delete the employee
-      const { error } = await supabase
-        .from('hr_employees')
-        .delete()
-        .eq('id', id);
-        
-      if (error) throw error;
-      
-      toast({
-        title: 'Success',
-        description: `Employee ${employee?.name || ''} deleted successfully`,
-      });
-      
-      return true;
-    } catch (error) {
-      return handleError(error, 'Failed to delete employee');
-    }
-  },
-  
-  /**
-   * Search employees by name, email, or department
-   */
-  async searchEmployees(query: string) {
-    try {
-      const { data, error } = await supabase
-        .from('hr_employees')
-        .select(`
-          *,
-          department:hr_departments(id, name),
-          position:hr_positions(id, title)
-        `)
-        .or(`name.ilike.%${query}%,email.ilike.%${query}%`)
-        .order('name');
-        
-      if (error) throw error;
-      
-      return data;
-    } catch (error) {
-      return handleError(error, 'Failed to search employees');
-    }
-  },
-  
-  /**
-   * Get employees by department
-   */
-  async getEmployeesByDepartment(departmentId: string) {
-    try {
-      const { data, error } = await supabase
-        .from('hr_employees')
-        .select(`
-          *,
-          position:hr_positions(id, title)
-        `)
-        .eq('department_id', departmentId)
-        .order('name');
-        
-      if (error) throw error;
-      
-      return data;
-    } catch (error) {
-      return handleError(error, 'Failed to fetch employees by department');
-    }
-  },
-  
-  /**
-   * Get employee metrics
-   */
-  async getEmployeeMetrics() {
-    try {
-      // Get total employees
-      const { data: employeeCount, error: countError } = await supabase
-        .from('hr_employees')
-        .select('id', { count: 'exact', head: true });
-        
-      if (countError) throw countError;
-      
-      // Get employees by status
-      const { data: statusData, error: statusError } = await supabase
-        .from('hr_employees')
-        .select('status')
-        .not('status', 'is', null);
-        
-      if (statusError) throw statusError;
-      
-      // Calculate metrics
-      const totalEmployees = employeeCount?.count || 0;
-      const statusCounts = statusData?.reduce((acc, emp) => {
-        acc[emp.status] = (acc[emp.status] || 0) + 1;
-        return acc;
-      }, {});
-      
-      // Get new employees this month
-      const firstDayOfMonth = new Date();
-      firstDayOfMonth.setDate(1);
-      firstDayOfMonth.setHours(0, 0, 0, 0);
-      
-      const { data: newEmployees, error: newError } = await supabase
-        .from('hr_employees')
-        .select('id')
-        .gte('created_at', firstDayOfMonth.toISOString())
-        .select('id', { count: 'exact', head: true });
-        
-      if (newError) throw newError;
-      
-      return {
-        totalEmployees,
-        activeEmployees: statusCounts?.active || 0,
-        inactiveEmployees: statusCounts?.inactive || 0,
-        onboardingEmployees: statusCounts?.onboarding || 0,
-        offboardingEmployees: statusCounts?.offboarding || 0,
-        newEmployeesThisMonth: newEmployees?.count || 0,
-      };
-    } catch (error) {
-      return handleError(error, 'Failed to fetch employee metrics');
-    }
-  }
-};
 
-export default hrEmployeeService; 
+        console.log('Employees table created successfully.');
+      } else {
+        console.log('Employees table already exists. No action needed.');
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error during HR system initialization:', error);
+      return { success: false, error };
+    }
+  },
+
+  /**
+   * Fetch all employees from the database.
+   * @returns {Promise<{ data: Employee[] | null; error: any | null }>}
+   */
+  async getAllEmployees(): Promise<{ data: Employee[] | null; error: any | null }> {
+    const { data, error } = await supabase
+      .from('employees')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    return { data, error };
+  },
+
+  /**
+   * Get a single employee by ID.
+   * @param {string} id - The ID of the employee to retrieve.
+   * @returns {Promise<{ data: Employee | null; error: any | null }>}
+   */
+  async getEmployeeById(id: string): Promise<{ data: Employee | null; error: any | null }> {
+    const { data, error } = await supabase
+      .from('employees')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    return { data, error };
+  },
+
+  /**
+   * Create a new employee.
+   * @param {Partial<Employee>} employee - The employee data to insert.
+   * @returns {Promise<{ data: Employee[] | null; error: any | null }>}
+   */
+  async createEmployee(employee: Partial<Employee>): Promise<{ data: Employee[] | null; error: any | null }> {
+    const { data, error } = await supabase
+      .from('employees')
+      .insert([
+        {
+          ...employee,
+          // Ensure these fields are provided during creation
+          name: employee.name || 'Unknown',
+          email: employee.email || 'no-email@example.com',
+        },
+      ])
+      .select();
+
+    return { data, error };
+  },
+
+  /**
+   * Update an existing employee's data.
+   * @param {string} id - The ID of the employee to update.
+   * @param {Partial<Employee>} updatedEmployee - The updated employee data.
+   * @returns {Promise<{ data: Employee[] | null; error: any | null }>}
+   */
+  async updateEmployee(id: string, updatedEmployee: Partial<Employee>): Promise<{ data: Employee[] | null; error: any | null }> {
+    // Log the updatedEmployee object to check its contents
+    console.log('Updating employee with ID:', id, 'with data:', updatedEmployee);
+
+    const { data, error } = await supabase
+      .from('employees')
+      .update({
+        name: updatedEmployee.name,
+        email: updatedEmployee.email,
+        phone: updatedEmployee.phone,
+        address: updatedEmployee.address,
+        department: updatedEmployee.department,
+        position: updatedEmployee.position,
+        salary: updatedEmployee.salary,
+        hire_date: updatedEmployee.hire_date,
+        last_activity: updatedEmployee.lastActivity,
+        is_active: updatedEmployee.is_active,
+        profile_url: updatedEmployee.profile_url,
+      })
+      .eq('id', id)
+      .select();
+
+    if (error) {
+      console.error('Error updating employee:', error);
+    } else {
+      console.log('Employee updated successfully. Result:', data);
+    }
+
+    return { data, error };
+  },
+
+  /**
+   * Delete an employee by ID.
+   * @param {string} id - The ID of the employee to delete.
+   * @returns {Promise<{ error: any | null }>}
+   */
+  async deleteEmployee(id: string): Promise<{ error: any | null }> {
+    const { error } = await supabase
+      .from('employees')
+      .delete()
+      .eq('id', id);
+
+    return { error };
+  },
+
+  /**
+   * Update the activity timestamp of an employee.
+   * @param {string} id - The ID of the employee to update.
+   * @returns {Promise<{ data: Employee[] | null; error: any | null }>}
+   */
+  async updateEmployeeActivity(id: string): Promise<{ data: Employee[] | null; error: any | null }> {
+    const { data, error } = await supabase
+      .from('employees')
+      .update({ last_activity: new Date().toISOString() })
+      .eq('id', id)
+      .select();
+
+    return { data, error };
+  },
+};
