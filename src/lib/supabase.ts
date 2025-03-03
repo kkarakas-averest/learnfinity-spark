@@ -36,4 +36,34 @@ export const isSupabaseConfigured = () => {
   return !!supabaseAnonKey && supabaseAnonKey !== 'MISSING_KEY_PLACEHOLDER' && supabaseAnonKey !== 'ERROR_PLACEHOLDER';
 };
 
+// Add a test function to verify connection
+export const testSupabaseConnection = async () => {
+  try {
+    console.log('Testing Supabase connection...');
+    
+    // Try to access a public table
+    const { data, error } = await supabase
+      .from('hr_departments')
+      .select('id, name')
+      .limit(1);
+    
+    if (error) {
+      console.error('❌ Supabase connection test failed:', error);
+      return { success: false, error };
+    }
+    
+    console.log('✅ Supabase connection test successful:', data);
+    return { success: true, data };
+  } catch (error) {
+    console.error('❌ Supabase connection test failed with exception:', error);
+    return { success: false, error };
+  }
+};
+
+// Make the test function available globally in development
+if (import.meta.env.DEV) {
+  (window as any).testSupabaseConnection = testSupabaseConnection;
+  console.log('🔧 Global function window.testSupabaseConnection() is now available for testing');
+}
+
 export { supabase };
