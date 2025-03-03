@@ -334,10 +334,14 @@ export const hrEmployeeService = {
         throw employeeError;
       }
       
+      // Create a temporary password for the new account
+      // In a real production app, this would be a secure random password
+      const tempPassword = `Welcome123!${Math.floor(Math.random() * 1000)}`;
+      
       // Create a user account with Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: employee.email,
-        password: 'hashed-in-rpc', // The actual password is handled by Supabase Auth
+        password: tempPassword,
         options: {
           emailRedirectTo: window.location.origin,
           data: {
@@ -349,63 +353,39 @@ export const hrEmployeeService = {
       
       if (authError) {
         console.error('Error creating user account:', authError);
+        
+        // If creating the user fails, delete the employee record to maintain consistency
+        if (employeeData?.id) {
+          await this.deleteEmployee(employeeData.id);
+        }
+        
         return { 
-          data: employeeData, 
-          error: null, 
-          userAccount: null,
-          authError
+          data: null, 
+          error: authError, 
+          userAccount: null 
         };
       }
       
-      // Try to insert user into users table
-      try {
-        const { error: insertError } = await supabase
-          .from('users')
-          .insert({
-            id: authData.user.id,
-            name: employee.name,
-            email: employee.email,
-            password: 'hashed-in-rpc', // The actual password is handled by Supabase Auth
-            role: 'learner',
-          });
-
-        if (insertError) {
-          console.warn('Failed to create user profile, but auth user was created:', insertError);
-        }
-      } catch (insertError) {
-        console.warn('Exception when creating user profile:', insertError);
-      }
-      
-      // Also create a learner record associated with the user
-      try {
-        const { error: learnerError } = await supabase
-          .from('learners')
-          .insert({
-            id: authData.user.id,
-            company_id: employee.company_id,
-            progress_status: {},
-            preferences: {},
-            certifications: {}
-          });
-          
-        if (learnerError) {
-          console.warn('Failed to create learner record:', learnerError);
-        }
-      } catch (learnerError) {
-        console.warn('Exception when creating learner record:', learnerError);
-      }
+      // Store temporary credentials in local storage for potential auto-login
+      localStorage.setItem('temp_login_email', employee.email);
+      localStorage.setItem('temp_login_password', tempPassword);
       
       return { 
         data: employeeData, 
         error: null, 
         userAccount: {
           email: employee.email,
-          id: authData.user.id
+          id: authData.user.id,
+          tempPassword // Include the temporary password in the response
         }
       };
     } catch (error) {
-      console.error('Error in createEmployeeWithUserAccount:', error);
-      return { data: null, error, userAccount: null };
+      console.error('Exception in createEmployeeWithUserAccount:', error);
+      return { 
+        data: null, 
+        error, 
+        userAccount: null 
+      };
     }
   },
 

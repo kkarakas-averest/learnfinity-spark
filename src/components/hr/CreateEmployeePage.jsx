@@ -21,7 +21,7 @@ import {
   AlertTitle, 
   AlertDescription 
 } from '@/components/ui/alert';
-import { Copy, Info, Wrench } from 'lucide-react';
+import { Copy, Info, Wrench, AlertCircle } from 'lucide-react';
 
 const CreateEmployeePage = () => {
   // For debugging
@@ -104,49 +104,23 @@ const CreateEmployeePage = () => {
     try {
       setIsLoading(true);
       
-      // Validate company ID
-      if (!formData.companyId) {
-        console.warn('Company ID not set. Using default or null value.');
-      }
-      
-      // Update toast to show resume processing if a file is included
-      const hasResume = formData.resumeFile !== null;
-      
-      if (hasResume) {
-        toast.info('Processing resume and creating employee account...', { duration: 3000 });
-      }
-      
-      // Store selected course titles for display
-      const selectedCourses = formData.courseIds.map(courseId => {
-        // Find the course title from the ID
-        const courseTitle = availableCourses.find(course => course.id === courseId)?.title || 'Course';
-        return courseTitle;
-      });
-      
-      setEnrolledCourses(selectedCourses);
-      
-      // Prepare employee data as a clean JSON object
-      const employeeJSON = {
+      // Create the employee data object
+      const employeeData = {
         name: formData.name,
         email: formData.email,
-        departmentId: formData.departmentId,
-        positionId: formData.positionId || null,
-        status: formData.status,
-        companyId: formData.companyId,
-        resumeFile: formData.resumeFile,
-        courseIds: formData.courseIds
+        department_id: formData.department,
+        position_id: formData.position,
+        status: 'active',
+        phone: formData.phone || null
       };
       
-      console.log('Submitting employee JSON:', JSON.stringify(employeeJSON, 
-        (key, value) => key === 'resumeFile' ? 
-          (value ? `[File: ${value.name}]` : null) : value, 2)
-      );
+      // Create the employee with user account
+      const { data, error, userAccount, authError } = await hrEmployeeService.createEmployeeWithUserAccount(employeeData);
       
-      // Create employee using the new JSON-based approach
-      const { data, error, userAccount, authError } = await hrEmployeeService.createEmployeeFromJSON(employeeJSON);
+      setIsLoading(false);
       
       if (error) {
-        console.error('Employee creation error:', error);
+        console.error('Error creating employee:', error);
         
         // Show a more helpful error message
         let errorMessage = 'Failed to create employee.';
@@ -165,8 +139,13 @@ const CreateEmployeePage = () => {
         throw error;
       }
       
-      if (userAccount) {
-        setCredentials(userAccount);
+      if (userAccount && userAccount.email && userAccount.tempPassword) {
+        // Set credentials from userAccount response
+        setCredentials({
+          email: userAccount.email,
+          tempPassword: userAccount.tempPassword,
+          id: userAccount.id
+        });
         setShowCredentials(true);
       } else if (authError) {
         toast.warning(
@@ -188,7 +167,7 @@ const CreateEmployeePage = () => {
   const handleCopyCredentials = () => {
     if (credentials) {
       navigator.clipboard.writeText(
-        `Email: ${credentials.email}\nPassword: ${credentials.password}`
+        `Email: ${credentials.email}\nPassword: ${credentials.tempPassword}`
       );
       toast.success('Credentials copied to clipboard');
     }
@@ -205,7 +184,7 @@ const CreateEmployeePage = () => {
       // Store the credentials in localStorage for the login page to use
       localStorage.setItem('pendingAutoLogin', JSON.stringify({
         email: credentials.email,
-        password: credentials.password
+        password: credentials.tempPassword
       }));
       
       // Close the dialog and redirect to the login page
@@ -342,7 +321,16 @@ const CreateEmployeePage = () => {
                 <AlertTitle>User Credentials</AlertTitle>
                 <AlertDescription className="mt-2">
                   <div><strong>Email:</strong> {credentials.email}</div>
-                  <div><strong>Password:</strong> {credentials.password}</div>
+                  <div><strong>Temporary Password:</strong> {credentials.tempPassword}</div>
+                </AlertDescription>
+              </Alert>
+              
+              <Alert variant="warning">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Important</AlertTitle>
+                <AlertDescription>
+                  This temporary password is only displayed once. Please copy it and share it with the employee securely.
+                  The employee should change this password after first login.
                 </AlertDescription>
               </Alert>
               
