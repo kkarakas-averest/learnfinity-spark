@@ -1,4 +1,4 @@
-import * as React from "react";
+import React from "react";
 import { cn } from "@/lib/utils";
 import { ArrowRight, Bookmark, Layers, Zap } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -15,6 +15,21 @@ const Index = () => {
   }, []);
 
   console.log("[Index] Component rendering started");
+
+  // Safe wrapper for using cn function
+  const safeClassNames = (...args: any[]) => {
+    try {
+      console.log("[Index] Calling cn with args:", JSON.stringify(args));
+      return cn(...args);
+    } catch (err) {
+      console.error("[Index] Error applying class names:", err);
+      // Return a sensible default if cn fails
+      if (args.length > 0 && typeof args[0] === 'string') {
+        return args[0];
+      }
+      return "";
+    }
+  };
 
   const features = [
     {
@@ -58,188 +73,208 @@ const Index = () => {
     },
   ];
 
-  return (
-    <div className="min-h-screen flex flex-col">
-      <Navbar />
-      <main className="flex-1">
-        <Hero />
+  try {
+    console.log("[Index] Rendering main content");
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Navbar />
+        <main className="flex-1">
+          <Hero />
 
-        {/* Features Section */}
-        <section className="py-20 bg-secondary/50">
-          <div className="container px-4 md:px-6">
-            <div className={cn("text-center max-w-[800px] mx-auto mb-12 md:mb-16", {
-              "animate-fade-in": true
-            })}>
-              <h2 className="text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl">
-                Revolutionize Your Learning Experience
-              </h2>
-              <p className="mt-4 text-xl text-muted-foreground">
-                Our AI-powered platform delivers a tailored learning experience designed specifically for you
-              </p>
-            </div>
+          {/* Features Section */}
+          <section className="py-20 bg-secondary/50">
+            <div className="container px-4 md:px-6">
+              <div className={safeClassNames("text-center max-w-[800px] mx-auto mb-12 md:mb-16", {
+                "animate-fade-in": true
+              })}>
+                <h2 className="text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl">
+                  Revolutionize Your Learning Experience
+                </h2>
+                <p className="mt-4 text-xl text-muted-foreground">
+                  Our AI-powered platform delivers a tailored learning experience designed specifically for you
+                </p>
+              </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 animate-fade-in">
-              {features.map((feature, i) => (
-                <div
-                  key={i}
-                  className={cn("bg-white rounded-xl p-8 shadow-sm transition-all duration-200", {
-                    "hover:shadow-md": true
-                  })}
-                >
-                  <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mb-6">
-                    {feature.icon}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8 animate-fade-in">
+                {features.map((feature, i) => (
+                  <div
+                    key={i}
+                    className={safeClassNames("bg-white rounded-xl p-8 shadow-sm transition-all duration-200", {
+                      "hover:shadow-md": true
+                    })}
+                  >
+                    <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mb-6">
+                      {feature.icon}
+                    </div>
+                    <h3 className="text-xl font-semibold mb-3">{feature.title}</h3>
+                    <p className="text-muted-foreground">{feature.description}</p>
                   </div>
-                  <h3 className="text-xl font-semibold mb-3">{feature.title}</h3>
-                  <p className="text-muted-foreground">{feature.description}</p>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
 
-        {/* Testimonials Section */}
-        <section className="py-20">
-          <div className="container px-4 md:px-6">
-            <div className={cn(
-              "text-center max-w-[800px] mx-auto mb-12 md:mb-16",
-              "animate-fade-in"
-            )}>
-              <h2 className="text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl">
-                What Our Learners Say
-              </h2>
-              <p className="mt-4 text-xl text-muted-foreground">
-                Discover how our platform is transforming learning experiences
-              </p>
-            </div>
+          {/* Testimonials Section */}
+          <section className="py-20">
+            <div className="container px-4 md:px-6">
+              <div className={safeClassNames(
+                "text-center max-w-[800px] mx-auto mb-12 md:mb-16",
+                "animate-fade-in"
+              )}>
+                <h2 className="text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl">
+                  What Our Learners Say
+                </h2>
+                <p className="mt-4 text-xl text-muted-foreground">
+                  Discover how our platform is transforming learning experiences
+                </p>
+              </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-fade-in">
-              {testimonials.map((testimonial, i) => (
-                <div
-                  key={i}
-                  className={cn(
-                    "bg-secondary/30 rounded-xl p-8 border border-secondary relative"
-                  )}
-                >
-                  <div className="absolute -top-3 -left-3 text-4xl text-primary opacity-50">"</div>
-                  <p className="mb-6 relative z-10 text-muted-foreground">
-                    {testimonial.quote}
-                  </p>
-                  <div>
-                    <p className="font-semibold">{testimonial.author}</p>
-                    <p className="text-sm text-muted-foreground">{testimonial.role}</p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-fade-in">
+                {testimonials.map((testimonial, i) => (
+                  <div
+                    key={i}
+                    className={safeClassNames(
+                      "bg-secondary/30 rounded-xl p-8 border border-secondary relative"
+                    )}
+                  >
+                    <div className="absolute -top-3 -left-3 text-4xl text-primary opacity-50">"</div>
+                    <p className="mb-6 relative z-10 text-muted-foreground">
+                      {testimonial.quote}
+                    </p>
+                    <div>
+                      <p className="font-semibold">{testimonial.author}</p>
+                      <p className="text-sm text-muted-foreground">{testimonial.role}</p>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
 
-        {/* CTA Section */}
-        <section className="py-20 bg-primary text-white">
-          <div className="container px-4 md:px-6">
-            <div className={cn(
-              "max-w-[800px] mx-auto text-center",
-              "animate-fade-in"
-            )}>
-              <h2 className="text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl mb-6">
-                Start Your Personalized Learning Journey Today
-              </h2>
-              <p className="text-xl mb-8 text-primary-foreground/80">
-                Join thousands of learners already benefiting from AI-powered education
-              </p>
-              <Button size="lg" variant="secondary" asChild>
-                <Link to="/register" className="text-primary">
-                  Get Started for Free <ArrowRight className="ml-2 h-4 w-4" />
-                </Link>
-              </Button>
+          {/* CTA Section */}
+          <section className="py-20 bg-primary text-white">
+            <div className="container px-4 md:px-6">
+              <div className={safeClassNames(
+                "max-w-[800px] mx-auto text-center",
+                "animate-fade-in"
+              )}>
+                <h2 className="text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl mb-6">
+                  Start Your Personalized Learning Journey Today
+                </h2>
+                <p className="text-xl mb-8 text-primary-foreground/80">
+                  Join thousands of learners already benefiting from AI-powered education
+                </p>
+                <Button size="lg" variant="secondary" asChild>
+                  <Link to="/register" className="text-primary">
+                    Get Started for Free <ArrowRight className="ml-2 h-4 w-4" />
+                  </Link>
+                </Button>
+              </div>
             </div>
-          </div>
-        </section>
-      </main>
+          </section>
+        </main>
 
-      {/* Footer */}
-      <footer className="border-t bg-background">
-        <div className="container px-4 md:px-6 py-10">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-            <div>
-              <div className="text-xl font-semibold mb-4">Learnfinity</div>
-              <p className="text-sm text-muted-foreground">
-                AI-powered personalized learning platform that adapts to your unique needs and goals.
-              </p>
+        {/* Footer */}
+        <footer className="border-t bg-background">
+          <div className="container px-4 md:px-6 py-10">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+              <div>
+                <div className="text-xl font-semibold mb-4">Learnfinity</div>
+                <p className="text-sm text-muted-foreground">
+                  AI-powered personalized learning platform that adapts to your unique needs and goals.
+                </p>
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold mb-3">Platform</h3>
+                <ul className="space-y-2">
+                  <li>
+                    <Link to="/courses" className="text-sm text-muted-foreground hover:text-primary">
+                      Courses
+                    </Link>
+                  </li>
+                  <li>
+                    <Link to="/learning-paths" className="text-sm text-muted-foreground hover:text-primary">
+                      Learning Paths
+                    </Link>
+                  </li>
+                  <li>
+                    <Link to="/dashboard" className="text-sm text-muted-foreground hover:text-primary">
+                      Dashboard
+                    </Link>
+                  </li>
+                </ul>
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold mb-3">Company</h3>
+                <ul className="space-y-2">
+                  <li>
+                    <Link to="/about" className="text-sm text-muted-foreground hover:text-primary">
+                      About Us
+                    </Link>
+                  </li>
+                  <li>
+                    <Link to="/contact" className="text-sm text-muted-foreground hover:text-primary">
+                      Contact
+                    </Link>
+                  </li>
+                  <li>
+                    <Link to="/privacy" className="text-sm text-muted-foreground hover:text-primary">
+                      Privacy
+                    </Link>
+                  </li>
+                  <li>
+                    <Link to="/hr-login" className="text-sm text-muted-foreground hover:text-primary">
+                      HR Admin
+                    </Link>
+                  </li>
+                </ul>
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold mb-3">Legal</h3>
+                <ul className="space-y-2">
+                  <li>
+                    <Link to="/terms" className="text-sm text-muted-foreground hover:text-primary">
+                      Terms
+                    </Link>
+                  </li>
+                  <li>
+                    <Link to="/privacy" className="text-sm text-muted-foreground hover:text-primary">
+                      Privacy
+                    </Link>
+                  </li>
+                  <li>
+                    <Link to="/cookies" className="text-sm text-muted-foreground hover:text-primary">
+                      Cookies
+                    </Link>
+                  </li>
+                </ul>
+              </div>
             </div>
-            <div>
-              <h3 className="text-sm font-semibold mb-3">Platform</h3>
-              <ul className="space-y-2">
-                <li>
-                  <Link to="/courses" className="text-sm text-muted-foreground hover:text-primary">
-                    Courses
-                  </Link>
-                </li>
-                <li>
-                  <Link to="/learning-paths" className="text-sm text-muted-foreground hover:text-primary">
-                    Learning Paths
-                  </Link>
-                </li>
-                <li>
-                  <Link to="/dashboard" className="text-sm text-muted-foreground hover:text-primary">
-                    Dashboard
-                  </Link>
-                </li>
-              </ul>
-            </div>
-            <div>
-              <h3 className="text-sm font-semibold mb-3">Company</h3>
-              <ul className="space-y-2">
-                <li>
-                  <Link to="/about" className="text-sm text-muted-foreground hover:text-primary">
-                    About Us
-                  </Link>
-                </li>
-                <li>
-                  <Link to="/contact" className="text-sm text-muted-foreground hover:text-primary">
-                    Contact
-                  </Link>
-                </li>
-                <li>
-                  <Link to="/privacy" className="text-sm text-muted-foreground hover:text-primary">
-                    Privacy
-                  </Link>
-                </li>
-                <li>
-                  <Link to="/hr-login" className="text-sm text-muted-foreground hover:text-primary">
-                    HR Admin
-                  </Link>
-                </li>
-              </ul>
-            </div>
-            <div>
-              <h3 className="text-sm font-semibold mb-3">Legal</h3>
-              <ul className="space-y-2">
-                <li>
-                  <Link to="/terms" className="text-sm text-muted-foreground hover:text-primary">
-                    Terms
-                  </Link>
-                </li>
-                <li>
-                  <Link to="/privacy" className="text-sm text-muted-foreground hover:text-primary">
-                    Privacy
-                  </Link>
-                </li>
-                <li>
-                  <Link to="/cookies" className="text-sm text-muted-foreground hover:text-primary">
-                    Cookies
-                  </Link>
-                </li>
-              </ul>
+            <div className="mt-10 pt-6 border-t text-center text-sm text-muted-foreground">
+              © {new Date().getFullYear()} Learnfinity. All rights reserved.
             </div>
           </div>
-          <div className="mt-10 pt-6 border-t text-center text-sm text-muted-foreground">
-            © {new Date().getFullYear()} Learnfinity. All rights reserved.
-          </div>
+        </footer>
+      </div>
+    );
+  } catch (error) {
+    console.error("[Index] Error rendering component:", error);
+    // Fallback UI in case of render error
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-4">
+        <h1 className="text-2xl font-bold mb-4">Welcome to Learnfinity</h1>
+        <p className="text-muted-foreground mb-6">We're experiencing some technical difficulties with the homepage.</p>
+        <div className="flex gap-4">
+          <Button asChild>
+            <Link to="/login">Sign In</Link>
+          </Button>
+          <Button variant="outline" asChild>
+            <Link to="/register">Register</Link>
+          </Button>
         </div>
-      </footer>
-    </div>
-  );
+      </div>
+    );
+  }
 };
 
 export default Index;

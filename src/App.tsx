@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { Toaster } from "@/components/ui/toaster";
@@ -110,7 +109,7 @@ function App() {
                   <CreateEmployeePage />
                 </HRAuthProvider>
               } />
-              <Route path={ROUTES.HR_DASHBOARD_EMPLOYEES_EDIT} element={
+              <Route path="/hr-dashboard/employees/:id/edit" element={
                 <HRAuthProvider>
                   <EditEmployeePage />
                 </HRAuthProvider>
