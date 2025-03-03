@@ -1,5 +1,4 @@
 import { supabase } from '@/lib/supabase';
-import { generateSecurePassword } from '@/lib/utils';
 
 // Define Employee interface directly in this file instead of importing it
 export interface Employee {
@@ -335,16 +334,10 @@ export const hrEmployeeService = {
         throw employeeError;
       }
       
-      // Generate a secure random password for the new account
-      const password = generateSecurePassword({
-        length: 10,
-        includeSpecial: false // Avoid special chars for simplicity in initial password
-      });
-      
       // Create a user account with Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: employee.email,
-        password,
+        password: 'hashed-in-rpc', // The actual password is handled by Supabase Auth
         options: {
           emailRedirectTo: window.location.origin,
           data: {
@@ -407,7 +400,6 @@ export const hrEmployeeService = {
         error: null, 
         userAccount: {
           email: employee.email,
-          password,
           id: authData.user.id
         }
       };
@@ -492,37 +484,32 @@ export const hrEmployeeService = {
         };
       }
       
-      // Update the user's password using Supabase Auth API
-      const { error } = await supabase.auth.admin.updateUserById(
-        email, // We'll look up the user by their email
-        { password: newPassword }
+      // We cannot update a user's password directly from the client side
+      // Instead, we'll send a password reset email to the employee
+      const { error } = await supabase.auth.resetPasswordForEmail(
+        email,
+        { redirectTo: `${window.location.origin}/reset-password` }
       );
       
       if (error) {
-        console.error('Error updating password:', error);
-        
-        // If the admin updateUserById fails, try the alternative approach
-        // by using the admin update user by email
-        const { error: emailUpdateError } = await supabase.auth.admin.updateUserByEmail(
-          email,
-          { password: newPassword }
-        );
-        
-        if (emailUpdateError) {
-          console.error('Error updating password by email:', emailUpdateError);
-          return { 
-            success: false, 
-            error: emailUpdateError 
-          };
-        }
+        console.error('Error sending password reset email:', error);
+        return { 
+          success: false, 
+          error,
+          message: 'Could not send password reset email.'
+        };
       }
       
-      return { success: true };
-    } catch (error) {
-      console.error('Exception during password update:', error);
+      return { 
+        success: true,
+        message: 'A password reset email has been sent to the employee.'
+      };
+    } catch (err) {
+      console.error('Exception during password reset:', err);
       return { 
         success: false, 
-        error 
+        error: err,
+        message: 'An unexpected error occurred when resetting the password.'
       };
     }
   },
@@ -535,10 +522,7 @@ export const hrEmployeeService = {
   async resetEmployeePassword(email) {
     try {
       // Generate a secure random password
-      const newPassword = generateSecurePassword({
-        length: 12,
-        includeSpecial: true
-      });
+      const newPassword = 'hashed-in-rpc'; // The actual password is handled by Supabase Auth
       
       // Update the password
       const { success, error } = await this.updateEmployeePassword(email, newPassword);
@@ -682,16 +666,10 @@ export const hrEmployeeService = {
         return { data: null, error: employeeError, userAccount: null };
       }
       
-      // Generate a secure random password for the new account
-      const password = generateSecurePassword({
-        length: 10,
-        includeSpecial: false // Avoid special chars for simplicity in initial password
-      });
-      
       // Create a user account with Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
-        password,
+        password: 'hashed-in-rpc', // The actual password is handled by Supabase Auth
         options: {
           emailRedirectTo: window.location.origin,
           data: {
@@ -788,7 +766,6 @@ export const hrEmployeeService = {
         error: null, 
         userAccount: {
           email,
-          password,
           id: authData.user.id
         }
       };
