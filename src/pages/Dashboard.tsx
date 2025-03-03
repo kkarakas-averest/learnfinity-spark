@@ -31,20 +31,33 @@ import { useLearningData } from "@/hooks/useLearningData";
 import AgentGeneratedCourses from "@/components/learner/AgentGeneratedCourses";
 
 const Dashboard = () => {
-  const { user, userDetails, isLoading } = useAuth();
+  const { user, userDetails, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = React.useState("overview");
   const { getActiveCourses, getLearningPaths, coursesLoading, learnerCourses } = useLearningData();
+  const [dashboardError, setDashboardError] = React.useState(null);
 
   // Log the auth and learning state for debugging
   React.useEffect(() => {
-    console.log("Dashboard - Auth State:", { user, userDetails, isLoading });
+    console.log("Dashboard - Auth State:", { user, userDetails, authLoading });
     console.log("Dashboard - Learning Data:", { 
       courses: getActiveCourses(), 
       paths: getLearningPaths(),
       rawCourses: learnerCourses
     });
-  }, [user, userDetails, isLoading, learnerCourses]);
+  }, [user, userDetails, authLoading, learnerCourses]);
+
+  // If there's an error loading data, capture it
+  React.useEffect(() => {
+    try {
+      // Try to access data to catch any potential errors
+      const courses = getActiveCourses();
+      console.log("Successfully loaded courses:", courses.length);
+    } catch (error) {
+      console.error("Error in Dashboard data loading:", error);
+      setDashboardError(error);
+    }
+  }, [learnerCourses]);
 
   // Mock data (would come from the backend in a real app)
   const recentActivities = [
@@ -78,7 +91,7 @@ const Dashboard = () => {
   
   React.useEffect(() => {
     // If regular auth loading finishes, or after 3 seconds, stop showing loading state
-    if (!isLoading || user) {
+    if (!authLoading || user) {
       setIsInitialLoading(false);
     } else {
       const timer = setTimeout(() => {
@@ -87,17 +100,17 @@ const Dashboard = () => {
       }, 3000);
       return () => clearTimeout(timer);
     }
-  }, [isLoading, user]);
+  }, [authLoading, user]);
 
   // Check if user is authenticated
   React.useEffect(() => {
-    if (!isLoading && !user) {
+    if (!authLoading && !user) {
       console.log("No user detected, redirecting to login");
       navigate('/login');
     }
-  }, [user, isLoading, navigate]);
+  }, [user, authLoading, navigate]);
 
-  // Only show loading for initial load, not subsequent data fetches
+  // Replace the isInitialLoading check with this enhanced version
   if (isInitialLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-secondary/20">
@@ -109,8 +122,34 @@ const Dashboard = () => {
     );
   }
 
+  // Add error handling
+  if (dashboardError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-secondary/20">
+        <div className="flex flex-col items-center gap-4 text-center max-w-md mx-auto p-4">
+          <div className="text-red-500 text-4xl mb-4">⚠️</div>
+          <h2 className="text-xl font-semibold">Dashboard Error</h2>
+          <p className="text-muted-foreground">We encountered an error loading your dashboard.</p>
+          <Button 
+            className="mt-4" 
+            onClick={() => window.location.reload()}
+          >
+            Try Again
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   // Get active courses - ensure we have data even if API fails
-  const activeCourses = getActiveCourses();
+  const activeCourses = (() => {
+    try {
+      return getActiveCourses();
+    } catch (error) {
+      console.error("Error getting active courses:", error);
+      return [];
+    }
+  })();
   console.log("Active courses:", activeCourses);
 
   // Fallback to rendering the dashboard even if auth is still technically loading
