@@ -1,3 +1,4 @@
+
 import * as React from 'react';
 import { 
   Users, 
@@ -16,7 +17,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
-import hrEmployeeService from '@/services/hrEmployeeService';
+import { hrEmployeeService } from '@/services/hrEmployeeService';
 import { hrServices } from '@/services/hrServices';
 
 const DashboardOverview: React.FC = () => {
@@ -33,34 +34,34 @@ const DashboardOverview: React.FC = () => {
         
         // Fetch key metrics data
         const metrics = await hrServices.getDashboardMetrics();
-        if (metrics) {
+        if (metrics && metrics.success && metrics.metrics) {
           setKeyMetricsData([
             {
               title: "Active Learners",
-              value: metrics.activeEmployees.toString(),
-              change: `${metrics.newEmployees > 0 ? '+' : ''}${metrics.newEmployees} this month`,
-              trend: metrics.newEmployees >= 0 ? "up" : "down",
+              value: metrics.metrics.activeEmployees.toString(),
+              change: `${metrics.metrics.newEmployees > 0 ? '+' : ''}${metrics.metrics.newEmployees} this month`,
+              trend: metrics.metrics.newEmployees >= 0 ? "up" : "down",
               icon: Users,
             },
             {
               title: "Course Completion",
-              value: `${metrics.completionRate}%`,
-              change: `${metrics.completionRateChange >= 0 ? '+' : ''}${metrics.completionRateChange}% from last month`,
-              trend: metrics.completionRateChange >= 0 ? "up" : "down",
+              value: `${metrics.metrics.completionRate}%`,
+              change: `${metrics.metrics.completionRateChange >= 0 ? '+' : ''}${metrics.metrics.completionRateChange}% from last month`,
+              trend: metrics.metrics.completionRateChange >= 0 ? "up" : "down",
               icon: CheckCircle,
             },
             {
               title: "Skill Gaps",
-              value: metrics.skillGaps.toString(),
-              change: `${metrics.skillGapsChange >= 0 ? '+' : ''}${metrics.skillGapsChange} this month`,
-              trend: metrics.skillGapsChange <= 0 ? "up" : "down", // Fewer skill gaps is positive
+              value: metrics.metrics.skillGaps.toString(),
+              change: `${metrics.metrics.skillGapsChange >= 0 ? '+' : ''}${metrics.metrics.skillGapsChange} this month`,
+              trend: metrics.metrics.skillGapsChange <= 0 ? "up" : "down", // Fewer skill gaps is positive
               icon: Activity,
             },
             {
               title: "Learning Hours",
-              value: metrics.learningHours.toLocaleString(),
-              change: `${metrics.learningHoursChange >= 0 ? '+' : ''}${metrics.learningHoursChange} this month`,
-              trend: metrics.learningHoursChange >= 0 ? "up" : "down",
+              value: metrics.metrics.learningHours.toLocaleString(),
+              change: `${metrics.metrics.learningHoursChange >= 0 ? '+' : ''}${metrics.metrics.learningHoursChange} this month`,
+              trend: metrics.metrics.learningHoursChange >= 0 ? "up" : "down",
               icon: Clock,
             },
           ]);
@@ -68,8 +69,8 @@ const DashboardOverview: React.FC = () => {
         
         // Fetch recent activities
         const activities = await hrServices.getRecentActivities();
-        if (activities && activities.length > 0) {
-          setRecentActivities(activities);
+        if (activities && activities.success && activities.activities && activities.activities.length > 0) {
+          setRecentActivities(activities.activities);
         }
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
@@ -269,4 +270,4 @@ const DashboardOverview: React.FC = () => {
   );
 };
 
-export default DashboardOverview; 
+export default DashboardOverview;

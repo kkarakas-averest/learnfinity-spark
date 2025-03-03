@@ -1,4 +1,5 @@
-import { ReactNode, useState, useEffect } from "react";
+
+import React from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { 
   BarChart2, 
@@ -25,16 +26,16 @@ type SidebarItem = {
 };
 
 interface DashboardLayoutProps {
-  children: ReactNode;
+  children: React.ReactNode;
 }
 
 const DashboardLayout = ({ children }: DashboardLayoutProps) => {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = React.useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const { userDetails, signOut, isLoading } = useAuth();
 
-  useEffect(() => {
+  React.useEffect(() => {
     // Redirect to login if not authenticated and not loading
     if (!isLoading && !userDetails) {
       navigate("/login");

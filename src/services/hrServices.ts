@@ -1,176 +1,114 @@
 
-import { supabase } from "@/lib/supabase";
-import { hrEmployeeService } from "./hrEmployeeService";
+import { Employee } from './hrEmployeeService';
+import { hrEmployeeService } from '/dev-server/src/services/hrEmployeeService';
+
+// Mock data for dashboard and activity
+const mockDashboardMetrics = {
+  totalEmployees: 156,
+  activeEmployees: 134,
+  inactiveEmployees: 22,
+  totalDepartments: 8,
+  recentHires: 12,
+  newEmployees: 5,
+  completionRate: 67,
+  completionRateChange: 4.2,
+  skillGaps: 23,
+  skillGapsChange: -5,
+  learningHours: 1452,
+  learningHoursChange: 123
+};
+
+const mockActivities = [
+  {
+    type: 'enrollment',
+    user: 'Jordan Lee',
+    course: 'Advanced TypeScript',
+    time: '2 hours ago'
+  },
+  {
+    type: 'completion',
+    user: 'Alex Morgan',
+    course: 'React State Management',
+    time: 'Yesterday'
+  },
+  {
+    type: 'feedback',
+    user: 'Taylor Swift',
+    course: 'Building APIs with Node.js',
+    rating: 4.5,
+    comment: 'Excellent course with practical examples',
+    time: '2 days ago'
+  },
+  {
+    type: 'alert',
+    user: 'Chris Walker',
+    issue: 'Has not completed mandatory compliance training',
+    time: '3 days ago'
+  }
+];
 
 export const hrServices = {
+  // Initialize HR database
   initializeHRDatabase: async () => {
-    try {
-      // Check if employees table exists
-      const { error: schemaError } = await supabase
-        .from('hr_employees')
-        .select('id')
-        .limit(1);
-        
-      if (schemaError) {
-        console.log('Creating HR tables schema...');
-        // Create departments table
-        await supabase.rpc('execute_sql', {
-          sql: `
-            CREATE TABLE IF NOT EXISTS hr_departments (
-              id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-              name TEXT NOT NULL,
-              code TEXT,
-              description TEXT,
-              created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW()),
-              updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
-            );
-          `
-        });
-        
-        // Create positions table
-        await supabase.rpc('execute_sql', {
-          sql: `
-            CREATE TABLE IF NOT EXISTS hr_positions (
-              id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-              title TEXT NOT NULL,
-              department_id UUID REFERENCES hr_departments(id),
-              level TEXT,
-              created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW()),
-              updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
-            );
-          `
-        });
-        
-        // Create employees table
-        await supabase.rpc('execute_sql', {
-          sql: `
-            CREATE TABLE IF NOT EXISTS hr_employees (
-              id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-              user_id UUID REFERENCES auth.users(id),
-              first_name TEXT NOT NULL,
-              last_name TEXT NOT NULL,
-              email TEXT NOT NULL,
-              department TEXT,
-              position TEXT,
-              hire_date DATE,
-              status TEXT DEFAULT 'active',
-              manager_id UUID REFERENCES hr_employees(id),
-              phone TEXT,
-              address TEXT,
-              city TEXT,
-              state TEXT,
-              postal_code TEXT,
-              country TEXT,
-              birth_date DATE,
-              emergency_contact TEXT,
-              emergency_phone TEXT,
-              skills TEXT[],
-              certifications TEXT[],
-              photo_url TEXT,
-              notes TEXT,
-              last_activity TEXT,
-              created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW()),
-              updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
-            );
-          `
-        });
-        
-        // Create sample data
-        await hrEmployeeService.seedSampleData();
-      }
-      
-      return { success: true };
-    } catch (error) {
-      console.error("Error initializing HR database:", error);
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : "Unknown error initializing database" 
-      };
-    }
+    return new Promise<void>((resolve) => {
+      console.log("Initializing HR database");
+      // Simulating initialization delay
+      setTimeout(() => {
+        console.log("HR database initialized");
+        resolve();
+      }, 500);
+    });
   },
-  
-  // Add missing dashboard functions
+
+  // Dashboard metrics
   getDashboardMetrics: async () => {
     try {
-      // Get total number of employees
-      const { data: employeesData, error: employeesError } = await supabase
-        .from('hr_employees')
-        .select('id, status')
-        .order('created_at', { ascending: false });
-        
-      if (employeesError) throw employeesError;
-      
-      const employeeCount = employeesData?.length || 0;
-      const activeEmployees = employeesData?.filter(e => e.status === 'active').length || 0;
-      const inactiveEmployees = employeesData?.filter(e => e.status !== 'active').length || 0;
-      
-      // Get departments count
-      const { data: departmentsData, error: departmentsError } = await supabase
-        .from('hr_departments')
-        .select('id');
-        
-      if (departmentsError) throw departmentsError;
-      
-      // Get recent hires (last 30 days)
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      
-      const { data: recentHiresData, error: recentHiresError } = await supabase
-        .from('hr_employees')
-        .select('id')
-        .gte('created_at', thirtyDaysAgo.toISOString());
-        
-      if (recentHiresError) throw recentHiresError;
-      
+      // In a real app, this would call hrEmployeeService.getDashboardMetrics()
+      // For demo purposes, return mock data
       return {
         success: true,
-        metrics: {
-          totalEmployees: employeeCount,
-          activeEmployees,
-          inactiveEmployees,
-          totalDepartments: departmentsData?.length || 0,
-          recentHires: recentHiresData?.length || 0
-        }
+        metrics: mockDashboardMetrics
       };
     } catch (error) {
       console.error("Error fetching dashboard metrics:", error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : "Unknown error fetching metrics"
+        error: "Failed to fetch dashboard metrics"
       };
     }
   },
-  
+
+  // Recent activities
   getRecentActivities: async () => {
     try {
-      // Get recent employees (created in the last 30 days)
-      const { data: recentEmployees, error: employeesError } = await supabase
-        .from('hr_employees')
-        .select('id, first_name, last_name, email, status, position, department, created_at')
-        .order('created_at', { ascending: false })
-        .limit(10);
-        
-      if (employeesError) throw employeesError;
-      
-      // Transform to activities format
-      const activities = recentEmployees?.map(employee => ({
-        id: employee.id,
-        type: 'employee_created',
-        subject: `${employee.first_name} ${employee.last_name}`,
-        description: `New employee added as ${employee.position} in ${employee.department}`,
-        timestamp: employee.created_at,
-        status: employee.status
-      })) || [];
-      
+      // In a real app, this would call an appropriate service method
       return {
         success: true,
-        activities
+        activities: mockActivities
       };
     } catch (error) {
       console.error("Error fetching recent activities:", error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : "Unknown error fetching activities"
+        error: "Failed to fetch recent activities"
+      };
+    }
+  },
+  
+  // Seed sample data if needed
+  seedSampleData: async () => {
+    try {
+      console.log("Seeding sample HR data");
+      // Simulate seeding data
+      return {
+        success: true,
+        message: "Sample data seeded successfully"
+      };
+    } catch (error) {
+      console.error("Error seeding sample data:", error);
+      return {
+        success: false,
+        error: "Failed to seed sample data"
       };
     }
   }

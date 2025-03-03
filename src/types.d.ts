@@ -1,3 +1,4 @@
+
 // Type declarations for missing modules and components
 
 // Declare React module with correct exports
@@ -93,7 +94,7 @@ declare module '@/components/ui/sheet' {
   
   export const Sheet: React.FC<SheetProps>;
   export const SheetTrigger: React.FC<React.HTMLAttributes<HTMLButtonElement> & { asChild?: boolean }>;
-  export const SheetContent: React.FC<React.HTMLAttributes<HTMLDivElement> & { side?: SheetProps['side'] }>;
+  export const SheetContent: React.FC<React.HTMLAttributes<HTMLDivElement> & { side?: "top" | "right" | "bottom" | "left" }>;
   export const SheetHeader: React.FC<React.HTMLAttributes<HTMLDivElement>>;
   export const SheetTitle: React.FC<React.HTMLAttributes<HTMLHeadingElement>>;
   export const SheetDescription: React.FC<React.HTMLAttributes<HTMLParagraphElement>>;

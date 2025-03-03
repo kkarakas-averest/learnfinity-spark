@@ -1,8 +1,8 @@
 
+import React from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { UserRole } from "@/lib/database.types";
-import { useEffect } from "react";
 import { toast } from "@/components/ui/use-toast";
 
 interface ProtectedRouteProps {
@@ -13,7 +13,7 @@ interface ProtectedRouteProps {
 const ProtectedRoute = ({ children, allowedRoles }: ProtectedRouteProps) => {
   const { user, userDetails, isLoading } = useAuth();
   
-  useEffect(() => {
+  React.useEffect(() => {
     // For demonstration purposes - showing a toast to guide users
     if (!user && window.location.pathname.includes('admin')) {
       toast({

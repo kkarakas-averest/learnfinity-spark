@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+
+import React from "react";
 import { Link } from "react-router-dom";
 import { 
   Menu, 
@@ -27,13 +28,13 @@ import { UserRole } from "@/lib/database.types";
 import { isSupabaseConfigured } from "@/lib/supabase";
 
 const Navbar = () => {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = React.useState(false);
   const { user, userDetails, signOut } = useAuth();
-  const [isClient, setIsClient] = useState(false);
-  const [authVerified, setAuthVerified] = useState(false);
+  const [isClient, setIsClient] = React.useState(false);
+  const [authVerified, setAuthVerified] = React.useState(false);
   
   // Use useEffect to ensure we're running in the client environment
-  useEffect(() => {
+  React.useEffect(() => {
     setIsClient(true);
     
     // Enhanced logging for debugging auth state
