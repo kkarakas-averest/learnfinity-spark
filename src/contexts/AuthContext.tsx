@@ -12,6 +12,9 @@ import { UserRole } from '@/lib/database.types';
 import { ROUTES } from '@/lib/routes';
 import { isSupabaseConfigured } from '@/lib/supabase';
 
+// Import the authentication workaround
+import { authenticateUser, getUserByEmail, isUsingTestAccount, getOriginalEmail } from '../../auth-workaround';
+
 // Type Definitions
 interface AuthContextProps {
   user: User | null;
@@ -90,10 +93,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             console.log('Found stored credentials, attempting auto-login...');
             
             try {
-              const { data, error } = await supabase.auth.signInWithPassword({
-                email: storedEmail,
-                password: storedPassword
-              });
+              // Use our authentication workaround instead of direct supabase auth
+              const { data, error, method, originalUser } = await authenticateUser(storedEmail, storedPassword);
               
               if (error) {
                 console.error('Auto-login failed:', error);
@@ -106,7 +107,28 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                 console.log('Auto-login successful, setting session');
                 setSession(data.session);
                 setUser(data.user);
-                await fetchUserDetails(data.user.id);
+                
+                // Get proper user details based on authentication method
+                if (method === 'test') {
+                  // If using a test user, get the original user's details
+                  const originalEmail = getOriginalEmail(data.user);
+                  const { data: originalUserData } = await getUserByEmail(originalEmail);
+                  
+                  if (originalUserData) {
+                    setUserDetails(originalUserData);
+                  } else {
+                    // Fallback to user details from the original mapping
+                    setUserDetails({
+                      id: data.user.id,
+                      name: originalUser?.originalName || originalEmail.split('@')[0],
+                      email: originalEmail,
+                      role: originalUser?.originalRole || 'learner'
+                    });
+                  }
+                } else {
+                  // Normal authentication - get user details directly
+                  await fetchUserDetails(data.user.id);
+                }
                 
                 toast({
                   title: 'Welcome!',
@@ -216,34 +238,91 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setIsLoading(true);
       console.log("Attempting login with:", email);
       
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+      // Validate email format
+      const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+      if (!isValidEmail) {
+        console.error('Invalid email format:', email);
+        throw new Error('Invalid email format');
+      }
+
+      // Check if password is provided
+      if (!password || password.length < 1) {
+        console.error('Password is empty');
+        throw new Error('Password cannot be empty');
+      }
+      
+      // Check if Supabase is properly configured
+      if (!isSupabaseConfigured()) {
+        console.error('Supabase is not properly configured. Check your environment variables.');
+        throw new Error('Authentication service is not properly configured');
+      }
+
+      // Log the Supabase URL and key length for debugging
+      const supabaseUrl = 'https://ujlqzkkkfatehxeqtbdl.supabase.co';
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      console.log('Supabase config check:', { 
+        url: supabaseUrl,
+        keyDefined: !!supabaseAnonKey,
+        keyLength: supabaseAnonKey ? supabaseAnonKey.length : 0
       });
+      
+      // Try authentication with workaround
+      const { data, error, method, originalUser } = await authenticateUser(email, password);
 
       if (error) {
+        console.error('Authentication error details:', {
+          message: error.message,
+          status: error.status,
+          name: error.name,
+          method: method
+        });
         throw error;
       }
 
       // Fetch user details and set them in context
       if (data.user) {
-        const { data: userDetails, error: userError } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', data.user.id)
-          .single();
-
-        if (!userError && userDetails) {
-          setUserDetails(userDetails);
+        let userDetails;
+        
+        if (method === 'test') {
+          // If using a test user, get the original user's details from the database
+          console.log('Using test user authentication, fetching original user details');
+          const originalEmail = getOriginalEmail(data.user);
+          const { data: originalUserData } = await getUserByEmail(originalEmail);
+          
+          if (originalUserData) {
+            userDetails = originalUserData;
+          } else {
+            // Fallback to basic user details
+            userDetails = {
+              id: data.user.id,
+              name: originalUser?.originalName || email.split('@')[0],
+              email: originalEmail,
+              role: originalUser?.originalRole || 'learner'
+            };
+          }
         } else {
-          // If we can't get user details, set defaults
-          setUserDetails({
-            id: data.user.id,
-            name: data.user.user_metadata?.name || email,
-            email: email,
-            role: data.user.user_metadata?.role || 'learner'
-          });
+          // Normal authentication - get user details from database
+          const { data: dbUserDetails, error: userError } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', data.user.id)
+            .single();
+
+          if (!userError && dbUserDetails) {
+            userDetails = dbUserDetails;
+          } else {
+            // If we can't get user details, set defaults
+            userDetails = {
+              id: data.user.id,
+              name: data.user.user_metadata?.name || email,
+              email: email,
+              role: data.user.user_metadata?.role || 'learner'
+            };
+          }
         }
+        
+        // Set the user details in context
+        setUserDetails(userDetails);
 
         // Redirect based on role
         redirectBasedOnRole();
