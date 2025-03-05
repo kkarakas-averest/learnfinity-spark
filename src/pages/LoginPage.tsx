@@ -69,14 +69,18 @@ export default function LoginPage() {
       });
       
       navigate("/dashboard");
-    } catch (error: any) {
+    } catch (error: Error | unknown) {
       console.error("Login error:", error);
-      setError(error.message || "Failed to sign in. Please check your credentials.");
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : "Failed to sign in. Please check your credentials.";
+      
+      setError(errorMessage);
       
       toast({
         variant: "destructive",
         title: "Login failed",
-        description: error.message || "Failed to sign in. Please check your credentials.",
+        description: errorMessage,
       });
     } finally {
       setLoading(false);
@@ -97,14 +101,18 @@ export default function LoginPage() {
       });
       
       navigate("/admin");
-    } catch (error: any) {
+    } catch (error: Error | unknown) {
       console.error("Admin login error:", error);
-      setError(error.message || "Failed to sign in. Please check your credentials.");
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : "Failed to sign in. Please check your credentials.";
+      
+      setError(errorMessage);
       
       toast({
         variant: "destructive",
         title: "Admin login failed",
-        description: error.message || "Failed to sign in. Please check your credentials.",
+        description: errorMessage,
       });
     } finally {
       setLoading(false);

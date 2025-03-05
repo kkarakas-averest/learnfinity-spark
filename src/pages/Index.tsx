@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import Navbar from "@/components/Navbar";
 import Hero from "@/components/Hero";
+import { type ClassValue } from "clsx";
 
 const Index = () => {
   React.useEffect(() => {
@@ -17,7 +18,7 @@ const Index = () => {
   console.log("[Index] Component rendering started");
 
   // Safe wrapper for using cn function
-  const safeClassNames = (...args: any[]) => {
+  const safeClassNames = (...args: ClassValue[]) => {
     try {
       console.log("[Index] Calling cn with args:", JSON.stringify(args));
       return cn(...args);

@@ -97,12 +97,13 @@ export const testSupabaseConnection = async () => {
 
 // Make the test function available globally in development
 if (import.meta.env.DEV) {
-  (window as any).testSupabaseConnection = testSupabaseConnection;
+  (window as Window & typeof globalThis & { testSupabaseConnection: typeof testSupabaseConnection }) 
+    .testSupabaseConnection = testSupabaseConnection;
   console.log('🔧 Global function window.testSupabaseConnection() is now available for testing');
   
   // Remove the old test function if it exists to avoid confusion
-  if ((window as any).runSupabaseTest) {
-    delete (window as any).runSupabaseTest;
+  if ((window as Window & typeof globalThis & { runSupabaseTest?: Function }).runSupabaseTest) {
+    delete (window as Window & typeof globalThis & { runSupabaseTest?: Function }).runSupabaseTest;
   }
 }
 

@@ -52,13 +52,16 @@ export default function HRDashboard() {
         }
         
         console.log('HR database initialized');
-      } catch (error: any) {
-        console.error('Error initializing database:', error);
-        setInitError(error.message || 'Failed to initialize the HR database. Check console for details.');
+      } catch (error: Error | unknown) {
+        console.error('Unexpected error initializing HR database:', error);
+        const errorMessage = error instanceof Error 
+          ? error.message 
+          : 'Unexpected error initializing database';
+        
         toast({
-          title: 'Database Error',
-          description: 'There was an error initializing the HR database. Some features may not work correctly.',
           variant: 'destructive',
+          title: 'Database Initialization Failed',
+          description: errorMessage,
         });
       } finally {
         setInitializing(false);

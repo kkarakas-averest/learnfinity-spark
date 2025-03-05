@@ -1,4 +1,3 @@
-
 import React from "@/lib/react-helpers";
 import { toast } from "@/components/ui/use-toast";
 import { hrEmployeeService } from '@/services/hrEmployeeService';
@@ -22,7 +21,7 @@ const EmployeeManagement = () => {
           variant: "destructive",
         });
       }
-    } catch (error: any) {
+    } catch (error: Error | unknown) {
       console.error("Error fetching employees:", error);
       toast({
         title: "Error",

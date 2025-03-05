@@ -57,18 +57,22 @@ export default function RegisterPage() {
       await signUp(email, password, name);
       
       toast({
-        title: "Registration successful!",
+        title: "Registration Successful",
         description: "Your account has been created successfully.",
       });
       
-      navigate("/onboarding");
-    } catch (error: any) {
+      navigate("/dashboard");
+    } catch (error: Error | unknown) {
       console.error("Registration error:", error);
+      
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : "Failed to register. Please check your information and try again.";
       
       toast({
         variant: "destructive",
-        title: "Registration failed",
-        description: error.message || "Failed to register. Please try again.",
+        title: "Registration Failed",
+        description: errorMessage,
       });
     }
   };

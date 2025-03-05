@@ -46,7 +46,7 @@ export function useAsync<T, E = Error>(
 /**
  * Hook to manage form state with validation
  */
-export function useForm<T extends Record<string, any>>(
+export function useForm<T extends Record<string, unknown>>(
   initialValues: T,
   validate?: (values: T) => Partial<Record<keyof T, string>>
 ) {
@@ -164,12 +164,13 @@ export function useSimplePagination<T>(items: T[], itemsPerPage: number = 10) {
 
 /**
  * Hook for managing a modal dialog
+ * @template T - Type of the modal data
  */
-export function useModal() {
+export function useModal<T = unknown>() {
   const [isOpen, setIsOpen] = useState(false);
-  const [modalData, setModalData] = useState<any>(null);
+  const [modalData, setModalData] = useState<T | null>(null);
   
-  const open = useCallback((data?: any) => {
+  const open = useCallback((data?: T) => {
     setIsOpen(true);
     if (data) setModalData(data);
   }, []);

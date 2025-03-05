@@ -1,8 +1,9 @@
-
 import React from "@/lib/react-helpers";
 import { useState, useEffect } from '@/lib/react-helpers';
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
+import { Course } from "@/types/hr.types";
+import { Row } from "@tanstack/react-table";
 
 // Create minimal column definitions for course management
 const columns = [
@@ -25,7 +26,7 @@ const columns = [
   {
     id: "actions",
     header: "Actions",
-    cell: ({ row }: { row: any }) => {
+    cell: ({ row }: { row: Row<Course> }) => {
       return (
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm">

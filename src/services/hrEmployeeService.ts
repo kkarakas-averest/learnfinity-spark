@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import { SupabaseResponse } from '@/types/service-responses';
+import { SupabaseResponse, SupabaseUser } from '@/types/service-responses';
 
 // Define Employee interface directly in this file instead of importing it
 export interface Employee {
@@ -448,9 +448,9 @@ export const hrEmployeeService = {
    * Update employee password
    * @param {string} email - Employee email
    * @param {string} newPassword - New password
-   * @returns {Promise<SupabaseResponse<{ user: any }>>}
+   * @returns {Promise<SupabaseResponse<{ user: SupabaseUser }>>}
    */
-  async updateEmployeePassword(email: string, newPassword: string): Promise<SupabaseResponse<{ user: any }>> {
+  async updateEmployeePassword(email: string, newPassword: string): Promise<SupabaseResponse<{ user: SupabaseUser }>> {
     try {
       // For now, use the supabase client directly to update the auth user
       const { data, error } = await supabase.auth.updateUser({

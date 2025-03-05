@@ -1,3 +1,5 @@
+import { UserRole } from '@/lib/database.types';
+
 /**
  * HR Module Types
  * 
@@ -9,7 +11,7 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  role: string;
+  role: UserRole;
 }
 
 // HR Dashboard types
@@ -114,5 +116,5 @@ export interface Activity {
   rating?: number;
   issue?: string;
   time: string;
-  icon: any; // Using any for icon component type
+  icon: React.ComponentType<{ className?: string }>;
 } 

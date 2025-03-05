@@ -26,6 +26,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { UserRole } from "@/lib/database.types";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { ROUTES } from "@/lib/routes";
+import { User as UserType } from '@/types/hr.types';
 
 // Navigation items configuration
 const NAV_ITEMS = {
@@ -58,7 +59,7 @@ const UserAvatar = ({ name, email, role }: { name?: string; email?: string; role
 };
 
 // User menu component
-const UserMenu = ({ userDetails, signOut }: { userDetails: any; signOut: () => Promise<void> }) => {
+const UserMenu = ({ userDetails, signOut }: { userDetails: UserType; signOut: () => Promise<void> }) => {
   if (!userDetails) return null;
   
   return (
@@ -100,18 +101,40 @@ const UserMenu = ({ userDetails, signOut }: { userDetails: any; signOut: () => P
   );
 };
 
-// Navigation menu item component
+// NavMenuItem component
 const NavMenuItem = ({ to, icon, label }: { to: string; icon: React.ReactNode; label: string }) => (
   <DropdownMenuItem asChild>
-    <Link to={to} className="flex items-center cursor-pointer">
+    <Link
+      to={to}
+      className="flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
+    >
       {icon}
-      <span>{label}</span>
+      <span className="ml-2">{label}</span>
     </Link>
   </DropdownMenuItem>
 );
 
+// Define the navigation item type
+interface NavItem {
+  name: string;
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+}
+
 // Mobile navigation menu
-const MobileMenu = ({ isOpen, navItems, onClose, userDetails, signOut }) => {
+const MobileMenu = ({ 
+  isOpen, 
+  navItems, 
+  onClose, 
+  userDetails, 
+  signOut 
+}: { 
+  isOpen: boolean; 
+  navItems: NavItem[]; 
+  onClose: () => void;
+  userDetails: UserType | null;
+  signOut: () => Promise<void>;
+}) => {
   if (!isOpen) return null;
   
   return (

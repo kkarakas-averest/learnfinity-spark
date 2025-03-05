@@ -1,16 +1,44 @@
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/components/ui/use-toast';
 import { LearningPath } from '@/types/hr.types';
+import { SupabaseError, SupabaseResponse } from '@/types/service-responses';
+
+type ErrorType = Error | SupabaseError | unknown;
 
 // Error handling helper
-const handleError = (error: any, customMessage: string = 'An error occurred') => {
+const handleError = (error: ErrorType, customMessage: string = 'An error occurred') => {
   console.error(`${customMessage}:`, error);
-  toast({
-    title: 'Error',
-    description: customMessage,
-    variant: 'destructive',
-  });
-  return null;
+  
+  // Check if this is a Supabase error
+  if (error && typeof error === 'object' && 'code' in error && 'message' in error) {
+    return {
+      success: false,
+      error: {
+        code: (error as SupabaseError).code,
+        message: customMessage + ': ' + (error as SupabaseError).message
+      }
+    };
+  }
+  
+  // Handle standard errors
+  if (error instanceof Error) {
+    return {
+      success: false,
+      error: {
+        code: 'UNKNOWN_ERROR',
+        message: customMessage + ': ' + error.message
+      }
+    };
+  }
+  
+  // Default case for unknown error types
+  return {
+    success: false,
+    error: {
+      code: 'UNKNOWN_ERROR',
+      message: customMessage
+    }
+  };
 };
 
 // HR Learning Path service with specialized functions for learning path operations
@@ -205,7 +233,13 @@ const hrLearningPathService = {
   async updateLearningPath(id: string, pathData: Partial<LearningPath>, courseIds?: string[]) {
     try {
       // Update the learning path
-      const updateData: any = {
+      interface LearningPathUpdate {
+        title?: string;
+        description?: string;
+        skill_level?: string;
+      }
+      
+      const updateData: LearningPathUpdate = {
         title: pathData.title,
         description: pathData.description,
         skill_level: pathData.skillLevel,
@@ -213,7 +247,7 @@ const hrLearningPathService = {
       
       // Remove undefined values
       Object.keys(updateData).forEach(key => 
-        updateData[key] === undefined && delete updateData[key]
+        updateData[key as keyof LearningPathUpdate] === undefined && delete updateData[key as keyof LearningPathUpdate]
       );
       
       const { data, error } = await supabase
@@ -338,7 +372,13 @@ const hrLearningPathService = {
    */
   async updateEnrollmentStatus(enrollmentId: string, status: string, progress: number) {
     try {
-      const updateData: any = {
+      interface EnrollmentStatusUpdate {
+        status: string;
+        progress: number;
+        completion_date?: string;
+      }
+      
+      const updateData: EnrollmentStatusUpdate = {
         status,
         progress,
       };

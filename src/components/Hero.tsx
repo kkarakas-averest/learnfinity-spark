@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils";
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
+import { type ClassValue } from "clsx";
 
 const Hero = () => {
   React.useEffect(() => {
@@ -15,7 +16,7 @@ const Hero = () => {
   console.log("[Hero] Component rendering");
 
   // Safe wrapper for using cn function
-  const safeClassNames = (...args: any[]) => {
+  const safeClassNames = (...args: ClassValue[]) => {
     try {
       console.log("[Hero] Calling cn with args:", JSON.stringify(args));
       return cn(...args);

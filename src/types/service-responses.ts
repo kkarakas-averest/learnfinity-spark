@@ -46,10 +46,42 @@ export interface HttpStatus {
   statusText: string;
 }
 
-// Type guard to check if an object is a SupabaseError
-export function isSupabaseError(error: any): error is SupabaseError {
-  return error && typeof error === 'object' && 'message' in error && 
-    (error.code !== undefined || error.status !== undefined);
+/**
+ * Type guard to check if an error is a SupabaseError
+ * @param error The error to check
+ * @returns A boolean indicating if the error is a SupabaseError
+ */
+export function isSupabaseError(error: unknown): error is SupabaseError {
+  return (
+    error !== null &&
+    typeof error === 'object' &&
+    'code' in error &&
+    'message' in error &&
+    'details' in error
+  );
+}
+
+// Supabase User interface for auth services
+export interface SupabaseUser {
+  id: string;
+  email?: string;
+  app_metadata: {
+    provider?: string;
+    providers?: string[];
+    [key: string]: unknown;
+  };
+  user_metadata: {
+    name?: string;
+    role?: string;
+    avatar_url?: string;
+    [key: string]: unknown;
+  };
+  aud: string;
+  created_at: string;
+  confirmed_at?: string;
+  last_sign_in_at?: string;
+  role?: string;
+  updated_at?: string;
 }
 
 // Specific domain types can be expanded below 

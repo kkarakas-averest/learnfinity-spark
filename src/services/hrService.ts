@@ -1,15 +1,50 @@
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/components/ui/use-toast';
+import { SupabaseError, SupabaseResponse } from '@/types/service-responses';
+
+type ErrorType = Error | SupabaseError | unknown;
 
 // Error handling helper
-const handleError = (error: any, customMessage: string = 'An error occurred') => {
+const handleError = (error: ErrorType, customMessage: string = 'An error occurred') => {
   console.error(`${customMessage}:`, error);
+  
+  // Show toast message for UI feedback
   toast({
     title: 'Error',
     description: customMessage,
     variant: 'destructive',
   });
-  return null;
+  
+  // Check if this is a Supabase error
+  if (error && typeof error === 'object' && 'code' in error && 'message' in error) {
+    return {
+      success: false,
+      error: {
+        code: (error as SupabaseError).code,
+        message: customMessage + ': ' + (error as SupabaseError).message
+      }
+    };
+  }
+  
+  // Handle standard errors
+  if (error instanceof Error) {
+    return {
+      success: false,
+      error: {
+        code: 'UNKNOWN_ERROR',
+        message: customMessage + ': ' + error.message
+      }
+    };
+  }
+  
+  // Default case for unknown error types
+  return {
+    success: false,
+    error: {
+      code: 'UNKNOWN_ERROR',
+      message: customMessage
+    }
+  };
 };
 
 // Base HR service with core functionality

@@ -1,4 +1,3 @@
-
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useToast } from './use-toast';
@@ -91,12 +90,21 @@ export const useCoursesData = (companyId?: string) => {
         description: 'Your course has been successfully created.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: Error | unknown) => {
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : 'Failed to create course';
       toast({
-        title: 'Failed to Create Course',
-        description: error.message || 'An error occurred while creating the course.',
+        title: 'Error',
+        description: errorMessage,
         variant: 'destructive',
       });
+    },
+    onMutate: async (newCourse) => {
+      await queryClient.cancelQueries({ queryKey: ['courses'] });
+      const previousCourses = queryClient.getQueryData(['courses']);
+      queryClient.setQueryData(['courses'], (old: Course[] = []) => [...old, newCourse]);
+      return { previousCourses };
     },
   });
 

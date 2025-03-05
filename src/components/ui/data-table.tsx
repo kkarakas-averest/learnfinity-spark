@@ -1,4 +1,3 @@
-
 import React from "@/lib/react-helpers";
 import {
   Table,
@@ -9,8 +8,21 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
+// Define a type for the column with more flexible accessorKey requirement
+export interface DataTableColumn<TData> {
+  id?: string;
+  accessorKey?: string;
+  header?: string;
+  cell?: (props: { row: TData }) => React.ReactNode;
+}
+
+// Ensure at least one of id or accessorKey is present
+export type ValidDataTableColumn<TData> = 
+  | (DataTableColumn<TData> & { id: string })
+  | (DataTableColumn<TData> & { accessorKey: string });
+
 interface DataTableProps<TData> {
-  columns: any[];
+  columns: ValidDataTableColumn<TData>[];
   data: TData[];
 }
 
@@ -25,7 +37,7 @@ export function DataTable<TData>({
           <TableRow>
             {columns.map((column) => (
               <TableHead key={column.id || column.accessorKey || Math.random().toString()}>
-                {column.header || column.accessorKey}
+                {column.header || column.accessorKey || column.id}
               </TableHead>
             ))}
           </TableRow>
@@ -37,7 +49,9 @@ export function DataTable<TData>({
                 <TableCell key={colIndex}>
                   {column.cell 
                     ? column.cell({ row })
-                    : (row as any)[column.accessorKey]}
+                    : column.accessorKey 
+                      ? (row as Record<string, unknown>)[column.accessorKey]
+                      : null}
                 </TableCell>
               ))}
             </TableRow>

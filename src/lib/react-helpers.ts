@@ -1,6 +1,6 @@
 /**
  * This file provides consistent React imports for the entire application.
- * It helps ensure the same import style is used throughout the codebase.
+ * It centralizes React imports and re-exports them to prevent inconsistency issues.
  */
 
 import React from 'react';
@@ -42,16 +42,19 @@ export const {
   isValidElement
 } = React;
 
+// Add custom types/extensions here if needed
+export type WithChildren<T = unknown> = T & { children?: React.ReactNode };
+
 // Define React types directly to avoid import issues
-export type ElementRef<T = any> = React.RefObject<T>;
-export type ComponentPropsWithoutRef<T = any> = Omit<React.ComponentProps<T>, 'ref'>;
-export type HTMLAttributes<T = any> = React.HTMLAttributes<T>;
+export type ElementRef<T extends React.ElementType = HTMLElement> = React.RefObject<React.ElementRef<T>>;
+export type ComponentPropsWithoutRef<T extends React.ElementType> = Omit<React.ComponentProps<T>, 'ref'>;
+export type HTMLAttributes<T extends HTMLElement = HTMLElement> = React.HTMLAttributes<T>;
 export type ReactNode = React.ReactNode;
-export type ReactElement<T = any> = React.ReactElement<T>;
+export type ReactElement<P = object, T extends React.ElementType = React.ElementType> = React.ReactElement<P, T>;
 export type FC<T = Record<string, unknown>> = React.FC<T>;
-export type ChangeEvent<T = Element> = React.ChangeEvent<T>;
-export type FormEvent<T = Element> = React.FormEvent<T>;
-export type MouseEvent<T = Element> = React.MouseEvent<T>;
-export type KeyboardEvent<T = Element> = React.KeyboardEvent<T>;
+export type ChangeEvent<T extends Element = Element> = React.ChangeEvent<T>;
+export type FormEvent<T extends Element = Element> = React.FormEvent<T>;
+export type MouseEvent<T extends Element = Element> = React.MouseEvent<T>;
+export type KeyboardEvent<T extends Element = Element> = React.KeyboardEvent<T>;
 
 export default React;

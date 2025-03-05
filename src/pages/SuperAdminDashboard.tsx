@@ -50,13 +50,14 @@ const SuperAdminDashboard = () => {
 
         const data = await response.json();
         setUsers(data);
-      } catch (e: any) {
+      } catch (e: Error | unknown) {
+        const errorMessage = e instanceof Error ? e.message : "Failed to fetch users";
         console.error("Failed to fetch users:", e);
-        setError(e.message || "Failed to fetch users");
+        setError(errorMessage);
         toast({
           variant: "destructive",
           title: "Failed to fetch users",
-          description: e.message || "Failed to fetch users",
+          description: errorMessage,
         });
       } finally {
         setLoading(false);
@@ -72,12 +73,13 @@ const SuperAdminDashboard = () => {
     try {
       await signOut();
       navigate('/login');
-    } catch (error: any) {
+    } catch (error: Error | unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to sign out";
       console.error("Sign out error:", error);
       toast({
         variant: "destructive",
         title: "Sign out failed",
-        description: error.message || "Failed to sign out",
+        description: errorMessage,
       });
     }
   };

@@ -45,8 +45,9 @@ export const useAgentSystem = () => {
 
         setAgents(mockAgents);
         setLoading(false);
-      } catch (err: any) {
-        setError(err.message || "Failed to fetch agents");
+      } catch (err: Error | unknown) {
+        const errorMessage = err instanceof Error ? err.message : "Failed to fetch agents";
+        setError(errorMessage);
         setLoading(false);
       }
     };

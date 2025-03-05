@@ -346,16 +346,19 @@ export const useLearningData = () => {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['learnerCourses'] });
+      queryClient.invalidateQueries({ queryKey: ['userProgress'] });
       toast({
         title: 'Progress Updated',
         description: 'Your learning progress has been updated.',
       });
     },
-    onError: (error: any) => {
+    onError: (error: Error | unknown) => {
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : 'Failed to update learning progress';
       toast({
-        title: 'Failed to Update Progress',
-        description: error.message || 'An error occurred while updating your progress.',
+        title: 'Error',
+        description: errorMessage,
         variant: 'destructive',
       });
     },
