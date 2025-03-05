@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "@/lib/react-helpers";
 import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
 import { hrEmployeeService } from "@/services/hrEmployeeService";
@@ -13,7 +13,7 @@ type UpdateEmployeeReturnType = {
 };
 
 const EditEmployeePage = () => {
-  const { id } = useParams<{ id: string }>();
+  const { id } = useParams();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [employee, setEmployee] = useState<any>(null);
