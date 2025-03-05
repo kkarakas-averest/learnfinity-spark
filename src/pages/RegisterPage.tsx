@@ -1,3 +1,4 @@
+
 import * as React from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -41,7 +42,7 @@ export default function RegisterPage() {
   const { signUp } = useAuth();
   const navigate = useNavigate();
   
-  const form = useForm<RegisterFormValues>({
+  const form = useForm({
     resolver: zodResolver(registerSchema),
     defaultValues: {
       name: "",

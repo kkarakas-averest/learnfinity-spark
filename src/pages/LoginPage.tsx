@@ -39,7 +39,7 @@ export default function LoginPage() {
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   
-  const form = useForm<LoginFormValues>({
+  const form = useForm({
     resolver: zodResolver(loginSchema),
     defaultValues: {
       email: "",
@@ -47,7 +47,7 @@ export default function LoginPage() {
     },
   });
 
-  const adminForm = useForm<LoginFormValues>({
+  const adminForm = useForm({
     resolver: zodResolver(loginSchema),
     defaultValues: {
       email: "admin@example.com",

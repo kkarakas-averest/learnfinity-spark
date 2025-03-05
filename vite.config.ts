@@ -34,7 +34,8 @@ export default defineConfig(({ mode }) => ({
       tsconfigRaw: `{
         "compilerOptions": {
           "allowSyntheticDefaultImports": true,
-          "esModuleInterop": true
+          "esModuleInterop": true,
+          "jsx": "react-jsx"
         }
       }`
     }

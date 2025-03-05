@@ -33,7 +33,7 @@ export default function HRLogin() {
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   
-  const form = useForm<HRLoginFormValues>({
+  const form = useForm({
     resolver: zodResolver(formSchema),
     defaultValues: {
       username: "",
