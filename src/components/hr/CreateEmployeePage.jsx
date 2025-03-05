@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import EmployeeProfileForm from './EmployeeProfileForm';
-import hrEmployeeService from '@/services/hrEmployeeService';
+import { hrEmployeeService } from '@/services/hrEmployeeService';
 import { hrDepartmentService } from '@/services/hrDepartmentService';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { PageHeader } from '@/components/PageHeader';
