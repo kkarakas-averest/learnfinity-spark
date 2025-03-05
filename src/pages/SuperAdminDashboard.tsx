@@ -1,16 +1,25 @@
 import React from "@/lib/react-helpers";
-import { useEffect, useState } from 'react';
+import { useEffect, useState } from '@/lib/react-helpers';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from "@/components/ui/use-toast";
-import { DataTable } from "@/components/ui/table"
-import { columns } from "@/components/superadmin/columns"
-import { User } from "@/lib/database.types";
+import { DataTable } from "@/components/ui/data-table";
+import { columns } from "@/components/superadmin/columns";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2 } from "lucide-react";
 
+// Define the User type here since we're having issues importing it
+interface User {
+  id: string;
+  email: string;
+  name?: string;
+  role?: string;
+  created_at?: string;
+}
+
 const SuperAdminDashboard = () => {
   const { user, signOut, session, isLoading } = useAuth();
+  
   const navigate = useNavigate();
   const [users, setUsers] = useState<User[]>([]);
   const [error, setError] = useState<string | null>(null);
