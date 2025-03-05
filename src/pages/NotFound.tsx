@@ -1,16 +1,18 @@
 
 import * as React from "react";
-import { useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
-const NotFound = () => {
-  const location = useLocation();
-
+export default function NotFound() {
+  const navigate = useNavigate();
+  
   React.useEffect(() => {
-    console.error(
-      "404 Error: User attempted to access non-existent route:",
-      location.pathname
-    );
-  }, [location.pathname]);
+    // Optional: Auto-redirect after a delay
+    const timer = setTimeout(() => {
+      // navigate('/');
+    }, 5000);
+    
+    return () => clearTimeout(timer);
+  }, [navigate]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
@@ -23,6 +25,4 @@ const NotFound = () => {
       </div>
     </div>
   );
-};
-
-export default NotFound;
+}

@@ -1,9 +1,8 @@
-
 import * as React from "react";
 import { useNavigate } from "react-router-dom";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import * as z from "zod";
+import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -14,145 +13,129 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Loader2, AlertCircle } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useHRAuth } from "@/contexts/HRAuthContext";
+import { toast } from "@/components/ui/use-toast";
+import { Loader2 } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
-// Login form schema validation
-const loginSchema = z.object({
-  username: z.string().min(1, "Username is required."),
-  password: z.string().min(1, "Password is required."),
-});
+type HRLoginFormValues = {
+  username: string;
+  password: string;
+};
 
-// Type for form values based on schema
-type LoginFormValues = z.infer<typeof loginSchema>;
-
-const HRLogin = () => {
-  const [loginError, setLoginError] = React.useState<string | null>(null);
+export default function HRLogin() {
+  const { login } = useHRAuth();
   const navigate = useNavigate();
-  const { login, isAuthenticated, isLoading: authLoading } = useHRAuth();
-
-  // Redirect if already authenticated
-  React.useEffect(() => {
-    if (isAuthenticated) {
-      navigate('/hr');
-    }
-  }, [isAuthenticated, navigate]);
-
-  const loginForm = useForm<LoginFormValues>({
-    resolver: zodResolver(loginSchema),
+  
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  
+  const form = useForm<HRLoginFormValues>({
+    resolver: zodResolver(
+      z.object({
+        username: z.string().min(1, "Username is required"),
+        password: z.string().min(1, "Password is required"),
+      })
+    ),
     defaultValues: {
       username: "",
       password: "",
     },
   });
 
-  const onLoginSubmit = async (values: LoginFormValues) => {
+  const onSubmit = async (data: HRLoginFormValues) => {
+    setLoading(true);
+    setError(null);
+    
     try {
-      setLoginError(null);
+      const { username, password } = data;
+      await login(username, password);
       
-      // Attempt login with credentials
-      await login(values.username, values.password);
+      toast({
+        title: "HR Login successful!",
+        description: "You've successfully logged in as HR.",
+      });
       
-      // If successful, navigate to dashboard
-      navigate('/hr');
-    } catch (error) {
-      setLoginError("Invalid HR credentials. Please try again.");
+      navigate("/hr-dashboard");
+    } catch (error: any) {
+      console.error("HR Login error:", error);
+      setError(error.message || "Failed to sign in. Please check your credentials.");
+      
+      toast({
+        variant: "destructive",
+        title: "HR Login failed",
+        description: error.message || "Failed to sign in. Please check your credentials.",
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Early return if already authenticated to avoid form flashing
-  if (isAuthenticated) {
-    return null;
-  }
-
   return (
-    <div className="min-h-screen flex flex-col">
-      <div className="flex min-h-screen flex-1 flex-col justify-center px-6 py-12 lg:px-8">
-        <div className="sm:mx-auto sm:w-full sm:max-w-md">
-          <h2 className="mt-6 text-center text-2xl font-bold leading-9 tracking-tight">
-            HR Administrator Login
-          </h2>
-          <p className="mt-2 text-center text-sm text-muted-foreground">
-            Access the HR dashboard to manage learners and courses
+    <div className="container flex h-screen w-screen flex-col items-center justify-center">
+      <div className="mx-auto flex w-full flex-col justify-center space-y-6 sm:w-[350px]">
+        <div className="flex flex-col space-y-2 text-center">
+          <h1 className="text-2xl font-semibold tracking-tight">
+            HR Sign In
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Enter your username and password below to sign in as HR
           </p>
         </div>
 
-        <div className="mt-10 sm:mx-auto sm:w-full sm:max-w-md">
-          <div className="bg-white px-6 py-8 shadow sm:rounded-lg sm:px-8">
-            {loginError && (
-              <Alert variant="destructive" className="mb-6">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>
-                  {loginError}
-                </AlertDescription>
-              </Alert>
-            )}
-            
-            <Form {...loginForm}>
-              <form onSubmit={loginForm.handleSubmit(onLoginSubmit)} className="space-y-5">
-                <FormField
-                  control={loginForm.control}
-                  name="username"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Username</FormLabel>
-                      <FormControl>
-                        <Input placeholder="HR username" {...field} disabled={authLoading} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={loginForm.control}
-                  name="password"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Password</FormLabel>
-                      <FormControl>
-                        <Input placeholder="••••••••" type="password" {...field} disabled={authLoading} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+        {error && (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
 
-                <Button type="submit" className="w-full" disabled={authLoading}>
-                  {authLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Signing In...
-                    </>
-                  ) : (
-                    "HR Sign In"
-                  )}
-                </Button>
-              </form>
-            </Form>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="username"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Username</FormLabel>
+                  <FormControl>
+                    <Input placeholder="hradmin" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             
-            <div className="mt-6 text-center">
-              <p className="text-sm text-muted-foreground">
-                This is a restricted area for HR administrators only.
-              </p>
-              <p className="text-sm text-muted-foreground mt-2">
-                <strong>Use the credentials:</strong><br/>
-                Username: adminhr<br/>
-                Password: adminhr
-              </p>
-              <Button 
-                variant="link" 
-                className="text-sm text-primary"
-                onClick={() => navigate('/login')}
-              >
-                Return to main login
-              </Button>
-            </div>
-          </div>
-        </div>
+            <FormField
+              control={form.control}
+              name="password"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Password</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="••••••••"
+                      type="password"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Signing in...
+                </>
+              ) : (
+                "Sign In"
+              )}
+            </Button>
+          </form>
+        </Form>
       </div>
     </div>
   );
-};
-
-export default HRLogin;
+}
