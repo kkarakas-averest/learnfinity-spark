@@ -1,3 +1,4 @@
+
 import * as React from "react";
 import { toast } from "@/components/ui/use-toast";
 import { hrEmployeeService } from '@/services/hrEmployeeService';
@@ -11,17 +12,17 @@ const EmployeeManagement = () => {
     setIsLoading(true);
     try {
       const result = await hrEmployeeService.getEmployees();
-      if (result.success && result.employees) {
+      if (result && result.success && result.employees) {
         setEmployees(result.employees);
       } else {
-        console.error("Failed to fetch employees:", result.error);
+        console.error("Failed to fetch employees:", result?.error || "Unknown error");
         toast({
           title: "Error",
           description: "Failed to fetch employees. Please try again.",
           variant: "destructive",
         });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching employees:", error);
       toast({
         title: "Error",

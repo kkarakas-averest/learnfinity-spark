@@ -1,3 +1,4 @@
+
 import * as React from "react"
 import * as SheetPrimitive from "@radix-ui/react-dialog"
 import { X } from "lucide-react"
@@ -31,7 +32,6 @@ type SheetContentProps = React.ComponentPropsWithoutRef<typeof SheetPrimitive.Co
   side?: "top" | "bottom" | "left" | "right"
 }
 
-// Fix the SheetContent type issue by updating the side property type
 const SheetContent = React.forwardRef<
   React.ElementRef<typeof SheetPrimitive.Content>,
   SheetContentProps

@@ -1,8 +1,9 @@
-import * as React from "react";
+
+import React from "react";
 import { useNavigate } from "react-router-dom";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
+import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -18,10 +19,12 @@ import { toast } from "@/components/ui/use-toast";
 import { Loader2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
-type HRLoginFormValues = {
-  username: string;
-  password: string;
-};
+const formSchema = z.object({
+  username: z.string().min(1, "Username is required"),
+  password: z.string().min(1, "Password is required"),
+});
+
+type HRLoginFormValues = z.infer<typeof formSchema>;
 
 export default function HRLogin() {
   const { login } = useHRAuth();
@@ -31,12 +34,7 @@ export default function HRLogin() {
   const [error, setError] = React.useState<string | null>(null);
   
   const form = useForm<HRLoginFormValues>({
-    resolver: zodResolver(
-      z.object({
-        username: z.string().min(1, "Username is required"),
-        password: z.string().min(1, "Password is required"),
-      })
-    ),
+    resolver: zodResolver(formSchema),
     defaultValues: {
       username: "",
       password: "",

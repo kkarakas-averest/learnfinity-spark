@@ -30,11 +30,11 @@ export default defineConfig(({ mode }) => ({
   },
   optimizeDeps: {
     esbuildOptions: {
-      tsconfigRaw: {
-        compilerOptions: {
-          allowSyntheticDefaultImports: true
+      tsconfigRaw: `{
+        "compilerOptions": {
+          "allowSyntheticDefaultImports": true
         }
-      }
+      }`
     }
   }
 }));
