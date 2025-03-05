@@ -24,6 +24,9 @@ import {
 } from '@/components/ui/alert';
 import { AlertCircle, Info, Wrench } from 'lucide-react';
 
+// Define return type for updateEmployeeWithRetry
+type UpdateEmployeeReturnType = { success: boolean; data: any } | null;
+
 const EditEmployeePage = () => {
   // For debugging
   console.log('=== Rendering EditEmployeePage ===');
@@ -158,7 +161,7 @@ const EditEmployeePage = () => {
   };
   
   // Function to retry Supabase operations with exponential backoff
-  const updateEmployeeWithRetry = async (employeeId, employeeData, maxRetries = 3) => {
+  const updateEmployeeWithRetry = async (employeeId, employeeData, maxRetries = 3): Promise<UpdateEmployeeReturnType> => {
     let retryAttempt = 0;
     let lastError = null;
     
