@@ -1,3 +1,4 @@
+
 import React from "@/lib/react-helpers";
 import * as ContextMenuPrimitive from "@radix-ui/react-context-menu"
 import { Check, ChevronRight, Circle, DotsVertical } from "lucide-react"
@@ -132,7 +133,7 @@ const ContextMenuRadioItem = React.forwardRef<
       </ContextMenuPrimitive.ItemIndicator>
     </span>
     {children}
-  </ContextMenuRadioItem>
+  </ContextMenuPrimitive.RadioItem>
 ))
 ContextMenuRadioItem.displayName = ContextMenuPrimitive.RadioItem.displayName
 
