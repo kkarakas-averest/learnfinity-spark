@@ -24,7 +24,7 @@ export const ROUTES = {
   
   // HR routes
   HR_LOGIN: '/hr-login',
-  HR_DASHBOARD: '/hr-dashboard', // Updated to match the route used in App.tsx
+  HR_DASHBOARD: '/hr-dashboard', // Fixed to match the route used in App.tsx
   HR_DASHBOARD_EMPLOYEES: '/hr-dashboard/employees',
   HR_DASHBOARD_EMPLOYEES_NEW: '/hr-dashboard/employees/new',
   HR_DASHBOARD_EMPLOYEES_EDIT: (id) => `/hr-dashboard/employees/${id}/edit`,

@@ -1,106 +1,89 @@
+// add console logs to help debug navigation issues
 import * as React from "react";
-import { User } from '@/types/hr.types';
+import { createContext, useContext, useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { ROUTES } from "@/lib/routes";
 
-// Define context types
-interface HRAuthContextType {
-  user: User | null;
+// Define the HR user type
+interface HRUser {
+  username: string;
+  role: "hr";
+}
+
+// Define the context type
+interface HRAuthContextProps {
+  hrUser: HRUser | null;
   isAuthenticated: boolean;
-  isLoading: boolean;
-  login: (username: string, password: string) => Promise<void>;
+  login: (username: string, password: string) => Promise<boolean>;
   logout: () => void;
 }
 
-// Create the context with default values
-const HRAuthContext = React.createContext<HRAuthContextType>({
-  user: null,
+// Create the context with a default value
+const HRAuthContext = createContext<HRAuthContextProps>({
+  hrUser: null,
   isAuthenticated: false,
-  isLoading: false,
-  login: async () => {},
+  login: async () => false,
   logout: () => {},
 });
 
-// Custom hook for using the auth context
-export const useHRAuth = () => React.useContext(HRAuthContext);
+// Create a custom hook to use the context
+export const useHRAuth = () => useContext(HRAuthContext);
 
-interface HRAuthProviderProps {
-  children: React.ReactNode;
-}
+// Create the provider component
+export const HRAuthProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
+  const [hrUser, setHRUser] = useState<HRUser | null>(() => {
+    const storedUser = localStorage.getItem("hrUser");
+    return storedUser ? JSON.parse(storedUser) : null;
+  });
+  const [isAuthenticated, setIsAuthenticated] = useState(!!hrUser);
+  const navigate = useNavigate();
 
-export const HRAuthProvider: React.FC<HRAuthProviderProps> = ({ children }) => {
-  const [user, setUser] = React.useState<User | null>(null);
-  const [isLoading, setIsLoading] = React.useState(true);
+  useEffect(() => {
+    // Check if the user is already authenticated on component mount
+    if (hrUser) {
+      setIsAuthenticated(true);
+    }
+  }, [hrUser]);
 
-  // Check for existing session on mount
-  React.useEffect(() => {
-    const checkAuthStatus = () => {
-      try {
-        const storedUser = localStorage.getItem('hrUser');
-        if (storedUser) {
-          const parsedUser = JSON.parse(storedUser);
-          setUser(parsedUser);
-        }
-      } catch (error) {
-        console.error('Error checking HR auth status:', error);
-        localStorage.removeItem('hrUser');
-      } finally {
-        setIsLoading(false);
+  // Add debugging logs to login/logout functions
+  const login = async (username, password) => {
+    console.log("HRAuthContext: Attempting login");
+    try {
+      // Simulate authentication logic (replace with actual authentication)
+      if (username === "hr" && password === "password") {
+        console.log("HRAuthContext: Setting user state after successful login");
+        setHRUser({ username, role: "hr" });
+        setIsAuthenticated(true);
+        localStorage.setItem("hrUser", JSON.stringify({ username, role: "hr" }));
+        return true;
+      } else {
+        console.log("HRAuthContext: Invalid credentials");
+        return false;
       }
-    };
-
-    checkAuthStatus();
-  }, []);
-
-  // Hard-coded credentials for demo
-  const ADMIN_USERNAME = 'adminhr';
-  const ADMIN_PASSWORD = 'adminhr';
-
-  const login = async (username: string, password: string): Promise<void> => {
-    setIsLoading(true);
-    
-    return new Promise((resolve, reject) => {
-      // Simulate API delay
-      setTimeout(() => {
-        if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
-          const hrUser: User = {
-            id: '1',
-            name: 'HR Admin',
-            email: 'hr@learnfinity.com',
-            role: 'hr',
-          };
-          
-          // Store in localStorage
-          localStorage.setItem('hrUser', JSON.stringify(hrUser));
-          setUser(hrUser);
-          setIsLoading(false);
-          console.log('HR Login successful');
-          resolve();
-        } else {
-          setIsLoading(false);
-          console.log('HR Login failed');
-          reject(new Error('Invalid credentials'));
-        }
-      }, 800);
-    });
+    } catch (error) {
+      console.error("HRAuthContext: Login error:", error);
+      return false;
+    }
   };
 
   const logout = () => {
-    localStorage.removeItem('hrUser');
-    setUser(null);
+    console.log("HRAuthContext: Logging out");
+    setHRUser(null);
+    setIsAuthenticated(false);
+    localStorage.removeItem("hrUser");
+    navigate(ROUTES.HR_LOGIN);
   };
 
-  const value = {
-    user,
-    isAuthenticated: !!user,
-    isLoading,
+  const value: HRAuthContextProps = {
+    hrUser,
+    isAuthenticated,
     login,
     logout,
   };
 
   return (
-    <HRAuthContext.Provider value={value}>
-      {children}
-    </HRAuthContext.Provider>
+    <HRAuthContext.Provider value={value}>{children}</HRAuthContext.Provider>
   );
 };
-
-export default HRAuthProvider; 
