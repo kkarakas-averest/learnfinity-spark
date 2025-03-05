@@ -1,13 +1,16 @@
+
 import React from "react";
 import { Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useHRAuth } from '@/contexts/HRAuthContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from '@/components/ui/button';
-import { LogOut, Users, BookOpen, BarChart2 } from 'lucide-react';
+import { LogOut, Users, BookOpen, BarChart2, AlertCircle } from 'lucide-react';
 import { HRDashboardTab } from '@/types/hr.types';
 import { useToast } from '@/components/ui/use-toast';
 import { hrServices } from '@/services/hrServices';
 import { useAuth } from '../contexts/AuthContext';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Card } from '@/components/ui/card';
 
 // Import HR components
 const DashboardOverview = React.lazy(() => import('@/components/hr/DashboardOverview'));
@@ -21,6 +24,7 @@ export default function HRDashboard() {
   const location = useLocation();
   const [activeTab, setActiveTab] = React.useState<HRDashboardTab>('overview');
   const [initializing, setInitializing] = React.useState(true);
+  const [initError, setInitError] = React.useState<string | null>(null);
   
   // Parse the query parameters to get the tab
   React.useEffect(() => {
@@ -35,9 +39,19 @@ export default function HRDashboard() {
   React.useEffect(() => {
     const initializeDatabase = async () => {
       try {
-        await hrServices.initializeHRDatabase();
+        console.log('Initializing HR database...');
+        setInitError(null);
+        const result = await hrServices.initializeHRDatabase();
+        console.log('HR database initialization result:', result);
+        
+        if (!result.success) {
+          throw new Error(result.error || 'Unknown database initialization error');
+        }
+        
+        console.log('HR database initialized');
       } catch (error) {
         console.error('Error initializing database:', error);
+        setInitError(error.message || 'Failed to initialize the HR database. Check console for details.');
         toast({
           title: 'Database Error',
           description: 'There was an error initializing the HR database. Some features may not work correctly.',
@@ -62,12 +76,24 @@ export default function HRDashboard() {
 
   const handleTabChange = (value: string) => {
     setActiveTab(value as HRDashboardTab);
+    
+    // Update URL without reloading the page
+    const url = new URL(window.location.href);
+    url.searchParams.set('tab', value);
+    window.history.pushState({}, '', url.toString());
   };
 
   const handleLogout = () => {
     logout();
     signOut();
     navigate('/hr-login');
+  };
+
+  const handleRetryInit = () => {
+    setInitializing(true);
+    setInitError(null);
+    // Force re-render which will trigger useEffect again
+    window.location.reload();
   };
 
   if (isLoading || initializing) {
@@ -102,6 +128,21 @@ export default function HRDashboard() {
 
       {/* Main content with tabs */}
       <div className="container p-4">
+        {initError && (
+          <Alert variant="destructive" className="mb-6">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Database Error</AlertTitle>
+            <AlertDescription>
+              {initError}
+              <div className="mt-2">
+                <Button size="sm" onClick={handleRetryInit}>
+                  Retry Initialization
+                </Button>
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
+        
         <Tabs defaultValue="overview" value={activeTab} onValueChange={handleTabChange}>
           <TabsList className="grid w-full max-w-3xl grid-cols-4 mb-8">
             <TabsTrigger value="overview" className="flex items-center">

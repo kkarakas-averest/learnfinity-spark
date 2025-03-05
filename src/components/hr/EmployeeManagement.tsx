@@ -1,3 +1,4 @@
+
 import * as React from 'react';
 import { 
   Search,
@@ -72,29 +73,46 @@ const EmployeeManagement: React.FC = () => {
   const [departments, setDepartments] = React.useState([]);
   const [selectedDepartment, setSelectedDepartment] = React.useState('all');
   const [selectedStatus, setSelectedStatus] = React.useState('all');
+  const [error, setError] = React.useState<string | null>(null);
   
   React.useEffect(() => {
     // Fetch employees and departments when component mounts
     const fetchData = async () => {
       try {
         setIsLoading(true);
+        setError(null);
+        
+        console.log('Fetching employee data...');
         
         // Fetch all employees
         const { data: employeeData, error: employeeError } = await hrEmployeeService.getEmployees();
-        if (employeeError) throw employeeError;
+        if (employeeError) {
+          console.error('Error fetching employees:', employeeError);
+          throw employeeError;
+        }
+        
+        console.log('Employee data received:', employeeData);
+        
         if (employeeData) {
           setEmployees(employeeData);
           setFilteredEmployees(employeeData);
         }
         
-        // Fetch departments for filtering
-        const { data: departmentData, error: departmentError } = await hrDepartmentService.getAllDepartments();
-        if (departmentError) throw departmentError;
+        // Fetch departments for filtering - FIX: using getDepartments() instead of getAllDepartments()
+        const { data: departmentData, error: departmentError } = await hrDepartmentService.getDepartments();
+        if (departmentError) {
+          console.error('Error fetching departments:', departmentError);
+          throw departmentError;
+        }
+        
+        console.log('Department data received:', departmentData);
+        
         if (departmentData) {
           setDepartments(departmentData);
         }
       } catch (error) {
         console.error('Error fetching data:', error);
+        setError(`Failed to load data: ${error.message || 'Unknown error'}`);
         toast.error("Failed to load employee data. Please try again.");
       } finally {
         setIsLoading(false);
@@ -212,6 +230,40 @@ const EmployeeManagement: React.FC = () => {
     return (
       <div className="flex h-full items-center justify-center min-h-[60vh]">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+  
+  // Display error state
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div>
+            <h2 className="text-2xl font-bold">Employee Management</h2>
+            <p className="text-muted-foreground">
+              Manage your organization's employees and their learning progress
+            </p>
+          </div>
+        </div>
+        
+        <Card className="border-red-200">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-red-600 flex items-center">
+              <AlertTriangle className="mr-2 h-5 w-5" />
+              Error Loading Data
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p>{error}</p>
+            <Button 
+              className="mt-4" 
+              onClick={() => window.location.reload()}
+            >
+              Try Again
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -429,4 +481,4 @@ const EmployeeManagement: React.FC = () => {
   );
 };
 
-export default EmployeeManagement; 
+export default EmployeeManagement;
