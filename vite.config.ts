@@ -13,9 +13,10 @@ export default defineConfig(({ mode }) => ({
   },
   plugins: [
     react({
+      // Using React's standard JSX runtime
+      jsxImportSource: "react",
       // Enable JSX compatibility for better TypeScript support
       tsDecorators: true,
-      jsxImportSource: "@/lib/react-helpers",
     }),
     mode === 'development' &&
     componentTagger(),

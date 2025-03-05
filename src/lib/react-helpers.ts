@@ -6,6 +6,10 @@
 
 import React from 'react';
 
+// Export the JSX runtime for Vite/SWC
+export * from 'react/jsx-runtime';
+export * from 'react/jsx-dev-runtime';
+
 // Re-export common hooks and components
 export const {
   useState,
