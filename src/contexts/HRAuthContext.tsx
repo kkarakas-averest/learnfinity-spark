@@ -1,4 +1,3 @@
-
 // add console logs to help debug navigation issues
 import * as React from "react";
 import { useNavigate } from "react-router-dom";
@@ -10,7 +9,7 @@ interface HRUser {
   role: "hr";
 }
 
-// Define the context type
+// Define the context properties
 interface HRAuthContextProps {
   hrUser: HRUser | null;
   isAuthenticated: boolean;
@@ -26,26 +25,28 @@ const HRAuthContext = React.createContext<HRAuthContextProps>({
   logout: () => {},
 });
 
-// Create a custom hook to use the context
+// Create a hook for easier context access
 export const useHRAuth = () => React.useContext(HRAuthContext);
 
 // Create the provider component
 export const HRAuthProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const [hrUser, setHRUser] = React.useState<HRUser | null>(() => {
-    const storedUser = localStorage.getItem("hrUser");
-    return storedUser ? JSON.parse(storedUser) : null;
-  });
-  const [isAuthenticated, setIsAuthenticated] = React.useState(!!hrUser);
   const navigate = useNavigate();
-
+  const [hrUser, setHRUser] = React.useState<HRUser | null>(null);
+  
+  // Check for saved auth state on mount
   React.useEffect(() => {
-    // Check if the user is already authenticated on component mount
-    if (hrUser) {
-      setIsAuthenticated(true);
+    const storedHRUser = localStorage.getItem("hrUser");
+    if (storedHRUser) {
+      try {
+        setHRUser(JSON.parse(storedHRUser));
+      } catch (error) {
+        console.error("Failed to parse stored HR user:", error);
+        localStorage.removeItem("hrUser");
+      }
     }
-  }, [hrUser]);
+  }, []);
 
   // Add debugging logs to login/logout functions
   const login = async (username: string, password: string) => {
@@ -55,7 +56,6 @@ export const HRAuthProvider: React.FC<{ children: React.ReactNode }> = ({
       if (username === "hr" && password === "password") {
         console.log("HRAuthContext: Setting user state after successful login");
         setHRUser({ username, role: "hr" });
-        setIsAuthenticated(true);
         localStorage.setItem("hrUser", JSON.stringify({ username, role: "hr" }));
         return true;
       } else {
@@ -71,14 +71,13 @@ export const HRAuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const logout = () => {
     console.log("HRAuthContext: Logging out");
     setHRUser(null);
-    setIsAuthenticated(false);
     localStorage.removeItem("hrUser");
     navigate(ROUTES.HR_LOGIN);
   };
 
   const value: HRAuthContextProps = {
     hrUser,
-    isAuthenticated,
+    isAuthenticated: !!hrUser,
     login,
     logout,
   };
