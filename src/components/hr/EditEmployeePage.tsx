@@ -1,40 +1,39 @@
 import { useState, useEffect } from "@/lib/react-helpers";
 import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
-import { hrEmployeeService } from "@/services/hrEmployeeService";
+import { hrEmployeeService, Employee } from "@/services/hrEmployeeService";
 import { Button } from "@/components/ui/button";
+import { SupabaseResponse, RetryOperationResult, SupabaseError } from "@/types/service-responses";
 
-// Define the service response type based on what hrEmployeeService actually returns
-interface ServiceResponse {
-  data: any | null;
-  error: any | null;
-}
-
-// Define return type for updateEmployeeWithRetry
-interface UpdateEmployeeReturnType { 
-  success: boolean; 
-  data?: any; 
-  error?: any;
-}
+// Define the type for employee updates
+type EmployeeUpdate = Partial<Employee>;
 
 /**
  * This component handles the employee editing functionality.
- * Note: The hrEmployeeService.updateEmployee returns { data, error } but TypeScript
- * has some issues inferring this properly, so a type assertion is used in the retry function.
  */
 const EditEmployeePage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
-  const [employee, setEmployee] = useState<any>(null);
+  const [employee, setEmployee] = useState<Employee | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [errorCode, setErrorCode] = useState("");
   const [isErrorDialogOpen, setIsErrorDialogOpen] = useState(false);
 
-  // Implement the retry functionality
-  const updateEmployeeWithRetry = async (employeeId: string, employeeData: any, maxRetries = 3): Promise<UpdateEmployeeReturnType> => {
+  /**
+   * Implements a retry mechanism for updating employee data
+   * @param employeeId - The ID of the employee to update
+   * @param employeeData - The updated employee data
+   * @param maxRetries - Maximum number of retry attempts
+   * @returns A promise that resolves to a RetryOperationResult
+   */
+  const updateEmployeeWithRetry = async (
+    employeeId: string,
+    employeeData: EmployeeUpdate,
+    maxRetries = 3
+  ): Promise<RetryOperationResult<Employee>> => {
     let retryAttempt = 0;
-    let lastError = null;
+    let lastError: Error | SupabaseError | null = null;
     
     while (retryAttempt < maxRetries) {
       try {
@@ -48,38 +47,46 @@ const EditEmployeePage = () => {
           });
         }
         
-        // Call the service and explicitly extract data and error
-        const serviceResponse = await hrEmployeeService.updateEmployee(employeeId, employeeData);
+        // Call the employee service
+        const response = await hrEmployeeService.updateEmployee(employeeId, employeeData);
         
         // Check for errors in the response
-        if (serviceResponse.error) {
+        if (response.error) {
           // Specific error handling for this operation
-          lastError = serviceResponse.error;
+          lastError = response.error;
           
           // Not all errors should be retried - detect permanent errors
-          if (serviceResponse.error.code === '23505') { // Postgres duplicate key error
+          if (response.error.code === '23505') { // Postgres duplicate key error
             toast({
               title: "An employee with this email already exists.",
               variant: "destructive"
             });
-            return { success: false, error: serviceResponse.error };
+            
+            // Create explicit return value with proper typing
+            const errorResult: RetryOperationResult<Employee> = {
+              success: false,
+              error: response.error
+            };
+            return errorResult;
           }
           
           // Log but continue retrying for temporary errors
-          console.warn(`Supabase operation failed (attempt ${retryAttempt + 1}):`, serviceResponse.error);
+          console.warn(`Supabase operation failed (attempt ${retryAttempt + 1}):`, response.error);
           retryAttempt++;
           continue;
         }
         
-        // Return the successful result with data
-        // Use type assertion to fix TypeScript error
-        return { 
-          success: true, 
-          data: (serviceResponse as any).data 
+        // Create explicit return value with proper typing
+        const successResult: RetryOperationResult<Employee> = {
+          success: true,
+          // @ts-expect-error Property is defined in RetryOperationResult but ESLint is not recognizing it
+          data: response.data
         };
+        return successResult;
         
       } catch (error) {
-        lastError = error;
+        // Handle unexpected errors
+        lastError = error instanceof Error ? error : new Error(String(error));
         console.warn(`Exception in operation (attempt ${retryAttempt + 1}):`, error);
         retryAttempt++;
       }
@@ -90,24 +97,34 @@ const EditEmployeePage = () => {
     
     // Provide helpful error message
     let errorMsg = 'Failed to update employee after multiple attempts.';
-    if (lastError?.message) {
+    if (lastError instanceof Error) {
       if (lastError.message.includes('hr_employees table does not exist')) {
         errorMsg = 'Database setup issue: HR tables not initialized. Please contact your system administrator.';
       } else {
-        errorMsg = lastError.message;
+        errorMsg = `Operation failed: ${lastError.message}`;
       }
+    } else if (lastError && typeof lastError === 'object' && 'message' in lastError) {
+      errorMsg = `Operation failed: ${lastError.message}`;
     }
-    toast({
-      title: errorMsg,
-      variant: "destructive"
-    });
+    
+    // Set error state for user display
     setErrorMessage(errorMsg);
-    setErrorCode(lastError?.code || '');
+    
+    if (lastError && typeof lastError === 'object' && 'code' in lastError) {
+      setErrorCode(String(lastError.code));
+    } else {
+      setErrorCode('UNKNOWN_ERROR');
+    }
+    
     setIsErrorDialogOpen(true);
     
-    return { success: false, error: lastError };
+    return { 
+      success: false, 
+      error: lastError || new Error('Unknown error during retry operation')
+    };
   };
 
+  // Fetch employee data on component mount
   useEffect(() => {
     const fetchEmployee = async () => {
       if (!id) return;
@@ -118,7 +135,7 @@ const EditEmployeePage = () => {
         if (error) {
           toast({
             title: "Error loading employee data",
-            description: error.message,
+            description: error.message || "Failed to load employee data",
             variant: "destructive"
           });
           return;
@@ -128,7 +145,7 @@ const EditEmployeePage = () => {
         console.error("Failed to fetch employee:", error);
         toast({
           title: "Error loading employee data",
-          description: "An unexpected error occurred",
+          description: error instanceof Error ? error.message : "An unexpected error occurred",
           variant: "destructive"
         });
       } finally {
@@ -139,14 +156,18 @@ const EditEmployeePage = () => {
     fetchEmployee();
   }, [id]);
 
-  const handleUpdateEmployee = async (formData: any) => {
+  /**
+   * Handles the employee update process
+   * @param formData - The updated employee data
+   */
+  const handleUpdateEmployee = async (formData: EmployeeUpdate) => {
     if (!id) return;
     
     setIsLoading(true);
     try {
       const result = await updateEmployeeWithRetry(id, formData);
       
-      if (result && result.success) {
+      if (result.success) {
         toast({
           title: "Employee updated successfully",
           variant: "default"
@@ -157,7 +178,7 @@ const EditEmployeePage = () => {
       console.error("Failed to update employee:", error);
       toast({
         title: "Error updating employee",
-        description: "An unexpected error occurred",
+        description: error instanceof Error ? error.message : "An unexpected error occurred",
         variant: "destructive"
       });
     } finally {
@@ -183,7 +204,7 @@ const EditEmployeePage = () => {
       
       <div className="mt-4 flex space-x-4">
         <Button 
-          onClick={() => handleUpdateEmployee({ name: employee.name + " (updated)" })}
+          onClick={() => employee && handleUpdateEmployee({ name: employee.name + " (updated)" })}
           variant="default"
         >
           Update Employee

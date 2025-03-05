@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { SupabaseResponse } from '@/types/service-responses';
 
 // Define Employee interface directly in this file instead of importing it
 export interface Employee {
@@ -14,6 +15,9 @@ export interface Employee {
   created_at?: string;
   updated_at?: string;
 }
+
+// Define EmployeeUpdate type for update operations
+export type EmployeeUpdate = Partial<Employee>;
 
 // Import from env variables or use a fallback with a valid UUID
 const DEFAULT_COMPANY_ID = import.meta.env.VITE_DEFAULT_COMPANY_ID || '4fb1a692-3995-40ee-8aa5-292fd8ebf029';
@@ -225,7 +229,7 @@ export const hrEmployeeService = {
    * @param {number} options.pageSize - Page size
    * @param {string} options.searchTerm - Search term
    * @param {string} options.departmentId - Filter by department ID
-   * @returns {Promise<{data: Array, error: Object, count: number}>}
+   * @returns {Promise<SupabaseResponse<Employee[]> & { count?: number }>}
    */
   async getEmployees({ 
     page = 1, 
@@ -233,7 +237,7 @@ export const hrEmployeeService = {
     searchTerm = '', 
     departmentId = null,
     status = null
-  } = {}) {
+  } = {}): Promise<SupabaseResponse<Employee[]> & { count?: number }> {
     try {
       // Calculate range
       const from = (page - 1) * pageSize;
@@ -279,9 +283,9 @@ export const hrEmployeeService = {
   /**
    * Get a single employee by ID
    * @param {string} id - Employee ID
-   * @returns {Promise<{data: Object, error: Object}>}
+   * @returns {Promise<SupabaseResponse<Employee>>}
    */
-  async getEmployee(id) {
+  async getEmployee(id: string): Promise<SupabaseResponse<Employee>> {
     try {
       const { data, error } = await supabase
         .from(TABLE_NAME)
@@ -302,10 +306,10 @@ export const hrEmployeeService = {
 
   /**
    * Create a new employee
-   * @param {Object} employee - Employee data
-   * @returns {Promise<{data: Object, error: Object}>}
+   * @param {EmployeeUpdate} employee - Employee data to create
+   * @returns {Promise<SupabaseResponse<Employee>>}
    */
-  async createEmployee(employee) {
+  async createEmployee(employee: EmployeeUpdate): Promise<SupabaseResponse<Employee>> {
     try {
       const { data, error } = await supabase
         .from(TABLE_NAME)
@@ -390,12 +394,12 @@ export const hrEmployeeService = {
   },
 
   /**
-   * Update an existing employee
+   * Update an employee
    * @param {string} id - Employee ID
-   * @param {Object} updates - Fields to update
-   * @returns {Promise<{data: Object, error: Object}>}
+   * @param {EmployeeUpdate} updates - Fields to update
+   * @returns {Promise<SupabaseResponse<Employee>>}
    */
-  async updateEmployee(id, updates) {
+  async updateEmployee(id: string, updates: EmployeeUpdate): Promise<SupabaseResponse<Employee>> {
     try {
       const { data, error } = await supabase
         .from(TABLE_NAME)
@@ -414,29 +418,29 @@ export const hrEmployeeService = {
   /**
    * Delete an employee
    * @param {string} id - Employee ID
-   * @returns {Promise<{error: Object}>}
+   * @returns {Promise<SupabaseResponse<null>>}
    */
-  async deleteEmployee(id) {
+  async deleteEmployee(id: string): Promise<SupabaseResponse<null>> {
     try {
       const { error } = await supabase
         .from(TABLE_NAME)
         .delete()
         .eq('id', id);
 
-      return { error };
+      return { data: null, error };
     } catch (error) {
       console.error('Error in deleteEmployee:', error);
-      return { error };
+      return { data: null, error };
     }
   },
 
   /**
    * Update employee status
    * @param {string} id - Employee ID
-   * @param {string} status - New status
-   * @returns {Promise<{data: Object, error: Object}>}
+   * @param {string} status - New status value
+   * @returns {Promise<SupabaseResponse<Employee>>}
    */
-  async updateEmployeeStatus(id, status) {
+  async updateEmployeeStatus(id: string, status: string): Promise<SupabaseResponse<Employee>> {
     return this.updateEmployee(id, { status });
   },
   
@@ -444,83 +448,42 @@ export const hrEmployeeService = {
    * Update employee password
    * @param {string} email - Employee email
    * @param {string} newPassword - New password
-   * @returns {Promise<{success: boolean, error?: Object}>}
+   * @returns {Promise<SupabaseResponse<{ user: any }>>}
    */
-  async updateEmployeePassword(email, newPassword) {
+  async updateEmployeePassword(email: string, newPassword: string): Promise<SupabaseResponse<{ user: any }>> {
     try {
-      // Check if this is a valid email format
-      if (!email || !email.includes('@')) {
-        return { 
-          success: false, 
-          error: { message: 'Invalid email format' } 
-        };
-      }
-      
-      // Check if the password meets minimum requirements
-      if (!newPassword || newPassword.length < 8) {
-        return { 
-          success: false, 
-          error: { message: 'Password must be at least 8 characters long' } 
-        };
-      }
-      
-      // We cannot update a user's password directly from the client side
-      // Instead, we'll send a password reset email to the employee
-      const { error } = await supabase.auth.resetPasswordForEmail(
-        email,
-        { redirectTo: `${window.location.origin}/reset-password` }
-      );
+      // For now, use the supabase client directly to update the auth user
+      const { data, error } = await supabase.auth.updateUser({
+        password: newPassword
+      });
       
       if (error) {
-        console.error('Error sending password reset email:', error);
-        return { 
-          success: false, 
-          error,
-          message: 'Could not send password reset email.'
-        };
+        console.error('Failed to update password:', error);
+        return { data: null, error };
       }
       
-      return { 
-        success: true,
-        message: 'A password reset email has been sent to the employee.'
-      };
-    } catch (err) {
-      console.error('Exception during password reset:', err);
-      return { 
-        success: false, 
-        error: err,
-        message: 'An unexpected error occurred when resetting the password.'
-      };
+      return { data, error: null };
+    } catch (error) {
+      console.error('Error in updateEmployeePassword:', error);
+      return { data: null, error };
     }
   },
   
   /**
-   * Reset employee password to a new random one
+   * Reset employee password - sends a password reset email
    * @param {string} email - Employee email
-   * @returns {Promise<{success: boolean, newPassword?: string, error?: Object}>}
+   * @returns {Promise<SupabaseResponse<{}>>}
    */
-  async resetEmployeePassword(email) {
+  async resetEmployeePassword(email: string): Promise<SupabaseResponse<{}>> {
     try {
-      // Generate a secure random password
-      const newPassword = 'hashed-in-rpc'; // The actual password is handled by Supabase Auth
+      const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
       
-      // Update the password
-      const { success, error } = await this.updateEmployeePassword(email, newPassword);
-      
-      if (!success) {
-        return { success: false, error };
-      }
-      
-      return { 
-        success: true, 
-        newPassword 
-      };
+      return { data: data || {}, error };
     } catch (error) {
-      console.error('Error resetting password:', error);
-      return { 
-        success: false, 
-        error 
-      };
+      console.error('Error in resetEmployeePassword:', error);
+      return { data: {}, error };
     }
   },
   
@@ -569,35 +532,74 @@ export const hrEmployeeService = {
   /**
    * Upload employee resume
    * @param {string} employeeId - Employee ID
-   * @param {File} file - Resume file
-   * @returns {Promise<{data: Object, error: Object}>}
+   * @param {File} file - Resume file to upload
+   * @returns {Promise<SupabaseResponse<{ resumeUrl: string }>>}
    */
-  async uploadEmployeeResume(employeeId, file) {
+  async uploadEmployeeResume(employeeId: string, file: File): Promise<SupabaseResponse<{ resumeUrl: string }>> {
     try {
-      if (!file) {
-        return { data: null, error: { message: 'No file provided' } };
+      // Validate inputs
+      if (!employeeId) {
+        return { 
+          data: null, 
+          error: { 
+            message: 'Employee ID is required',
+            code: 'INVALID_INPUT'
+          } 
+        };
       }
       
+      if (!file) {
+        return { 
+          data: null, 
+          error: { 
+            message: 'File is required', 
+            code: 'INVALID_INPUT'
+          } 
+        };
+      }
+      
+      // Generate a unique filename with timestamp and random string
+      const timestamp = new Date().getTime();
+      const randomString = Math.random().toString(36).substring(2, 10);
+      const safeOriginalName = file.name.replace(/[^a-zA-Z0-9.]/g, '_');
+      const filename = `${timestamp}_${randomString}_${safeOriginalName}`;
+      
+      const filePath = `resumes/${employeeId}/${filename}`;
+      
       // Upload to storage
-      const filename = `${employeeId}_${Date.now()}_${file.name}`;
       const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('employee-resumes')
-        .upload(filename, file);
+        .from('employee-files')
+        .upload(filePath, file);
       
       if (uploadError) {
-        console.error('Resume upload error:', uploadError);
+        console.error('Error uploading resume:', uploadError);
         return { data: null, error: uploadError };
       }
       
-      // Get the public URL for the uploaded file
-      const { data: { publicUrl } } = supabase.storage
-        .from('employee-resumes')
-        .getPublicUrl(filename);
+      // Get the public URL
+      const { data: publicUrlData } = supabase.storage
+        .from('employee-files')
+        .getPublicUrl(filePath);
       
-      // Update the employee record with the new resume URL
-      const { data, error } = await this.updateEmployee(employeeId, { resume_url: publicUrl });
+      const resumeUrl = publicUrlData.publicUrl;
       
-      return { data, error };
+      // Update the employee record with the resume URL
+      const { data: updateData, error: updateError } = await supabase
+        .from(TABLE_NAME)
+        .update({ resume_url: resumeUrl })
+        .eq('id', employeeId)
+        .select()
+        .single();
+      
+      if (updateError) {
+        console.error('Error updating employee with resume URL:', updateError);
+        return { data: null, error: updateError };
+      }
+      
+      return { 
+        data: { resumeUrl }, 
+        error: null 
+      };
     } catch (error) {
       console.error('Error in uploadEmployeeResume:', error);
       return { data: null, error };

@@ -1,24 +1,41 @@
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/components/ui/use-toast';
 import { Course } from '@/types/hr.types';
+import { SupabaseResponse, SupabaseError } from '@/types/service-responses';
+import { v4 as uuidv4 } from 'uuid';
 
 // Error handling helper
-const handleError = (error: any, customMessage: string = 'An error occurred') => {
+const handleError = (error: SupabaseError | Error | any, customMessage: string = 'An error occurred'): SupabaseResponse<null> => {
   console.error(`${customMessage}:`, error);
   toast({
     title: 'Error',
     description: customMessage,
     variant: 'destructive',
   });
-  return null;
+  return { 
+    data: null,
+    error: error.message 
+      ? { message: error.message, details: customMessage }
+      : { message: customMessage } 
+  };
 };
+
+// Course data interface for create/update operations
+export interface CourseData {
+  title: string;
+  description?: string;
+  department_id?: string;
+  duration?: number;
+  status?: 'active' | 'draft' | 'archived';
+}
 
 // HR Course service with specialized functions for course operations
 const hrCourseService = {
   /**
    * Get all courses with their department information
+   * @returns {Promise<SupabaseResponse<Course[]>>}
    */
-  async getAllCourses() {
+  async getAllCourses(): Promise<SupabaseResponse<Course[]>> {
     try {
       const { data, error } = await supabase
         .from('hr_courses')
@@ -28,7 +45,9 @@ const hrCourseService = {
         `)
         .order('title');
         
-      if (error) throw error;
+      if (error) {
+        return { data: null, error };
+      }
       
       // Format the course data to match our frontend Course type
       const courses: Course[] = data.map(course => ({
@@ -60,17 +79,31 @@ const hrCourseService = {
         }
       }
       
-      return courses;
-    } catch (error) {
-      return handleError(error, 'Failed to fetch courses');
+      return { data: courses, error: null };
+    } catch (err) {
+      const error = err as Error;
+      console.error('Error fetching courses:', error);
+      return {
+        data: null,
+        error: { message: error.message || 'Failed to fetch courses' }
+      };
     }
   },
   
   /**
-   * Get a course by ID with all related information
+   * Get a specific course by ID with detailed information
+   * @param {string} id - The course ID to retrieve
+   * @returns {Promise<SupabaseResponse<Course>>}
    */
-  async getCourseById(id: string) {
+  async getCourseById(id: string): Promise<SupabaseResponse<Course>> {
     try {
+      if (!id) {
+        return {
+          data: null,
+          error: { message: 'Course ID is required' }
+        };
+      }
+
       const { data, error } = await supabase
         .from('hr_courses')
         .select(`
@@ -80,8 +113,16 @@ const hrCourseService = {
         .eq('id', id)
         .single();
         
-      if (error) throw error;
-      if (!data) return null;
+      if (error) {
+        return { data: null, error };
+      }
+      
+      if (!data) {
+        return {
+          data: null,
+          error: { message: 'Course not found' }
+        };
+      }
       
       // Get enrollments for this course
       const { data: enrollments, error: enrollError } = await supabase
@@ -103,15 +144,22 @@ const hrCourseService = {
             .reduce((sum, e) => sum + parseFloat(e.score), 0) / completed 
         : 0;
       
-      return {
-        ...data,
-        enrollments: enrollments || [],
-        totalEnrollments,
-        completed,
-        completionRate,
-        averageScore: averageScore ? averageScore.toFixed(1) : 'N/A',
+      // Format the course data
+      const course: Course = {
+        id: data.id,
+        title: data.title,
+        description: data.description || '',
+        department: data.department?.name || 'General',
+        enrollments: totalEnrollments || 0,
+        completionRate: completionRate || 0,
+        averageScore: averageScore ? Number(averageScore.toFixed(1)) : 0,
         duration: `${data.duration || 0} mins`,
+        status: data.status || 'active',
+        createdAt: new Date(data.created_at).toLocaleDateString(),
+        updatedAt: new Date(data.updated_at).toLocaleDateString(),
       };
+      
+      return { data: course, error: null };
     } catch (error) {
       return handleError(error, `Failed to fetch course with ID ${id}`);
     }
@@ -119,94 +167,179 @@ const hrCourseService = {
   
   /**
    * Create a new course
+   * @param {CourseData} courseData - The course data to create
+   * @returns {Promise<SupabaseResponse<Course>>}
    */
-  async createCourse(courseData: Partial<Course>) {
+  async createCourse(courseData: CourseData): Promise<SupabaseResponse<Course>> {
     try {
-      // Validate required fields
       if (!courseData.title) {
-        throw new Error('Course title is required');
+        return {
+          data: null,
+          error: { message: 'Course title is required' }
+        };
       }
       
-      // Format data for insertion
-      const newCourse = {
+      // Prepare the data for insertion
+      const courseRecord = {
+        id: uuidv4(),
         title: courseData.title,
         description: courseData.description || '',
-        department_id: courseData.department,
-        skill_level: courseData.status || 'beginner',
-        duration: parseInt(courseData.duration) || 60,
+        department_id: courseData.department_id,
+        duration: courseData.duration || 0,
         status: courseData.status || 'draft',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       };
       
       const { data, error } = await supabase
         .from('hr_courses')
-        .insert(newCourse)
+        .insert(courseRecord)
         .select()
         .single();
         
-      if (error) throw error;
+      if (error) {
+        return { data: null, error };
+      }
       
-      toast({
-        title: 'Success',
-        description: `Course "${data.title}" created successfully`,
-      });
+      // Return the newly created course in the expected format
+      const course: Course = {
+        id: data.id,
+        title: data.title,
+        description: data.description || '',
+        department: 'General', // We'll need to fetch the actual department name
+        enrollments: 0,
+        completionRate: 0,
+        duration: `${data.duration || 0} mins`,
+        status: data.status || 'draft',
+        createdAt: new Date(data.created_at).toLocaleDateString(),
+        updatedAt: new Date(data.updated_at).toLocaleDateString(),
+      };
       
-      return data;
-    } catch (error) {
-      return handleError(error, 'Failed to create course');
+      if (courseData.department_id) {
+        // Fetch department name if department_id is provided
+        const { data: deptData } = await supabase
+          .from('hr_departments')
+          .select('name')
+          .eq('id', courseData.department_id)
+          .single();
+          
+        if (deptData) {
+          course.department = deptData.name;
+        }
+      }
+      
+      return { data: course, error: null };
+    } catch (err) {
+      const error = err as Error;
+      console.error('Error creating course:', error);
+      return {
+        data: null,
+        error: { message: error.message || 'Failed to create course' }
+      };
     }
   },
   
   /**
    * Update an existing course
+   * @param {string} id - The course ID to update
+   * @param {CourseData} courseData - The course data to update
+   * @returns {Promise<SupabaseResponse<Course>>}
    */
-  async updateCourse(id: string, courseData: Partial<Course>) {
+  async updateCourse(id: string, courseData: CourseData): Promise<SupabaseResponse<Course>> {
     try {
-      // Format data for update
-      const updateData = {
-        title: courseData.title,
-        description: courseData.description,
-        department_id: courseData.department,
-        skill_level: courseData.status,
-        duration: courseData.duration ? parseInt(courseData.duration) : undefined,
-        status: courseData.status,
-      };
+      if (!id) {
+        return {
+          data: null,
+          error: { message: 'Course ID is required' }
+        };
+      }
       
-      // Remove undefined values
-      Object.keys(updateData).forEach(key => 
-        updateData[key] === undefined && delete updateData[key]
-      );
+      // Prepare the data for update
+      const updates = {
+        ...courseData,
+        updated_at: new Date().toISOString()
+      };
       
       const { data, error } = await supabase
         .from('hr_courses')
-        .update(updateData)
+        .update(updates)
         .eq('id', id)
         .select()
         .single();
         
-      if (error) throw error;
+      if (error) {
+        return { data: null, error };
+      }
       
-      toast({
-        title: 'Success',
-        description: `Course "${data.title}" updated successfully`,
-      });
+      // Return the updated course in the expected format
+      const course: Course = {
+        id: data.id,
+        title: data.title,
+        description: data.description || '',
+        department: 'General', // We'll need to fetch the actual department name
+        enrollments: 0, // This will be populated elsewhere
+        completionRate: 0, // This will be calculated elsewhere
+        duration: `${data.duration || 0} mins`,
+        status: data.status || 'active',
+        createdAt: new Date(data.created_at).toLocaleDateString(),
+        updatedAt: new Date(data.updated_at).toLocaleDateString(),
+      };
       
-      return data;
-    } catch (error) {
-      return handleError(error, 'Failed to update course');
+      if (data.department_id) {
+        // Fetch department name
+        const { data: deptData } = await supabase
+          .from('hr_departments')
+          .select('name')
+          .eq('id', data.department_id)
+          .single();
+          
+        if (deptData) {
+          course.department = deptData.name;
+        }
+      }
+      
+      return { data: course, error: null };
+    } catch (err) {
+      const error = err as Error;
+      console.error('Error updating course:', error);
+      return {
+        data: null,
+        error: { message: error.message || 'Failed to update course' }
+      };
     }
   },
   
   /**
-   * Delete a course
+   * Delete a course by ID
+   * @param {string} id - The course ID to delete
+   * @returns {Promise<SupabaseResponse<null>>}
    */
-  async deleteCourse(id: string) {
+  async deleteCourse(id: string): Promise<SupabaseResponse<null>> {
     try {
-      // Get course title first for the success message
-      const { data: course } = await supabase
+      if (!id) {
+        return {
+          data: null,
+          error: { message: 'Course ID is required' }
+        };
+      }
+      
+      // First check if the course exists
+      const { data: existingCourse, error: fetchError } = await supabase
         .from('hr_courses')
-        .select('title')
+        .select('id')
         .eq('id', id)
         .single();
+        
+      if (fetchError) {
+        return { data: null, error: fetchError };
+      }
+      
+      if (!existingCourse) {
+        return {
+          data: null,
+          error: { message: 'Course not found' }
+        };
+      }
       
       // Delete the course
       const { error } = await supabase
@@ -214,165 +347,226 @@ const hrCourseService = {
         .delete()
         .eq('id', id);
         
-      if (error) throw error;
+      if (error) {
+        return { data: null, error };
+      }
       
-      toast({
-        title: 'Success',
-        description: `Course "${course?.title || ''}" deleted successfully`,
-      });
-      
-      return true;
-    } catch (error) {
-      return handleError(error, 'Failed to delete course');
+      return { data: null, error: null };
+    } catch (err) {
+      const error = err as Error;
+      console.error('Error deleting course:', error);
+      return {
+        data: null,
+        error: { message: error.message || 'Failed to delete course' }
+      };
     }
   },
   
   /**
    * Enroll employees in a course
+   * @param {string} courseId - The course ID
+   * @param {string[]} employeeIds - Array of employee IDs to enroll
+   * @returns {Promise<SupabaseResponse<{ success: boolean, enrolled: number }>>}
    */
-  async enrollEmployees(courseId: string, employeeIds: string[]) {
+  async enrollEmployees(courseId: string, employeeIds: string[]): Promise<SupabaseResponse<{ success: boolean, enrolled: number }>> {
     try {
-      // Prepare the enrollment data
+      if (!courseId) {
+        return {
+          data: null,
+          error: { message: 'Course ID is required' }
+        };
+      }
+      
+      if (!employeeIds || !employeeIds.length) {
+        return {
+          data: null,
+          error: { message: 'At least one employee ID is required' }
+        };
+      }
+      
+      // Create enrollment records
       const enrollments = employeeIds.map(employeeId => ({
+        id: uuidv4(),
         course_id: courseId,
         employee_id: employeeId,
         status: 'enrolled',
         progress: 0,
+        score: null,
+        enrolled_at: new Date().toISOString(),
+        last_activity_at: new Date().toISOString()
       }));
       
       const { data, error } = await supabase
         .from('hr_course_enrollments')
-        .insert(enrollments)
-        .select();
+        .insert(enrollments);
         
-      if (error) throw error;
-      
-      // Log the enrollment activity for each employee
-      for (const enrollment of data) {
-        await supabase.from('hr_employee_activities').insert({
-          employee_id: enrollment.employee_id,
-          activity_type: 'enrollment',
-          description: 'Enrolled in course',
-          course_id: courseId,
-        });
+      if (error) {
+        return { data: null, error };
       }
       
-      toast({
-        title: 'Success',
-        description: `${data.length} employees enrolled successfully`,
-      });
-      
-      return data;
-    } catch (error) {
-      return handleError(error, 'Failed to enroll employees');
+      return { 
+        data: {
+          success: true,
+          enrolled: employeeIds.length
+        }, 
+        error: null
+      };
+    } catch (err) {
+      const error = err as Error;
+      console.error('Error enrolling employees:', error);
+      return {
+        data: null,
+        error: { message: error.message || 'Failed to enroll employees' }
+      };
     }
   },
   
   /**
-   * Update an enrollment status
+   * Update a course enrollment (progress, status, score)
+   * @param {string} enrollmentId - The enrollment ID to update
+   * @param {string} status - New enrollment status
+   * @param {number} progress - New progress percentage (0-100)
+   * @param {number} [score] - Optional score to update
+   * @returns {Promise<SupabaseResponse<{ success: boolean }>>}
    */
-  async updateEnrollment(enrollmentId: string, status: string, progress: number, score?: number) {
+  async updateEnrollment(
+    enrollmentId: string, 
+    status: string, 
+    progress: number, 
+    score?: number
+  ): Promise<SupabaseResponse<{ success: boolean }>> {
     try {
-      const updateData: any = {
+      if (!enrollmentId) {
+        return {
+          data: null,
+          error: { message: 'Enrollment ID is required' }
+        };
+      }
+      
+      // Validate progress is a number between 0-100
+      if (typeof progress !== 'number' || progress < 0 || progress > 100) {
+        return {
+          data: null,
+          error: { message: 'Progress must be a number between 0 and 100' }
+        };
+      }
+      
+      const updates = {
         status,
         progress,
+        ...(score !== undefined ? { score } : {}),
+        last_activity_at: new Date().toISOString(),
+        ...(status === 'completed' ? { completed_at: new Date().toISOString() } : {})
       };
       
-      // Add completion date if completed
-      if (status === 'completed') {
-        updateData.completion_date = new Date().toISOString();
-        updateData.score = score || null;
-      }
-      
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('hr_course_enrollments')
-        .update(updateData)
-        .eq('id', enrollmentId)
-        .select(`*, employee:hr_employees(id, name), course:hr_courses(id, title)`)
-        .single();
+        .update(updates)
+        .eq('id', enrollmentId);
         
-      if (error) throw error;
-      
-      // Log activity if completed
-      if (status === 'completed') {
-        await supabase.from('hr_employee_activities').insert({
-          employee_id: data.employee.id,
-          activity_type: 'completion',
-          description: `Completed course: ${data.course.title}`,
-          course_id: data.course.id,
-        });
+      if (error) {
+        return { data: null, error };
       }
       
-      toast({
-        title: 'Success',
-        description: `Enrollment updated successfully`,
-      });
-      
-      return data;
-    } catch (error) {
-      return handleError(error, 'Failed to update enrollment');
+      return { 
+        data: { success: true }, 
+        error: null
+      };
+    } catch (err) {
+      const error = err as Error;
+      console.error('Error updating enrollment:', error);
+      return {
+        data: null,
+        error: { message: error.message || 'Failed to update enrollment' }
+      };
     }
   },
   
   /**
-   * Get course metrics
+   * Get course metrics for dashboards and reports
+   * @returns {Promise<SupabaseResponse<{
+   *   totalCourses: number,
+   *   activeCourses: number,
+   *   totalEnrollments: number,
+   *   averageCompletionRate: number,
+   *   departmentBreakdown: {id: string, name: string, courseCount: number}[]
+   * }>>}
    */
-  async getCourseMetrics() {
+  async getCourseMetrics(): Promise<SupabaseResponse<{
+    totalCourses: number,
+    activeCourses: number,
+    totalEnrollments: number,
+    averageCompletionRate: number,
+    departmentBreakdown: {id: string, name: string, courseCount: number}[]
+  }>> {
     try {
-      // Get total courses
-      const { data: courseCount, error: countError } = await supabase
+      // Get total courses and active courses
+      const { data: coursesData, error: coursesError } = await supabase
         .from('hr_courses')
-        .select('id', { count: 'exact', head: true });
+        .select('id, status, department_id')
+        .order('created_at', { ascending: false });
         
-      if (countError) throw countError;
+      if (coursesError) {
+        return { data: null, error: coursesError };
+      }
       
-      // Get courses by status
-      const { data: statusData, error: statusError } = await supabase
-        .from('hr_courses')
-        .select('status')
-        .not('status', 'is', null);
-        
-      if (statusError) throw statusError;
+      const totalCourses = coursesData.length;
+      const activeCourses = coursesData.filter(c => c.status === 'active').length;
       
-      // Get total enrollments
-      const { data: enrollmentCount, error: enrollError } = await supabase
+      // Get enrollment data
+      const { data: enrollmentsData, error: enrollmentsError } = await supabase
         .from('hr_course_enrollments')
-        .select('id', { count: 'exact', head: true });
+        .select('id, status, progress');
         
-      if (enrollError) throw enrollError;
+      if (enrollmentsError) {
+        return { data: null, error: enrollmentsError };
+      }
       
-      // Get completed enrollments
-      const { data: completedCount, error: completeError } = await supabase
-        .from('hr_course_enrollments')
-        .select('id', { count: 'exact', head: true })
-        .eq('status', 'completed');
-        
-      if (completeError) throw completeError;
+      const totalEnrollments = enrollmentsData.length;
+      const completedEnrollments = enrollmentsData.filter(e => e.status === 'completed').length;
       
-      // Calculate metrics
-      const totalCourses = courseCount?.count || 0;
-      const statusCounts = statusData?.reduce((acc, course) => {
-        acc[course.status] = (acc[course.status] || 0) + 1;
-        return acc;
-      }, {});
-      
-      const totalEnrollments = enrollmentCount?.count || 0;
-      const completedEnrollments = completedCount?.count || 0;
-      const completionRate = totalEnrollments > 0 
+      // Calculate average completion rate
+      const averageCompletionRate = totalEnrollments > 0 
         ? Math.round((completedEnrollments / totalEnrollments) * 100) 
         : 0;
       
+      // Get department breakdown
+      const { data: departmentsData, error: departmentsError } = await supabase
+        .from('hr_departments')
+        .select('id, name');
+        
+      if (departmentsError) {
+        return { data: null, error: departmentsError };
+      }
+      
+      // Count courses by department
+      const departmentBreakdown = departmentsData.map(dept => {
+        const courseCount = coursesData.filter(course => course.department_id === dept.id).length;
+        return {
+          id: dept.id,
+          name: dept.name,
+          courseCount
+        };
+      });
+      
+      // Return the metrics
       return {
-        totalCourses,
-        activeCourses: statusCounts?.active || 0,
-        draftCourses: statusCounts?.draft || 0,
-        archivedCourses: statusCounts?.archived || 0,
-        totalEnrollments,
-        completedEnrollments,
-        completionRate,
+        data: {
+          totalCourses,
+          activeCourses,
+          totalEnrollments,
+          averageCompletionRate,
+          departmentBreakdown
+        },
+        error: null
       };
-    } catch (error) {
-      return handleError(error, 'Failed to fetch course metrics');
+    } catch (err) {
+      const error = err as Error;
+      console.error('Error fetching course metrics:', error);
+      return {
+        data: null,
+        error: { message: error.message || 'Failed to fetch course metrics' }
+      };
     }
   }
 };
