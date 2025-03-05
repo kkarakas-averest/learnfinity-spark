@@ -1,4 +1,3 @@
-
 /**
  * This file provides consistent React imports for the entire application.
  * It helps ensure the same import style is used throughout the codebase.
@@ -49,7 +48,7 @@ export type ComponentPropsWithoutRef<T = any> = Omit<React.ComponentProps<T>, 'r
 export type HTMLAttributes<T = any> = React.HTMLAttributes<T>;
 export type ReactNode = React.ReactNode;
 export type ReactElement<T = any> = React.ReactElement<T>;
-export type FC<T = {}> = React.FC<T>;
+export type FC<T = Record<string, unknown>> = React.FC<T>;
 export type ChangeEvent<T = Element> = React.ChangeEvent<T>;
 export type FormEvent<T = Element> = React.FormEvent<T>;
 export type MouseEvent<T = Element> = React.MouseEvent<T>;

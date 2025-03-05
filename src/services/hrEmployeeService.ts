@@ -470,20 +470,20 @@ export const hrEmployeeService = {
   },
   
   /**
-   * Reset employee password - sends a password reset email
+   * Reset an employee's password by sending a password reset email
    * @param {string} email - Employee email
-   * @returns {Promise<SupabaseResponse<{}>>}
+   * @returns {Promise<SupabaseResponse<{success: boolean}>>}
    */
-  async resetEmployeePassword(email: string): Promise<SupabaseResponse<{}>> {
+  async resetEmployeePassword(email: string): Promise<SupabaseResponse<{success: boolean}>> {
     try {
       const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/reset-password`,
       });
       
-      return { data: data || {}, error };
+      return { data: { success: !!data }, error };
     } catch (error) {
       console.error('Error in resetEmployeePassword:', error);
-      return { data: {}, error };
+      return { data: { success: false }, error };
     }
   },
   
