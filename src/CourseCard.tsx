@@ -1,4 +1,4 @@
-import * as React from "react";
+import React from "@/lib/react-helpers";
 import { Link } from "react-router-dom";
 import { Clock, BarChart2, Users } from "lucide-react";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
@@ -28,6 +28,7 @@ const CourseCard = ({
   image,
   progress,
 }: CourseCardProps) => {
+  // Use React.useState instead of destructuring useState
   const [isHovered, setIsHovered] = React.useState(false);
 
   const getLevelColor = (level: string) => {

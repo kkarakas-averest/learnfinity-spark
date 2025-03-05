@@ -1,4 +1,3 @@
-
 import * as React from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -16,8 +15,8 @@ import { Pencil, Save, User, Shield, GraduationCap, Building2, BookOpen } from "
 const ProfilePage = () => {
   const { user, userDetails, isLoading } = useAuth();
   const navigate = useNavigate();
-  const [isEditing, setIsEditing] = useState(false);
-  const [profileData, setProfileData] = useState({
+  const [isEditing, setIsEditing] = React.useState(false);
+  const [profileData, setProfileData] = React.useState({
     name: userDetails?.name || "",
     email: userDetails?.email || "",
   });

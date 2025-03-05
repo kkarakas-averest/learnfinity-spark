@@ -1,104 +1,72 @@
-import * as React from "react";
-import { AgentService } from '@/agents/AgentService';
-import { AgentTask } from '@/agents/interfaces/BaseAgent';
-import { useAuth } from '@/contexts/AuthContext';
+import React from "@/lib/react-helpers";
+import { useState, useEffect } from "@/lib/react-helpers";
 
-/**
- * Hook to access the Agent System
- */
+// Define the Agent interface
+interface Agent {
+  id: string;
+  name: string;
+  status: "online" | "offline" | "busy";
+  skills: string[];
+}
+
+// Custom hook for managing agent system
 export const useAgentSystem = () => {
-  const { user, userDetails } = useAuth();
-  const [initialized, setInitialized] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [agents, setAgents] = useState<Agent[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  
-  const agentService = AgentService.getInstance();
-  
-  /**
-   * Initialize the agent system
-   */
-  const initializeAgents = async () => {
-    if (agentService.isInitialized()) {
-      setInitialized(true);
-      return;
-    }
-    
-    setLoading(true);
-    setError(null);
-    
-    try {
-      // Get user ID and company ID from auth context
-      const userId = user?.id;
-      const companyId = userDetails?.companyId || undefined;
-      
-      await agentService.initialize(userId, companyId);
-      setInitialized(true);
-    } catch (err) {
-      console.error('Error initializing agent system:', err);
-      setError(err instanceof Error ? err.message : 'Unknown error initializing agents');
-    } finally {
-      setLoading(false);
-    }
-  };
-  
-  /**
-   * Execute a task using the agent system
-   */
-  const executeTask = async (task: Omit<AgentTask, 'id' | 'startTime' | 'status'>) => {
-    if (!initialized) {
-      throw new Error('Agent system not initialized');
-    }
-    
-    return agentService.executeTask(task);
-  };
-  
-  /**
-   * Shutdown the agent system
-   */
-  const shutdownAgents = async () => {
-    if (!initialized) {
-      return;
-    }
-    
-    try {
-      await agentService.shutdown();
-      setInitialized(false);
-    } catch (err) {
-      console.error('Error shutting down agent system:', err);
-      throw err;
-    }
-  };
-  
-  // Initialize the agent system when the user is authenticated
+
   useEffect(() => {
-    if (user && !initialized && !loading) {
-      initializeAgents();
-    }
-    
-    // Shutdown the agent system when the component unmounts
-    return () => {
-      // We don't want to shut down the agents when unmounting the component
-      // as other components might still be using the agent system.
-      // The agents will be shut down when the user logs out instead.
+    // Simulate fetching agents from an API
+    const fetchAgents = async () => {
+      try {
+        // Simulate API call delay
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+
+        const mockAgents: Agent[] = [
+          {
+            id: "1",
+            name: "Alice",
+            status: "online",
+            skills: ["javascript", "react", "node"],
+          },
+          {
+            id: "2",
+            name: "Bob",
+            status: "busy",
+            skills: ["python", "data analysis", "machine learning"],
+          },
+          {
+            id: "3",
+            name: "Charlie",
+            status: "offline",
+            skills: ["design", "ui/ux", "figma"],
+          },
+        ];
+
+        setAgents(mockAgents);
+        setLoading(false);
+      } catch (err: any) {
+        setError(err.message || "Failed to fetch agents");
+        setLoading(false);
+      }
     };
-  }, [user, initialized, loading]);
-  
-  // Listen for user logout to shutdown agents
-  useEffect(() => {
-    if (!user && initialized) {
-      shutdownAgents();
-    }
-  }, [user, initialized]);
-  
+
+    fetchAgents();
+  }, []);
+
+  // Function to update agent status
+  const updateAgentStatus = (agentId: string, newStatus: Agent["status"]) => {
+    setAgents((prevAgents) =>
+      prevAgents.map((agent) =>
+        agent.id === agentId ? { ...agent, status: newStatus } : agent
+      )
+    );
+  };
+
   return {
-    initialized,
+    agents,
     loading,
     error,
-    initializeAgents,
-    executeTask,
-    shutdownAgents,
-    getManagerAgent: agentService.getManagerAgent.bind(agentService),
-    getAllAgents: agentService.getAllAgents.bind(agentService),
-    getAgent: agentService.getAgent.bind(agentService),
+    updateAgentStatus,
   };
-}; 
+};

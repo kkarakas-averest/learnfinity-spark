@@ -1,4 +1,3 @@
-
 import * as React from "react";
 import { Search, Filter, X } from "lucide-react";
 import Navbar from "@/components/Navbar";
@@ -24,6 +23,7 @@ import {
 } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import React from "@/lib/react-helpers";
 
 // Mock data
 const mockCourses = [
@@ -102,16 +102,16 @@ const categories = [
 const levels = ["Beginner", "Intermediate", "Advanced"];
 
 const Courses = () => {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filteredCourses, setFilteredCourses] = useState(mockCourses);
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
-  const [selectedLevels, setSelectedLevels] = useState<string[]>([]);
-  const [sortBy, setSortBy] = useState("popular");
+  const [searchTerm, setSearchTerm] = React.useState("");
+  const [filteredCourses, setFilteredCourses] = React.useState(mockCourses);
+  const [selectedCategories, setSelectedCategories] = React.useState<string[]>([]);
+  const [selectedLevels, setSelectedLevels] = React.useState<string[]>([]);
+  const [sortBy, setSortBy] = React.useState("popular");
   
   // For mobile filter sheet state
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [isFilterOpen, setIsFilterOpen] = React.useState(false);
   
-  useEffect(() => {
+  React.useEffect(() => {
     let result = mockCourses;
     
     // Filter by search term
