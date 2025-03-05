@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from '@/lib/react-helpers';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -189,7 +190,7 @@ const EditEmployeePage = () => {
           continue;
         }
         
-        // Return the successful result
+        // Return the successful result with data
         return { success: true, data };
         
       } catch (error) {
