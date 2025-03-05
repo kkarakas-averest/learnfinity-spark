@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from '@/lib/react-helpers';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -24,8 +23,8 @@ import {
 } from '@/components/ui/alert';
 import { AlertCircle, Info, Wrench } from 'lucide-react';
 
-// Define return type for updateEmployeeWithRetry
-type UpdateEmployeeReturnType = { success: boolean; data: any } | null;
+// Define return type for updateEmployeeWithRetry - Fix: added error property to align with implementation
+type UpdateEmployeeReturnType = { success: boolean; data?: any; error?: any } | null;
 
 const EditEmployeePage = () => {
   // For debugging

@@ -6,9 +6,17 @@
 
 import React from 'react';
 
-// Export the JSX runtime for Vite/SWC
-export * from 'react/jsx-runtime';
-export * from 'react/jsx-dev-runtime';
+// Export the JSX runtime for Vite/SWC - using named imports to avoid name conflicts
+import * as jsxRuntime from 'react/jsx-runtime';
+import * as jsxDevRuntime from 'react/jsx-dev-runtime';
+
+export const jsx = jsxRuntime.jsx;
+export const jsxs = jsxRuntime.jsxs;
+export const Fragment = jsxRuntime.Fragment;
+
+// Export the dev runtime
+export const jsxDEV = jsxDevRuntime.jsxDEV;
+export const jsxsDEV = jsxDevRuntime.jsxsDEV;
 
 // Re-export common hooks and components
 export const {
@@ -32,8 +40,7 @@ export const {
   Children,
   cloneElement,
   createElement,
-  isValidElement,
-  Fragment
+  isValidElement
 } = React;
 
 // Define React types directly to avoid import issues
