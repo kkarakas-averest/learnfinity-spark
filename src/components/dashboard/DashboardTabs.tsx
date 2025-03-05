@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import React from "react";
 import { 
   LayoutDashboard, 
   Library
@@ -55,7 +55,7 @@ const mockAllLearningPaths = [
 ];
 
 const DashboardTabs = () => {
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = React.useState("overview");
 
   return (
     <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8">

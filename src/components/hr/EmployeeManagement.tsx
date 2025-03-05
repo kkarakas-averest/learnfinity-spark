@@ -1,30 +1,17 @@
-
 import * as React from 'react';
-import { 
-  Search,
-  Filter,
-  UserPlus,
-  Upload,
-  Download,
-  AlertTriangle,
-  Clock,
-  Check
-} from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Plus, Search, Filter, MoreHorizontal, Trash2, Edit, ArrowDown, ArrowUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
-import { 
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from '@/components/ui/select';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
   Table,
   TableBody,
@@ -33,446 +20,346 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
-import { toast } from 'sonner';
 import { hrEmployeeService } from '@/services/hrEmployeeService';
 import { hrDepartmentService } from '@/services/hrDepartmentService';
-import { ROUTES } from '@/lib/routes';
-import { Employee } from '@/types/hr.types';
 
-// Function to get status badge color
-const getStatusBadge = (status: string) => {
-  switch(status) {
-    case "active":
-      return "bg-green-100 text-green-800 hover:bg-green-200";
-    case "inactive":
-      return "bg-red-100 text-red-800 hover:bg-red-200";
-    case "onboarding":
-      return "bg-blue-100 text-blue-800 hover:bg-blue-200";
-    case "on_leave":
-      return "bg-amber-100 text-amber-800 hover:bg-amber-200";
-    default:
-      return "bg-gray-100 text-gray-800 hover:bg-gray-200";
-  }
-};
+// Define interfaces for type safety
+interface Employee {
+  id: string;
+  name: string;
+  email: string;
+  department: string;
+  position: string;
+  status: 'Active' | 'Inactive' | 'On Leave';
+  hireDate: string;
+}
 
-// Function to get progress color
-const getProgressColor = (progress: number) => {
-  if (progress >= 80) return "bg-green-500";
-  if (progress >= 50) return "bg-amber-500";
-  return "bg-red-500";
-};
+interface Department {
+  id: string;
+  name: string;
+}
 
 const EmployeeManagement: React.FC = () => {
-  const { toast: uiToast } = useToast();
+  const { toast } = useToast();
   const navigate = useNavigate();
-  const [isLoading, setIsLoading] = React.useState(true);
   const [employees, setEmployees] = React.useState<Employee[]>([]);
-  const [filteredEmployees, setFilteredEmployees] = React.useState<Employee[]>([]);
+  const [isLoading, setIsLoading] = React.useState(true);
   const [searchQuery, setSearchQuery] = React.useState('');
-  const [departments, setDepartments] = React.useState([]);
-  const [selectedDepartment, setSelectedDepartment] = React.useState('all');
-  const [selectedStatus, setSelectedStatus] = React.useState('all');
-  const [error, setError] = React.useState<string | null>(null);
-  
+  const [departments, setDepartments] = React.useState<Department[]>([]);
+  const [selectedDepartment, setSelectedDepartment] = React.useState<string>('all');
+  const [sortField, setSortField] = React.useState<keyof Employee>('name');
+  const [sortDirection, setSortDirection] = React.useState<'asc' | 'desc'>('asc');
+
+  // Fetch employees and departments on component mount
   React.useEffect(() => {
-    // Fetch employees and departments when component mounts
     const fetchData = async () => {
       try {
         setIsLoading(true);
-        setError(null);
         
-        console.log('Fetching employee data...');
-        
-        // Fetch all employees
-        const { data: employeeData, error: employeeError } = await hrEmployeeService.getEmployees();
-        if (employeeError) {
-          console.error('Error fetching employees:', employeeError);
-          throw employeeError;
+        // Fetch employees
+        const employeesResponse = await hrEmployeeService.getAllEmployees();
+        if (employeesResponse && employeesResponse.success && employeesResponse.employees) {
+          setEmployees(employeesResponse.employees);
         }
         
-        console.log('Employee data received:', employeeData);
-        
-        if (employeeData) {
-          setEmployees(employeeData);
-          setFilteredEmployees(employeeData);
-        }
-        
-        // Fetch departments for filtering
-        const { data: departmentData, error: departmentError } = await hrDepartmentService.getAllDepartments();
-        if (departmentError) {
-          console.error('Error fetching departments:', departmentError);
-          throw departmentError;
-        }
-        
-        console.log('Department data received:', departmentData);
-        
-        if (departmentData) {
-          setDepartments(departmentData);
+        // Fetch departments - corrected method name from getDepartments to getAllDepartments
+        const departmentsResponse = await hrDepartmentService.getAllDepartments();
+        if (departmentsResponse && departmentsResponse.success && departmentsResponse.departments) {
+          setDepartments(departmentsResponse.departments);
         }
       } catch (error) {
-        console.error('Error fetching data:', error);
-        setError(`Failed to load data: ${error.message || 'Unknown error'}`);
-        toast.error("Failed to load employee data. Please try again.");
+        console.error('Error fetching employee data:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load employee data. Please try again.",
+          variant: "destructive",
+        });
       } finally {
         setIsLoading(false);
       }
     };
-    
+
     fetchData();
   }, []);
-  
-  // Filter employees based on search query, department, and status
-  React.useEffect(() => {
-    let filtered = [...employees];
-    
-    // Filter by search query (name or email)
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        emp => emp.name.toLowerCase().includes(query) || 
-               emp.email.toLowerCase().includes(query)
-      );
-    }
-    
-    // Filter by department
-    if (selectedDepartment !== 'all') {
-      filtered = filtered.filter(emp => emp.department === selectedDepartment);
-    }
-    
-    // Filter by status
-    if (selectedStatus !== 'all') {
-      filtered = filtered.filter(emp => emp.status === selectedStatus);
-    }
-    
-    setFilteredEmployees(filtered);
-  }, [searchQuery, selectedDepartment, selectedStatus, employees]);
-  
-  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchQuery(e.target.value);
-  };
-  
-  const handleDepartmentChange = (value: string) => {
-    setSelectedDepartment(value);
-  };
-  
-  const handleStatusChange = (value: string) => {
-    setSelectedStatus(value);
-  };
-  
-  // Function to handle file upload (placeholder for CSV import)
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      const file = e.target.files[0];
-      toast({
-        title: "File selected",
-        description: `File ${file.name} selected. Processing...`,
-      });
+
+  // Filter employees based on search query and selected department
+  const filteredEmployees = React.useMemo(() => {
+    return employees.filter(employee => {
+      const matchesSearch = 
+        employee.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        employee.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        employee.position.toLowerCase().includes(searchQuery.toLowerCase());
       
-      // In a real implementation, we would process the CSV file here
-      // For now, just show a success message after a delay
-      setTimeout(() => {
-        toast({
-          title: "Import successful",
-          description: "Employees have been imported successfully.",
-        });
-      }, 2000);
-    }
-  };
-  
-  // Function to export employees as CSV (placeholder)
-  const handleExport = () => {
-    toast({
-      title: "Export started",
-      description: "Exporting employee data...",
+      const matchesDepartment = 
+        selectedDepartment === 'all' || 
+        employee.department === selectedDepartment;
+      
+      return matchesSearch && matchesDepartment;
     });
-    
-    // In a real implementation, we would generate and download a CSV file
-    // For now, just show a success message after a delay
-    setTimeout(() => {
-      toast({
-        title: "Export successful",
-        description: "Employee data has been exported successfully.",
-      });
-    }, 1000);
-  };
-  
-  // Function to handle deleting an employee
-  const handleDeleteEmployee = async (id: string, name: string) => {
-    if (confirm(`Are you sure you want to delete ${name}?`)) {
-      try {
-        const { error } = await hrEmployeeService.deleteEmployee(id);
-        
-        if (error) throw error;
-        
-        // Remove the employee from the state
-        setEmployees(employees.filter(emp => emp.id !== id));
-        toast.success(`${name} has been deleted successfully.`);
-      } catch (error) {
-        console.error('Error deleting employee:', error);
-        toast.error(`Failed to delete ${name}. Please try again.`);
+  }, [employees, searchQuery, selectedDepartment]);
+
+  // Sort employees based on sort field and direction
+  const sortedEmployees = React.useMemo(() => {
+    return [...filteredEmployees].sort((a, b) => {
+      const aValue = a[sortField];
+      const bValue = b[sortField];
+      
+      if (aValue < bValue) {
+        return sortDirection === 'asc' ? -1 : 1;
       }
+      if (aValue > bValue) {
+        return sortDirection === 'asc' ? 1 : -1;
+      }
+      return 0;
+    });
+  }, [filteredEmployees, sortField, sortDirection]);
+
+  // Handle sort column click
+  const handleSort = (field: keyof Employee) => {
+    if (field === sortField) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
     }
   };
-  
-  // Function to handle adding a new employee (redirects to the add employee page)
-  const handleAddEmployee = () => {
-    navigate(ROUTES.HR_DASHBOARD_EMPLOYEES_NEW);
+
+  // Handle employee deletion
+  const handleDeleteEmployee = async (id: string) => {
+    try {
+      const result = await hrEmployeeService.deleteEmployee(id);
+      
+      if (result && result.success) {
+        setEmployees(employees.filter(emp => emp.id !== id));
+        toast({
+          title: "Success",
+          description: "Employee has been deleted successfully.",
+        });
+      } else {
+        throw new Error(result?.error || 'Failed to delete employee');
+      }
+    } catch (error) {
+      console.error('Error deleting employee:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete employee. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
-  
-  // Function to handle editing an employee (redirects to the edit employee page)
-  const handleEditEmployee = (id: string) => {
-    navigate(ROUTES.HR_DASHBOARD_EMPLOYEES_EDIT(id));
+
+  // Get status badge color
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'Active':
+        return 'bg-green-100 text-green-800';
+      case 'Inactive':
+        return 'bg-red-100 text-red-800';
+      case 'On Leave':
+        return 'bg-yellow-100 text-yellow-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
   };
-  
-  // Display loading state
-  if (isLoading) {
-    return (
-      <div className="flex h-full items-center justify-center min-h-[60vh]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
-  
-  // Display error state
-  if (error) {
-    return (
-      <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div>
-            <h2 className="text-2xl font-bold">Employee Management</h2>
-            <p className="text-muted-foreground">
-              Manage your organization's employees and their learning progress
-            </p>
-          </div>
-        </div>
-        
-        <Card className="border-red-200">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-red-600 flex items-center">
-              <AlertTriangle className="mr-2 h-5 w-5" />
-              Error Loading Data
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p>{error}</p>
-            <Button 
-              className="mt-4" 
-              onClick={() => window.location.reload()}
-            >
-              Try Again
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold">Employee Management</h2>
-          <p className="text-muted-foreground">
-            Manage your organization's employees and their learning progress
-          </p>
+      <div className="flex items-center justify-between">
+        <h2 className="text-3xl font-bold">Employee Management</h2>
+        <Button onClick={() => navigate('/hr-dashboard/employees/new')}>
+          <Plus className="mr-2 h-4 w-4" />
+          Add Employee
+        </Button>
+      </div>
+
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search employees..."
+            className="pl-8"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
         </div>
-        <div className="flex items-center gap-2">
-          <Button onClick={handleAddEmployee}>
-            <UserPlus className="mr-2 h-4 w-4" />
-            Add Employee
-          </Button>
+        <div className="w-full sm:w-[200px]">
+          <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
+            <SelectTrigger>
+              <div className="flex items-center">
+                <Filter className="mr-2 h-4 w-4" />
+                <SelectValue placeholder="Filter by department" />
+              </div>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Departments</SelectItem>
+              {departments.map((dept) => (
+                <SelectItem key={dept.id} value={dept.id}>
+                  {dept.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
-      
-      {/* Search and Filters */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle>Search & Filters</CardTitle>
-          <CardDescription>
-            Find employees by name, email, department, or status
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="relative col-span-2">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-              <Input 
-                placeholder="Search by name or email..."
-                className="pl-9"
-                value={searchQuery}
-                onChange={handleSearch}
-              />
-            </div>
-            
-            <div>
-              <Label htmlFor="department-filter" className="sr-only">Department</Label>
-              <Select 
-                value={selectedDepartment} 
-                onValueChange={handleDepartmentChange}
-              >
-                <SelectTrigger id="department-filter" className="w-full">
-                  <SelectValue placeholder="Department" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Departments</SelectItem>
-                  {departments.map(dept => (
-                    <SelectItem key={dept.id} value={dept.name}>
-                      {dept.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div>
-              <Label htmlFor="status-filter" className="sr-only">Status</Label>
-              <Select 
-                value={selectedStatus} 
-                onValueChange={handleStatusChange}
-              >
-                <SelectTrigger id="status-filter" className="w-full">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Statuses</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
-                  <SelectItem value="onboarding">Onboarding</SelectItem>
-                  <SelectItem value="on_leave">On Leave</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          
-          <div className="flex justify-between mt-4">
-            <div className="text-sm text-muted-foreground">
-              {filteredEmployees.length} employees found
-            </div>
-            <div className="flex items-center gap-2">
-              <label htmlFor="csv-upload" className="cursor-pointer">
-                <div className="flex items-center gap-1 text-sm text-primary hover:underline">
-                  <Upload className="h-4 w-4" />
-                  Import CSV
-                </div>
-                <input 
-                  id="csv-upload" 
-                  type="file" 
-                  accept=".csv" 
-                  className="hidden" 
-                  onChange={handleFileChange}
-                />
-              </label>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="text-sm" 
-                onClick={handleExport}
-              >
-                <Download className="mr-2 h-4 w-4" />
-                Export CSV
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-      
-      {/* Employees Table */}
+
       <Card>
         <CardHeader className="pb-3">
           <CardTitle>Employees</CardTitle>
-          <CardDescription>
-            View and manage employee information and learning progress
-          </CardDescription>
         </CardHeader>
         <CardContent>
-          {filteredEmployees.length > 0 ? (
-            <div className="overflow-auto">
+          {isLoading ? (
+            <div className="h-[400px] flex items-center justify-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+            </div>
+          ) : (
+            <div className="rounded-md border">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-12">
-                      <Checkbox />
+                    <TableHead 
+                      className="cursor-pointer"
+                      onClick={() => handleSort('name')}
+                    >
+                      <div className="flex items-center">
+                        Name
+                        {sortField === 'name' && (
+                          sortDirection === 'asc' ? 
+                            <ArrowUp className="ml-1 h-4 w-4" /> : 
+                            <ArrowDown className="ml-1 h-4 w-4" />
+                        )}
+                      </div>
                     </TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Department</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Progress</TableHead>
-                    <TableHead>Last Activity</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead 
+                      className="cursor-pointer"
+                      onClick={() => handleSort('email')}
+                    >
+                      <div className="flex items-center">
+                        Email
+                        {sortField === 'email' && (
+                          sortDirection === 'asc' ? 
+                            <ArrowUp className="ml-1 h-4 w-4" /> : 
+                            <ArrowDown className="ml-1 h-4 w-4" />
+                        )}
+                      </div>
+                    </TableHead>
+                    <TableHead 
+                      className="cursor-pointer"
+                      onClick={() => handleSort('department')}
+                    >
+                      <div className="flex items-center">
+                        Department
+                        {sortField === 'department' && (
+                          sortDirection === 'asc' ? 
+                            <ArrowUp className="ml-1 h-4 w-4" /> : 
+                            <ArrowDown className="ml-1 h-4 w-4" />
+                        )}
+                      </div>
+                    </TableHead>
+                    <TableHead 
+                      className="cursor-pointer"
+                      onClick={() => handleSort('position')}
+                    >
+                      <div className="flex items-center">
+                        Position
+                        {sortField === 'position' && (
+                          sortDirection === 'asc' ? 
+                            <ArrowUp className="ml-1 h-4 w-4" /> : 
+                            <ArrowDown className="ml-1 h-4 w-4" />
+                        )}
+                      </div>
+                    </TableHead>
+                    <TableHead 
+                      className="cursor-pointer"
+                      onClick={() => handleSort('status')}
+                    >
+                      <div className="flex items-center">
+                        Status
+                        {sortField === 'status' && (
+                          sortDirection === 'asc' ? 
+                            <ArrowUp className="ml-1 h-4 w-4" /> : 
+                            <ArrowDown className="ml-1 h-4 w-4" />
+                        )}
+                      </div>
+                    </TableHead>
+                    <TableHead 
+                      className="cursor-pointer"
+                      onClick={() => handleSort('hireDate')}
+                    >
+                      <div className="flex items-center">
+                        Hire Date
+                        {sortField === 'hireDate' && (
+                          sortDirection === 'asc' ? 
+                            <ArrowUp className="ml-1 h-4 w-4" /> : 
+                            <ArrowDown className="ml-1 h-4 w-4" />
+                        )}
+                      </div>
+                    </TableHead>
+                    <TableHead className="w-[80px]">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredEmployees.map((employee) => (
-                    <TableRow key={employee.id}>
-                      <TableCell>
-                        <Checkbox />
-                      </TableCell>
-                      <TableCell>
-                        <div className="font-medium">{employee.name}</div>
-                      </TableCell>
-                      <TableCell>{employee.email}</TableCell>
-                      <TableCell>{employee.department}</TableCell>
-                      <TableCell>
-                        <Badge className={getStatusBadge(employee.status)}>
-                          {employee.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <div className="h-2 w-24 bg-gray-200 rounded-full overflow-hidden">
-                            <div
-                              className={`h-full ${getProgressColor(employee.progress)}`}
-                              style={{ width: `${employee.progress}%` }}
-                            />
-                          </div>
-                          <span className="text-xs font-medium">{employee.progress}%</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          <Clock className="h-3 w-3 text-muted-foreground" />
-                          <span className="text-xs">{employee.lastActivity}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEditEmployee(employee.id)}
-                          >
-                            Edit
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-red-500 hover:text-red-700 hover:bg-red-100"
-                            onClick={() => handleDeleteEmployee(employee.id, employee.name)}
-                          >
-                            Delete
-                          </Button>
-                        </div>
+                  {sortedEmployees.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="h-24 text-center">
+                        No employees found.
                       </TableCell>
                     </TableRow>
-                  ))}
+                  ) : (
+                    sortedEmployees.map((employee) => (
+                      <TableRow key={employee.id}>
+                        <TableCell className="font-medium">{employee.name}</TableCell>
+                        <TableCell>{employee.email}</TableCell>
+                        <TableCell>
+                          {departments.find(d => d.id === employee.department)?.name || employee.department}
+                        </TableCell>
+                        <TableCell>{employee.position}</TableCell>
+                        <TableCell>
+                          <Badge className={getStatusColor(employee.status)}>
+                            {employee.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{employee.hireDate}</TableCell>
+                        <TableCell>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" className="h-8 w-8 p-0">
+                                <span className="sr-only">Open menu</span>
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                              <DropdownMenuItem
+                                onClick={() => navigate(`/hr-dashboard/employees/${employee.id}`)}
+                              >
+                                <Edit className="mr-2 h-4 w-4" />
+                                Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                className="text-red-600"
+                                onClick={() => handleDeleteEmployee(employee.id)}
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
-            </div>
-          ) : (
-            <div className="py-12 text-center">
-              <AlertTriangle className="mx-auto h-12 w-12 text-amber-500 mb-4" />
-              <h3 className="text-lg font-medium mb-1">No employees found</h3>
-              <p className="text-muted-foreground mb-4">
-                {searchQuery || selectedDepartment !== 'all' || selectedStatus !== 'all'
-                  ? "Try adjusting your search or filters to find what you're looking for."
-                  : "Start by adding employees to your organization."}
-              </p>
-              <Button onClick={handleAddEmployee}>
-                <UserPlus className="mr-2 h-4 w-4" />
-                Add Employee
-              </Button>
             </div>
           )}
         </CardContent>

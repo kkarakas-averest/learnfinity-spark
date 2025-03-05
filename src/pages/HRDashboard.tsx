@@ -47,15 +47,16 @@ export default function HRDashboard() {
       try {
         console.log('Initializing HR database...');
         setInitError(null);
-        const result = await hrServices.initializeHRDatabase() as DatabaseInitResult;
+        // Cast the result to DatabaseInitResult since we know the structure
+        const result = await hrServices.initializeHRDatabase() as unknown as DatabaseInitResult;
         console.log('HR database initialization result:', result);
         
-        if (!result.success) {
-          throw new Error(result.error || 'Unknown database initialization error');
+        if (!result || !result.success) {
+          throw new Error(result?.error || 'Unknown database initialization error');
         }
         
         console.log('HR database initialized');
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error initializing database:', error);
         setInitError(error.message || 'Failed to initialize the HR database. Check console for details.');
         toast({
