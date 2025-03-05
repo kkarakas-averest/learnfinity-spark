@@ -30,9 +30,11 @@ export default defineConfig(({ mode }) => ({
   },
   optimizeDeps: {
     esbuildOptions: {
+      // Using string format for tsconfigRaw as that's what Vite expects
       tsconfigRaw: `{
         "compilerOptions": {
-          "allowSyntheticDefaultImports": true
+          "allowSyntheticDefaultImports": true,
+          "esModuleInterop": true
         }
       }`
     }
