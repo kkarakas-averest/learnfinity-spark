@@ -1,3 +1,6 @@
+import { clsx } from 'clsx';
+import { twMerge } from 'tailwind-merge';
+
 /**
  * Generate a secure random password
  * @param {Object} options - Password generation options
@@ -39,3 +42,12 @@ export const generateSecurePassword = ({
   
   return password;
 };
+
+/**
+ * Merge class names utility function
+ * @param {string[]} inputs - Class names to merge
+ * @returns {string} - Merged class names
+ */
+export function cn(...inputs) {
+  return twMerge(clsx(inputs));
+}
