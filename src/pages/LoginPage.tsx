@@ -42,22 +42,22 @@ const signupSchema = z.object({
 
 const LoginPage = () => {
   const { signIn, signUp, isLoading, signupDisabled, user } = useAuth();
-  const [activeTab, setActiveTab] = useState<"login" | "signup">(
+  const [activeTab, setActiveTab] = React.useState<"login" | "signup">(
     signupDisabled ? "login" : "login" // Always default to login if signup is disabled
   );
-  const [loginError, setLoginError] = useState<string | null>(null);
-  const [signupError, setSignupError] = useState<string | null>(null);
+  const [loginError, setLoginError] = React.useState<string | null>(null);
+  const [signupError, setSignupError] = React.useState<string | null>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
 
   // Clear error when tab changes
-  useEffect(() => {
+  React.useEffect(() => {
     setLoginError(null);
     setSignupError(null);
   }, [activeTab]);
 
   // Redirect if user is already authenticated
-  useEffect(() => {
+  React.useEffect(() => {
     if (user) {
       navigate('/dashboard');
     }

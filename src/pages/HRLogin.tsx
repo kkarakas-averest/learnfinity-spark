@@ -27,7 +27,7 @@ const loginSchema = z.object({
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 const HRLogin = () => {
-  const [loginError, setLoginError] = useState<string | null>(null);
+  const [loginError, setLoginError] = React.useState<string | null>(null);
   const navigate = useNavigate();
   const { login, isAuthenticated, isLoading: authLoading } = useHRAuth();
 
