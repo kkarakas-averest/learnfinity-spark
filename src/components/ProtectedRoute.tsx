@@ -1,3 +1,4 @@
+
 import React, { useEffect } from '@/lib/react-helpers';
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
