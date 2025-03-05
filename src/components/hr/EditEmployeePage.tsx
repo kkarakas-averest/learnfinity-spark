@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from '@/lib/react-helpers';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -86,19 +85,16 @@ const EditEmployeePage = () => {
 
         // Fetch employee data - using the correct method name
         if (employeeId) {
-          // Fixed: Handle the return type correctly - the hrEmployeeService.getEmployee doesn't return a data property
-          // We'll adjust the assignment to match the actual return structure
-          const result = await hrEmployeeService.getEmployee(employeeId);
+          // Get the employee data and handle the result structure correctly
+          const { data, error } = await hrEmployeeService.getEmployee(employeeId);
           
-          // Check if there's an error in the result
-          if (result.error) {
-            console.error('Error fetching employee:', result.error);
+          if (error) {
+            console.error('Error fetching employee:', error);
             toast.error('Failed to load employee data. Please check the console for details.');
-            throw result.error;
+            throw error;
           }
           
-          // If no error, use the result directly
-          setEmployeeData(result || null);
+          setEmployeeData(data || null);
         }
         
       } catch (error) {
@@ -194,7 +190,7 @@ const EditEmployeePage = () => {
         }
         
         // Return the successful result
-        return { success: true };
+        return { success: true, data };
         
       } catch (error) {
         lastError = error;

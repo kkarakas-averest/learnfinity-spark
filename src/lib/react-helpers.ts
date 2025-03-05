@@ -6,22 +6,6 @@
 
 import React from 'react';
 
-// Import React types directly
-import type {
-  ElementRef as ReactElementRef,
-  ComponentPropsWithoutRef as ReactComponentPropsWithoutRef,
-  HTMLAttributes as ReactHTMLAttributes,
-  ReactNode as ReactNodeType,
-  ReactElement as ReactElementType,
-  FC as ReactFC,
-  ChangeEvent as ReactChangeEvent,
-  FormEvent as ReactFormEvent,
-  MouseEvent as ReactMouseEvent,
-  KeyboardEvent as ReactKeyboardEvent
-} from 'react';
-
-export default React;
-
 // Re-export common hooks and components
 export const {
   useState,
@@ -48,14 +32,16 @@ export const {
   Fragment
 } = React;
 
-// Re-export types using named aliases to avoid TypeScript errors
-export type ElementRef<T = any> = ReactElementRef<T>;
-export type ComponentPropsWithoutRef<T = any> = ReactComponentPropsWithoutRef<T>;
-export type HTMLAttributes<T = any> = ReactHTMLAttributes<T>;
-export type ReactNode = ReactNodeType;
-export type ReactElement<T = any> = ReactElementType<T>;
-export type FC<T = {}> = ReactFC<T>;
-export type ChangeEvent<T = Element> = ReactChangeEvent<T>;
-export type FormEvent<T = Element> = ReactFormEvent<T>;
-export type MouseEvent<T = Element> = ReactMouseEvent<T>;
-export type KeyboardEvent<T = Element> = ReactKeyboardEvent<T>;
+// Define React types directly to avoid import issues
+export type ElementRef<T = any> = React.RefObject<T>;
+export type ComponentPropsWithoutRef<T = any> = Omit<React.ComponentProps<T>, 'ref'>;
+export type HTMLAttributes<T = any> = React.HTMLAttributes<T>;
+export type ReactNode = React.ReactNode;
+export type ReactElement<T = any> = React.ReactElement<T>;
+export type FC<T = {}> = React.FC<T>;
+export type ChangeEvent<T = Element> = React.ChangeEvent<T>;
+export type FormEvent<T = Element> = React.FormEvent<T>;
+export type MouseEvent<T = Element> = React.MouseEvent<T>;
+export type KeyboardEvent<T = Element> = React.KeyboardEvent<T>;
+
+export default React;
