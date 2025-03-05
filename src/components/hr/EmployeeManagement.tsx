@@ -1,4 +1,3 @@
-
 import * as React from 'react';
 import { 
   Search,
@@ -98,7 +97,7 @@ const EmployeeManagement: React.FC = () => {
           setFilteredEmployees(employeeData);
         }
         
-        // Fetch departments for filtering - FIX: using getDepartments() instead of getAllDepartments()
+        // Fetch departments for filtering
         const { data: departmentData, error: departmentError } = await hrDepartmentService.getDepartments();
         if (departmentError) {
           console.error('Error fetching departments:', departmentError);

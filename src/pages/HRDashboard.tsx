@@ -1,4 +1,3 @@
-
 import React from "react";
 import { Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useHRAuth } from '@/contexts/HRAuthContext';
