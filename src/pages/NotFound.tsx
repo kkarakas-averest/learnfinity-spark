@@ -1,11 +1,11 @@
 
-import React, { useEffect } from "react";
+import * as React from "react";
 import { useLocation } from "react-router-dom";
 
 const NotFound = () => {
   const location = useLocation();
 
-  useEffect(() => {
+  React.useEffect(() => {
     console.error(
       "404 Error: User attempted to access non-existent route:",
       location.pathname

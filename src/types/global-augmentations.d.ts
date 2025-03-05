@@ -1,19 +1,19 @@
 
-// This file provides global type augmentations
-
-// Define 'z' namespace for zod validation schemas
-declare namespace z {
-  export function object(schema: any): any;
-  export function string(): any;
-  export function email(): any;
-  export function password(): any;
-  export function min(length: number, message?: string): any;
+declare module "react" {
+  export = React;
+  export as namespace React;
 }
 
-// Define UserRole type
-declare type UserRole = 'learner' | 'admin' | 'superadmin';
+declare module "react-dom" {
+  export = ReactDOM;
+  export as namespace ReactDOM;
+}
 
-// Add missing utility functions
-declare module '@/lib/utils' {
-  export function debounce<F extends (...args: any[]) => any>(func: F, waitFor: number): F;
+// Augment zod's infer type for better TypeScript support
+declare module "zod" {
+  interface ZodType<Output = any, Def extends ZodTypeDef = ZodTypeDef, Input = Output> {
+    readonly _output: Output;
+    readonly _input: Input;
+    readonly _def: Def;
+  }
 }

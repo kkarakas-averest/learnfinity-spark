@@ -1,5 +1,5 @@
 
-/// <reference path="./react-augmentation.d.ts" />
-/// <reference path="./lucide-augmentation.d.ts" />
-/// <reference path="./hr-service.d.ts" />
-/// <reference path="./global-augmentations.d.ts" />
+/// <reference types="react" />
+/// <reference types="react-dom" />
+/// <reference types="lucide-react" />
+/// <reference types="zod" />

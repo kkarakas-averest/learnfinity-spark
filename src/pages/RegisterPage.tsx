@@ -38,7 +38,7 @@ const registerSchema = z.object({
   path: ["confirmPassword"],
 });
 
-// Use typeof with z.infer to correctly type the form values
+// Use typeof for z.infer to correctly type the form values
 type RegisterFormValues = z.infer<typeof registerSchema>;
 
 export default function RegisterPage() {
