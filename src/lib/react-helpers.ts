@@ -33,3 +33,17 @@ export const {
   isValidElement,
   Fragment
 } = React;
+
+// Re-export types
+export type {
+  ElementRef,
+  ComponentPropsWithoutRef,
+  HTMLAttributes,
+  ReactNode,
+  ReactElement,
+  FC,
+  ChangeEvent,
+  FormEvent,
+  MouseEvent,
+  KeyboardEvent
+} from 'react';

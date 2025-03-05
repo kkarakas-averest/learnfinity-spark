@@ -21,14 +21,34 @@ const categories = [
   "AI & Machine Learning"
 ];
 
+// Mock data for categories that don't exist in the database
+const courseCategoryMap = {
+  "Programming": ["Programming", "Development", "Coding"],
+  "Data Science": ["Data Science", "Analytics", "Statistics"],
+  "Design": ["Design", "UI/UX", "Graphic Design"],
+  "Business": ["Business", "Management", "Entrepreneurship"],
+  "Marketing": ["Marketing", "Digital Marketing", "SEO"],
+  "AI & Machine Learning": ["AI", "Machine Learning", "Deep Learning"]
+};
+
 const CoursesPage = () => {
   const { toast } = useToast();
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
-  const { isLoading, courses, error } = useCoursesData();
+  const { courses, coursesLoading: isLoading, coursesError: error } = useCoursesData();
+
+  // Add mock categories to courses since they don't have categories in the database
+  const enhancedCourses = courses.map(course => ({
+    ...course,
+    category: courseCategoryMap[Object.keys(courseCategoryMap)[Math.floor(Math.random() * Object.keys(courseCategoryMap).length)]][0],
+    level: ["Beginner", "Intermediate", "Advanced"][Math.floor(Math.random() * 3)],
+    duration: `${Math.floor(Math.random() * 10) + 1} hours`,
+    enrolled: Math.floor(Math.random() * 1000),
+    image: `https://source.unsplash.com/random/800x600?${course.title.split(' ')[0].toLowerCase()}`
+  }));
 
   // Filter courses based on search query and selected category
-  const filteredCourses = courses.filter(course => {
+  const filteredCourses = enhancedCourses.filter(course => {
     const matchesSearch = course.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
                         course.description.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = selectedCategory === "All" || course.category === selectedCategory;
@@ -126,7 +146,16 @@ const CoursesPage = () => {
               to={`/courses/${course.id}`}
               className="no-underline"
             >
-              <CourseCard course={course} />
+              <CourseCard 
+                id={course.id}
+                title={course.title}
+                description={course.description || ''}
+                category={course.category}
+                duration={course.duration}
+                level={course.level}
+                enrolled={course.enrolled}
+                image={course.image}
+              />
             </Link>
           ))}
         </div>

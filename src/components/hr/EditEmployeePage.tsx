@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from '@/lib/react-helpers';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -190,7 +189,7 @@ const EditEmployeePage = () => {
         }
         
         // Return the successful result
-        return { data };
+        return { success: true };
         
       } catch (error) {
         lastError = error;
