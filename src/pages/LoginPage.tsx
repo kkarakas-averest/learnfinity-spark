@@ -15,7 +15,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/components/ui/use-toast";
-import { Key, Mail, ShieldCheck } from "lucide-react";
+import { Key, Loader2, Mail, ShieldCheck } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 // Schema for login form
