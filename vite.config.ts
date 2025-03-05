@@ -1,3 +1,4 @@
+
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
@@ -11,7 +12,11 @@ export default defineConfig(({ mode }) => ({
     historyApiFallback: true,
   },
   plugins: [
-    react(),
+    react({
+      // Enable JSX compatibility for better TypeScript support
+      tsDecorators: true,
+      jsxImportSource: "@/lib/react-helpers",
+    }),
     mode === 'development' &&
     componentTagger(),
   ].filter(Boolean),
