@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { LogOut, Users, BookOpen, BarChart2, AlertCircle } from 'lucide-react';
 import { HRDashboardTab } from '@/types/hr.types';
 import { useToast } from '@/components/ui/use-toast';
-import { hrServices } from '@/services/hrServices';
+import { hrServices } from '@/lib/services/hrServices';
 import { useAuth } from '../contexts/AuthContext';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card } from '@/components/ui/card';

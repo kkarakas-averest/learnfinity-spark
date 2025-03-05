@@ -16,8 +16,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
-import { hrEmployeeService } from '@/services/hrEmployeeService';
-import { hrServices } from '@/services/hrServices';
+import { hrEmployeeService } from '@/lib/services/hrEmployeeService';
+import { hrServices } from '@/lib/services/hrServices';
 
 const DashboardOverview: React.FC = () => {
   const { toast } = useToast();
