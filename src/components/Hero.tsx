@@ -1,4 +1,4 @@
-import * as React from "react";
+import React, { useEffect } from '@/lib/react-helpers';
 import { cn } from "@/lib/utils";
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";

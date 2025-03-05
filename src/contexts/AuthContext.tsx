@@ -1,6 +1,4 @@
-import * as React from "react";
-// Create local constants for React hooks
-const { createContext, useContext, useEffect, useState } = React;
+import React, { createContext, useContext, useEffect, useState } from '@/lib/react-helpers';
 // Use React.ReactNode instead of importing it separately
 import { User, Session } from '@supabase/supabase-js';
 import { createClient } from '@supabase/supabase-js';

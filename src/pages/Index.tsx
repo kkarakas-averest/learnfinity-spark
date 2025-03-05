@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from '@/lib/react-helpers';
 import { cn } from "@/lib/utils";
 import { ArrowRight, Bookmark, Layers, Zap } from "lucide-react";
 import { Link } from "react-router-dom";

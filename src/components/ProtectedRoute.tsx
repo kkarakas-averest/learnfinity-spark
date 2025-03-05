@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from '@/lib/react-helpers';
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { UserRole } from "@/lib/database.types";

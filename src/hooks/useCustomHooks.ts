@@ -1,9 +1,6 @@
-import * as React from "react";
+import React, { useState, useEffect, useRef, useCallback } from '@/lib/react-helpers';
 import { toast } from '@/hooks/use-toast';
 import { debounce } from '@/lib/utils';
-
-// Create local constants for React hooks
-const { useState, useEffect, useRef, useCallback } = React;
 
 /**
  * Hook for managing asynchronous operations with loading and error states
