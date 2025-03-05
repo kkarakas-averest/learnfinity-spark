@@ -16,7 +16,7 @@ export const Fragment = jsxRuntime.Fragment;
 
 // Export the dev runtime
 export const jsxDEV = jsxDevRuntime.jsxDEV;
-export const jsxsDEV = jsxDevRuntime.jsxsDEV;
+// jsxsDEV doesn't exist in React's JSX dev runtime, so we're removing it
 
 // Re-export common hooks and components
 export const {

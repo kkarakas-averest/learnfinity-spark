@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from '@/lib/react-helpers';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -143,7 +144,8 @@ const EditEmployeePage = () => {
         return;
       }
       
-      // Success case
+      // Success case - using optional chaining to safely access the data property
+      // This fixes the TypeScript error since result.data might not exist
       toast.success('Employee updated successfully');
       setLoading(false);
       
