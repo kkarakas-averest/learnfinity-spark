@@ -1,6 +1,5 @@
-
 import { Employee } from './hrEmployeeService';
-import { hrEmployeeService } from '/dev-server/src/services/hrEmployeeService';
+import { hrEmployeeService } from './hrEmployeeService';
 
 // Mock data for dashboard and activity
 const mockDashboardMetrics = {

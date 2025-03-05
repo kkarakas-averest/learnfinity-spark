@@ -379,4 +379,4 @@ const hrDepartmentService = {
   }
 };
 
-export default hrDepartmentService; 
+export { hrDepartmentService }; 

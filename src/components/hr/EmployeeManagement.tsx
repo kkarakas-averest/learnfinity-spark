@@ -34,8 +34,8 @@ import {
 } from '@/components/ui/table';
 import { useToast } from '@/components/ui/use-toast';
 import { toast } from 'sonner';
-import { hrEmployeeService } from '@/lib/services/hrEmployeeService';
-import { hrDepartmentService } from '@/lib/services/hrDepartmentService';
+import { hrEmployeeService } from '@/services/hrEmployeeService';
+import { hrDepartmentService } from '@/services/hrDepartmentService';
 import { ROUTES } from '@/lib/routes';
 import { Employee } from '@/types/hr.types';
 
@@ -88,7 +88,7 @@ const EmployeeManagement: React.FC = () => {
         }
         
         // Fetch departments for filtering
-        const { data: departmentData, error: departmentError } = await hrDepartmentService.getDepartments();
+        const { data: departmentData, error: departmentError } = await hrDepartmentService.getAllDepartments();
         if (departmentError) throw departmentError;
         if (departmentData) {
           setDepartments(departmentData);

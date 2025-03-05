@@ -22,7 +22,7 @@ import ProfileSettings from "@/pages/ProfileSettings";
 import Billing from "@/pages/Billing";
 import CreateEmployeePage from "@/components/hr/CreateEmployeePage";
 import EditEmployeePage from "@/components/hr/EditEmployeePage";
-import { hrEmployeeService } from '@/lib/services/hrEmployeeService';
+import { hrEmployeeService } from '@/services/hrEmployeeService';
 import { toast } from "@/components/ui/use-toast";
 
 import "./App.css";
