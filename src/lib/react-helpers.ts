@@ -4,7 +4,10 @@
  * It helps ensure the same import style is used throughout the codebase.
  */
 
-import React, { 
+import React from 'react';
+
+// Import React types directly
+import type {
   ElementRef as ReactElementRef,
   ComponentPropsWithoutRef as ReactComponentPropsWithoutRef,
   HTMLAttributes as ReactHTMLAttributes,
