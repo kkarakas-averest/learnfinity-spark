@@ -12,7 +12,7 @@ const EmployeeManagement = () => {
     setIsLoading(true);
     try {
       const result = await hrEmployeeService.getEmployees();
-      if (result && result.success && result.employees) {
+      if (result && result.success && Array.isArray(result.employees)) {
         setEmployees(result.employees);
       } else {
         console.error("Failed to fetch employees:", result?.error || "Unknown error");

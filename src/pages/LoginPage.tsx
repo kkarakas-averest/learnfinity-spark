@@ -201,7 +201,7 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <Button variant="secondary" className="w-full gap-2" onClick={adminForm.handleSubmit(onAdminSubmit)}>
+        <Button variant="secondary" className="w-full gap-2" onClick={() => adminForm.handleSubmit(onAdminSubmit)()}>
           <ShieldCheck className="h-4 w-4" />
           Sign in as Admin
         </Button>
