@@ -1,6 +1,6 @@
+
 // add console logs to help debug navigation issues
 import * as React from "react";
-import { createContext, useContext, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ROUTES } from "@/lib/routes";
 
@@ -19,7 +19,7 @@ interface HRAuthContextProps {
 }
 
 // Create the context with a default value
-const HRAuthContext = createContext<HRAuthContextProps>({
+const HRAuthContext = React.createContext<HRAuthContextProps>({
   hrUser: null,
   isAuthenticated: false,
   login: async () => false,
@@ -27,20 +27,20 @@ const HRAuthContext = createContext<HRAuthContextProps>({
 });
 
 // Create a custom hook to use the context
-export const useHRAuth = () => useContext(HRAuthContext);
+export const useHRAuth = () => React.useContext(HRAuthContext);
 
 // Create the provider component
 export const HRAuthProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const [hrUser, setHRUser] = useState<HRUser | null>(() => {
+  const [hrUser, setHRUser] = React.useState<HRUser | null>(() => {
     const storedUser = localStorage.getItem("hrUser");
     return storedUser ? JSON.parse(storedUser) : null;
   });
-  const [isAuthenticated, setIsAuthenticated] = useState(!!hrUser);
+  const [isAuthenticated, setIsAuthenticated] = React.useState(!!hrUser);
   const navigate = useNavigate();
 
-  useEffect(() => {
+  React.useEffect(() => {
     // Check if the user is already authenticated on component mount
     if (hrUser) {
       setIsAuthenticated(true);
@@ -48,7 +48,7 @@ export const HRAuthProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [hrUser]);
 
   // Add debugging logs to login/logout functions
-  const login = async (username, password) => {
+  const login = async (username: string, password: string) => {
     console.log("HRAuthContext: Attempting login");
     try {
       // Simulate authentication logic (replace with actual authentication)

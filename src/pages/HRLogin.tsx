@@ -1,3 +1,4 @@
+
 import * as React from "react";
 import { useNavigate } from "react-router-dom";
 import { useHRAuth } from "@/contexts/HRAuthContext";
@@ -12,7 +13,7 @@ const HRLogin = () => {
   const [username, setUsername] = React.useState("");
   const [password, setPassword] = React.useState("");
 
-  const handleLogin = async (e) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     console.log("HRLogin: Attempting login");
     try {
