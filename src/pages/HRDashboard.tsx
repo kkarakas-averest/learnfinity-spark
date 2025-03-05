@@ -1,3 +1,4 @@
+
 import React from "react";
 import { Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useHRAuth } from '@/contexts/HRAuthContext';
@@ -14,6 +15,12 @@ import { Card } from '@/components/ui/card';
 // Import HR components
 const DashboardOverview = React.lazy(() => import('@/components/hr/DashboardOverview'));
 const EmployeeManagement = React.lazy(() => import('@/components/hr/EmployeeManagement'));
+
+// Define a type for the database initialization result
+interface DatabaseInitResult {
+  success: boolean;
+  error?: string;
+}
 
 export default function HRDashboard() {
   const { toast } = useToast();
@@ -40,7 +47,7 @@ export default function HRDashboard() {
       try {
         console.log('Initializing HR database...');
         setInitError(null);
-        const result = await hrServices.initializeHRDatabase();
+        const result = await hrServices.initializeHRDatabase() as DatabaseInitResult;
         console.log('HR database initialization result:', result);
         
         if (!result.success) {

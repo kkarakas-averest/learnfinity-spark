@@ -1,3 +1,4 @@
+
 import * as React from 'react';
 import { 
   Search,
@@ -98,7 +99,7 @@ const EmployeeManagement: React.FC = () => {
         }
         
         // Fetch departments for filtering
-        const { data: departmentData, error: departmentError } = await hrDepartmentService.getDepartments();
+        const { data: departmentData, error: departmentError } = await hrDepartmentService.getAllDepartments();
         if (departmentError) {
           console.error('Error fetching departments:', departmentError);
           throw departmentError;

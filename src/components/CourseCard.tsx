@@ -1,4 +1,5 @@
 
+// Import React directly without destructuring
 import React from "react";
 import { Link } from "react-router-dom";
 import { Clock, BarChart2, Users } from "lucide-react";
@@ -29,6 +30,7 @@ const CourseCard = ({
   image,
   progress,
 }: CourseCardProps) => {
+  // Use React.useState instead of destructuring useState
   const [isHovered, setIsHovered] = React.useState(false);
 
   const getLevelColor = (level: string) => {
