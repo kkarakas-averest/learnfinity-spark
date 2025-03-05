@@ -18,6 +18,7 @@ import { useHRAuth } from "@/contexts/HRAuthContext";
 import { toast } from "@/components/ui/use-toast";
 import { Loader2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { ROUTES } from "@/lib/routes";
 
 const formSchema = z.object({
   username: z.string().min(1, "Username is required"),
@@ -54,7 +55,7 @@ export default function HRLogin() {
         description: "You've successfully logged in as HR.",
       });
       
-      navigate("/hr-dashboard");
+      navigate(ROUTES.HR_DASHBOARD);
     } catch (error: any) {
       console.error("HR Login error:", error);
       setError(error.message || "Failed to sign in. Please check your credentials.");

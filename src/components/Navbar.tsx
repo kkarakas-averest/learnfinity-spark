@@ -25,6 +25,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { UserRole } from "@/lib/database.types";
 import { isSupabaseConfigured } from "@/lib/supabase";
+import { ROUTES } from "@/lib/routes";
 
 // Navigation items configuration
 const NAV_ITEMS = {
@@ -235,7 +236,7 @@ const Navbar = () => {
               // AUTHENTICATED USER: Show profile dropdown
               <div className="flex items-center gap-4">
                 {userDetails?.role && userDetails.role !== "learner" && (
-                  <Link to={userDetails.role === "superadmin" ? "/admin" : "/hr"}>
+                  <Link to={userDetails.role === "superadmin" ? ROUTES.ADMIN_DASHBOARD : ROUTES.HR_DASHBOARD}>
                     <Badge className="hidden md:inline-flex">
                       {userDetails.role === "superadmin" ? "Admin Panel" : "HR Dashboard"}
                     </Badge>

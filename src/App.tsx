@@ -115,7 +115,7 @@ function App() {
                   <CreateEmployeePage />
                 </HRAuthProvider>
               } />
-              <Route path="/hr-dashboard/employees/:id/edit" element={
+              <Route path={ROUTES.HR_DASHBOARD_EMPLOYEES_EDIT} element={
                 <HRAuthProvider>
                   <EditEmployeePage />
                 </HRAuthProvider>

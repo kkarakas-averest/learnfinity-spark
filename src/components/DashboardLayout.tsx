@@ -17,6 +17,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
+import { ROUTES } from "@/lib/routes";
 
 type SidebarItem = {
   title: string;
@@ -59,10 +60,10 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
     { title: "AI Management", icon: BrainCircuit, href: "/admin/ai", role: "superadmin" },
     
     // HR items
-    { title: "Dashboard", icon: BarChart2, href: "/hr", role: "hr" },
-    { title: "Employees", icon: Users, href: "/hr/employees", role: "hr" },
-    { title: "Learning Path", icon: GraduationCap, href: "/hr/learning-path", role: "hr" },
-    { title: "Reports", icon: FileSpreadsheet, href: "/hr/reports", role: "hr" },
+    { title: "Dashboard", icon: BarChart2, href: ROUTES.HR_DASHBOARD, role: "hr" },
+    { title: "Employees", icon: Users, href: ROUTES.HR_DASHBOARD_EMPLOYEES, role: "hr" },
+    { title: "Learning Path", icon: GraduationCap, href: ROUTES.HR_DASHBOARD_COURSES, role: "hr" },
+    { title: "Reports", icon: FileSpreadsheet, href: ROUTES.HR_DASHBOARD_REPORTS, role: "hr" },
     
     // Learner items
     { title: "Dashboard", icon: BarChart2, href: "/dashboard", role: "learner" },
