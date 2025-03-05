@@ -1,20 +1,19 @@
 
-import { z as zodInstance } from 'zod';
+// This file provides global type augmentations
 
-declare global {
-  namespace z {
-    export const object: typeof zodInstance.object;
-    export const string: typeof zodInstance.string;
-    export const number: typeof zodInstance.number;
-    export const boolean: typeof zodInstance.boolean;
-    export const array: typeof zodInstance.array;
-    export const infer: typeof zodInstance.infer;
-    
-    export type infer<T> = zodInstance.infer<T>;
-  }
-
-  // Add UserRole type to fix App.tsx error
-  type UserRole = "learner" | "mentor" | "hr" | "superadmin" | "admin";
+// Define 'z' namespace for zod validation schemas
+declare namespace z {
+  export function object(schema: any): any;
+  export function string(): any;
+  export function email(): any;
+  export function password(): any;
+  export function min(length: number, message?: string): any;
 }
 
-export {};
+// Define UserRole type
+declare type UserRole = 'learner' | 'admin' | 'superadmin';
+
+// Add missing utility functions
+declare module '@/lib/utils' {
+  export function debounce<F extends (...args: any[]) => any>(func: F, waitFor: number): F;
+}

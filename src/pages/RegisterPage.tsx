@@ -1,92 +1,53 @@
+
 import * as React from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/lib/supabase";
-import { isSupabaseConfigured } from "@/lib/supabase";
-import { UserRole } from "@/lib/database.types";
-import { useToast } from "@/hooks/use-toast";
-
-// UI Components
 import { Button } from "@/components/ui/button";
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
-import { 
-  Card, 
-  CardContent, 
-  CardDescription, 
-  CardFooter, 
-  CardHeader, 
-  CardTitle 
-} from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { ArrowLeft, Loader2, AlertCircle, Info, Check } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "@/components/ui/use-toast";
+import { Loader2 } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
-// Define the registration schema with extended profile fields
+// Schema for registration form
 const registerSchema = z.object({
-  // Basic account info
-  name: z.string().min(2, { message: "Name must be at least 2 characters." }),
-  email: z.string().email({ message: "Please enter a valid email address." }),
-  password: z
-    .string()
-    .min(8, { message: "Password must be at least 8 characters." })
-    .regex(/[A-Z]/, { message: "Password must contain at least one uppercase letter." })
-    .regex(/[a-z]/, { message: "Password must contain at least one lowercase letter." })
-    .regex(/[0-9]/, { message: "Password must contain at least one number." }),
-  confirmPassword: z.string(),
-  
-  // Profile details
-  jobTitle: z.string().optional(),
-  company: z.string().optional(),
-  bio: z.string().max(500, { message: "Bio must not exceed 500 characters." }).optional(),
-  interests: z.string().max(200, { message: "Interests must not exceed 200 characters." }).optional(),
-  experienceLevel: z.enum(["beginner", "intermediate", "advanced"]).optional(),
-  
-  // Contact and social media
-  phoneNumber: z.string().optional(),
-  linkedinUrl: z.string().url({ message: "Please enter a valid URL." }).optional().or(z.literal("")),
-  githubUrl: z.string().url({ message: "Please enter a valid URL." }).optional().or(z.literal("")),
-  
-  // Preferences
-  receiveNotifications: z.boolean().default(true),
-  termsAccepted: z.literal(true, {
-    errorMap: () => ({ message: "You must accept the terms and conditions." }),
+  name: z.string().min(2, {
+    message: "Name must be at least 2 characters.",
   }),
-}).refine(data => data.password === data.confirmPassword, {
-  message: "Passwords do not match",
+  email: z.string().email({
+    message: "Please enter a valid email address.",
+  }),
+  password: z.string().min(6, {
+    message: "Password must be at least 6 characters.",
+  }),
+  confirmPassword: z.string().min(6, {
+    message: "Confirm password must be at least 6 characters.",
+  }),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords don't match",
   path: ["confirmPassword"],
 });
 
 type RegisterFormValues = z.infer<typeof registerSchema>;
 
-const RegisterPage = () => {
-  const { signUp, user, isLoading: authLoading } = useAuth();
-  const [registrationStep, setRegistrationStep] = useState<number>(1);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [registrationError, setRegistrationError] = useState<string | null>(null);
+export default function RegisterPage() {
+  const { signUp } = useAuth();
   const navigate = useNavigate();
-  const { toast } = useToast();
-
+  
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  const [registrationComplete, setRegistrationComplete] = React.useState(false);
+  
   const form = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
@@ -94,536 +55,201 @@ const RegisterPage = () => {
       email: "",
       password: "",
       confirmPassword: "",
-      jobTitle: "",
-      company: "",
-      bio: "",
-      interests: "",
-      experienceLevel: "beginner",
-      phoneNumber: "",
-      linkedinUrl: "",
-      githubUrl: "",
-      receiveNotifications: true,
-      termsAccepted: false,
     },
   });
 
-  // Check if user is already logged in
-  useEffect(() => {
-    if (user) {
-      navigate('/dashboard');
-    }
-  }, [user, navigate]);
-
-  // Check if Supabase is configured correctly
-  useEffect(() => {
-    if (!isSupabaseConfigured()) {
-      setRegistrationError("Authentication service is not configured properly. Please contact support.");
-    }
-  }, []);
-
-  const onSubmit = async (values: RegisterFormValues) => {
+  // Handle form submission
+  const onSubmit = async (data: RegisterFormValues) => {
+    setLoading(true);
+    setError(null);
+    
     try {
-      setIsSubmitting(true);
-      setRegistrationError(null);
+      const { name, email, password } = data;
       
-      console.log("Starting registration with:", values.email);
+      // Call sign up function from auth context
+      await signUp(email, password, name);
       
-      // Create the user in Supabase Auth
-      await signUp(values.email, values.password, values.name, "learner");
+      // Set registration complete flag and display success message
+      setRegistrationComplete(true);
       
-      // After signup succeeds, store additional profile information in a separate profile table
-      // This assumes that the AuthContext's signUp function properly creates the user in the users table
-      // and signs the user in, so we'll have access to the user's ID
-      const { data: { user: newUser } } = await supabase.auth.getUser();
-      
-      if (newUser?.id) {
-        // Additional profile data to store
-        const profileData = {
-          user_id: newUser.id,
-          job_title: values.jobTitle || null,
-          company: values.company || null,
-          bio: values.bio || null,
-          interests: values.interests || null,
-          experience_level: values.experienceLevel || "beginner",
-          phone_number: values.phoneNumber || null,
-          linkedin_url: values.linkedinUrl || null,
-          github_url: values.githubUrl || null,
-          receive_notifications: values.receiveNotifications,
-        };
-        
-        // First, check if the user_profiles table exists
-        const { error: tableCheckError } = await supabase
-          .from('user_profiles')
-          .select('user_id')
-          .limit(1);
-          
-        if (tableCheckError) {
-          console.warn('user_profiles table likely does not exist yet, will create it if possible');
-          
-          // Try to create the table if it doesn't exist (this would typically be done via migrations)
-          // Note: This approach is simplified and not recommended for production
-          try {
-            const createTableSQL = `
-              CREATE TABLE IF NOT EXISTS public.user_profiles (
-                user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-                job_title TEXT,
-                company TEXT,
-                bio TEXT,
-                interests TEXT,
-                experience_level TEXT,
-                phone_number TEXT,
-                linkedin_url TEXT,
-                github_url TEXT,
-                receive_notifications BOOLEAN DEFAULT TRUE,
-                created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW()),
-                updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
-              );
-            `;
-            
-            await supabase.rpc('execute_sql', { sql: createTableSQL });
-            console.log('Created user_profiles table');
-          } catch (createError) {
-            console.error('Failed to create user_profiles table:', createError);
-          }
-        }
-        
-        // Now attempt to insert the profile data
-        const { error: insertError } = await supabase
-          .from('user_profiles')
-          .insert(profileData);
-          
-        if (insertError) {
-          console.warn('Failed to save extended profile data:', insertError);
-          // We'll continue even if saving extended profile fails
-          // The core user data is already saved
-        }
-      }
-      
-      // Show success message
       toast({
-        title: "Registration Successful",
-        description: "Your account has been created. Welcome to Learnfinity!",
+        title: "Account created!",
+        description: "You've successfully registered. Please verify your email.",
       });
       
-      // Redirect will be handled by the useEffect that checks for user
+      // Navigate to login page after a delay
+      setTimeout(() => {
+        navigate("/login");
+      }, 3000);
     } catch (error: any) {
-      console.error("Registration failed:", error);
-      setRegistrationError(error.message || "Registration failed. Please try again or contact support.");
+      console.error("Registration error:", error);
+      setError(error.message || "Failed to create account. Please try again.");
       
-      // Show error toast
       toast({
-        title: "Registration Failed",
-        description: error.message || "There was an issue creating your account. Please try again.",
         variant: "destructive",
+        title: "Registration failed",
+        description: error.message || "Failed to create account. Please try again.",
       });
     } finally {
-      setIsSubmitting(false);
+      setLoading(false);
     }
   };
 
-  const nextStep = () => {
-    // Validate current step fields before proceeding
-    if (registrationStep === 1) {
-      const basicInfoValid = form.trigger(['name', 'email', 'password', 'confirmPassword']);
-      if (basicInfoValid) {
-        setRegistrationStep(2);
+  // Redirect to login page if registration is complete
+  React.useEffect(() => {
+    if (registrationComplete) {
+      const timer = setTimeout(() => {
+        navigate("/login");
+      }, 3000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [registrationComplete, navigate]);
+
+  // Prevent form submission if already loading
+  React.useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (loading) {
+        e.preventDefault();
+        e.returnValue = "";
       }
-    } else if (registrationStep === 2) {
-      setRegistrationStep(3);
-    }
-  };
-
-  const prevStep = () => {
-    setRegistrationStep(registrationStep - 1);
-  };
-
-  // Render loading state if auth is still initializing
-  if (authLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
+    };
+    
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [loading]);
 
   return (
-    <div className="min-h-screen bg-secondary/20 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-3xl mx-auto">
-        <div className="mb-8 text-center">
-          <Link to="/" className="inline-block mb-6">
-            <h1 className="text-3xl font-bold">Learnfinity</h1>
-          </Link>
-          <h2 className="text-2xl font-bold tracking-tight">Create Your Account</h2>
-          <p className="mt-2 text-muted-foreground">
-            Join our community and start your personalized learning journey
+    <div className="container flex h-screen w-screen flex-col items-center justify-center">
+      <div className="mx-auto flex w-full flex-col justify-center space-y-6 sm:w-[350px]">
+        <div className="flex flex-col space-y-2 text-center">
+          <h1 className="text-2xl font-semibold tracking-tight">
+            Create an account
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Enter your information below to create your account
           </p>
         </div>
-        
-        {registrationError && (
-          <Alert variant="destructive" className="mb-6">
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Registration Error</AlertTitle>
-            <AlertDescription>{registrationError}</AlertDescription>
+
+        {error && (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
-        
-        <Card className="mb-6">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <div className={`h-8 w-8 rounded-full flex items-center justify-center ${registrationStep >= 1 ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
-                  {registrationStep > 1 ? <Check className="h-4 w-4" /> : "1"}
-                </div>
-                <div className={`h-1 w-12 ${registrationStep > 1 ? 'bg-primary' : 'bg-muted'}`}></div>
-                <div className={`h-8 w-8 rounded-full flex items-center justify-center ${registrationStep >= 2 ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
-                  {registrationStep > 2 ? <Check className="h-4 w-4" /> : "2"}
-                </div>
-                <div className={`h-1 w-12 ${registrationStep > 2 ? 'bg-primary' : 'bg-muted'}`}></div>
-                <div className={`h-8 w-8 rounded-full flex items-center justify-center ${registrationStep >= 3 ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
-                  3
-                </div>
-              </div>
-              <div className="text-sm text-muted-foreground">
-                Step {registrationStep} of 3
-              </div>
+
+        {registrationComplete ? (
+          <div className="flex flex-col items-center justify-center space-y-4">
+            <div className="rounded-full bg-green-100 p-3">
+              <svg
+                className="h-6 w-6 text-green-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M5 13l4 4L19 7"
+                ></path>
+              </svg>
             </div>
-            <CardTitle>
-              {registrationStep === 1 && "Account Information"}
-              {registrationStep === 2 && "Professional Profile"}
-              {registrationStep === 3 && "Preferences & Terms"}
-            </CardTitle>
-            <CardDescription>
-              {registrationStep === 1 && "Create your account credentials"}
-              {registrationStep === 2 && "Tell us about yourself"}
-              {registrationStep === 3 && "Set your preferences and complete registration"}
-            </CardDescription>
-          </CardHeader>
-          
-          <CardContent>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                {/* Step 1: Account Information */}
-                {registrationStep === 1 && (
-                  <>
-                    <FormField
-                      control={form.control}
-                      name="name"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Full Name</FormLabel>
-                          <FormControl>
-                            <Input placeholder="John Doe" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="email"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Email</FormLabel>
-                          <FormControl>
-                            <Input placeholder="you@example.com" type="email" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="password"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Password</FormLabel>
-                          <FormControl>
-                            <Input placeholder="••••••••" type="password" {...field} />
-                          </FormControl>
-                          <FormDescription>
-                            Password must be at least 8 characters with uppercase, lowercase, and a number.
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="confirmPassword"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Confirm Password</FormLabel>
-                          <FormControl>
-                            <Input placeholder="••••••••" type="password" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </>
+            <p className="text-center text-sm">
+              Account created successfully! Redirecting to login...
+            </p>
+          </div>
+        ) : (
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Your name" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
                 )}
-                
-                {/* Step 2: Professional Profile */}
-                {registrationStep === 2 && (
-                  <>
-                    <FormField
-                      control={form.control}
-                      name="jobTitle"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Job Title</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Software Engineer" {...field} />
-                          </FormControl>
-                          <FormDescription>
-                            Your current role or position
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="company"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Company / Organization</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Acme Inc." {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="experienceLevel"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Experience Level</FormLabel>
-                          <Select 
-                            onValueChange={field.onChange} 
-                            defaultValue={field.value}
-                          >
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select your experience level" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="beginner">Beginner</SelectItem>
-                              <SelectItem value="intermediate">Intermediate</SelectItem>
-                              <SelectItem value="advanced">Advanced</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormDescription>
-                            This helps us personalize your learning content
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="bio"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Bio</FormLabel>
-                          <FormControl>
-                            <Textarea 
-                              placeholder="Tell us a bit about yourself and your learning goals..." 
-                              className="min-h-[120px]" 
-                              {...field} 
-                            />
-                          </FormControl>
-                          <FormDescription>
-                            A brief description about yourself (max 500 characters)
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="interests"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Learning Interests</FormLabel>
-                          <FormControl>
-                            <Input 
-                              placeholder="AI, Web Development, UX Design..."
-                              {...field} 
-                            />
-                          </FormControl>
-                          <FormDescription>
-                            Comma-separated topics you're interested in learning
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </>
+              />
+              
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email</FormLabel>
+                    <FormControl>
+                      <Input placeholder="name@example.com" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
                 )}
-                
-                {/* Step 3: Preferences & Terms */}
-                {registrationStep === 3 && (
-                  <>
-                    <h3 className="text-lg font-semibold">Contact Information</h3>
-                    <div className="space-y-4">
-                      <FormField
-                        control={form.control}
-                        name="phoneNumber"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Phone Number (Optional)</FormLabel>
-                            <FormControl>
-                              <Input placeholder="+1 (555) 123-4567" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
+              />
+              
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Password</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="••••••••"
+                        type="password"
+                        {...field}
                       />
-                      
-                      <FormField
-                        control={form.control}
-                        name="linkedinUrl"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>LinkedIn Profile (Optional)</FormLabel>
-                            <FormControl>
-                              <Input placeholder="https://www.linkedin.com/in/yourname" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <FormField
-                        control={form.control}
-                        name="githubUrl"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>GitHub Profile (Optional)</FormLabel>
-                            <FormControl>
-                              <Input placeholder="https://github.com/yourusername" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                    
-                    <Separator className="my-6" />
-                    
-                    <h3 className="text-lg font-semibold">Preferences</h3>
-                    <div className="space-y-4">
-                      <FormField
-                        control={form.control}
-                        name="receiveNotifications"
-                        render={({ field }) => (
-                          <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                            <FormControl>
-                              <Checkbox
-                                checked={field.value}
-                                onCheckedChange={field.onChange}
-                              />
-                            </FormControl>
-                            <div className="space-y-1 leading-none">
-                              <FormLabel>Receive Notifications</FormLabel>
-                              <FormDescription>
-                                Get updates about new courses, features, and learning opportunities
-                              </FormDescription>
-                            </div>
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <FormField
-                        control={form.control}
-                        name="termsAccepted"
-                        render={({ field }) => (
-                          <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                            <FormControl>
-                              <Checkbox
-                                checked={field.value}
-                                onCheckedChange={field.onChange}
-                              />
-                            </FormControl>
-                            <div className="space-y-1 leading-none">
-                              <FormLabel>Terms and Conditions</FormLabel>
-                              <FormDescription>
-                                I agree to the <Link to="#" className="text-primary hover:underline">Terms of Service</Link> and <Link to="#" className="text-primary hover:underline">Privacy Policy</Link>
-                              </FormDescription>
-                            </div>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                  </>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
                 )}
-                
-                <div className="flex justify-between pt-4">
-                  {registrationStep > 1 ? (
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      onClick={prevStep}
-                    >
-                      <ArrowLeft className="mr-2 h-4 w-4" />
-                      Back
-                    </Button>
-                  ) : (
-                    <Button 
-                      type="button" 
-                      variant="outline"
-                      asChild
-                    >
-                      <Link to="/login">
-                        <ArrowLeft className="mr-2 h-4 w-4" />
-                        Back to Login
-                      </Link>
-                    </Button>
-                  )}
-                  
-                  {registrationStep < 3 ? (
-                    <Button type="button" onClick={nextStep}>
-                      Next
-                    </Button>
-                  ) : (
-                    <Button type="submit" disabled={isSubmitting}>
-                      {isSubmitting ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Creating Account...
-                        </>
-                      ) : (
-                        "Complete Registration"
-                      )}
-                    </Button>
-                  )}
-                </div>
-              </form>
-            </Form>
-          </CardContent>
-        </Card>
-        
-        <div className="text-center text-sm text-muted-foreground">
+              />
+              
+              <FormField
+                control={form.control}
+                name="confirmPassword"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Confirm Password</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="••••••••"
+                        type="password"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Creating account...
+                  </>
+                ) : (
+                  "Sign Up"
+                )}
+              </Button>
+            </form>
+          </Form>
+        )}
+
+        <div className="px-8 text-center text-sm text-muted-foreground">
           Already have an account?{" "}
-          <Link to="/login" className="font-semibold text-primary hover:underline">
-            Sign in here
+          <Link
+            to="/login"
+            className="underline underline-offset-4 hover:text-primary"
+          >
+            Sign in
           </Link>
         </div>
       </div>
     </div>
   );
-};
-
-export default RegisterPage; 
+}

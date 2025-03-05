@@ -66,12 +66,12 @@ const EmployeeManagement: React.FC = () => {
         setIsLoading(true);
         
         // Fetch employees
-        const employeesResponse = await hrEmployeeService.getAllEmployees();
+        const employeesResponse = await hrEmployeeService.getEmployees();
         if (employeesResponse && employeesResponse.success && employeesResponse.employees) {
           setEmployees(employeesResponse.employees);
         }
         
-        // Fetch departments - corrected method name from getDepartments to getAllDepartments
+        // Fetch departments
         const departmentsResponse = await hrDepartmentService.getAllDepartments();
         if (departmentsResponse && departmentsResponse.success && departmentsResponse.departments) {
           setDepartments(departmentsResponse.departments);

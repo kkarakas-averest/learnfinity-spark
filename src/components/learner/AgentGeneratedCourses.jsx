@@ -1,3 +1,4 @@
+
 import * as React from "react";
 import { useAuth } from '@/contexts/AuthContext';
 import { Award, BookOpen, CheckCircle, Clock, Info, Sparkles } from 'lucide-react';
@@ -13,13 +14,13 @@ import { useNavigate } from 'react-router-dom';
 const AgentGeneratedCourses = () => {
   const { user, userDetails } = useAuth();
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [courses, setCourses] = useState([]);
-  const [learningPath, setLearningPath] = useState(null);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState(null);
+  const [courses, setCourses] = React.useState([]);
+  const [learningPath, setLearningPath] = React.useState(null);
   
   // Fetch courses when the component mounts
-  useEffect(() => {
+  React.useEffect(() => {
     const fetchCourses = async () => {
       if (!user) return;
       
@@ -216,4 +217,4 @@ const AgentGeneratedCourses = () => {
   );
 };
 
-export default AgentGeneratedCourses; 
+export default AgentGeneratedCourses;

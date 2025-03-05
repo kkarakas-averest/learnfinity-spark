@@ -1,3 +1,4 @@
+
 import * as React from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { Toaster } from "@/components/ui/toaster";
@@ -130,7 +131,7 @@ function App() {
               <Route 
                 path={ROUTES.ADMIN_DASHBOARD} 
                 element={
-                  <ProtectedRoute allowedRoles={["admin", "superadmin"]}>
+                  <ProtectedRoute allowedRoles={["superadmin"]}>
                     <SuperAdminDashboard />
                   </ProtectedRoute>
                 } 

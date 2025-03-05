@@ -1,4 +1,3 @@
-
 import * as React from "react";
 import { Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useHRAuth } from '@/contexts/HRAuthContext';
@@ -16,13 +15,6 @@ import { LoadingSpinner } from '@/components/ui/loading-spinner';
 // Import HR components
 const DashboardOverview = React.lazy(() => import('@/components/hr/DashboardOverview'));
 const EmployeeManagement = React.lazy(() => import('@/components/hr/EmployeeManagement'));
-
-// Define a type for the database initialization result
-interface DatabaseInitResult {
-  success: boolean;
-  error?: string;
-  message?: string;
-}
 
 export default function HRDashboard() {
   const { toast } = useToast();
@@ -52,13 +44,10 @@ export default function HRDashboard() {
         
         // Call the initialization function and handle the response
         const result = await hrServices.initializeHRDatabase();
+        console.log('HR database initialization result:', result);
         
-        // Type assertion to handle the returned value
-        const initResult = result as unknown as DatabaseInitResult;
-        console.log('HR database initialization result:', initResult);
-        
-        if (!initResult || initResult.success === false) {
-          throw new Error(initResult?.error || 'Unknown database initialization error');
+        if (!result || result.success === false) {
+          throw new Error(result?.error || 'Unknown database initialization error');
         }
         
         console.log('HR database initialized');
