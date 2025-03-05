@@ -1,5 +1,4 @@
-
-import * as React from "react";
+import React from "@/lib/react-helpers";
 import { Link, useNavigate } from "react-router-dom";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";

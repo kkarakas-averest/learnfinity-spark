@@ -1,4 +1,5 @@
-import * as React from "react";
+
+import React from "@/lib/react-helpers";
 import { toast } from "@/components/ui/use-toast";
 import { hrEmployeeService } from '@/services/hrEmployeeService';
 

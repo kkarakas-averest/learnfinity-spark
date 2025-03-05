@@ -1,4 +1,4 @@
-import * as React from "react"
+import React from "@/lib/react-helpers";
 import * as TabsPrimitive from "@radix-ui/react-tabs"
 
 import { cn } from "@/lib/utils"

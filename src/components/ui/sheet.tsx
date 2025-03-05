@@ -1,5 +1,5 @@
 
-import * as React from "react"
+import React from "@/lib/react-helpers";
 import * as SheetPrimitive from "@radix-ui/react-dialog"
 import { X } from "lucide-react"
 

@@ -1,4 +1,5 @@
-import * as React from "react";
+
+import React from "@/lib/react-helpers";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -75,4 +76,4 @@ const ProfileSettings = () => {
   );
 };
 
-export default ProfileSettings; 
+export default ProfileSettings;

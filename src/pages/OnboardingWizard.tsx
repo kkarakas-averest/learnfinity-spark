@@ -1,4 +1,5 @@
-import * as React from "react";
+
+import React from "@/lib/react-helpers";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 
@@ -35,4 +36,4 @@ const OnboardingWizard = () => {
   );
 };
 
-export default OnboardingWizard; 
+export default OnboardingWizard;

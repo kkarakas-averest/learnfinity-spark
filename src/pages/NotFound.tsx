@@ -1,5 +1,5 @@
 
-import * as React from "react";
+import React from "@/lib/react-helpers";
 import { useNavigate } from "react-router-dom";
 
 export default function NotFound() {

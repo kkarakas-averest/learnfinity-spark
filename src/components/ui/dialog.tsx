@@ -1,4 +1,5 @@
-import * as React from "react"
+
+import React from "@/lib/react-helpers";
 import * as DialogPrimitive from "@radix-ui/react-dialog"
 import { X } from "lucide-react"
 
