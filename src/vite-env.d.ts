@@ -12,4 +12,12 @@ declare module 'lucide-react' {
   export const ChevronsLeft: React.FC<LucideProps>;
   export const ChevronsRight: React.FC<LucideProps>;
   export const ChevronsUpDown: React.FC<LucideProps>;
+  export const Copy: React.FC<LucideProps>;
+  export const Wrench: React.FC<LucideProps>;
+  export const Filter: React.FC<LucideProps>;
+  export const Key: React.FC<LucideProps>;
+  export const Mail: React.FC<LucideProps>;
+  export const ShieldCheck: React.FC<LucideProps>;
+  export const AlertCircle: React.FC<LucideProps>;
+  export const Info: React.FC<LucideProps>;
 }

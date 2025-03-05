@@ -1,7 +1,14 @@
 
 import React from "@/lib/react-helpers";
-import { User } from "@/lib/database.types";
 import { Button } from "@/components/ui/button";
+
+// Define the User interface directly since we can't import it
+interface User {
+  id: string;
+  email: string;
+  name?: string;
+  role?: string;
+}
 
 export const columns = [
   {

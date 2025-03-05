@@ -18,5 +18,18 @@ export const {
   useContext,
   createContext,
   memo,
-  forwardRef
-} = React; 
+  forwardRef,
+  useReducer,
+  useLayoutEffect,
+  useImperativeHandle,
+  useDebugValue,
+  useId,
+  useDeferredValue,
+  useTransition,
+  startTransition,
+  Children,
+  cloneElement,
+  createElement,
+  isValidElement,
+  Fragment
+} = React;

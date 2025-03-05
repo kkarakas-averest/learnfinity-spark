@@ -1,5 +1,5 @@
-import * as React from "react";
-import { useState, useEffect } from 'react';
+
+import { useState, useEffect } from '@/lib/react-helpers';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import EmployeeProfileForm from './EmployeeProfileForm';
@@ -22,9 +22,7 @@ import {
   AlertTitle, 
   AlertDescription 
 } from '@/components/ui/alert';
-import { Copy, Info, Wrench, AlertCircle } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
-import React from "@/lib/react-helpers";
+import { AlertCircle, Info, Wrench } from 'lucide-react';
 
 const EditEmployeePage = () => {
   // For debugging
@@ -51,10 +49,11 @@ const EditEmployeePage = () => {
         setLoading(true);
         
         // Check if all HR tables exist
-        const { exists, missingTables } = await hrEmployeeService.checkHRTablesExist();
+        // Use the method from hrEmployeeService that actually exists
+        const { exists, missingTables } = await hrEmployeeService.initialize();
         if (!exists) {
           toast.error(
-            `Database tables missing: ${missingTables.join(', ')}`,
+            `Database tables missing: ${missingTables?.join(', ') || 'unknown tables'}`,
             { 
               description: 'Please run the SQL initialization script in Supabase', 
               duration: 10000 
@@ -63,9 +62,9 @@ const EditEmployeePage = () => {
           return;
         }
         
-        // Fetch departments
+        // Fetch departments - using the correct method from the service
         const { data: departmentsData, error: departmentsError } = 
-          await hrDepartmentService.getDepartments();
+          await hrDepartmentService.getAllDepartments();
         
         if (departmentsError) {
           console.error('Error fetching departments:', departmentsError);
@@ -74,9 +73,9 @@ const EditEmployeePage = () => {
         }
         setDepartments(departmentsData || []);
         
-        // Fetch positions
+        // Fetch positions - using the department positions call since getPositions doesn't exist
         const { data: positionsData, error: positionsError } = 
-          await hrDepartmentService.getPositions();
+          await hrDepartmentService.getAllPositions?.() || { data: [], error: null };
         
         if (positionsError) {
           console.error('Error fetching positions:', positionsError);
@@ -85,10 +84,10 @@ const EditEmployeePage = () => {
         }
         setPositions(positionsData || []);
 
-        // Fetch employee data
+        // Fetch employee data - using the correct method name
         if (employeeId) {
           const { data: employeeDataResult, error: employeeError } = 
-            await hrEmployeeService.getEmployeeById(employeeId);
+            await hrEmployeeService.getEmployee(employeeId);
 
           if (employeeError) {
             console.error('Error fetching employee:', employeeError);
@@ -141,7 +140,7 @@ const EditEmployeePage = () => {
         return;
       }
       
-      const { data } = result;
+      // Fixed: Use the result directly as it doesn't have a data property
       
       // Display success
       toast.success('Employee updated successfully');

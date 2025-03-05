@@ -1,44 +1,57 @@
-import React from "@/lib/react-helpers";
-import * as RadioGroupPrimitive from "@radix-ui/react-radio-group"
 
-import { cn } from "@/lib/utils"
+import * as React from "react";
+import * as RadioGroupPrimitive from "@radix-ui/react-radio-group";
 
-const RadioGroup = RadioGroupPrimitive.Root
+import { cn } from "@/lib/utils";
+
+const RadioGroup = React.forwardRef<
+  React.ElementRef<typeof RadioGroupPrimitive.Root>,
+  React.ComponentPropsWithoutRef<typeof RadioGroupPrimitive.Root>
+>(({ className, ...props }, ref) => {
+  return (
+    <RadioGroupPrimitive.Root
+      className={cn("grid gap-2", className)}
+      {...props}
+      ref={ref}
+    />
+  );
+});
+RadioGroup.displayName = RadioGroupPrimitive.Root.displayName;
 
 const RadioGroupItem = React.forwardRef<
   React.ElementRef<typeof RadioGroupPrimitive.Item>,
   React.ComponentPropsWithoutRef<typeof RadioGroupPrimitive.Item>
->(({ className, children, ...props }, ref) => {
+>(({ className, ...props }, ref) => {
   return (
     <RadioGroupPrimitive.Item
       ref={ref}
       className={cn(
-        "aspect-square h-4 w-4 rounded-full border border-primary text-primary ring-offset-background focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground",
+        "aspect-square h-4 w-4 rounded-full border border-primary text-primary shadow focus:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
         className
       )}
       {...props}
     >
       <RadioGroupPrimitive.Indicator className="flex items-center justify-center">
-        {children}
+        <div className="h-2 w-2 rounded-full bg-current" />
       </RadioGroupPrimitive.Indicator>
     </RadioGroupPrimitive.Item>
-  )
-})
-RadioGroupItem.displayName = RadioGroupPrimitive.Item.displayName
+  );
+});
+RadioGroupItem.displayName = RadioGroupPrimitive.Item.displayName;
 
+// Create a custom RadioGroupLabel since RadioGroupPrimitive.Label doesn't exist
 const RadioGroupLabel = React.forwardRef<
-  React.ElementRef<typeof RadioGroupPrimitive.Label>,
-  React.ComponentPropsWithoutRef<typeof RadioGroupPrimitive.Label>
->(({ className, ...props }, ref) => (
-  <RadioGroupPrimitive.Label
-    ref={ref}
-    className={cn(
-      "px-2.5 text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70",
-      className
-    )}
-    {...props}
-  />
-))
-RadioGroupLabel.displayName = RadioGroupPrimitive.Label.displayName
+  HTMLLabelElement,
+  React.LabelHTMLAttributes<HTMLLabelElement>
+>(({ className, ...props }, ref) => {
+  return (
+    <label
+      ref={ref}
+      className={cn("text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70", className)}
+      {...props}
+    />
+  );
+});
+RadioGroupLabel.displayName = "RadioGroupLabel";
 
-export { RadioGroup, RadioGroupItem, RadioGroupLabel }
+export { RadioGroup, RadioGroupItem, RadioGroupLabel };
