@@ -1,227 +1,271 @@
-import * as React from "react";
-import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import { toast } from "@/components/ui/use-toast";
-import { UserRole } from "@/lib/database.types";
-import { Pencil, Save, User, Shield, GraduationCap, Building2, BookOpen } from "lucide-react";
 
-const ProfilePage = () => {
-  const { user, userDetails, isLoading } = useAuth();
-  const navigate = useNavigate();
-  const [isEditing, setIsEditing] = React.useState(false);
-  const [profileData, setProfileData] = React.useState({
-    name: userDetails?.name || "",
-    email: userDetails?.email || "",
-  });
+import { useState, useEffect } from '@/lib/react-helpers';
+import { useParams } from 'react-router-dom';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useAuth } from '@/contexts/AuthContext';
 
-  // Redirect if not authenticated
-  if (!isLoading && !user) {
-    navigate("/login");
-    return null;
-  }
+export default function ProfilePage() {
+  const { userId } = useParams();
+  const { user } = useAuth();
+  const [userData, setUserData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('overview');
 
-  // Show loading state
-  if (isLoading) {
+  // Fetch user data
+  useEffect(() => {
+    const targetId = userId || user?.id;
+    
+    if (!targetId) {
+      setLoading(false);
+      return;
+    }
+    
+    // Simulate API call to fetch user data
+    const timeout = setTimeout(() => {
+      // Mock data
+      const mockUserData = {
+        id: targetId,
+        name: userId ? 'Alex Johnson' : user?.name || 'Current User',
+        email: userId ? 'alex.johnson@example.com' : user?.email || 'user@example.com',
+        role: 'Learner',
+        avatar: null,
+        createdAt: '2023-05-15',
+        bio: 'Passionate about learning new technologies and skills.',
+        company: 'Acme Inc.',
+        position: 'Software Engineer',
+        skills: ['JavaScript', 'React', 'Node.js', 'Python', 'UI/UX'],
+        progress: {
+          courses: 5,
+          completed: 3,
+          certificatesEarned: 2,
+          hoursWatched: 28
+        },
+        recentActivity: [
+          { id: 1, type: 'course_progress', title: 'Completed "JavaScript Basics" module', date: '2023-09-25' },
+          { id: 2, type: 'certificate', title: 'Earned "React Developer" certificate', date: '2023-09-20' },
+          { id: 3, type: 'course_start', title: 'Started "Advanced Node.js" course', date: '2023-09-15' }
+        ]
+      };
+      
+      setUserData(mockUserData);
+      setLoading(false);
+    }, 1000);
+    
+    return () => clearTimeout(timeout);
+  }, [userId, user]);
+
+  const getInitials = (name) => {
+    if (!name) return 'U';
+    return name
+      .split(' ')
+      .map(part => part[0])
+      .join('')
+      .toUpperCase()
+      .substring(0, 2);
+  };
+
+  if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      <div className="container mx-auto py-10 px-4">
+        <div className="flex flex-col md:flex-row gap-8">
+          <div className="w-full md:w-1/3">
+            <Card>
+              <CardHeader className="pb-2">
+                <Skeleton className="h-8 w-3/4 mb-2" />
+                <Skeleton className="h-4 w-1/2" />
+              </CardHeader>
+              <CardContent className="flex flex-col items-center text-center pt-4">
+                <Skeleton className="h-24 w-24 rounded-full" />
+                <Skeleton className="h-6 w-1/2 mt-4" />
+                <Skeleton className="h-4 w-3/4 mt-2" />
+                <Skeleton className="h-4 w-2/3 mt-1" />
+                <div className="w-full mt-6">
+                  <Skeleton className="h-9 w-full" />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+          
+          <div className="w-full md:w-2/3">
+            <Skeleton className="h-10 w-full mb-6" />
+            <Skeleton className="h-[400px] w-full" />
+          </div>
+        </div>
       </div>
     );
   }
 
-  const handleEditToggle = () => {
-    if (isEditing) {
-      // If we're currently editing, save the changes
-      toast({
-        title: "Profile updated",
-        description: "Your profile information has been saved.",
-      });
-    }
-    setIsEditing(!isEditing);
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setProfileData({
-      ...profileData,
-      [name]: value,
-    });
-  };
-
-  // Function to render role badge with appropriate color
-  const getRoleBadge = (role: UserRole) => {
-    switch (role) {
-      case "superadmin":
-        return <Badge className="bg-red-500">{role}</Badge>;
-      case "hr":
-        return <Badge className="bg-blue-500">{role}</Badge>;
-      case "mentor":
-        return <Badge className="bg-green-500">{role}</Badge>;
-      case "learner":
-      default:
-        return <Badge className="bg-purple-500">{role}</Badge>;
-    }
-  };
-
-  // Function to get the icon for the role
-  const getRoleIcon = (role: UserRole) => {
-    switch (role) {
-      case "superadmin":
-        return <Shield className="h-5 w-5 text-red-500" />;
-      case "hr":
-        return <Building2 className="h-5 w-5 text-blue-500" />;
-      case "mentor":
-        return <GraduationCap className="h-5 w-5 text-green-500" />;
-      case "learner":
-      default:
-        return <BookOpen className="h-5 w-5 text-purple-500" />;
-    }
-  };
-
-  // Get initials for avatar fallback
-  const getInitials = (name: string) => {
-    return name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase();
-  };
+  // If user not found
+  if (!userData) {
+    return (
+      <div className="container mx-auto py-20 px-4 text-center">
+        <h1 className="text-2xl font-bold mb-2">User Not Found</h1>
+        <p className="text-muted-foreground mb-6">
+          The user profile you are looking for doesn't exist or you don't have permission to view it.
+        </p>
+        <Button asChild>
+          <a href="/">Return to Home</a>
+        </Button>
+      </div>
+    );
+  }
 
   return (
-    <div className="container mx-auto py-10 px-4 md:px-6">
-      <div className="max-w-4xl mx-auto">
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-8">
-          <div className="flex items-center gap-4 mb-4 md:mb-0">
-            <Avatar className="h-20 w-20">
-              <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${userDetails?.name}`} alt={userDetails?.name} />
-              <AvatarFallback>{userDetails?.name ? getInitials(userDetails.name) : <User />}</AvatarFallback>
-            </Avatar>
-            <div>
-              <h1 className="text-3xl font-bold">{userDetails?.name}</h1>
-              <div className="flex items-center mt-1">
-                {userDetails?.role && getRoleIcon(userDetails.role)}
-                <span className="ml-2">{getRoleBadge(userDetails?.role || "learner")}</span>
+    <div className="container mx-auto py-10 px-4">
+      <div className="flex flex-col md:flex-row gap-8">
+        {/* Profile sidebar */}
+        <div className="w-full md:w-1/3">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle>Profile</CardTitle>
+              <CardDescription>View and manage your profile information</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col items-center text-center pt-4">
+              <Avatar className="h-24 w-24">
+                <AvatarImage src={userData.avatar} />
+                <AvatarFallback className="text-lg">{getInitials(userData.name)}</AvatarFallback>
+              </Avatar>
+              <h2 className="text-xl font-bold mt-4">{userData.name}</h2>
+              <p className="text-muted-foreground">{userData.email}</p>
+              <div className="flex gap-2 mt-2">
+                <Badge variant="secondary">{userData.role}</Badge>
+                {userData.position && (
+                  <Badge variant="outline">{userData.position}</Badge>
+                )}
               </div>
-            </div>
-          </div>
-          <Button onClick={handleEditToggle} className="gap-2">
-            {isEditing ? (
-              <>
-                <Save size={16} />
-                Save Changes
-              </>
-            ) : (
-              <>
-                <Pencil size={16} />
-                Edit Profile
-              </>
-            )}
-          </Button>
+              <div className="w-full mt-6">
+                <Button className="w-full" variant="outline">
+                  Edit Profile
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+          
+          {/* Stats card */}
+          <Card className="mt-6">
+            <CardHeader>
+              <CardTitle>Learning Stats</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex justify-between mb-1">
+                  <span>Courses Progress</span>
+                  <span className="font-medium">
+                    {userData.progress.completed}/{userData.progress.courses}
+                  </span>
+                </div>
+                <Progress value={(userData.progress.completed / userData.progress.courses) * 100} />
+                
+                <div className="grid grid-cols-2 gap-4 pt-2">
+                  <div className="bg-muted rounded-lg p-3 text-center">
+                    <div className="text-2xl font-bold">{userData.progress.certificatesEarned}</div>
+                    <div className="text-xs text-muted-foreground">Certificates</div>
+                  </div>
+                  <div className="bg-muted rounded-lg p-3 text-center">
+                    <div className="text-2xl font-bold">{userData.progress.hoursWatched}</div>
+                    <div className="text-xs text-muted-foreground">Hours Watched</div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
-
-        <Tabs defaultValue="profile" className="w-full">
-          <TabsList className="grid w-full max-w-md grid-cols-2">
-            <TabsTrigger value="profile">Profile</TabsTrigger>
-            <TabsTrigger value="account">Account</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="profile" className="space-y-6 mt-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Personal Information</CardTitle>
-                <CardDescription>
-                  Your personal information visible to others
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Full Name</Label>
-                  {isEditing ? (
-                    <Input
-                      id="name"
-                      name="name"
-                      value={profileData.name}
-                      onChange={handleInputChange}
-                    />
+        
+        {/* Profile content */}
+        <div className="w-full md:w-2/3">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="overview">Overview</TabsTrigger>
+              <TabsTrigger value="courses">Courses</TabsTrigger>
+              <TabsTrigger value="activity">Activity</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="overview" className="mt-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>About</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div>
+                      <h3 className="font-medium mb-1">Bio</h3>
+                      <p className="text-sm text-muted-foreground">{userData.bio}</p>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-3 pt-2">
+                      <div>
+                        <h3 className="text-sm font-medium">Company</h3>
+                        <p className="text-sm text-muted-foreground">{userData.company || 'Not specified'}</p>
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-medium">Position</h3>
+                        <p className="text-sm text-muted-foreground">{userData.position || 'Not specified'}</p>
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-medium">Member Since</h3>
+                        <p className="text-sm text-muted-foreground">{new Date(userData.createdAt).toLocaleDateString()}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="pt-2">
+                      <h3 className="font-medium mb-2">Skills</h3>
+                      <div className="flex flex-wrap gap-2">
+                        {userData.skills.map((skill) => (
+                          <Badge key={skill} variant="secondary">{skill}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+            
+            <TabsContent value="courses" className="mt-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>My Courses</CardTitle>
+                  <CardDescription>Courses you are currently taking or have completed</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-muted-foreground">No courses data available yet.</p>
+                </CardContent>
+              </Card>
+            </TabsContent>
+            
+            <TabsContent value="activity" className="mt-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Recent Activity</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {userData.recentActivity.length > 0 ? (
+                    <div className="space-y-4">
+                      {userData.recentActivity.map((activity) => (
+                        <div key={activity.id} className="flex justify-between border-b pb-3 last:border-0">
+                          <div>
+                            <p className="font-medium">{activity.title}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {new Date(activity.date).toLocaleDateString()}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   ) : (
-                    <div className="p-2 border rounded bg-muted/40">{profileData.name}</div>
+                    <p className="text-muted-foreground">No recent activity.</p>
                   )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email Address</Label>
-                  <div className="p-2 border rounded bg-muted/40">{profileData.email}</div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>User Role</Label>
-                  <div className="p-2 border rounded bg-muted/40 capitalize">
-                    {userDetails?.role || "learner"}
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>User ID</Label>
-                  <div className="p-2 border rounded bg-muted/40 text-xs font-mono overflow-auto">
-                    {user?.id}
-                  </div>
-                </div>
-              </CardContent>
-              <CardFooter className="flex justify-between">
-                <Button variant="outline">Reset</Button>
-                <Button onClick={handleEditToggle}>
-                  {isEditing ? "Save Changes" : "Edit"}
-                </Button>
-              </CardFooter>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="account" className="space-y-6 mt-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Account Settings</CardTitle>
-                <CardDescription>
-                  Manage your account settings and preferences
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Account Status</Label>
-                  <div className="p-2 border rounded bg-muted/40">
-                    <Badge variant="success">Active</Badge>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Account Created</Label>
-                  <div className="p-2 border rounded bg-muted/40">
-                    {user?.created_at ? new Date(user.created_at).toLocaleDateString() : "Unknown"}
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Last Login</Label>
-                  <div className="p-2 border rounded bg-muted/40">
-                    {user?.last_sign_in_at ? new Date(user.last_sign_in_at).toLocaleString() : "Unknown"}
-                  </div>
-                </div>
-              </CardContent>
-              <CardFooter>
-                <Button variant="outline" className="w-full">
-                  Change Password
-                </Button>
-              </CardFooter>
-            </Card>
-          </TabsContent>
-        </Tabs>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        </div>
       </div>
     </div>
   );
-};
-
-export default ProfilePage;
+}

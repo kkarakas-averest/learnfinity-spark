@@ -50,10 +50,10 @@ const EditEmployeePage = () => {
         
         // Check if all HR tables exist
         // Use the method from hrEmployeeService that actually exists
-        const { exists, missingTables } = await hrEmployeeService.initialize();
-        if (!exists) {
+        const { success, error } = await hrEmployeeService.initialize();
+        if (!success) {
           toast.error(
-            `Database tables missing: ${missingTables?.join(', ') || 'unknown tables'}`,
+            `Database tables missing: check Supabase setup`,
             { 
               description: 'Please run the SQL initialization script in Supabase', 
               duration: 10000 
@@ -73,9 +73,9 @@ const EditEmployeePage = () => {
         }
         setDepartments(departmentsData || []);
         
-        // Fetch positions - using the department positions call since getPositions doesn't exist
+        // Fetch positions - using the correct method in the service
         const { data: positionsData, error: positionsError } = 
-          await hrDepartmentService.getAllPositions?.() || { data: [], error: null };
+          await hrDepartmentService.getAllPositions();
         
         if (positionsError) {
           console.error('Error fetching positions:', positionsError);
@@ -140,9 +140,7 @@ const EditEmployeePage = () => {
         return;
       }
       
-      // Fixed: Use the result directly as it doesn't have a data property
-      
-      // Display success
+      // Success case
       toast.success('Employee updated successfully');
       setLoading(false);
       

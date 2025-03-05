@@ -1,55 +1,51 @@
 
-import * as React from "react";
+import { Fragment } from '@/lib/react-helpers';
 import { cn } from "@/lib/utils";
 
-interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
+interface SidebarProps {
   className?: string;
+  children?: React.ReactNode;
 }
 
-const Sidebar = React.forwardRef<HTMLDivElement, SidebarProps>(
-  ({ className, ...props }, ref) => (
+export function Sidebar({ className, children }: SidebarProps) {
+  return (
     <div
-      ref={ref}
-      className={cn("w-64 bg-white border-r h-screen", className)}
-      {...props}
-    />
-  )
-);
-
-Sidebar.displayName = "Sidebar";
-
-interface SidebarSectionProps extends React.HTMLAttributes<HTMLDivElement> {}
-
-const SidebarSection = React.forwardRef<HTMLDivElement, SidebarSectionProps>(
-  ({ className, ...props }, ref) => (
-    <div
-      ref={ref}
-      className={cn("py-4 px-3", className)}
-      {...props}
-    />
-  )
-);
-
-SidebarSection.displayName = "SidebarSection";
-
-interface SidebarItemProps extends React.HTMLAttributes<HTMLDivElement> {
-  active?: boolean;
-}
-
-const SidebarItem = React.forwardRef<HTMLDivElement, SidebarItemProps>(
-  ({ className, active, ...props }, ref) => (
-    <div
-      ref={ref}
       className={cn(
-        "flex items-center py-2 px-3 rounded-md cursor-pointer hover:bg-gray-100",
-        active && "bg-gray-100 font-medium",
+        "flex h-screen w-64 flex-col border-r bg-background",
         className
       )}
-      {...props}
-    />
-  )
-);
+    >
+      {children}
+    </div>
+  );
+}
 
-SidebarItem.displayName = "SidebarItem";
+interface SidebarSectionProps {
+  title?: string;
+  children?: React.ReactNode;
+}
 
-export { Sidebar, SidebarSection, SidebarItem };
+export function SidebarSection({ title, children }: SidebarSectionProps) {
+  return (
+    <Fragment>
+      {title && (
+        <h3 className="px-4 py-2 text-lg font-semibold tracking-tight">
+          {title}
+        </h3>
+      )}
+      <div className="px-3">{children}</div>
+    </Fragment>
+  );
+}
+
+export function SidebarNav({ children }: { children: React.ReactNode }) {
+  return <nav className="grid gap-1">{children}</nav>;
+}
+
+export function SidebarFooter({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="mt-auto border-t p-4">
+      {children}
+    </div>
+  );
+}

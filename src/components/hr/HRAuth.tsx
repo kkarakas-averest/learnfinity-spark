@@ -1,5 +1,6 @@
-import React from "@/lib/react-helpers";
-import { createContext, useContext, useState, useEffect } from 'react';
+
+import { createContext, useContext, useState, useEffect } from '@/lib/react-helpers';
+import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/components/ui/use-toast';
 import { User } from '@supabase/supabase-js';
@@ -24,6 +25,8 @@ const HRAuthContext = createContext<HRAuthContextType>({
 
 // HRAuthProvider component
 export const HRAuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [hrUser, setHRUser] = useState<User | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -51,6 +54,12 @@ export const HRAuthProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     loadUser();
   }, []);
+
+  // Log when current path changes for debugging
+  useEffect(() => {
+    console.log("HRAuthContext: Current path:", location.pathname);
+    console.log("HRAuthContext: Authentication state:", !!hrUser);
+  }, [location.pathname, hrUser]);
 
   const login = async (username, password) => {
     setIsLoading(true);
@@ -105,9 +114,7 @@ export const HRAuthProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   return (
-    <HRAuthContext.Provider value={value}>
-      {children}
-    </HRAuthContext.Provider>
+    <HRAuthContext.Provider value={value}>{children}</HRAuthContext.Provider>
   );
 };
 
