@@ -1,4 +1,4 @@
-import * as React from "react";
+import React from "@/lib/react-helpers";
 import { Link } from "react-router-dom";
 import { Clock, BarChart2, Users } from "lucide-react";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";

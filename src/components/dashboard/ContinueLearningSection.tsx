@@ -1,5 +1,5 @@
 
-import * as React from "react";
+import React from "@/lib/react-helpers";
 import CourseCard from "@/components/CourseCard";
 import { useLearningData } from "@/hooks/useLearningData";
 import { Skeleton } from "@/components/ui/skeleton";
