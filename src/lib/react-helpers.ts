@@ -4,7 +4,18 @@
  * It helps ensure the same import style is used throughout the codebase.
  */
 
-import React from 'react';
+import React, { 
+  ElementRef as ReactElementRef,
+  ComponentPropsWithoutRef as ReactComponentPropsWithoutRef,
+  HTMLAttributes as ReactHTMLAttributes,
+  ReactNode as ReactNodeType,
+  ReactElement as ReactElementType,
+  FC as ReactFC,
+  ChangeEvent as ReactChangeEvent,
+  FormEvent as ReactFormEvent,
+  MouseEvent as ReactMouseEvent,
+  KeyboardEvent as ReactKeyboardEvent
+} from 'react';
 
 export default React;
 
@@ -34,16 +45,14 @@ export const {
   Fragment
 } = React;
 
-// Re-export types
-export type {
-  ElementRef,
-  ComponentPropsWithoutRef,
-  HTMLAttributes,
-  ReactNode,
-  ReactElement,
-  FC,
-  ChangeEvent,
-  FormEvent,
-  MouseEvent,
-  KeyboardEvent
-} from 'react';
+// Re-export types using named aliases to avoid TypeScript errors
+export type ElementRef<T = any> = ReactElementRef<T>;
+export type ComponentPropsWithoutRef<T = any> = ReactComponentPropsWithoutRef<T>;
+export type HTMLAttributes<T = any> = ReactHTMLAttributes<T>;
+export type ReactNode = ReactNodeType;
+export type ReactElement<T = any> = ReactElementType<T>;
+export type FC<T = {}> = ReactFC<T>;
+export type ChangeEvent<T = Element> = ReactChangeEvent<T>;
+export type FormEvent<T = Element> = ReactFormEvent<T>;
+export type MouseEvent<T = Element> = ReactMouseEvent<T>;
+export type KeyboardEvent<T = Element> = ReactKeyboardEvent<T>;

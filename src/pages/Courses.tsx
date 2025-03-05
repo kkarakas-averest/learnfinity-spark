@@ -31,6 +31,10 @@ const courseCategoryMap = {
   "AI & Machine Learning": ["AI", "Machine Learning", "Deep Learning"]
 };
 
+// Define acceptable levels for type safety
+type CourseLevel = "Beginner" | "Intermediate" | "Advanced";
+const courseLevels: CourseLevel[] = ["Beginner", "Intermediate", "Advanced"];
+
 const CoursesPage = () => {
   const { toast } = useToast();
   const [selectedCategory, setSelectedCategory] = useState("All");
@@ -41,7 +45,7 @@ const CoursesPage = () => {
   const enhancedCourses = courses.map(course => ({
     ...course,
     category: courseCategoryMap[Object.keys(courseCategoryMap)[Math.floor(Math.random() * Object.keys(courseCategoryMap).length)]][0],
-    level: ["Beginner", "Intermediate", "Advanced"][Math.floor(Math.random() * 3)],
+    level: courseLevels[Math.floor(Math.random() * courseLevels.length)],
     duration: `${Math.floor(Math.random() * 10) + 1} hours`,
     enrolled: Math.floor(Math.random() * 1000),
     image: `https://source.unsplash.com/random/800x600?${course.title.split(' ')[0].toLowerCase()}`
