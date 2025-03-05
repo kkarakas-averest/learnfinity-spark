@@ -1,3 +1,4 @@
+
 import * as React from "react";
 import { useNavigate } from "react-router-dom";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -19,8 +20,8 @@ import { useHRAuth } from "@/contexts/HRAuthContext";
 
 // Login form schema validation
 const loginSchema = z.object({
-  username: z.string().min(1, { message: "Username is required." }),
-  password: z.string().min(1, { message: "Password is required." }),
+  username: z.string().min(1, "Username is required."),
+  password: z.string().min(1, "Password is required."),
 });
 
 // Type for form values based on schema
@@ -154,4 +155,4 @@ const HRLogin = () => {
   );
 };
 
-export default HRLogin; 
+export default HRLogin;

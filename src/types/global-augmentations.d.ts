@@ -1,36 +1,20 @@
 
-// Global type augmentations for libraries like zod
-declare module 'zod' {
-  export interface ZodType<T = any> {
-    _type: T;
-  }
-  
-  export interface ZodString extends ZodType<string> {
-    email: (message?: string) => ZodString;
-    min: (length: number, message?: string) => ZodString;
-  }
-  
-  export interface ZodObject<T extends ZodRawShape> extends ZodType<T> {
-    shape: T;
-  }
-  
-  export interface ZodRawShape {
-    [key: string]: ZodType;
-  }
-  
-  export function string(): ZodString;
-  export function object(shape: ZodRawShape): ZodObject<ZodRawShape>;
-  export function infer<T extends ZodType>(schema: T): T["_type"];
+import { z as zodInstance } from 'zod';
 
-  export namespace z {
-    export const string: typeof string;
-    export const object: typeof object;
-    export const infer: typeof infer;
-    export type TypeOf<T extends ZodType> = T["_type"];
-  }
-}
-
-// Prevent duplicate declarations
 declare global {
-  // Add any global declarations here
+  namespace z {
+    export const object: typeof zodInstance.object;
+    export const string: typeof zodInstance.string;
+    export const number: typeof zodInstance.number;
+    export const boolean: typeof zodInstance.boolean;
+    export const array: typeof zodInstance.array;
+    export const infer: typeof zodInstance.infer;
+    
+    export type infer<T> = zodInstance.infer<T>;
+  }
+
+  // Add UserRole type to fix App.tsx error
+  type UserRole = "learner" | "mentor" | "hr" | "superadmin" | "admin";
 }
+
+export {};

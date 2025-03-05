@@ -1,3 +1,4 @@
+
 import * as React from "react";
 import { Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useHRAuth } from '@/contexts/HRAuthContext';
@@ -10,6 +11,7 @@ import { hrServices } from '@/lib/services/hrServices';
 import { useAuth } from '../contexts/AuthContext';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card } from '@/components/ui/card';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
 // Import HR components
 const DashboardOverview = React.lazy(() => import('@/components/hr/DashboardOverview'));
@@ -19,6 +21,7 @@ const EmployeeManagement = React.lazy(() => import('@/components/hr/EmployeeMana
 interface DatabaseInitResult {
   success: boolean;
   error?: string;
+  message?: string;
 }
 
 export default function HRDashboard() {
@@ -46,12 +49,16 @@ export default function HRDashboard() {
       try {
         console.log('Initializing HR database...');
         setInitError(null);
-        // Cast the result to DatabaseInitResult since we know the structure
-        const result = await hrServices.initializeHRDatabase() as unknown as DatabaseInitResult;
-        console.log('HR database initialization result:', result);
         
-        if (!result || !result.success) {
-          throw new Error(result?.error || 'Unknown database initialization error');
+        // Call the initialization function and handle the response
+        const result = await hrServices.initializeHRDatabase();
+        
+        // Type assertion to handle the returned value
+        const initResult = result as unknown as DatabaseInitResult;
+        console.log('HR database initialization result:', initResult);
+        
+        if (!initResult || initResult.success === false) {
+          throw new Error(initResult?.error || 'Unknown database initialization error');
         }
         
         console.log('HR database initialized');
@@ -73,7 +80,7 @@ export default function HRDashboard() {
     } else if (!isLoading) {
       setInitializing(false);
     }
-  }, [isAuthenticated, isLoading]);
+  }, [isAuthenticated, isLoading, toast]);
 
   // Redirect if not authenticated
   if (!isLoading && !isAuthenticated) {
@@ -105,7 +112,7 @@ export default function HRDashboard() {
   if (isLoading || initializing) {
     return (
       <div className="flex h-screen w-full items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        <LoadingSpinner size="xl" />
       </div>
     );
   }
@@ -171,7 +178,7 @@ export default function HRDashboard() {
           
           <React.Suspense fallback={
             <div className="flex items-center justify-center h-[60vh]">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+              <LoadingSpinner size="xl" />
             </div>
           }>
             <TabsContent value="overview">

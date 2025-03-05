@@ -32,16 +32,21 @@ function App() {
     const initializeHR = async () => {
       try {
         console.log('Starting HR system initialization...');
-        const result = await hrEmployeeService.initialize();
-        if (!result.success) {
-          console.error('Failed to initialize HR system:', result.error);
-          toast({
-            title: "HR System Initialization Warning",
-            description: "Some HR features may be limited.",
-            variant: "destructive"
-          });
+        // Check if initialize method exists before calling it
+        if (typeof hrEmployeeService.initialize === 'function') {
+          const result = await hrEmployeeService.initialize();
+          if (result && !result.success) {
+            console.error('Failed to initialize HR system:', result.error);
+            toast({
+              title: "HR System Initialization Warning",
+              description: "Some HR features may be limited.",
+              variant: "destructive"
+            });
+          } else {
+            console.log('HR system initialized successfully');
+          }
         } else {
-          console.log('HR system initialized successfully');
+          console.log('HR initialization method not available, skipping...');
         }
       } catch (error) {
         console.error('Error during HR system initialization:', error);
@@ -125,7 +130,7 @@ function App() {
               <Route 
                 path={ROUTES.ADMIN_DASHBOARD} 
                 element={
-                  <ProtectedRoute allowedRoles={["admin"]}>
+                  <ProtectedRoute allowedRoles={["admin", "superadmin"]}>
                     <SuperAdminDashboard />
                   </ProtectedRoute>
                 } 
