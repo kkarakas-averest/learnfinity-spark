@@ -3,7 +3,7 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { HRAuthProvider } from "@/contexts/HRAuthContext";
-import { ROUTES } from "@/lib/routes";
+import { ROUTES, buildRoute } from "@/lib/routes";
 import Index from "@/pages/Index";
 import LoginPage from "@/pages/LoginPage";
 import RegisterPage from "@/pages/RegisterPage";
@@ -72,7 +72,7 @@ function App() {
               <Route path={ROUTES.LOGIN} element={<LoginPage />} />
               <Route path={ROUTES.REGISTER} element={<RegisterPage />} />
               <Route path={ROUTES.COURSES} element={<Courses />} />
-              <Route path="/course/:id" element={<CourseDetailPage />} />
+              <Route path={ROUTES.COURSE_DETAIL} element={<CourseDetailPage />} />
               <Route path={ROUTES.ONBOARDING} element={<OnboardingWizard />} />
               <Route
                 path={ROUTES.DASHBOARD}
@@ -98,27 +98,11 @@ function App() {
                   </ProtectedRoute>
                 }
               />
-              {/* HR routes using HRAuthProvider */}
-              <Route path={ROUTES.HR_LOGIN} element={
-                <HRAuthProvider>
-                  <HRLogin />
-                </HRAuthProvider>
-              } />
-              <Route path={ROUTES.HR_DASHBOARD} element={
-                <HRAuthProvider>
-                  <HRDashboard />
-                </HRAuthProvider>
-              } />
-              <Route path={ROUTES.HR_DASHBOARD_EMPLOYEES_NEW} element={
-                <HRAuthProvider>
-                  <CreateEmployeePage />
-                </HRAuthProvider>
-              } />
-              <Route path="/hr-dashboard/employees/:id/edit" element={
-                <HRAuthProvider>
-                  <EditEmployeePage />
-                </HRAuthProvider>
-              } />
+              {/* HR routes */}
+              <Route path={ROUTES.HR_LOGIN} element={<HRLogin />} />
+              <Route path={ROUTES.HR_DASHBOARD} element={<HRDashboard />} />
+              <Route path={ROUTES.HR_DASHBOARD_EMPLOYEES_NEW} element={<CreateEmployeePage />} />
+              <Route path={ROUTES.HR_DASHBOARD_EMPLOYEES_EDIT} element={<EditEmployeePage />} />
               <Route 
                 path={ROUTES.USER_PROFILE} 
                 element={
@@ -138,8 +122,8 @@ function App() {
               {/* Catch all */}
               <Route path="*" element={<NotFound />} />
             </Routes>
+            <Toaster />
           </HRAuthProvider>
-          <Toaster />
         </AuthProvider>
       </Router>
     </ThemeProvider>
