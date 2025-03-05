@@ -1,5 +1,5 @@
 
-import * as React from "react";
+import React from "@/lib/react-helpers";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useHRAuth } from "@/contexts/HRAuthContext";
 import { ROUTES } from "@/lib/routes";
