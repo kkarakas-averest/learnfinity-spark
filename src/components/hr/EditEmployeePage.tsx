@@ -1,14 +1,18 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { toast } from "@/components/ui/use-toast";
-import { hrEmployeeService } from '@/services/hrEmployeeService';
+import { toast } from "@/hooks/use-toast";
+import { hrEmployeeService } from "@/services/hrEmployeeService";
+import { Button } from "@/components/ui/button";
 
-// First, let's fix the return type definition to include the data property
 // Define return type for updateEmployeeWithRetry
-type UpdateEmployeeReturnType = { success: boolean; data?: any; error?: any } | null;
+type UpdateEmployeeReturnType = { 
+  success: boolean; 
+  data?: any; 
+  error?: any;
+};
 
-const EditEmployeePage: React.FC = () => {
+const EditEmployeePage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
@@ -17,7 +21,7 @@ const EditEmployeePage: React.FC = () => {
   const [errorCode, setErrorCode] = useState("");
   const [isErrorDialogOpen, setIsErrorDialogOpen] = useState(false);
 
-  // Now let's make sure the implementation returns this type correctly
+  // Implement the retry functionality
   const updateEmployeeWithRetry = async (employeeId: string, employeeData: any, maxRetries = 3): Promise<UpdateEmployeeReturnType> => {
     let retryAttempt = 0;
     let lastError = null;
@@ -34,30 +38,29 @@ const EditEmployeePage: React.FC = () => {
           });
         }
         
-        const { data, error } = 
-          await hrEmployeeService.updateEmployee(employeeId, employeeData);
+        const response = await hrEmployeeService.updateEmployee(employeeId, employeeData);
         
-        if (error) {
+        if (response.error) {
           // Specific error handling for this operation
-          lastError = error;
+          lastError = response.error;
           
           // Not all errors should be retried - detect permanent errors
-          if (error.code === '23505') { // Postgres duplicate key error
+          if (response.error.code === '23505') { // Postgres duplicate key error
             toast({
               title: "An employee with this email already exists.",
               variant: "destructive"
             });
-            return null;
+            return { success: false, error: response.error };
           }
           
           // Log but continue retrying for temporary errors
-          console.warn(`Supabase operation failed (attempt ${retryAttempt + 1}):`, error);
+          console.warn(`Supabase operation failed (attempt ${retryAttempt + 1}):`, response.error);
           retryAttempt++;
           continue;
         }
         
         // Return the successful result with data
-        return { success: true, data };
+        return { success: true, data: response.data };
         
       } catch (error) {
         lastError = error;
@@ -89,7 +92,7 @@ const EditEmployeePage: React.FC = () => {
     return { success: false, error: lastError };
   };
 
-  React.useEffect(() => {
+  useEffect(() => {
     const fetchEmployee = async () => {
       if (!id) return;
       
@@ -158,23 +161,42 @@ const EditEmployeePage: React.FC = () => {
     <div className="p-8">
       <h1 className="text-2xl font-bold mb-6">Edit Employee</h1>
       {/* Form implementation will go here */}
-      <pre>{JSON.stringify(employee, null, 2)}</pre>
+      <pre className="bg-gray-100 p-4 rounded overflow-auto max-h-60 mb-4">
+        {JSON.stringify(employee, null, 2)}
+      </pre>
       
       <div className="mt-4 flex space-x-4">
-        <button 
-          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+        <Button 
           onClick={() => handleUpdateEmployee({ name: employee.name + " (updated)" })}
+          variant="default"
         >
           Update Employee
-        </button>
+        </Button>
         
-        <button 
-          className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
+        <Button 
           onClick={() => navigate('/hr-dashboard/employees')}
+          variant="outline"
         >
           Cancel
-        </button>
+        </Button>
       </div>
+
+      {isErrorDialogOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg max-w-md w-full">
+            <h2 className="text-xl font-bold mb-4">Error</h2>
+            <p className="text-red-500 mb-2">{errorMessage}</p>
+            {errorCode && <p className="text-sm text-gray-500">Error code: {errorCode}</p>}
+            <Button 
+              onClick={() => setIsErrorDialogOpen(false)}
+              className="mt-4"
+              variant="default"
+            >
+              Close
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
