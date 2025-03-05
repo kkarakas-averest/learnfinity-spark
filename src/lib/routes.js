@@ -1,4 +1,3 @@
-
 /**
  * Application route constants
  * 
@@ -13,7 +12,7 @@ export const ROUTES = {
   LOGIN: '/login',
   REGISTER: '/register',
   COURSES: '/courses',
-  COURSE_DETAIL: (id) => `/course/${id}`,
+  COURSE_DETAIL: '/course/:id',
   ONBOARDING: '/onboarding',
   
   // User dashboard routes
@@ -27,8 +26,8 @@ export const ROUTES = {
   HR_DASHBOARD: '/hr-dashboard', // Fixed to match the route used in App.tsx
   HR_DASHBOARD_EMPLOYEES: '/hr-dashboard/employees',
   HR_DASHBOARD_EMPLOYEES_NEW: '/hr-dashboard/employees/new',
-  HR_DASHBOARD_EMPLOYEES_EDIT: (id) => `/hr-dashboard/employees/${id}/edit`,
-  HR_DASHBOARD_EMPLOYEES_VIEW: (id) => `/hr-dashboard/employees/${id}`,
+  HR_DASHBOARD_EMPLOYEES_EDIT: '/hr-dashboard/employees/:id/edit',
+  HR_DASHBOARD_EMPLOYEES_VIEW: '/hr-dashboard/employees/:id',
   HR_DASHBOARD_COURSES: '/hr-dashboard/courses',
   HR_DASHBOARD_REPORTS: '/hr-dashboard/reports',
   
@@ -38,6 +37,13 @@ export const ROUTES = {
   ADMIN_USERS: '/admin/users',
   ADMIN_COURSES: '/admin/courses',
   ADMIN_AI: '/admin/ai',
+};
+
+// Helper functions for parameterized routes
+export const buildRoute = {
+  COURSE_DETAIL: (id) => `/course/${id}`,
+  HR_DASHBOARD_EMPLOYEES_EDIT: (id) => `/hr-dashboard/employees/${id}/edit`,
+  HR_DASHBOARD_EMPLOYEES_VIEW: (id) => `/hr-dashboard/employees/${id}`,
 };
 
 export default ROUTES;

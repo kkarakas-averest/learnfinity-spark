@@ -1,8 +1,8 @@
-import * as React from 'react';
+import React from '@/lib/react-helpers';
 import { 
   Users, 
   BookOpen, 
-  BarChart2, 
+  BarChart2,
   Clock,
   UserPlus,
   FileText,

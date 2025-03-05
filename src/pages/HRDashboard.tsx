@@ -1,4 +1,4 @@
-import * as React from "react";
+import React from "@/lib/react-helpers";
 import { Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useHRAuth } from '@/contexts/HRAuthContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -18,13 +18,14 @@ const EmployeeManagement = React.lazy(() => import('@/components/hr/EmployeeMana
 
 export default function HRDashboard() {
   const { toast } = useToast();
-  const { user, isAuthenticated, isLoading, logout } = useHRAuth();
+  const { hrUser, isAuthenticated, logout } = useHRAuth();
   const { signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [activeTab, setActiveTab] = React.useState<HRDashboardTab>('overview');
   const [initializing, setInitializing] = React.useState(true);
   const [initError, setInitError] = React.useState<string | null>(null);
+  const isLoading = false; // Define isLoading as a constant since it's not provided by HRAuthContext
   
   // Parse the query parameters to get the tab
   React.useEffect(() => {
@@ -115,9 +116,9 @@ export default function HRDashboard() {
             <h1 className="text-xl font-bold">Learnfinity HR Dashboard</h1>
           </div>
           <div className="flex items-center space-x-4">
-            {user && (
+            {hrUser && (
               <span className="text-sm text-muted-foreground">
-                Logged in as <span className="font-medium text-foreground">{user.name}</span>
+                Logged in as <span className="font-medium text-foreground">{hrUser.username}</span>
               </span>
             )}
             <Button variant="outline" size="sm" onClick={handleLogout}>
