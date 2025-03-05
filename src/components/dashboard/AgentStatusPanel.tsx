@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import * as React from "react";
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';

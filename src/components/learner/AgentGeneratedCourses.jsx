@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import * as React from "react";
 import { useAuth } from '@/contexts/AuthContext';
 import { Award, BookOpen, CheckCircle, Clock, Info, Sparkles } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';

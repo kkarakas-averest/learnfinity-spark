@@ -1,4 +1,4 @@
-import React from 'react';
+import * as React from "react";
 // Create local constants for React hooks
 const { createContext, useContext, useEffect, useState } = React;
 // Use React.ReactNode instead of importing it separately

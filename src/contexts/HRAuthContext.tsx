@@ -1,5 +1,4 @@
-
-import * as React from 'react';
+import * as React from "react";
 import { User } from '@/types/hr.types';
 
 // Define context types

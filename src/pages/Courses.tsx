@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import * as React from "react";
 import { Search, Filter, X } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import CourseCard from "@/components/CourseCard";

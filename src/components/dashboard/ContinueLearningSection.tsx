@@ -1,6 +1,5 @@
 
-// Import React directly without destructuring
-import React from "react";
+import * as React from "react";
 import CourseCard from "@/components/CourseCard";
 import { useLearningData } from "@/hooks/useLearningData";
 import { Skeleton } from "@/components/ui/skeleton";

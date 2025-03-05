@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import * as React from "react";
 import { Navigate } from 'react-router-dom';
 import { useHRAuth } from '@/contexts/HRAuthContext';
 
