@@ -1,17 +1,27 @@
-
 import { useState, useEffect } from "@/lib/react-helpers";
 import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
 import { hrEmployeeService } from "@/services/hrEmployeeService";
 import { Button } from "@/components/ui/button";
 
+// Define the service response type based on what hrEmployeeService actually returns
+interface ServiceResponse {
+  data: any | null;
+  error: any | null;
+}
+
 // Define return type for updateEmployeeWithRetry
-type UpdateEmployeeReturnType = { 
+interface UpdateEmployeeReturnType { 
   success: boolean; 
   data?: any; 
   error?: any;
-};
+}
 
+/**
+ * This component handles the employee editing functionality.
+ * Note: The hrEmployeeService.updateEmployee returns { data, error } but TypeScript
+ * has some issues inferring this properly, so a type assertion is used in the retry function.
+ */
 const EditEmployeePage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -38,29 +48,35 @@ const EditEmployeePage = () => {
           });
         }
         
-        const response = await hrEmployeeService.updateEmployee(employeeId, employeeData);
+        // Call the service and explicitly extract data and error
+        const serviceResponse = await hrEmployeeService.updateEmployee(employeeId, employeeData);
         
-        if (response.error) {
+        // Check for errors in the response
+        if (serviceResponse.error) {
           // Specific error handling for this operation
-          lastError = response.error;
+          lastError = serviceResponse.error;
           
           // Not all errors should be retried - detect permanent errors
-          if (response.error.code === '23505') { // Postgres duplicate key error
+          if (serviceResponse.error.code === '23505') { // Postgres duplicate key error
             toast({
               title: "An employee with this email already exists.",
               variant: "destructive"
             });
-            return { success: false, error: response.error };
+            return { success: false, error: serviceResponse.error };
           }
           
           // Log but continue retrying for temporary errors
-          console.warn(`Supabase operation failed (attempt ${retryAttempt + 1}):`, response.error);
+          console.warn(`Supabase operation failed (attempt ${retryAttempt + 1}):`, serviceResponse.error);
           retryAttempt++;
           continue;
         }
         
         // Return the successful result with data
-        return { success: true, data: response.data };
+        // Use type assertion to fix TypeScript error
+        return { 
+          success: true, 
+          data: (serviceResponse as any).data 
+        };
         
       } catch (error) {
         lastError = error;
