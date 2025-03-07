@@ -74,7 +74,9 @@ const HRLoginMigrated: React.FC = () => {
         console.log(`HRLogin: Navigating to ${ROUTES.HR_DASHBOARD}`);
         // Force navigation regardless of state updates
         setTimeout(() => {
-          navigate("/hr/dashboard");
+          // Make sure we're using the consistent path defined in ROUTES
+          navigate(ROUTES.HR_DASHBOARD);
+          console.log(`HRLogin: Navigation triggered to ${ROUTES.HR_DASHBOARD}`);
         }, 500);
       }
       // Note: Error handling is now done inside the useHRAuth hook directly
