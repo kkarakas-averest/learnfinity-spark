@@ -16,6 +16,7 @@ import { RAGStatus } from '@/types/hr.types';
 // Components
 import SkillsInventory from '@/components/hr/profile/SkillsInventory';
 import LearningHistory from '@/components/hr/profile/LearningHistory';
+import CareerDevelopment from '@/components/hr/profile/CareerDevelopment';
 
 // This will be broken down into separate components later
 const PersonalInfoSection = ({ profile, loading }: { profile: EnhancedEmployeeProfile | null, loading: boolean }) => {
@@ -223,15 +224,23 @@ const LearningHistorySection = ({ profile, loading }: { profile: EnhancedEmploye
 );
 
 const CareerDevelopmentSection = ({ profile }: { profile: EnhancedEmployeeProfile | null }) => (
-  <Card className="w-full mb-6">
-    <CardHeader>
-      <CardTitle>Career Development</CardTitle>
-      <CardDescription>Career goals and development plans</CardDescription>
-    </CardHeader>
-    <CardContent>
-      <p>Career development will be implemented here</p>
-    </CardContent>
-  </Card>
+  profile ? (
+    <CareerDevelopment 
+      careerGoals={profile.careerGoals} 
+      skills={profile.skills}
+      isEditable={false}
+    />
+  ) : (
+    <Card className="w-full mb-6">
+      <CardHeader>
+        <CardTitle>Career Development</CardTitle>
+        <CardDescription>Career goals and development plans</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <p>No career development data available</p>
+      </CardContent>
+    </Card>
+  )
 );
 
 const FeedbackSection = ({ profile }: { profile: EnhancedEmployeeProfile | null }) => (
