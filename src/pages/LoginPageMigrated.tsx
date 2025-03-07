@@ -114,16 +114,21 @@ const LoginPageMigrated: React.FC = () => {
       // Check if userDetails is set immediately
       console.log("After login - userDetails:", userDetails);
       
-      // Force refresh userDetails if not set
-      if (!userDetails && response?.user?.id) {
-        console.log("No userDetails found, manually redirecting based on role in session");
-        // Call dispatch directly with a slight delay to let other updates finish
-        setTimeout(() => {
+      // Always force navigation after successful login
+      // This ensures we don't rely solely on the useEffect
+      setTimeout(() => {
+        // If we have user details, use those for role-based navigation
+        if (userDetails) {
+          console.log("User details available, navigating based on role:", userDetails.role);
+          redirectBasedOnRole(userDetails.role);
+        } else {
+          // Fallback to dashboard if no user details yet
+          console.log("No user details yet, navigating to dashboard as fallback");
           navigate("/dashboard");
-        }, 500);
-      }
+        }
+      }, 500);
       
-      // Navigation is handled by the useEffect above that watches userDetails
+      // Navigation is also handled by the useEffect that watches userDetails
     } catch (error: any) {
       console.error("Login error:", error);
       const errorMessage = error instanceof Error 

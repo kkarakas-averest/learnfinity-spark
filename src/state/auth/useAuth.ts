@@ -157,6 +157,7 @@ export function useAuth() {
   const signInWithPassword = useCallback(async (email: string, password: string) => {
     try {
       dispatch(setLoading());
+      console.log('Auth: Attempting sign in with:', email);
       
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
@@ -165,6 +166,26 @@ export function useAuth() {
       
       if (error) throw error;
       
+      console.log('Auth: Sign in successful, user:', data.user?.id);
+      
+      // Important: Fetch user details immediately after login
+      if (data.user) {
+        console.log('Auth: Fetching user details after login');
+        try {
+          await fetchUserDetails(data.user.id);
+        } catch (detailsError) {
+          console.error('Failed to fetch user details after login:', detailsError);
+          // Create fallback user details if fetch fails
+          const fallbackDetails: UserDetails = {
+            id: data.user.id,
+            name: data.user.email?.split('@')[0] || 'User',
+            email: data.user.email || '',
+            role: 'learner',
+          };
+          dispatch(setUserDetails(fallbackDetails));
+        }
+      }
+      
       dispatch(setAuthSuccess(data.user));
       return data;
     } catch (error) {
@@ -172,7 +193,7 @@ export function useAuth() {
       dispatch(setAuthError(error instanceof Error ? error : new Error('Failed to sign in')));
       throw error;
     }
-  }, [dispatch]);
+  }, [dispatch, fetchUserDetails]);
   
   // Sign up with email and password
   const signUpWithPassword = useCallback(async (email: string, password: string, userData?: Partial<UserDetails>) => {

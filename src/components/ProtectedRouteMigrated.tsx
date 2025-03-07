@@ -1,4 +1,4 @@
-import React, { useEffect } from '@/lib/react-helpers';
+import React, { useEffect, useState } from '@/lib/react-helpers';
 import { Navigate } from "react-router-dom";
 import { UserRole } from "@/lib/database.types";
 import { Loader2 } from "lucide-react";
@@ -18,11 +18,29 @@ const ProtectedRouteMigrated: React.FC<ProtectedRouteProps> = ({
   // Use our new hooks instead of the old context
   const { user, userDetails, isLoading } = useAuth();
   const { toast } = useUI();
+  const [timeoutReached, setTimeoutReached] = useState(false);
+  
+  // Add a timeout to prevent infinite loading
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    
+    if (isLoading) {
+      timer = setTimeout(() => {
+        console.log("Protected route - Loading timeout reached, forcing continue");
+        setTimeoutReached(true);
+      }, 5000); // 5 second timeout
+    }
+    
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [isLoading]);
   
   console.log("ProtectedRouteMigrated - auth state:", { 
     user, 
     userDetails, 
     isLoading, 
+    timeoutReached,
     path: window.location.pathname,
     allowedRoles
   });
@@ -39,7 +57,7 @@ const ProtectedRouteMigrated: React.FC<ProtectedRouteProps> = ({
   }, [user, toast]);
 
   // If authentication is still loading, show a loading indicator
-  if (isLoading) {
+  if (isLoading && !timeoutReached) {
     console.log("Protected route - Authentication is still loading");
     return (
       <div className="flex items-center justify-center h-screen">
@@ -49,9 +67,9 @@ const ProtectedRouteMigrated: React.FC<ProtectedRouteProps> = ({
     );
   }
 
-  // If user is not authenticated, redirect to login
-  if (!user) {
-    console.log("Protected route - User not authenticated, redirecting to login");
+  // If loading timed out or user is not authenticated, redirect to login
+  if (timeoutReached || !user) {
+    console.log("Protected route - User not authenticated or loading timed out, redirecting to login");
     return <Navigate to="/login" replace />;
   }
 
