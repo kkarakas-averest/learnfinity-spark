@@ -19,109 +19,114 @@ import ExampleErrorHandling from "./components/ExampleErrorHandling";
 import FunctionalErrorBoundary from "./components/FunctionalErrorBoundary";
 import { UserRole } from "./lib/database.types";
 import { Toaster } from "./components/ui/toaster";
+import NavbarMigrated from "./components/NavbarMigrated";
 
 function App() {
   return (
     <FunctionalErrorBoundary>
-      <Routes>
-        <Route path="/" element={<Index />} />
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
-        <Route path="/hr-login" element={<HRLogin />} />
-        <Route path="/hr/login" element={<HRLoginMigrated />} />
-        
-        <Route 
-          path="/dashboard" 
-          element={
-            <ProtectedRoute allowedRoles={["learner", "mentor", "hr", "superadmin"]}>
-              <Dashboard />
-            </ProtectedRoute>
-          } 
-        />
-        
-        <Route 
-          path="/admin" 
-          element={
-            <ProtectedRoute allowedRoles={["superadmin"]}>
-              <SuperAdminDashboard />
-            </ProtectedRoute>
-          } 
-        />
-        
-        <Route 
-          path="/admin/*" 
-          element={
-            <ProtectedRoute allowedRoles={["superadmin"]}>
-              <SuperAdminDashboard />
-            </ProtectedRoute>
-          } 
-        />
-        
-        <Route 
-          path="/hr-dashboard/*" 
-          element={
-            <ProtectedRoute allowedRoles={["hr", "superadmin"]}>
-              <HRDashboard />
-            </ProtectedRoute>
-          } 
-        />
-        
-        <Route 
-          path="/hr/dashboard/*" 
-          element={
-            <ProtectedRoute allowedRoles={["hr", "superadmin"]}>
-              <HRDashboardMigrated />
-            </ProtectedRoute>
-          } 
-        />
-        
-        <Route 
-          path="/hr/*" 
-          element={
-            <ProtectedRoute allowedRoles={["hr", "superadmin"]}>
-              <HRDashboardMigrated />
-            </ProtectedRoute>
-          } 
-        />
-        
-        <Route 
-          path="/mentor/*" 
-          element={
-            <ProtectedRoute allowedRoles={["mentor", "superadmin"]}>
-              <Navigate to="/dashboard" replace />
-            </ProtectedRoute>
-          } 
-        />
-        
-        <Route 
-          path="/profile" 
-          element={
-            <ProtectedRoute>
-              <ProfilePage />
-            </ProtectedRoute>
-          } 
-        />
-        
-        <Route 
-          path="/settings" 
-          element={
-            <ProtectedRoute>
-              <ProfileSettings />
-            </ProtectedRoute>
-          } 
-        />
-        
-        <Route path="/courses" element={<Courses />} />
-        <Route path="/courses/:id" element={<CourseDetail />} />
-        
-        {/* Diagnostic route */}
-        <Route path="/diagnostic" element={<DiagnosticTool />} />
-        
-        {/* Error handling example route */}
-        <Route path="/error-examples" element={<ExampleErrorHandling />} />
-        
-        <Route path="*" element={<NotFound />} />
-      </Routes>
+      <NavbarMigrated />
+      
+      <main className="pt-16">
+        <Routes>
+          <Route path="/" element={<Index />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/hr-login" element={<HRLogin />} />
+          <Route path="/hr/login" element={<HRLoginMigrated />} />
+          
+          <Route 
+            path="/dashboard" 
+            element={
+              <ProtectedRoute allowedRoles={["learner", "mentor", "hr", "superadmin"]}>
+                <Dashboard />
+              </ProtectedRoute>
+            } 
+          />
+          
+          <Route 
+            path="/admin" 
+            element={
+              <ProtectedRoute allowedRoles={["superadmin"]}>
+                <SuperAdminDashboard />
+              </ProtectedRoute>
+            } 
+          />
+          
+          <Route 
+            path="/admin/*" 
+            element={
+              <ProtectedRoute allowedRoles={["superadmin"]}>
+                <SuperAdminDashboard />
+              </ProtectedRoute>
+            } 
+          />
+          
+          <Route 
+            path="/hr-dashboard/*" 
+            element={
+              <ProtectedRoute allowedRoles={["hr", "superadmin"]}>
+                <HRDashboard />
+              </ProtectedRoute>
+            } 
+          />
+          
+          <Route 
+            path="/hr/dashboard/*" 
+            element={
+              <ProtectedRoute allowedRoles={["hr", "superadmin"]}>
+                <HRDashboardMigrated />
+              </ProtectedRoute>
+            } 
+          />
+          
+          <Route 
+            path="/hr/*" 
+            element={
+              <ProtectedRoute allowedRoles={["hr", "superadmin"]}>
+                <HRDashboardMigrated />
+              </ProtectedRoute>
+            } 
+          />
+          
+          <Route 
+            path="/mentor/*" 
+            element={
+              <ProtectedRoute allowedRoles={["mentor", "superadmin"]}>
+                <Navigate to="/dashboard" replace />
+              </ProtectedRoute>
+            } 
+          />
+          
+          <Route 
+            path="/profile" 
+            element={
+              <ProtectedRoute>
+                <ProfilePage />
+              </ProtectedRoute>
+            } 
+          />
+          
+          <Route 
+            path="/settings" 
+            element={
+              <ProtectedRoute>
+                <ProfileSettings />
+              </ProtectedRoute>
+            } 
+          />
+          
+          <Route path="/courses" element={<Courses />} />
+          <Route path="/courses/:id" element={<CourseDetail />} />
+          
+          {/* Diagnostic route */}
+          <Route path="/diagnostic" element={<DiagnosticTool />} />
+          
+          {/* Error handling example route */}
+          <Route path="/error-examples" element={<ExampleErrorHandling />} />
+          
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </main>
       <Toaster />
     </FunctionalErrorBoundary>
   );

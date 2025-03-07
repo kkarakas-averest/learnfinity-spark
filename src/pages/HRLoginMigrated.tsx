@@ -3,14 +3,16 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { ROUTES } from "@/lib/routes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Loader2 } from 'lucide-react'; // Import Loader icon
 
 // Import from our new state management system
-import { useHRAuth, useUI } from "@/state";
+import { useHRAuth, useAuth, useUI } from "@/state";
 
 const HRLoginMigrated: React.FC = () => {
   // Use our new hooks instead of the old context
-  const { login, isAuthenticated, isLoading } = useHRAuth();
-  const { toast, toastError } = useUI();
+  const { login, isAuthenticated, isLoading: hrLoading } = useHRAuth();
+  const { signOut: regularUserSignOut } = useAuth(); // Import regular user signOut
+  const { toast, toastError, toastSuccess } = useUI();
   
   const navigate = useNavigate();
   const location = useLocation();
@@ -20,11 +22,23 @@ const HRLoginMigrated: React.FC = () => {
 
   // If already authenticated, redirect to dashboard
   useEffect(() => {
-    if (isAuthenticated && !isLoading) {
+    if (isAuthenticated && !hrLoading) {
       console.log("HRLogin: User already authenticated, redirecting to dashboard");
       navigate(ROUTES.HR_DASHBOARD);
     }
-  }, [isAuthenticated, isLoading, navigate]);
+  }, [isAuthenticated, hrLoading, navigate]);
+
+  // Function to ensure HR login doesn't conflict with regular user login
+  const ensureCleanLoginState = async () => {
+    // Sign out any existing regular user first to prevent conflicts
+    try {
+      await regularUserSignOut();
+      console.log("Successfully signed out regular user before HR login");
+    } catch (error) {
+      console.warn("Error signing out regular user:", error);
+      // Continue anyway - non-blocking
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,12 +56,16 @@ const HRLoginMigrated: React.FC = () => {
     setIsSubmitting(true);
     
     try {
+      // First ensure we don't have any conflicting sessions
+      await ensureCleanLoginState();
+      
+      // Then attempt HR login
       const success = await login(username, password);
       console.log(`HRLogin: Login ${success ? 'successful' : 'failed'}`);
       
       if (success) {
         console.log(`HRLogin: Navigating to ${ROUTES.HR_DASHBOARD}`);
-        navigate(ROUTES.HR_DASHBOARD);
+        navigate("/hr/dashboard"); // Use consistent path with the route defined in App.tsx
       }
       // Note: Error handling is now done inside the useHRAuth hook directly
     } catch (error) {
@@ -61,10 +79,13 @@ const HRLoginMigrated: React.FC = () => {
     }
   };
 
-  if (isLoading) {
+  if (hrLoading) {
     return (
       <div className="flex items-center justify-center h-screen bg-gray-100">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        <div className="text-center">
+          <Loader2 className="mx-auto h-12 w-12 animate-spin text-primary" />
+          <p className="mt-4 text-muted-foreground">Loading HR authentication...</p>
+        </div>
       </div>
     );
   }

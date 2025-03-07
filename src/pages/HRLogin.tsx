@@ -1,14 +1,16 @@
-
 import React from "@/lib/react-helpers";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useHRAuth } from "@/contexts/HRAuthContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { ROUTES } from "@/lib/routes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/use-toast";
+import { Loader2 } from 'lucide-react';
 
 const HRLogin = () => {
   const { login, isAuthenticated, isLoading } = useHRAuth();
+  const { signOut: regularUserSignOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [username, setUsername] = React.useState("");
@@ -22,6 +24,18 @@ const HRLogin = () => {
       navigate(ROUTES.HR_DASHBOARD);
     }
   }, [isAuthenticated, isLoading, navigate]);
+
+  // Function to ensure HR login doesn't conflict with regular user login
+  const ensureCleanLoginState = async () => {
+    // Sign out any existing regular user first to prevent conflicts
+    try {
+      await regularUserSignOut();
+      console.log("Successfully signed out regular user before HR login");
+    } catch (error) {
+      console.warn("Error signing out regular user:", error);
+      // Continue anyway - non-blocking
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,6 +53,10 @@ const HRLogin = () => {
     setIsSubmitting(true);
     
     try {
+      // First ensure we don't have any conflicting sessions
+      await ensureCleanLoginState();
+      
+      // Then attempt HR login
       const success = await login(username, password);
       console.log(`HRLogin: Login ${success ? 'successful' : 'failed'}`);
       
@@ -68,7 +86,10 @@ const HRLogin = () => {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen bg-gray-100">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        <div className="text-center">
+          <Loader2 className="mx-auto h-12 w-12 animate-spin text-primary" />
+          <p className="mt-4 text-muted-foreground">Loading HR authentication...</p>
+        </div>
       </div>
     );
   }
