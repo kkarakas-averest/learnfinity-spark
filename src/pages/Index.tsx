@@ -224,13 +224,8 @@ const Index = () => {
                     </Link>
                   </li>
                   <li>
-                    <Link to="/hr-login" className="text-sm text-muted-foreground hover:text-primary">
-                      HR Admin
-                    </Link>
-                  </li>
-                  <li>
                     <Link to="/hr/login" className="text-sm text-muted-foreground hover:text-primary">
-                      HR Admin (New)
+                      HR Admin
                     </Link>
                   </li>
                 </ul>

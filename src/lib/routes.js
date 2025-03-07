@@ -22,14 +22,14 @@ export const ROUTES = {
   SETTINGS_BILLING: '/settings/billing',
   
   // HR routes
-  HR_LOGIN: '/hr-login',
-  HR_DASHBOARD: '/hr-dashboard', // Fixed to match the route used in App.tsx
-  HR_DASHBOARD_EMPLOYEES: '/hr-dashboard/employees',
-  HR_DASHBOARD_EMPLOYEES_NEW: '/hr-dashboard/employees/new',
-  HR_DASHBOARD_EMPLOYEES_EDIT: '/hr-dashboard/employees/:id/edit',
-  HR_DASHBOARD_EMPLOYEES_VIEW: '/hr-dashboard/employees/:id',
-  HR_DASHBOARD_COURSES: '/hr-dashboard/courses',
-  HR_DASHBOARD_REPORTS: '/hr-dashboard/reports',
+  HR_LOGIN: '/hr/login',
+  HR_DASHBOARD: '/hr/dashboard',
+  HR_DASHBOARD_EMPLOYEES: '/hr/dashboard/employees',
+  HR_DASHBOARD_EMPLOYEES_NEW: '/hr/dashboard/employees/new',
+  HR_DASHBOARD_EMPLOYEES_EDIT: '/hr/dashboard/employees/:id/edit',
+  HR_DASHBOARD_EMPLOYEES_VIEW: '/hr/dashboard/employees/:id',
+  HR_DASHBOARD_COURSES: '/hr/dashboard/courses',
+  HR_DASHBOARD_REPORTS: '/hr/dashboard/reports',
   
   // Admin routes
   ADMIN_DASHBOARD: '/admin',
