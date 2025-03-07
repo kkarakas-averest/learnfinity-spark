@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Skill, ProficiencyLevel } from '@/types/employee-profile.types';
-import { AlertTriangle, RefreshCw, CheckCircle, Award, Plus } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Award } from 'lucide-react';
 
 interface SkillsInventoryProps {
   skills: Skill[];
@@ -79,7 +79,6 @@ const SkillsInventory: React.FC<SkillsInventoryProps> = ({
               </p>
               {isEditable && (
                 <Button onClick={onAddSkill}>
-                  <Plus className="h-4 w-4 mr-2" />
                   Add First Skill
                 </Button>
               )}
@@ -103,7 +102,6 @@ const SkillsInventory: React.FC<SkillsInventoryProps> = ({
         </div>
         {isEditable && (
           <Button variant="outline" size="sm" onClick={onAddSkill}>
-            <Plus className="h-4 w-4 mr-2" />
             Add Skill
           </Button>
         )}

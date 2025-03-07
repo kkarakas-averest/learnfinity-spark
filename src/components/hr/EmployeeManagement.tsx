@@ -10,7 +10,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { SparklesIcon } from '@heroicons/react/24/outline';
 import { Link } from "react-router-dom";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Activity, Edit, MessageSquare, User } from "lucide-react";
+import { Activity, Edit, MessageSquare, User, MoreHorizontal } from "lucide-react";
 
 interface EmployeeManagementProps {
   onViewDetails: (employee: Employee) => void;
