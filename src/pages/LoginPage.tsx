@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "@/hooks/use-toast";
 import { Key, Loader2, Mail, ShieldCheck } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
@@ -42,11 +42,13 @@ export default function LoginPage() {
   // Redirect if already logged in
   React.useEffect(() => {
     if (userDetails) {
+      console.log("User details detected, redirecting based on role:", userDetails.role);
       redirectBasedOnRole(userDetails.role);
     }
-  }, [userDetails]);
+  }, [userDetails, navigate]);
   
   const redirectBasedOnRole = (role: string) => {
+    console.log("Redirecting based on role:", role);
     switch (role) {
       case 'superadmin':
         navigate('/admin');
@@ -87,6 +89,7 @@ export default function LoginPage() {
     
     try {
       const { email, password } = data;
+      console.log("Attempting login with:", email);
       await signIn(email, password);
       
       toast({
@@ -94,8 +97,8 @@ export default function LoginPage() {
         description: "You've successfully logged in.",
       });
       
-      // Navigation is handled by the useEffect above
-    } catch (error: Error | unknown) {
+      // Navigation is handled by the useEffect above that watches userDetails
+    } catch (error: any) {
       console.error("Login error:", error);
       const errorMessage = error instanceof Error 
         ? error.message 
@@ -119,6 +122,7 @@ export default function LoginPage() {
     
     try {
       const { email, password } = data;
+      console.log("Attempting admin login with:", email);
       await signIn(email, password);
       
       toast({
@@ -126,8 +130,8 @@ export default function LoginPage() {
         description: "You've successfully logged in as admin.",
       });
       
-      // Navigation is handled by the useEffect above
-    } catch (error: Error | unknown) {
+      // Navigation is handled by the useEffect above that watches userDetails
+    } catch (error: any) {
       console.error("Admin login error:", error);
       const errorMessage = error instanceof Error 
         ? error.message 

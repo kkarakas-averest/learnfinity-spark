@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "@/lib/react-helpers";
 import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
@@ -62,12 +63,10 @@ const EditEmployeePage = () => {
               variant: "destructive"
             });
             
-            // Create explicit return value with proper typing
-            const errorResult: RetryOperationResult<Employee> = {
+            return {
               success: false,
               error: response.error
             };
-            return errorResult;
           }
           
           // Log but continue retrying for temporary errors
