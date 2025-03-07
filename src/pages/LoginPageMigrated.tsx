@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "@/lib/react-helpers";
+import React, { useState, useEffect, useRef } from "@/lib/react-helpers";
 import { Link, useNavigate } from "react-router-dom";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -33,6 +33,9 @@ const loginSchema = z.object({
 // Use typeof for z.infer
 type LoginFormValues = z.infer<typeof loginSchema>;
 
+// Debug rendering to identify potential mounting/unmounting issues
+console.log("LoginPageMigrated module loaded");
+
 const LoginPageMigrated: React.FC = () => {
   // Use our new hooks instead of the old context
   const { signInWithPassword, userDetails, isLoading: authLoading } = useAuth();
@@ -42,20 +45,68 @@ const LoginPageMigrated: React.FC = () => {
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const hasMounted = useRef(false);
   
-  console.log("LoginPageMigrated - Current state:", { 
-    authLoading, 
-    userDetails, 
-    loading,
-    error 
-  });
-  
-  // Redirect if already logged in
+  // Debug rendering
   useEffect(() => {
-    if (userDetails) {
-      console.log("User details detected, redirecting based on role:", userDetails.role);
-      redirectBasedOnRole(userDetails.role);
+    console.log("LoginPageMigrated mounted");
+    hasMounted.current = true;
+    
+    return () => {
+      console.log("LoginPageMigrated unmounted");
+      hasMounted.current = false;
+    };
+  }, []);
+  
+  // Log state changes but avoid excessive logging
+  const prevState = useRef({ authLoading, userDetails, loading, error });
+  useEffect(() => {
+    // Only log if something changed
+    if (
+      prevState.current.authLoading !== authLoading ||
+      prevState.current.userDetails !== userDetails ||
+      prevState.current.loading !== loading ||
+      prevState.current.error !== error
+    ) {
+      console.log("LoginPageMigrated - Current state:", { 
+        authLoading, 
+        userDetails, 
+        loading,
+        error 
+      });
+      
+      prevState.current = { authLoading, userDetails, loading, error };
     }
+  }, [authLoading, userDetails, loading, error]);
+  
+  // Redirect if already logged in - with debounce to avoid redirect loops
+  const redirectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  useEffect(() => {
+    if (userDetails && !redirectTimeoutRef.current && hasMounted.current) {
+      console.log("User details detected, will redirect based on role:", userDetails.role);
+      
+      // Clear any existing redirect timeout
+      if (redirectTimeoutRef.current) {
+        clearTimeout(redirectTimeoutRef.current);
+      }
+      
+      // Set a new redirect timeout
+      redirectTimeoutRef.current = setTimeout(() => {
+        if (hasMounted.current) { // Only redirect if still mounted
+          console.log("Executing redirect for role:", userDetails.role);
+          redirectBasedOnRole(userDetails.role);
+          redirectTimeoutRef.current = null;
+        }
+      }, 300);
+    }
+    
+    return () => {
+      if (redirectTimeoutRef.current) {
+        clearTimeout(redirectTimeoutRef.current);
+        redirectTimeoutRef.current = null;
+      }
+    };
   }, [userDetails, navigate]);
   
   const redirectBasedOnRole = (role: string) => {

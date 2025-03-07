@@ -8,6 +8,9 @@ import { StateProvider } from '@/state';
 import App from './App';
 import './index.css';
 
+// Debug log for main render
+console.log("Main rendering started");
+
 // Create a query client
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -18,18 +21,22 @@ const queryClient = new QueryClient({
   },
 });
 
-// Remove StrictMode temporarily to prevent double initialization
+// Debug wrapper for StateProvider to ensure single instance
+const SingletonStateProvider = ({children}: {children: React.ReactNode}) => {
+  console.log("StateProvider rendering");
+  return <StateProvider>{children}</StateProvider>;
+};
+
+// Completely remove StrictMode to prevent double renders
 ReactDOM.createRoot(document.getElementById('root')!).render(
-  // <React.StrictMode>
-    <BrowserRouter>
-      <QueryClientProvider client={queryClient}>
-        <StateProvider>
-          <ThemeProvider defaultTheme="light" storageKey="ui-theme">
-            <App />
-            <Toaster />
-          </ThemeProvider>
-        </StateProvider>
-      </QueryClientProvider>
-    </BrowserRouter>
-  // </React.StrictMode>
+  <BrowserRouter>
+    <QueryClientProvider client={queryClient}>
+      <SingletonStateProvider>
+        <ThemeProvider defaultTheme="light" storageKey="ui-theme">
+          <App />
+          <Toaster />
+        </ThemeProvider>
+      </SingletonStateProvider>
+    </QueryClientProvider>
+  </BrowserRouter>
 );

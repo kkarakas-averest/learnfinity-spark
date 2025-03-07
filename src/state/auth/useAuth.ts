@@ -12,6 +12,10 @@ import {
 } from './authActions';
 import { UserDetails } from '../types';
 
+// Create a global initialization flag outside the hook to prevent multiple initializations across instances
+const globalInitialized = { current: false };
+const globalInitializing = { current: false };
+
 /**
  * Custom hook for authentication
  * Provides methods for authentication and access to auth state
@@ -19,26 +23,25 @@ import { UserDetails } from '../types';
 export function useAuth() {
   const state = useAuthState();
   const dispatch = useAuthDispatch();
-  // Add initialization tracking ref
-  const isInitializing = useRef(false);
-  const hasInitialized = useRef(false);
+  // Use the global initialization refs instead of local ones
+  const initEffectRan = useRef(false);
   
   // Initialize auth state
   const initialize = useCallback(async () => {
-    // Prevent multiple simultaneous initializations
-    if (isInitializing.current) {
-      console.log("Auth: Already initializing, skipping duplicate call");
+    // Prevent multiple simultaneous initializations across hook instances
+    if (globalInitializing.current) {
+      console.log("Auth: Already initializing in another instance, skipping");
       return;
     }
     
-    // Only initialize once
-    if (hasInitialized.current) {
-      console.log("Auth: Already initialized, skipping");
+    // Only initialize once globally
+    if (globalInitialized.current) {
+      console.log("Auth: Already initialized globally, skipping");
       return;
     }
     
     try {
-      isInitializing.current = true;
+      globalInitializing.current = true;
       dispatch(setLoading());
       console.log("Auth: Initializing auth state");
       
@@ -76,7 +79,7 @@ export function useAuth() {
         }
       );
       
-      hasInitialized.current = true;
+      globalInitialized.current = true;
       return () => {
         subscription.unsubscribe();
       };
@@ -92,7 +95,7 @@ export function useAuth() {
         }
       }, 3000);
     } finally {
-      isInitializing.current = false;
+      globalInitializing.current = false;
     }
   }, [dispatch, state.loading]);
   
@@ -258,15 +261,26 @@ export function useAuth() {
     }
   }, [dispatch]);
   
-  // Set up auth listener on mount - with a stable dependency array
+  // Set up auth listener on mount - with more protection against multiple calls
   useEffect(() => {
+    // Only run the effect once per component instance
+    if (initEffectRan.current) {
+      return;
+    }
+    
+    console.log('Auth: Running initialization effect');
+    initEffectRan.current = true;
+    
     const cleanup = initialize();
+    
+    // Clean up function
     return () => {
       cleanup?.then((unsubscribe) => {
         if (unsubscribe) unsubscribe();
+      }).catch(err => {
+        console.error('Error during auth cleanup:', err);
       });
     };
-  // Remove state.loading from dependency array to prevent re-initialization
   }, [initialize]);
   
   return {
