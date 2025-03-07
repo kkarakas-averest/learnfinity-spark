@@ -72,22 +72,31 @@ This document tracks the implementation progress, bug fixes, and enhancements fo
 
 Based on the HR Dashboard PRD, the following features are prioritized for upcoming implementation:
 
-1. **Enhanced Employee Detail View**
+1. **Employee/Learner Profile Page**
+   - Comprehensive personal and professional information
+   - Learning preferences and style indicators
+   - Skills inventory and competency tracking
+   - Learning history with performance metrics
+   - Career development goals and paths
+   - Content format preferences and feedback history
+   - Data sources for LLM agent personalization
+
+2. **Enhanced Employee Detail View**
    - Progress timeline visualization
    - Intervention history tracking
    - Improved feedback display
 
-2. **Advanced RAG Status Visualization**
+3. **Advanced RAG Status Visualization**
    - Visual indicators of status trends over time
    - Department/team level aggregated views
    - Filtering and sorting by RAG status
 
-3. **Notification System Enhancements**
+4. **Notification System Enhancements**
    - User notification preferences
    - Scheduled notification delivery
    - Template-based notification content
 
-4. **Reporting & Analytics**
+5. **Reporting & Analytics**
    - Department-level progress reports
    - Trend analysis for learning engagement
    - RAG status distribution reports
