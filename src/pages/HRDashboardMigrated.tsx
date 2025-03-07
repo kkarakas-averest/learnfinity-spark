@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 // Import the services for database initialization
 import { hrServices } from '@/lib/services/hrServices';
+// Import the agent system hook
+import { useAgentSystem } from '@/hooks/useAgentSystem';
 
 const HRDashboardMigrated: React.FC = () => {
   const { hrUser, isAuthenticated, isLoading, logout } = useHRAuth();
@@ -15,7 +17,24 @@ const HRDashboardMigrated: React.FC = () => {
   // Add a ref to track if initialization has been completed
   const hasInitializedRef = React.useRef(false);
   
-  console.log("HRDashboard - Current state:", { hrUser, isAuthenticated, isLoading });
+  // Initialize the agent system
+  const { 
+    isInitialized: isAgentSystemInitialized, 
+    isInitializing: isAgentSystemInitializing,
+    initError: agentSystemError,
+    initialize: initializeAgentSystem
+  } = useAgentSystem({ 
+    autoInitialize: false, // We'll initialize manually after DB is ready
+    debug: process.env.NODE_ENV === 'development'
+  });
+
+  console.log("HRDashboard - Current state:", { 
+    hrUser, 
+    isAuthenticated, 
+    isLoading,
+    isAgentSystemInitialized,
+    isAgentSystemInitializing 
+  });
 
   // Add effect for database initialization
   React.useEffect(() => {
@@ -41,6 +60,18 @@ const HRDashboardMigrated: React.FC = () => {
               title: "Database Ready",
               description: "HR database initialized successfully with sample data."
             });
+          }
+
+          // Now that the database is ready, initialize the agent system
+          await initializeAgentSystem();
+          if (agentSystemError) {
+            console.error('Failed to initialize agent system:', agentSystemError);
+            toastError({
+              title: "Agent System Error",
+              description: "Failed to initialize AI agents. Some advanced features may not be available."
+            });
+          } else {
+            console.log('Agent system initialized successfully');
           }
         } else {
           console.error('Failed to initialize HR database:', result?.error);
@@ -95,14 +126,17 @@ const HRDashboardMigrated: React.FC = () => {
   }
 
   // Show loading state
-  if (isLoading || initializingDB) {
-    console.log("HRDashboard: Auth is loading or initializing DB, showing spinner");
+  if (isLoading || initializingDB || isAgentSystemInitializing) {
+    const loadingMessage = 
+      isAgentSystemInitializing ? "Initializing AI agents..." :
+      initializingDB ? "Initializing database..." : 
+      "Loading...";
+      
+    console.log(`HRDashboard: ${loadingMessage}`);
     return (
       <div className="flex items-center justify-center h-screen">
         <LoadingSpinner size="xl" />
-        <span className="ml-2 text-gray-500">
-          {initializingDB ? "Initializing database..." : "Loading..."}
-        </span>
+        <span className="ml-2 text-gray-500">{loadingMessage}</span>
       </div>
     );
   }
@@ -158,6 +192,16 @@ const HRDashboardMigrated: React.FC = () => {
           <Button variant="outline" onClick={navigateToReports}>View Reports</Button>
         </div>
       </div>
+      
+      {!isAgentSystemInitialized && agentSystemError && (
+        <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-md p-4 mt-4">
+          <h3 className="font-medium">AI Assistant Limited</h3>
+          <p className="text-sm">
+            The AI agent system could not be initialized. Basic functionality will work, 
+            but advanced features like automated RAG status analysis may be limited.
+          </p>
+        </div>
+      )}
     </div>
   );
 };
