@@ -1,10 +1,13 @@
 -- Interventions Schema for LearnFinity HR Dashboard
 -- This file contains SQL DDL for intervention-related tables
 
+-- Enable UUID extension if not already enabled
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
 -- Main interventions table - Stores all HR interventions
 CREATE TABLE IF NOT EXISTS interventions (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  employee_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  employee_id UUID NOT NULL,
   type VARCHAR(50) NOT NULL CHECK (type IN (
     'content_modification', 'resource_assignment', 'schedule_adjustment', 
     'mentor_assignment', 'feedback_request', 'custom'
@@ -12,19 +15,16 @@ CREATE TABLE IF NOT EXISTS interventions (
   status VARCHAR(20) NOT NULL CHECK (status IN (
     'pending', 'active', 'completed', 'cancelled'
   )),
-  reason VARCHAR(50) NOT NULL CHECK (reason IN (
-    'rag_status_change', 'progress_slowdown', 'low_engagement', 
-    'poor_performance', 'employee_request', 'periodic_review', 'custom'
-  )),
+  reason VARCHAR(255) NOT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-  created_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  created_by UUID NOT NULL,
   rag_status_at_creation VARCHAR(10) CHECK (rag_status_at_creation IN ('green', 'amber', 'red')),
   title VARCHAR(255) NOT NULL,
   description TEXT,
   due_date TIMESTAMP WITH TIME ZONE,
   completed_at TIMESTAMP WITH TIME ZONE,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-  custom_fields JSONB DEFAULT '{}'::jsonb,
+  notes TEXT,
   metadata JSONB DEFAULT '{}'::jsonb
 );
 
@@ -38,10 +38,8 @@ CREATE INDEX IF NOT EXISTS idx_interventions_due_date ON interventions(due_date)
 CREATE TABLE IF NOT EXISTS content_modifications (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   intervention_id UUID REFERENCES interventions(id) ON DELETE CASCADE,
-  content_id UUID NOT NULL,
-  content_type VARCHAR(20) NOT NULL CHECK (content_type IN (
-    'module', 'quiz', 'video', 'document', 'other'
-  )),
+  content_id VARCHAR(255) NOT NULL,
+  content_type VARCHAR(50) NOT NULL,
   original_content TEXT,
   modified_content TEXT NOT NULL,
   reason TEXT,
@@ -52,15 +50,11 @@ CREATE TABLE IF NOT EXISTS content_modifications (
 CREATE TABLE IF NOT EXISTS resource_assignments (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   intervention_id UUID REFERENCES interventions(id) ON DELETE CASCADE,
-  resource_id UUID NOT NULL,
-  resource_type VARCHAR(20) NOT NULL CHECK (resource_type IN (
-    'document', 'video', 'course', 'quiz', 'other'
-  )),
+  resource_id VARCHAR(255) NOT NULL,
+  resource_type VARCHAR(50) NOT NULL,
   resource_name VARCHAR(255) NOT NULL,
-  resource_url TEXT NOT NULL,
-  reason TEXT,
-  due_date TIMESTAMP WITH TIME ZONE,
-  is_required BOOLEAN DEFAULT TRUE,
+  resource_url TEXT,
+  assignment_reason TEXT NOT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -112,14 +106,11 @@ CREATE TABLE IF NOT EXISTS intervention_templates (
     'content_modification', 'resource_assignment', 'schedule_adjustment', 
     'mentor_assignment', 'feedback_request', 'custom'
   )),
-  reasons_for_use JSONB NOT NULL,
+  reason_for_use TEXT NOT NULL,
   content_template TEXT,
-  required_resource_ids JSONB,
-  suggested_mentor_ids JSONB,
-  feedback_questions JSONB,
+  resource_ids JSONB,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-  created_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
   is_active BOOLEAN DEFAULT TRUE
 );
 
@@ -218,9 +209,9 @@ INSERT INTO intervention_templates (
   name, 
   description, 
   type, 
-  reasons_for_use, 
+  reason_for_use, 
   content_template, 
-  feedback_questions
+  resource_ids
 )
 VALUES
   (
@@ -229,7 +220,7 @@ VALUES
     'content_modification',
     '["poor_performance", "progress_slowdown"]',
     'We have noticed that you are having some difficulty with the course material. This personalized plan is designed to help you overcome these challenges.',
-    '["What specific challenges are you facing with the current content?", "What learning style works best for you?", "Is there anything specific we can do to better support your learning?"]'
+    '["module_id_1", "module_id_2"]'
   ),
   (
     'Additional Resources Package',
@@ -237,7 +228,7 @@ VALUES
     'resource_assignment',
     '["low_engagement", "poor_performance"]',
     'To help you better understand the concepts, we have assigned these additional resources.',
-    '["Did you find these additional resources helpful?", "Which format of materials do you prefer?"]'
+    '["document_id_1", "video_id_1"]'
   ),
   (
     'Deadline Extension',
@@ -245,7 +236,7 @@ VALUES
     'schedule_adjustment',
     '["progress_slowdown", "employee_request"]',
     'We have adjusted your deadline to provide more time for completion.',
-    '["Is the new timeline more manageable for you?", "What factors were impacting your ability to meet the original deadline?"]'
+    '["new_due_date"]'
   ),
   (
     'Mentor Support Program',
@@ -253,7 +244,7 @@ VALUES
     'mentor_assignment',
     '["rag_status_change", "poor_performance"]',
     'To provide additional support, we have assigned a mentor who will guide you through the challenging aspects of this course.',
-    '["How helpful were the mentoring sessions?", "What specific areas did the mentor help you with?"]'
+    '["mentor_id"]'
   ),
   (
     'Learning Experience Feedback',
@@ -261,6 +252,6 @@ VALUES
     'feedback_request',
     '["periodic_review"]',
     'We value your input on the learning experience. Please provide detailed feedback to help us improve.',
-    '["How would you rate the overall quality of the course materials?", "Were the learning objectives clear?", "What aspects of the course could be improved?", "What did you find most valuable about the course?"]'
+    '["questions"]'
   )
 ON CONFLICT DO NOTHING; 
