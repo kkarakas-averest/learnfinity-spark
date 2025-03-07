@@ -8,6 +8,9 @@ import { useAgentSystem } from '@/hooks/useAgentSystem';
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { SparklesIcon } from '@heroicons/react/24/outline';
+import { Link } from "react-router-dom";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Activity, Edit, MessageSquare, User } from "lucide-react";
 
 interface EmployeeManagementProps {
   onViewDetails: (employee: Employee) => void;
@@ -386,20 +389,35 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ onViewDetails, 
                       </Tooltip>
                     </TooltipProvider>
                   )}
-                  <button
-                    className="px-3 py-1 text-sm bg-blue-100 text-blue-800 rounded"
-                    onClick={() => onViewDetails(employee)}
-                  >
-                    View Details
-                  </button>
-                  {employee.ragStatus !== 'green' && (
-                    <button
-                      className="px-3 py-1 text-sm bg-purple-100 text-purple-800 rounded"
-                      onClick={() => onIntervene(employee)}
-                    >
-                      Intervene
-                    </button>
-                  )}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" className="h-8 w-8 p-0">
+                        <span className="sr-only">Open menu</span>
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => analyzeEmployee(employee)}>
+                        <Activity className="mr-2 h-4 w-4" />
+                        <span>Analyze</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link to={`/hr-dashboard/employees/${employee.id}/profile`}>
+                          <User className="mr-2 h-4 w-4" />
+                          <span>View Profile</span>
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => onIntervene(employee)}>
+                        <MessageSquare className="mr-2 h-4 w-4" />
+                        <span>Intervene</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => onViewDetails(employee)}>
+                        <Edit className="mr-2 h-4 w-4" />
+                        <span>Edit</span>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </li>
             ))

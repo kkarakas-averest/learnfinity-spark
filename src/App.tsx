@@ -33,6 +33,7 @@ import EmployeesPage from "./pages/hr/EmployeesPage";
 import ProgramsPage from "./pages/hr/ProgramsPage";
 import ReportsPage from "./pages/hr/ReportsPage";
 import SettingsPage from "./pages/hr/SettingsPage";
+import EmployeeProfilePage from "./pages/hr/EmployeeProfilePage";
 
 // Simple diagnostic component for auth debugging
 const AuthDiagnostic = () => {
@@ -168,6 +169,17 @@ function App() {
               <ProtectedRouteMigrated allowedRoles={["hr", "superadmin"]} requireHRAuth={true}>
                 <React.Suspense fallback={<div className="flex items-center justify-center h-screen"><p>Loading...</p></div>}>
                   <SettingsPage />
+                </React.Suspense>
+              </ProtectedRouteMigrated>
+            } 
+          />
+          
+          <Route 
+            path="/hr-dashboard/employees/:employeeId/profile" 
+            element={
+              <ProtectedRouteMigrated allowedRoles={["hr", "superadmin"]} requireHRAuth={true}>
+                <React.Suspense fallback={<div className="flex items-center justify-center h-screen"><p>Loading...</p></div>}>
+                  <EmployeeProfilePage />
                 </React.Suspense>
               </ProtectedRouteMigrated>
             } 
