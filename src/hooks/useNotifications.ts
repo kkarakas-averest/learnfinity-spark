@@ -43,7 +43,7 @@ export function useNotifications(autoRefresh = true) {
         setNotifications(prev => 
           prev.map(notification => 
             notification.id === notificationId 
-              ? { ...notification, isRead: true } 
+              ? { ...notification, is_read: true } 
               : notification
           )
         );
@@ -64,7 +64,7 @@ export function useNotifications(autoRefresh = true) {
       if (result.success) {
         // Update local state
         setNotifications(prev => 
-          prev.map(notification => ({ ...notification, isRead: true }))
+          prev.map(notification => ({ ...notification, is_read: true }))
         );
         setUnreadCount(0);
       }

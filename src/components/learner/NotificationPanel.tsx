@@ -16,7 +16,7 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({
   onReadNotification,
   onClearAll
 }) => {
-  const unreadCount = notifications.filter(n => !n.isRead).length;
+  const unreadCount = notifications.filter(n => !n.is_read).length;
 
   return (
     <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border z-50 overflow-hidden max-h-[600px] flex flex-col">

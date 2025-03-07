@@ -7,6 +7,8 @@ import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { hrServices } from '@/lib/services/hrServices';
 // Import the agent system hook
 import { useAgentSystem } from '@/hooks/useAgentSystem';
+// Import the header component
+import HRDashboardHeader from '@/components/hr/HRDashboardHeader';
 
 const HRDashboardMigrated: React.FC = () => {
   const { hrUser, isAuthenticated, isLoading, logout } = useHRAuth();
@@ -177,46 +179,43 @@ const HRDashboardMigrated: React.FC = () => {
 
   console.log("HRDashboard: Rendering for user:", hrUser?.username);
   return (
-    <div className="container relative pt-20 pb-12">
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-3xl font-bold mb-2">HR Dashboard</h1>
-          <h2 className="text-xl">Welcome, {hrUser?.username || "HR User"}</h2>
-        </div>
-        <Button variant="outline" onClick={handleLogout}>
-          Logout
-        </Button>
-      </div>
+    <div className="min-h-screen bg-gray-50">
+      <HRDashboardHeader 
+        username={hrUser?.username || "HR Admin"} 
+        onLogout={handleLogout} 
+      />
       
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-medium mb-2">Employee Management</h3>
-          <p className="text-gray-600 mb-4">Manage employee records, onboarding, and roles.</p>
-          <Button variant="outline" onClick={navigateToEmployees}>View Employees</Button>
+      <div className="container pt-8 pb-12 mx-auto px-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+          <div className="bg-white rounded-lg shadow p-6">
+            <h3 className="text-lg font-medium mb-2">Employee Management</h3>
+            <p className="text-gray-600 mb-4">Manage employee records, onboarding, and roles.</p>
+            <Button variant="outline" onClick={navigateToEmployees}>View Employees</Button>
+          </div>
+          
+          <div className="bg-white rounded-lg shadow p-6">
+            <h3 className="text-lg font-medium mb-2">Learning Programs</h3>
+            <p className="text-gray-600 mb-4">Assign courses and track employee progress.</p>
+            <Button variant="outline" onClick={navigateToPrograms}>Manage Programs</Button>
+          </div>
+          
+          <div className="bg-white rounded-lg shadow p-6">
+            <h3 className="text-lg font-medium mb-2">Performance Analytics</h3>
+            <p className="text-gray-600 mb-4">View completion rates and assessment scores.</p>
+            <Button variant="outline" onClick={navigateToReports}>View Reports</Button>
+          </div>
         </div>
         
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-medium mb-2">Learning Programs</h3>
-          <p className="text-gray-600 mb-4">Assign courses and track employee progress.</p>
-          <Button variant="outline" onClick={navigateToPrograms}>Manage Programs</Button>
-        </div>
-        
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-medium mb-2">Performance Analytics</h3>
-          <p className="text-gray-600 mb-4">View completion rates and assessment scores.</p>
-          <Button variant="outline" onClick={navigateToReports}>View Reports</Button>
-        </div>
+        {!isAgentSystemInitialized && agentSystemError && (
+          <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-md p-4 mt-4">
+            <h3 className="font-medium">AI Assistant Limited</h3>
+            <p className="text-sm">
+              The AI agent system could not be initialized. Basic functionality will work, 
+              but advanced features like automated RAG status analysis may be limited.
+            </p>
+          </div>
+        )}
       </div>
-      
-      {!isAgentSystemInitialized && agentSystemError && (
-        <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-md p-4 mt-4">
-          <h3 className="font-medium">AI Assistant Limited</h3>
-          <p className="text-sm">
-            The AI agent system could not be initialized. Basic functionality will work, 
-            but advanced features like automated RAG status analysis may be limited.
-          </p>
-        </div>
-      )}
     </div>
   );
 };
