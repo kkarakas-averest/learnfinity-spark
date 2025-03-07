@@ -104,7 +104,7 @@ function App() {
           <Route 
             path="/hr-dashboard/*" 
             element={
-              <ProtectedRouteMigrated allowedRoles={["hr", "superadmin"]}>
+              <ProtectedRouteMigrated allowedRoles={["hr", "superadmin"]} requireHRAuth={true}>
                 <HRDashboardMigrated />
               </ProtectedRouteMigrated>
             } 
@@ -113,7 +113,7 @@ function App() {
           <Route 
             path="/hr/dashboard/*" 
             element={
-              <ProtectedRouteMigrated allowedRoles={["hr", "superadmin"]}>
+              <ProtectedRouteMigrated allowedRoles={["hr", "superadmin"]} requireHRAuth={true}>
                 <HRDashboardMigrated />
               </ProtectedRouteMigrated>
             } 

@@ -1,30 +1,34 @@
 import React, { useEffect, useState } from '@/lib/react-helpers';
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { UserRole } from "@/lib/database.types";
 import { Loader2 } from "lucide-react";
 
 // Import from our new state management system
-import { useAuth, useUI } from "@/state";
+import { useAuth, useHRAuth, useUI } from "@/state";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
   allowedRoles?: UserRole[];
+  requireHRAuth?: boolean;
 }
 
 const ProtectedRouteMigrated: React.FC<ProtectedRouteProps> = ({ 
   children, 
-  allowedRoles 
+  allowedRoles,
+  requireHRAuth = false
 }) => {
   // Use our new hooks instead of the old context
   const { user, userDetails, isLoading } = useAuth();
+  const { hrUser, isAuthenticated: hrIsAuthenticated, isLoading: hrIsLoading } = useHRAuth();
   const { toast } = useUI();
   const [timeoutReached, setTimeoutReached] = useState(false);
+  const location = useLocation();
   
   // Add a timeout to prevent infinite loading
   useEffect(() => {
     let timer: NodeJS.Timeout;
     
-    if (isLoading) {
+    if ((isLoading && !requireHRAuth) || (hrIsLoading && requireHRAuth)) {
       timer = setTimeout(() => {
         console.log("Protected route - Loading timeout reached, forcing continue");
         setTimeoutReached(true);
@@ -34,30 +38,38 @@ const ProtectedRouteMigrated: React.FC<ProtectedRouteProps> = ({
     return () => {
       clearTimeout(timer);
     };
-  }, [isLoading]);
+  }, [isLoading, hrIsLoading, requireHRAuth]);
+  
+  // Determine if we're on an HR route
+  const isHRRoute = location.pathname.startsWith('/hr/') || location.pathname.startsWith('/hr-');
   
   console.log("ProtectedRouteMigrated - auth state:", { 
     user, 
     userDetails, 
-    isLoading, 
+    isLoading,
+    hrUser,
+    hrIsAuthenticated,
+    hrIsLoading,
     timeoutReached,
-    path: window.location.pathname,
+    isHRRoute,
+    requireHRAuth,
+    path: location.pathname,
     allowedRoles
   });
   
   useEffect(() => {
     // For demonstration purposes - showing a toast to guide users
-    if (!user && window.location.pathname.includes('admin')) {
+    if (!user && location.pathname.includes('admin')) {
       toast(
         "Admin access",
         "This is a protected route. You would normally need to sign in as a superadmin.",
         "info"
       );
     }
-  }, [user, toast]);
+  }, [user, toast, location.pathname]);
 
   // If authentication is still loading, show a loading indicator
-  if (isLoading && !timeoutReached) {
+  if ((isLoading && !requireHRAuth) || (hrIsLoading && requireHRAuth) && !timeoutReached) {
     console.log("Protected route - Authentication is still loading");
     return (
       <div className="flex items-center justify-center h-screen">
@@ -67,7 +79,17 @@ const ProtectedRouteMigrated: React.FC<ProtectedRouteProps> = ({
     );
   }
 
-  // If loading timed out or user is not authenticated, redirect to login
+  // For HR routes, check HR authentication
+  if (requireHRAuth || isHRRoute) {
+    if (timeoutReached || !hrIsAuthenticated) {
+      console.log("Protected route - HR user not authenticated or loading timed out, redirecting to HR login");
+      return <Navigate to="/hr-login" replace />;
+    }
+    
+    return <>{children}</>;
+  }
+  
+  // For regular routes, check regular authentication
   if (timeoutReached || !user) {
     console.log("Protected route - User not authenticated or loading timed out, redirecting to login");
     return <Navigate to="/login" replace />;
