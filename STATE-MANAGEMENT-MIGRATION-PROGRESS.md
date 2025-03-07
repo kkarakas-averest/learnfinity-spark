@@ -9,16 +9,16 @@ This document tracks our progress in migrating components to use the new state m
 | Component | Status | Notes |
 |-----------|--------|-------|
 | `src/main.tsx` | ✅ Created migrated version | Created `mainMigrated.tsx` that uses StateProvider instead of AuthProvider |
+| `src/pages/LoginPage.tsx` | ✅ Created migrated version | Created `LoginPageMigrated.tsx` that uses useAuth hook |
+| `src/pages/RegisterPage.tsx` | ✅ Created migrated version | Created `RegisterPageMigrated.tsx` that uses useAuth hook |
 | `src/pages/HRLogin.tsx` | ✅ Created migrated version | Created `HRLoginMigrated.tsx` that uses useHRAuth hook |
 | `src/pages/HRDashboard.tsx` | ✅ Created migrated version | Created `HRDashboardMigrated.tsx` that uses useHRAuth and useUI hooks |
 | `src/pages/Courses.tsx` | ✅ Created migrated version | Created `CoursesMigrated.tsx` that uses useCourses hook |
+| `src/components/ProtectedRoute.tsx` | ✅ Created migrated version | Created `ProtectedRouteMigrated.tsx` that uses useAuth hook |
 | `src/pages/Dashboard.tsx` | ❌ Not migrated | Uses old AuthContext |
-| `src/pages/LoginPage.tsx` | ❌ Not migrated | Uses old AuthContext |
-| `src/pages/RegisterPage.tsx` | ❌ Not migrated | Uses old AuthContext |
 | `src/pages/ProfilePage.tsx` | ❌ Not migrated | Uses old AuthContext |
 | `src/components/Navbar.tsx` | ❌ Not migrated | Uses old AuthContext |
 | `src/components/DashboardLayout.tsx` | ❌ Not migrated | Uses old AuthContext |
-| `src/components/ProtectedRoute.tsx` | ❌ Not migrated | Uses old AuthContext |
 | `src/components/DiagnosticTool.tsx` | ❌ Not migrated | Uses old AuthContext |
 | `src/components/learner/AgentGeneratedCourses.jsx` | ❌ Not migrated | Uses old AuthContext |
 | `src/hooks/useLearningData.ts` | ❌ Not migrated | Uses old AuthContext |
