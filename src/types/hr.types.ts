@@ -14,6 +14,17 @@ export interface User {
   role: UserRole;
 }
 
+// RAG Status types
+export type RAGStatus = 'green' | 'amber' | 'red';
+
+export interface RAGStatusDetails {
+  status: RAGStatus;
+  justification: string;
+  lastUpdated: string;
+  updatedBy: string | 'system';
+  recommendedActions?: string[];
+}
+
 // HR Dashboard types
 export interface KeyMetric {
   title: string;
@@ -51,6 +62,23 @@ export interface Employee {
   progress: number;
   lastActivity: string;
   status: 'active' | 'inactive' | 'onboarding' | 'offboarding';
+  
+  // RAG status properties
+  ragStatus: RAGStatus;
+  ragDetails?: RAGStatusDetails;
+  statusHistory?: RAGStatusDetails[];
+}
+
+// Intervention types
+export interface Intervention {
+  id: string;
+  employeeId: string;
+  type: 'content_modification' | 'remedial_assignment' | 'notification' | 'other';
+  createdAt: string;
+  createdBy: string;
+  notes?: string;
+  content?: string;
+  status: 'pending' | 'delivered' | 'completed';
 }
 
 // Course types
@@ -117,4 +145,15 @@ export interface Activity {
   issue?: string;
   time: string;
   icon: React.ComponentType<{ className?: string }>;
+}
+
+// Notification type
+export interface Notification {
+  id: string;
+  recipientId: string | null;
+  title: string;
+  message: string;
+  isRead: boolean;
+  createdAt: string;
+  actionLink?: string;
 } 

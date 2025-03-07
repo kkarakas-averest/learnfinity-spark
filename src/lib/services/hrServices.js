@@ -50,12 +50,9 @@ export const hrServices = {
             CREATE TABLE IF NOT EXISTS hr_positions (
               id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
               title VARCHAR(100) NOT NULL,
-              department_id UUID,
-              salary_range_min DECIMAL(10,2),
-              salary_range_max DECIMAL(10,2),
+              department_id UUID REFERENCES hr_departments(id),
               created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-              updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-              UNIQUE(title, department_id)
+              updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
             );
           `
         });
@@ -65,261 +62,399 @@ export const hrServices = {
           return { success: false, error: posError };
         }
         
-        // Create employees table
-        const { error: empError } = await supabase.rpc('execute_sql', {
+        // Create RAG status tracking for employees
+        const { error: ragError } = await supabase.rpc('execute_sql', {
           sql: `
-            CREATE TABLE IF NOT EXISTS hr_employees (
-              id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-              name VARCHAR(100) NOT NULL,
-              email VARCHAR(100) NOT NULL UNIQUE,
-              phone VARCHAR(20),
-              hire_date DATE,
-              department_id UUID,
-              position_id UUID,
-              manager_id UUID,
-              status VARCHAR(20) DEFAULT 'active',
-              profile_image_url TEXT,
-              resume_url TEXT,
-              company_id UUID NOT NULL,
-              last_active_at TIMESTAMP WITH TIME ZONE,
-              created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-              updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-            );
+            ALTER TABLE hr_employees 
+            ADD COLUMN IF NOT EXISTS rag_status VARCHAR(10) DEFAULT 'green' CHECK (rag_status IN ('green', 'amber', 'red')),
+            ADD COLUMN IF NOT EXISTS status_justification TEXT,
+            ADD COLUMN IF NOT EXISTS status_updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            ADD COLUMN IF NOT EXISTS status_history JSONB DEFAULT '[]'::jsonb;
           `
         });
         
-        if (empError) {
-          console.error('Error creating hr_employees table:', empError);
-          return { success: false, error: empError };
+        if (ragError) {
+          console.error('Error adding RAG status columns to hr_employees table:', ragError);
+          return { success: false, error: ragError };
         }
         
-        // Create courses table
-        const { error: courseError } = await supabase.rpc('execute_sql', {
+        // Create notifications table
+        const { error: notifError } = await supabase.rpc('execute_sql', {
           sql: `
-            CREATE TABLE IF NOT EXISTS hr_courses (
+            CREATE TABLE IF NOT EXISTS notifications (
               id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+              recipient_id UUID REFERENCES auth.users(id),
               title VARCHAR(200) NOT NULL,
-              description TEXT,
-              department_id UUID,
-              skill_level VARCHAR(20) DEFAULT 'beginner',
-              duration INTEGER,
-              status VARCHAR(20) DEFAULT 'active',
-              created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-              updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+              message TEXT,
+              is_read BOOLEAN DEFAULT FALSE,
+              action_link VARCHAR(200),
+              created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
             );
           `
         });
         
-        if (courseError) {
-          console.error('Error creating hr_courses table:', courseError);
-          return { success: false, error: courseError };
+        if (notifError) {
+          console.error('Error creating notifications table:', notifError);
+          return { success: false, error: notifError };
         }
         
-        // Create course enrollments table
-        const { error: enrollError } = await supabase.rpc('execute_sql', {
+        // Create interventions table
+        const { error: interventionError } = await supabase.rpc('execute_sql', {
           sql: `
-            CREATE TABLE IF NOT EXISTS hr_course_enrollments (
+            CREATE TABLE IF NOT EXISTS interventions (
               id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-              employee_id UUID NOT NULL,
-              course_id UUID NOT NULL,
-              status VARCHAR(20) DEFAULT 'enrolled',
-              progress INTEGER DEFAULT 0,
-              score DECIMAL(5,2),
-              enrollment_date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-              completion_date TIMESTAMP WITH TIME ZONE,
-              UNIQUE(employee_id, course_id)
+              employee_id UUID REFERENCES hr_employees(id),
+              created_by UUID REFERENCES auth.users(id),
+              intervention_type VARCHAR(50) NOT NULL CHECK (intervention_type IN ('content_modification', 'remedial_assignment', 'notification', 'other')),
+              notes TEXT,
+              content TEXT,
+              status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'delivered', 'completed')),
+              created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
             );
+            
+            CREATE INDEX IF NOT EXISTS idx_interventions_employee_id ON interventions(employee_id);
           `
         });
         
-        if (enrollError) {
-          console.error('Error creating hr_course_enrollments table:', enrollError);
-          return { success: false, error: enrollError };
+        if (interventionError) {
+          console.error('Error creating interventions table:', interventionError);
+          return { success: false, error: interventionError };
         }
-        
-        // Create activities table
-        const { error: actError } = await supabase.rpc('execute_sql', {
-          sql: `
-            CREATE TABLE IF NOT EXISTS hr_employee_activities (
-              id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-              employee_id UUID NOT NULL,
-              activity_type VARCHAR(50) NOT NULL,
-              description TEXT,
-              course_id UUID,
-              timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-            );
-          `
-        });
-        
-        if (actError) {
-          console.error('Error creating hr_employee_activities table:', actError);
-          return { success: false, error: actError };
-        }
-        
-        console.log('Successfully created HR database tables');
-      } else {
-        console.log('HR database tables already exist');
       }
       
       return { success: true };
     } catch (error) {
-      console.error('Error creating HR database tables:', error);
-      return { success: false, error };
+      console.error('Error checking or creating HR tables:', error);
+      return { success: false, error: error.message };
     }
   },
-
+  
   /**
-   * Initialize the HR database
-   * This checks if seeding is needed and performs the seeding if necessary
-   * Also ensures required storage buckets exist
+   * Initialize database with sample data
    */
   async initializeHRDatabase() {
     try {
-      // First, create tables if they don't exist
-      const { success: tablesSuccess, error: tablesError } = await this.createHRTablesIfNotExist();
-      
-      if (!tablesSuccess) {
-        console.warn('Failed to create HR tables:', tablesError);
+      // First, ensure tables exist
+      const tablesResult = await this.createHRTablesIfNotExist();
+      if (!tablesResult.success) {
+        throw new Error(`Failed to create tables: ${tablesResult.error}`);
       }
-    
-      // Next, ensure the hr-documents storage bucket exists
-      try {
-        const { data: buckets } = await supabase.storage.listBuckets();
-        const hrDocumentsBucket = buckets?.find(bucket => bucket.name === 'hr-documents');
+      
+      // Check if we need to seed data
+      const { data: depts, error: deptError } = await supabase
+        .from('hr_departments')
+        .select('id')
+        .limit(1);
         
-        if (!hrDocumentsBucket) {
-          console.log('Creating hr-documents storage bucket...');
-          // Create the bucket
-          const { error: bucketError } = await supabase.storage.createBucket('hr-documents', {
-            public: false, // Private by default
-            fileSizeLimit: 10485760, // 10MB
-            allowedMimeTypes: [
-              'application/pdf',
-              'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-            ]
-          });
-          
-          if (bucketError) {
-            console.error('Error creating hr-documents bucket:', bucketError);
-          } else {
-            // Set bucket policy to make it publicly accessible
-            await supabase.storage.updateBucket('hr-documents', {
-              public: true
-            });
-          }
-        }
-      } catch (storageError) {
-        console.error('Error initializing storage bucket:', storageError);
+      if (deptError) {
+        throw new Error(`Failed to check departments: ${deptError.message}`);
       }
       
-      // Ensure the resume_url column exists in the hr_employees table
-      await hrEmployeeService.ensureResumeUrlColumn();
+      // If no departments exist, seed the database
+      if (depts.length === 0) {
+        console.log('No departments found. Seeding HR database...');
+        await seedHRDatabase(supabase);
+      }
       
-      // Seed the database if necessary
-      return await seedHRDatabase();
+      return { success: true };
     } catch (error) {
       console.error('Error initializing HR database:', error);
-      throw error;
+      return { success: false, error: error.message };
     }
   },
-
+  
   /**
-   * Get dashboard metrics for the overview
+   * Get dashboard metrics 
    */
   async getDashboardMetrics() {
     try {
-      // Get active employees count
-      const { data: activeEmployees, error: activeError } = await supabase
-        .from('hr_employees')
-        .select('id')
-        .eq('status', 'active');
-        
-      if (activeError) throw activeError;
+      // Get employee stats
+      const employeeStats = await hrEmployeeService.getEmployeeStats();
+      if (!employeeStats.success) {
+        throw new Error(employeeStats.error || 'Failed to get employee stats');
+      }
       
-      // Get new employees this month
-      const thisMonth = new Date();
-      thisMonth.setDate(1); // First day of current month
-      
-      const { data: newEmployees, error: newError } = await supabase
-        .from('hr_employees')
-        .select('id')
-        .gte('created_at', thisMonth.toISOString());
-        
-      if (newError) throw newError;
-      
-      // Get course completion metrics
-      const { data: enrollments, error: enrollError } = await supabase
-        .from('hr_course_enrollments')
-        .select('*');
-        
-      if (enrollError) throw enrollError;
-      
-      const totalEnrollments = enrollments ? enrollments.length : 0;
-      const completedEnrollments = enrollments ? enrollments.filter(e => e.status === 'completed').length : 0;
-      const completionRate = totalEnrollments > 0 ? Math.round((completedEnrollments / totalEnrollments) * 100) : 0;
-      
-      // Get previous month data for comparison
-      const lastMonth = new Date();
-      lastMonth.setMonth(lastMonth.getMonth() - 1);
-      lastMonth.setDate(1);
-      const endOfLastMonth = new Date(thisMonth);
-      endOfLastMonth.setDate(0);
-      
-      const { data: prevEnrollments, error: prevError } = await supabase
-        .from('hr_course_enrollments')
-        .select('*')
-        .lt('enrollment_date', thisMonth.toISOString())
-        .gte('enrollment_date', lastMonth.toISOString());
-        
-      if (prevError) throw prevError;
-      
-      const prevTotalEnrollments = prevEnrollments ? prevEnrollments.length : 0;
-      const prevCompletedEnrollments = prevEnrollments ? prevEnrollments.filter(e => e.status === 'completed').length : 0;
-      const prevCompletionRate = prevTotalEnrollments > 0 ? Math.round((prevCompletedEnrollments / prevTotalEnrollments) * 100) : 0;
-      
-      // Calculate trend percentages (positive = improving, negative = declining)
-      const completionRateTrend = prevCompletionRate > 0 ? 
-        ((completionRate - prevCompletionRate) / prevCompletionRate) * 100 : 0;
+      // Get RAG status counts
+      const greenCount = await this.getEmployeeCountByRAGStatus('green');
+      const amberCount = await this.getEmployeeCountByRAGStatus('amber');
+      const redCount = await this.getEmployeeCountByRAGStatus('red');
       
       return {
-        activeEmployees: activeEmployees?.length || 0,
-        newEmployees: newEmployees?.length || 0,
-        totalCourses: 5, // Placeholder
-        totalEnrollments,
-        completedEnrollments,
-        completionRate,
-        trends: {
-          completionRate: completionRateTrend
+        success: true,
+        metrics: {
+          ...employeeStats.stats,
+          ragStatusCounts: {
+            green: greenCount,
+            amber: amberCount,
+            red: redCount,
+            total: greenCount + amberCount + redCount
+          }
         }
       };
     } catch (error) {
-      console.error('Error fetching dashboard metrics:', error);
-      return null;
+      console.error('Error getting dashboard metrics:', error);
+      return { success: false, error: error.message };
     }
   },
-
+  
   /**
-   * Get recent activities for the dashboard
+   * Update employee RAG status
    */
-  async getRecentActivities(limit = 5) {
+  async updateEmployeeRAGStatus(employeeId, ragDetails) {
     try {
+      const { status, justification, recommendedActions, updatedBy = 'system' } = ragDetails;
+      
+      // First, get the current employee data
+      const { data: employee, error: fetchError } = await supabase
+        .from('hr_employees')
+        .select('*')
+        .eq('id', employeeId)
+        .single();
+      
+      if (fetchError) throw fetchError;
+      
+      // Prepare the status history entry
+      const statusHistoryEntry = {
+        status,
+        justification,
+        recommendedActions: recommendedActions || [],
+        lastUpdated: new Date().toISOString(),
+        updatedBy
+      };
+      
+      // Prepare the status history array
+      const statusHistory = employee.status_history || [];
+      statusHistory.push(statusHistoryEntry);
+      
+      // Update the employee record
       const { data, error } = await supabase
-        .from('hr_employee_activities')
-        .select(`
-          *,
-          hr_employees(id, name)
-        `)
-        .order('activity_date', { ascending: false })
-        .limit(limit);
-        
+        .from('hr_employees')
+        .update({
+          rag_status: status,
+          status_justification: justification,
+          status_updated_at: new Date().toISOString(),
+          status_history: statusHistory
+        })
+        .eq('id', employeeId);
+      
       if (error) throw error;
       
-      return data || [];
+      // Create a notification for Amber or Red status
+      if (status === 'amber' || status === 'red') {
+        await this.createStatusChangeNotification(employee, status, justification);
+      }
+      
+      return { success: true, data };
     } catch (error) {
-      console.error('Error fetching recent activities:', error);
-      return [];
+      console.error('Error updating employee RAG status:', error);
+      return { success: false, error: error.message };
+    }
+  },
+  
+  /**
+   * Create a notification for status changes
+   */
+  async createStatusChangeNotification(employee, status, justification) {
+    try {
+      // Create notification for HR
+      const { error } = await supabase
+        .from('notifications')
+        .insert({
+          recipient_id: null, // Null means for all HR users
+          title: `Employee Status Change: ${employee.name}`,
+          message: `${employee.name} status changed to ${status.toUpperCase()}. Reason: ${justification}`,
+          is_read: false
+        });
+      
+      if (error) throw error;
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Error creating notification:', error);
+      return { success: false, error: error.message };
+    }
+  },
+  
+  /**
+   * Get employees by RAG status
+   */
+  async getEmployeesByRAGStatus(status) {
+    try {
+      const { data, error } = await supabase
+        .from('hr_employees')
+        .select('*')
+        .eq('rag_status', status);
+      
+      if (error) throw error;
+      
+      return { success: true, employees: data };
+    } catch (error) {
+      console.error('Error fetching employees by RAG status:', error);
+      return { success: false, error: error.message };
+    }
+  },
+  
+  /**
+   * Get count of employees by RAG status
+   */
+  async getEmployeeCountByRAGStatus(status) {
+    try {
+      const { data, error, count } = await supabase
+        .from('hr_employees')
+        .select('id', { count: 'exact' })
+        .eq('rag_status', status);
+      
+      if (error) throw error;
+      
+      return count || 0;
+    } catch (error) {
+      console.error(`Error getting ${status} employee count:`, error);
+      return 0;
+    }
+  },
+  
+  /**
+   * Create an intervention for an employee
+   */
+  async createIntervention(interventionData) {
+    try {
+      const { employeeId, type, notes, content } = interventionData;
+      
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      const userId = user?.id || 'system';
+      
+      // Create the intervention record
+      const { data: intervention, error } = await supabase
+        .from('interventions')
+        .insert({
+          employee_id: employeeId,
+          intervention_type: type,
+          notes,
+          content,
+          created_by: userId,
+          status: 'pending'
+        })
+        .select()
+        .single();
+      
+      if (error) throw error;
+      
+      // Create a notification for the employee
+      await this.createInterventionNotification(employeeId, type, notes);
+      
+      return { success: true, intervention };
+    } catch (error) {
+      console.error('Error creating intervention:', error);
+      return { success: false, error: error.message };
+    }
+  },
+  
+  /**
+   * Create a notification for an intervention
+   */
+  async createInterventionNotification(employeeId, interventionType, notes) {
+    try {
+      // Get the employee details
+      const { data: employee, error: employeeError } = await supabase
+        .from('hr_employees')
+        .select('name, email')
+        .eq('id', employeeId)
+        .single();
+      
+      if (employeeError) throw employeeError;
+      
+      // Create the notification
+      const { error } = await supabase
+        .from('notifications')
+        .insert({
+          recipient_id: employeeId,
+          title: getInterventionTitle(interventionType),
+          message: `HR has created a new intervention for you: ${notes}`,
+          is_read: false
+        });
+      
+      if (error) throw error;
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Error creating intervention notification:', error);
+      return { success: false, error: error.message };
+    }
+  },
+  
+  /**
+   * Get interventions for an employee
+   */
+  async getEmployeeInterventions(employeeId) {
+    try {
+      const { data, error } = await supabase
+        .from('interventions')
+        .select('*')
+        .eq('employee_id', employeeId)
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      
+      return { success: true, interventions: data };
+    } catch (error) {
+      console.error('Error fetching employee interventions:', error);
+      return { success: false, error: error.message };
+    }
+  },
+  
+  /**
+   * Get all notifications for HR
+   */
+  async getHRNotifications() {
+    try {
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .is('recipient_id', null)
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      
+      return { success: true, notifications: data };
+    } catch (error) {
+      console.error('Error fetching HR notifications:', error);
+      return { success: false, error: error.message };
+    }
+  },
+  
+  /**
+   * Mark notification as read
+   */
+  async markNotificationAsRead(notificationId) {
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .update({ is_read: true })
+        .eq('id', notificationId);
+      
+      if (error) throw error;
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+      return { success: false, error: error.message };
     }
   }
 };
+
+// Helper function for intervention notification titles
+function getInterventionTitle(interventionType) {
+  switch (interventionType) {
+    case 'content_modification':
+      return 'Content Update Available';
+    case 'remedial_assignment':
+      return 'New Learning Assignment';
+    case 'notification':
+      return 'Message from HR';
+    default:
+      return 'HR Intervention';
+  }
+}
 
 export default hrServices; 

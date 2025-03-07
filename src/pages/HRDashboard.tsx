@@ -11,10 +11,21 @@ import { useAuth } from '../contexts/AuthContext';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card } from '@/components/ui/card';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Employee } from "@/types/hr.types";
+import EmployeeIntervention from '@/components/hr/EmployeeIntervention';
 
 // Import HR components
 const DashboardOverview = React.lazy(() => import('@/components/hr/DashboardOverview'));
 const EmployeeManagement = React.lazy(() => import('@/components/hr/EmployeeManagement'));
+
+// Define an extended type for hrServices
+type HRServicesExtended = typeof hrServices & {
+  initializeHRDatabase: () => Promise<{ success: boolean; error?: string }>;
+};
+
+// Cast the imported hrServices to our extended type
+const hrServicesExtended = hrServices as HRServicesExtended;
 
 export default function HRDashboard() {
   const { toast } = useToast();
@@ -25,6 +36,8 @@ export default function HRDashboard() {
   const [activeTab, setActiveTab] = React.useState<HRDashboardTab>('overview');
   const [initializing, setInitializing] = React.useState(true);
   const [initError, setInitError] = React.useState<string | null>(null);
+  const [selectedEmployee, setSelectedEmployee] = React.useState<Employee | null>(null);
+  const [showInterventionDialog, setShowInterventionDialog] = React.useState(false);
   const isLoading = false; // Define isLoading as a constant since it's not provided by HRAuthContext
   
   // Parse the query parameters to get the tab
@@ -44,7 +57,7 @@ export default function HRDashboard() {
         setInitError(null);
         
         // Call the initialization function and handle the response
-        const result = await hrServices.initializeHRDatabase();
+        const result = await hrServicesExtended.initializeHRDatabase();
         console.log('HR database initialization result:', result);
         
         if (!result || result.success === false) {
@@ -100,6 +113,24 @@ export default function HRDashboard() {
     setInitError(null);
     // Force re-render which will trigger useEffect again
     window.location.reload();
+  };
+
+  // Handle intervention request
+  const handleInterventionClick = (employee: Employee) => {
+    setSelectedEmployee(employee);
+    setShowInterventionDialog(true);
+  };
+
+  // Handle intervention completion
+  const handleInterventionComplete = () => {
+    setShowInterventionDialog(false);
+    setSelectedEmployee(null);
+    // Refresh the employee data
+    if (activeTab === 'employees') {
+      // This would refresh the EmployeeManagement component
+      // In a real implementation, you would have a state or ref to the component
+      // and call a refresh method
+    }
   };
 
   if (isLoading || initializing) {
@@ -179,7 +210,10 @@ export default function HRDashboard() {
             </TabsContent>
             
             <TabsContent value="employees">
-              <EmployeeManagement />
+              <EmployeeManagement 
+                onViewDetails={(employee) => console.log('View details:', employee)} 
+                onIntervene={handleInterventionClick}
+              />
             </TabsContent>
             
             <TabsContent value="courses">
@@ -204,6 +238,18 @@ export default function HRDashboard() {
           </React.Suspense>
         </Tabs>
       </div>
+
+      {/* Intervention Dialog */}
+      {selectedEmployee && (
+        <Dialog open={showInterventionDialog} onOpenChange={setShowInterventionDialog}>
+          <DialogContent className="sm:max-w-[600px]">
+            <EmployeeIntervention 
+              employee={selectedEmployee} 
+              onInterventionComplete={handleInterventionComplete} 
+            />
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
