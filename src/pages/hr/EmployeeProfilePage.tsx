@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from '@/lib/react-helpers';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -262,14 +262,15 @@ const FeedbackSection = ({ profile }: { profile: EnhancedEmployeeProfile | null 
  * for different profile sections
  */
 const EmployeeProfilePage: React.FC = () => {
-  const { employeeId } = useParams<{ employeeId: string }>();
+  const params = useParams();
+  const employeeId = params.employeeId;
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('personal-info');
-  const [profile, setProfile] = useState<EnhancedEmployeeProfile | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = React.useState('personal-info');
+  const [profile, setProfile] = React.useState<EnhancedEmployeeProfile | null>(null);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
   
-  useEffect(() => {
+  React.useEffect(() => {
     const fetchProfile = async () => {
       if (!employeeId) {
         setError('Employee ID is required');
