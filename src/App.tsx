@@ -3,6 +3,7 @@ import Index from "./pages/Index";
 import LoginPage from "./pages/LoginPage";
 import LoginPageMigrated from "./pages/LoginPageMigrated";
 import RegisterPage from "./pages/RegisterPage";
+import RegisterPageMigrated from "./pages/RegisterPageMigrated";
 import Dashboard from "./pages/Dashboard";
 import NotFound from "./pages/NotFound";
 import ProfilePage from "./pages/ProfilePage";
@@ -27,9 +28,9 @@ function App() {
       <main>
         <Routes>
           <Route path="/" element={<Index />} />
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
-          <Route path="/hr-login" element={<HRLogin />} />
+          <Route path="/login" element={<LoginPageMigrated />} />
+          <Route path="/register" element={<RegisterPageMigrated />} />
+          <Route path="/hr-login" element={<HRLoginMigrated />} />
           <Route path="/hr/login" element={<HRLoginMigrated />} />
           
           <Route 
