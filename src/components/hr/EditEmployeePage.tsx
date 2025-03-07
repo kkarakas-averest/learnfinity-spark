@@ -117,7 +117,8 @@ const EditEmployeePage = () => {
     
     return { 
       success: false, 
-      error: lastError || new Error('Unknown error during retry operation')
+      error: lastError || new Error('Unknown error during retry operation'),
+      data: undefined // Add the data property with undefined value for failed operations
     };
   };
 
