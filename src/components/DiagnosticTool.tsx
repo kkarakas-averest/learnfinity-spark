@@ -1,11 +1,9 @@
-
 import React from "@/lib/react-helpers";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import {
   Accordion,
   AccordionContent,
-  AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { toast } from "@/hooks/use-toast";
@@ -110,71 +108,65 @@ export default function DiagnosticTool() {
       </Button>
       
       <Accordion type="single" collapsible className="w-full">
-        <AccordionItem value="auth">
-          <AccordionTrigger>
-            Authentication Status 
-            {systemStatus.auth.user ? (
-              <CheckCircle className="h-4 w-4 ml-2 text-green-500" />
-            ) : (
-              <AlertCircle className="h-4 w-4 ml-2 text-amber-500" />
+        <AccordionTrigger>
+          Authentication Status 
+          {systemStatus.auth.user ? (
+            <CheckCircle className="h-4 w-4 ml-2 text-green-500" />
+          ) : (
+            <AlertCircle className="h-4 w-4 ml-2 text-amber-500" />
+          )}
+        </AccordionTrigger>
+        <AccordionContent>
+          <ul className="space-y-2">
+            <li>Auth Configured: {systemStatus.auth.configured ? "Yes ✅" : "No ❌"}</li>
+            <li>User Authenticated: {systemStatus.auth.user ? "Yes ✅" : "No ❌"}</li>
+            <li>User Details Available: {systemStatus.auth.userDetails ? "Yes ✅" : "No ❌"}</li>
+            {userDetails && (
+              <>
+                <li>User Name: {userDetails.name}</li>
+                <li>User Role: {userDetails.role}</li>
+                <li>User Email: {userDetails.email}</li>
+              </>
             )}
-          </AccordionTrigger>
-          <AccordionContent>
-            <ul className="space-y-2">
-              <li>Auth Configured: {systemStatus.auth.configured ? "Yes ✅" : "No ❌"}</li>
-              <li>User Authenticated: {systemStatus.auth.user ? "Yes ✅" : "No ❌"}</li>
-              <li>User Details Available: {systemStatus.auth.userDetails ? "Yes ✅" : "No ❌"}</li>
-              {userDetails && (
-                <>
-                  <li>User Name: {userDetails.name}</li>
-                  <li>User Role: {userDetails.role}</li>
-                  <li>User Email: {userDetails.email}</li>
-                </>
-              )}
-            </ul>
-          </AccordionContent>
-        </AccordionItem>
+          </ul>
+        </AccordionContent>
         
-        <AccordionItem value="supabase">
-          <AccordionTrigger>
-            Supabase Connection
-            {systemStatus.supabase.connected ? (
-              <CheckCircle className="h-4 w-4 ml-2 text-green-500" />
-            ) : (
-              <AlertTriangle className="h-4 w-4 ml-2 text-amber-500" />
-            )}  
-          </AccordionTrigger>
-          <AccordionContent>
-            <ul className="space-y-2">
-              <li>Supabase Configured: {systemStatus.supabase.configured ? "Yes ✅" : "No ❌"}</li>
-              <li>Supabase Connected: {systemStatus.supabase.connected ? "Yes ✅" : "No ❌"}</li>
-              {systemStatus.supabase.error && (
-                <li>
-                  <Alert variant="destructive">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>Connection Error</AlertTitle>
-                    <AlertDescription>
-                      {systemStatus.supabase.error}
-                    </AlertDescription>
-                  </Alert>
-                </li>
-              )}
-            </ul>
-          </AccordionContent>
-        </AccordionItem>
+        <AccordionTrigger>
+          Supabase Connection
+          {systemStatus.supabase.connected ? (
+            <CheckCircle className="h-4 w-4 ml-2 text-green-500" />
+          ) : (
+            <AlertTriangle className="h-4 w-4 ml-2 text-amber-500" />
+          )}  
+        </AccordionTrigger>
+        <AccordionContent>
+          <ul className="space-y-2">
+            <li>Supabase Configured: {systemStatus.supabase.configured ? "Yes ✅" : "No ❌"}</li>
+            <li>Supabase Connected: {systemStatus.supabase.connected ? "Yes ✅" : "No ❌"}</li>
+            {systemStatus.supabase.error && (
+              <li>
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>Connection Error</AlertTitle>
+                  <AlertDescription>
+                    {systemStatus.supabase.error}
+                  </AlertDescription>
+                </Alert>
+              </li>
+            )}
+          </ul>
+        </AccordionContent>
         
-        <AccordionItem value="routes">
-          <AccordionTrigger>Routing Information</AccordionTrigger>
-          <AccordionContent>
-            <ul className="space-y-2">
-              <li>Current Route: {systemStatus.routes.current}</li>
-              <li>Expected Dashboard: {userDetails?.role === 'learner' ? '/dashboard' : 
-                userDetails?.role === 'hr' ? '/hr-dashboard' : 
-                userDetails?.role === 'mentor' ? '/mentor' : 
-                userDetails?.role === 'superadmin' ? '/admin' : 'Not logged in'}</li>
-            </ul>
-          </AccordionContent>
-        </AccordionItem>
+        <AccordionTrigger>Routing Information</AccordionTrigger>
+        <AccordionContent>
+          <ul className="space-y-2">
+            <li>Current Route: {systemStatus.routes.current}</li>
+            <li>Expected Dashboard: {userDetails?.role === 'learner' ? '/dashboard' : 
+              userDetails?.role === 'hr' ? '/hr-dashboard' : 
+              userDetails?.role === 'mentor' ? '/mentor' : 
+              userDetails?.role === 'superadmin' ? '/admin' : 'Not logged in'}</li>
+          </ul>
+        </AccordionContent>
       </Accordion>
     </div>
   );
