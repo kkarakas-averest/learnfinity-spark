@@ -75,7 +75,7 @@ export const RAGStatusBadge: React.FC<RAGStatusBadgeProps> = ({
       className={`
         ${variants[status]} 
         ${sizeClasses[size]}
-        ${isAnimating ? 'animate-status-change' : ''}
+        ${isAnimating ? 'animate-rag-status-pulse' : ''}
         ${className}
       `}
     >
