@@ -19,6 +19,14 @@ const ProtectedRouteMigrated: React.FC<ProtectedRouteProps> = ({
   const { user, userDetails, isLoading } = useAuth();
   const { toast } = useUI();
   
+  console.log("ProtectedRouteMigrated - auth state:", { 
+    user, 
+    userDetails, 
+    isLoading, 
+    path: window.location.pathname,
+    allowedRoles
+  });
+  
   useEffect(() => {
     // For demonstration purposes - showing a toast to guide users
     if (!user && window.location.pathname.includes('admin')) {
@@ -32,6 +40,7 @@ const ProtectedRouteMigrated: React.FC<ProtectedRouteProps> = ({
 
   // If authentication is still loading, show a loading indicator
   if (isLoading) {
+    console.log("Protected route - Authentication is still loading");
     return (
       <div className="flex items-center justify-center h-screen">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -42,11 +51,17 @@ const ProtectedRouteMigrated: React.FC<ProtectedRouteProps> = ({
 
   // If user is not authenticated, redirect to login
   if (!user) {
+    console.log("Protected route - User not authenticated, redirecting to login");
     return <Navigate to="/login" replace />;
   }
 
   // If roles are specified and user doesn't have the required role, redirect
   if (allowedRoles && userDetails && !allowedRoles.includes(userDetails.role)) {
+    console.log("Protected route - User does not have the required role:", {
+      userRole: userDetails.role,
+      allowedRoles
+    });
+    
     // Redirect based on the user's role
     switch (userDetails.role) {
       case "superadmin":

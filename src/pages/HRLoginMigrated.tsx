@@ -21,6 +21,12 @@ const HRLoginMigrated: React.FC = () => {
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  console.log("HRLoginMigrated - Current state:", { 
+    hrLoading, 
+    isAuthenticated,
+    isSubmitting
+  });
+
   // If already authenticated, redirect to dashboard
   useEffect(() => {
     if (isAuthenticated && !hrLoading) {
@@ -66,7 +72,10 @@ const HRLoginMigrated: React.FC = () => {
       
       if (success) {
         console.log(`HRLogin: Navigating to ${ROUTES.HR_DASHBOARD}`);
-        navigate("/hr/dashboard"); // Use consistent path with the route defined in App.tsx
+        // Force navigation regardless of state updates
+        setTimeout(() => {
+          navigate("/hr/dashboard");
+        }, 500);
       }
       // Note: Error handling is now done inside the useHRAuth hook directly
     } catch (error) {

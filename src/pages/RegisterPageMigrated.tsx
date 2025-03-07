@@ -51,6 +51,12 @@ const RegisterPageMigrated: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
+  console.log("RegisterPageMigrated - Current state:", { 
+    authLoading, 
+    loading,
+    error 
+  });
+
   const form = useForm({
     resolver: zodResolver(registerSchema),
     defaultValues: {
@@ -67,14 +73,20 @@ const RegisterPageMigrated: React.FC = () => {
       setError(null);
       
       const { name, email, password } = data;
-      await signUpWithPassword(email, password, name);
+      console.log("Attempting registration with:", { email, name });
+      
+      const response = await signUpWithPassword(email, password, { name, role: 'learner' });
+      console.log("Registration response:", response);
       
       toastSuccess(
         "Registration Successful",
         "Your account has been created successfully."
       );
       
-      navigate("/dashboard");
+      // Force navigation after a short delay to ensure state updates
+      setTimeout(() => {
+        navigate("/dashboard");
+      }, 500);
     } catch (error) {
       console.error("Registration error:", error);
       

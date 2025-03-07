@@ -43,6 +43,13 @@ const LoginPageMigrated: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
+  console.log("LoginPageMigrated - Current state:", { 
+    authLoading, 
+    userDetails, 
+    loading,
+    error 
+  });
+  
   // Redirect if already logged in
   useEffect(() => {
     if (userDetails) {
@@ -96,12 +103,25 @@ const LoginPageMigrated: React.FC = () => {
       console.log("Attempting login with:", email);
       
       // Use the new signInWithPassword method from useAuth
-      await signInWithPassword(email, password);
+      const response = await signInWithPassword(email, password);
+      console.log("Login response:", response);
       
       toastSuccess(
         "Login successful!",
         "You've successfully logged in."
       );
+      
+      // Check if userDetails is set immediately
+      console.log("After login - userDetails:", userDetails);
+      
+      // Force refresh userDetails if not set
+      if (!userDetails && response?.user?.id) {
+        console.log("No userDetails found, manually redirecting based on role in session");
+        // Call dispatch directly with a slight delay to let other updates finish
+        setTimeout(() => {
+          navigate("/dashboard");
+        }, 500);
+      }
       
       // Navigation is handled by the useEffect above that watches userDetails
     } catch (error: any) {

@@ -22,6 +22,40 @@ import ExampleErrorHandling from "./components/ExampleErrorHandling";
 import FunctionalErrorBoundary from "./components/FunctionalErrorBoundary";
 import { UserRole } from "./lib/database.types";
 import { Toaster } from "./components/ui/toaster";
+import { useAuth, useHRAuth } from "./state";
+import { Button } from "./components/ui/button";
+
+// Simple diagnostic component for auth debugging
+const AuthDiagnostic = () => {
+  const { user, userDetails, isLoading, error } = useAuth();
+  const { hrUser, isAuthenticated: hrIsAuthenticated } = useHRAuth();
+  
+  return (
+    <div className="container mx-auto p-4">
+      <h1 className="text-2xl font-bold mb-4">Auth Diagnostic</h1>
+      
+      <div className="bg-gray-100 p-4 rounded mb-4">
+        <h2 className="text-xl font-semibold mb-2">Regular Auth State</h2>
+        <pre className="bg-gray-800 text-white p-4 rounded overflow-auto">
+          {JSON.stringify({ user, userDetails, isLoading, error }, null, 2)}
+        </pre>
+      </div>
+      
+      <div className="bg-gray-100 p-4 rounded mb-4">
+        <h2 className="text-xl font-semibold mb-2">HR Auth State</h2>
+        <pre className="bg-gray-800 text-white p-4 rounded overflow-auto">
+          {JSON.stringify({ hrUser, hrIsAuthenticated }, null, 2)}
+        </pre>
+      </div>
+      
+      <div className="flex gap-4 mt-4">
+        <Button onClick={() => window.location.href = "/login"}>Go to Login</Button>
+        <Button onClick={() => window.location.href = "/hr-login"}>Go to HR Login</Button>
+        <Button onClick={() => window.location.href = "/register"}>Go to Register</Button>
+      </div>
+    </div>
+  );
+};
 
 function App() {
   return (
@@ -35,6 +69,9 @@ function App() {
           {/* Unified HR routes */}
           <Route path="/hr-login" element={<HRLoginMigrated />} />
           <Route path="/hr/login" element={<HRLoginMigrated />} />
+          
+          {/* Auth diagnostic route */}
+          <Route path="/auth-diagnostic" element={<AuthDiagnostic />} />
           
           <Route 
             path="/dashboard" 
