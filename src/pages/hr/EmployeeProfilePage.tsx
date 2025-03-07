@@ -7,9 +7,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, Pencil, Clock, FileText, Book, Award, Activity, Star, MessageSquare } from 'lucide-react';
+import { toast } from '@/components/ui/use-toast';
 
 // Service and types
-import { getEmployeeProfile } from '@/services/employee-profile.service';
+import { getEmployeeProfile, updateEmployeeProfile } from '@/services/employee-profile.service';
 import { EnhancedEmployeeProfile } from '@/types/employee-profile.types';
 import { RAGStatus } from '@/types/hr.types';
 
@@ -17,9 +18,15 @@ import { RAGStatus } from '@/types/hr.types';
 import SkillsInventory from '@/components/hr/profile/SkillsInventory';
 import LearningHistory from '@/components/hr/profile/LearningHistory';
 import CareerDevelopment from '@/components/hr/profile/CareerDevelopment';
+import FeedbackPreferences from '@/components/hr/profile/FeedbackPreferences';
+import ProfileEditor from '@/components/hr/profile/ProfileEditor';
 
 // This will be broken down into separate components later
-const PersonalInfoSection = ({ profile, loading }: { profile: EnhancedEmployeeProfile | null, loading: boolean }) => {
+const PersonalInfoSection = ({ profile, loading, onEditPersonal }: { 
+  profile: EnhancedEmployeeProfile | null, 
+  loading: boolean,
+  onEditPersonal: () => void
+}) => {
   if (loading) {
     return (
       <Card className="w-full mb-6">
@@ -54,7 +61,7 @@ const PersonalInfoSection = ({ profile, loading }: { profile: EnhancedEmployeePr
             {profile.position} • {profile.department}
           </CardDescription>
         </div>
-        <Button variant="outline" size="sm">
+        <Button variant="outline" size="sm" onClick={onEditPersonal}>
           <Pencil className="h-4 w-4 mr-2" />
           Edit Profile
         </Button>
@@ -120,11 +127,20 @@ const PersonalInfoSection = ({ profile, loading }: { profile: EnhancedEmployeePr
 };
 
 // Placeholder components for other tabs - these will be implemented as separate components
-const LearningPreferencesSection = ({ profile }: { profile: EnhancedEmployeeProfile | null }) => (
+const LearningPreferencesSection = ({ profile, onEdit }: { 
+  profile: EnhancedEmployeeProfile | null,
+  onEdit: () => void 
+}) => (
   <Card className="w-full mb-6">
-    <CardHeader>
-      <CardTitle>Learning Preferences</CardTitle>
-      <CardDescription>How this employee prefers to learn and engage with content</CardDescription>
+    <CardHeader className="flex flex-row items-start justify-between">
+      <div>
+        <CardTitle>Learning Preferences</CardTitle>
+        <CardDescription>How this employee prefers to learn and engage with content</CardDescription>
+      </div>
+      <Button variant="outline" size="sm" onClick={onEdit}>
+        <Pencil className="h-4 w-4 mr-2" />
+        Edit Preferences
+      </Button>
     </CardHeader>
     <CardContent>
       {profile ? (
@@ -243,18 +259,6 @@ const CareerDevelopmentSection = ({ profile }: { profile: EnhancedEmployeeProfil
   )
 );
 
-const FeedbackSection = ({ profile }: { profile: EnhancedEmployeeProfile | null }) => (
-  <Card className="w-full mb-6">
-    <CardHeader>
-      <CardTitle>Feedback & Preferences</CardTitle>
-      <CardDescription>Content feedback and topic preferences</CardDescription>
-    </CardHeader>
-    <CardContent>
-      <p>Feedback and preferences will be implemented here</p>
-    </CardContent>
-  </Card>
-);
-
 /**
  * Employee Profile Page Component
  * 
@@ -270,32 +274,102 @@ const EmployeeProfilePage: React.FC = () => {
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   
+  // State for edit modals
+  const [editSection, setEditSection] = React.useState<'personal' | 'learning-preferences' | 'feedback-preferences' | null>(null);
+  
   React.useEffect(() => {
-    const fetchProfile = async () => {
-      if (!employeeId) {
-        setError('Employee ID is required');
-        setLoading(false);
-        return;
-      }
-      
-      try {
-        setLoading(true);
-        const profileData = await getEmployeeProfile(employeeId);
-        setProfile(profileData);
-        setError(null);
-      } catch (err) {
-        console.error('Error fetching employee profile:', err);
-        setError('Failed to load employee profile');
-      } finally {
-        setLoading(false);
-      }
-    };
-    
     fetchProfile();
   }, [employeeId]);
   
+  const fetchProfile = async () => {
+    if (!employeeId) {
+      setError('Employee ID is required');
+      setLoading(false);
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      const profileData = await getEmployeeProfile(employeeId);
+      setProfile(profileData);
+      setError(null);
+    } catch (err) {
+      console.error('Error fetching employee profile:', err);
+      setError('Failed to load employee profile');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
   const handleGoBack = () => {
     navigate('/hr-dashboard/employees');
+  };
+  
+  const handleEditPersonal = () => {
+    setEditSection('personal');
+  };
+  
+  const handleEditLearningPreferences = () => {
+    setEditSection('learning-preferences');
+  };
+  
+  const handleEditFeedbackPreferences = () => {
+    setEditSection('feedback-preferences');
+  };
+  
+  const handleCloseEditor = () => {
+    setEditSection(null);
+  };
+  
+  const handleSaveProfileSection = async (sectionData: any) => {
+    if (!profile || !employeeId) return;
+    
+    try {
+      let updatedProfile = { ...profile };
+      
+      switch (editSection) {
+        case 'personal':
+          updatedProfile = {
+            ...profile,
+            name: sectionData.name,
+            email: sectionData.email,
+            phoneNumber: sectionData.phoneNumber,
+            manager: sectionData.manager,
+            bio: sectionData.bio
+          };
+          break;
+        case 'learning-preferences':
+          updatedProfile = {
+            ...profile,
+            learningPreferences: sectionData
+          };
+          break;
+        case 'feedback-preferences':
+          updatedProfile = {
+            ...profile,
+            contentFeedback: {
+              ...profile.contentFeedback,
+              preferredTopics: sectionData.preferredTopics,
+              dislikedTopics: sectionData.dislikedTopics
+            }
+          };
+          break;
+      }
+      
+      await updateEmployeeProfile(employeeId, updatedProfile);
+      setProfile(updatedProfile);
+      toast({
+        title: "Profile updated",
+        description: "Employee profile has been successfully updated",
+      });
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      toast({
+        title: "Update failed",
+        description: "There was an error updating the profile. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
   
   const tabIcons = {
@@ -328,7 +402,11 @@ const EmployeeProfilePage: React.FC = () => {
         </Card>
       ) : (
         <>
-          <PersonalInfoSection profile={profile} loading={loading} />
+          <PersonalInfoSection 
+            profile={profile} 
+            loading={loading} 
+            onEditPersonal={handleEditPersonal} 
+          />
           
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid grid-cols-3 md:grid-cols-6 mb-6">
@@ -365,7 +443,10 @@ const EmployeeProfilePage: React.FC = () => {
             </TabsContent>
             
             <TabsContent value="learning-preferences">
-              <LearningPreferencesSection profile={profile} />
+              <LearningPreferencesSection 
+                profile={profile}
+                onEdit={handleEditLearningPreferences}
+              />
             </TabsContent>
             
             <TabsContent value="skills">
@@ -381,9 +462,24 @@ const EmployeeProfilePage: React.FC = () => {
             </TabsContent>
             
             <TabsContent value="feedback">
-              <FeedbackSection profile={profile} />
+              <FeedbackPreferences 
+                profile={profile} 
+                isEditable={true}
+                onEdit={handleEditFeedbackPreferences}
+              />
             </TabsContent>
           </Tabs>
+          
+          {/* Profile Editor Modal */}
+          {profile && editSection && (
+            <ProfileEditor
+              profile={profile}
+              section={editSection}
+              isOpen={!!editSection}
+              onClose={handleCloseEditor}
+              onSave={handleSaveProfileSection}
+            />
+          )}
         </>
       )}
     </div>

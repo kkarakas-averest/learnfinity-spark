@@ -161,57 +161,66 @@ const generateMockProfile = (employee: Employee): EnhancedEmployeeProfile => {
   };
 };
 
-// Service functions
+// Example profile data structure - in a real app, this would come from the backend
+const DUMMY_PROFILES: Record<string, EnhancedEmployeeProfile> = {};
 
 /**
- * Get an enhanced profile for a specific employee
+ * Fetch an employee's enhanced profile data
+ * 
+ * @param employeeId The ID of the employee to fetch
+ * @returns A promise that resolves to the employee's profile data
  */
 export const getEmployeeProfile = async (employeeId: string): Promise<EnhancedEmployeeProfile> => {
-  // Simulate API delay
-  await new Promise(resolve => setTimeout(resolve, 800));
-  
-  // Fetch the basic employee data (mock)
-  const basicEmployee: Employee = {
-    id: employeeId,
-    name: 'John Doe',
-    email: 'john.doe@example.com',
-    department: 'Engineering',
-    position: 'Frontend Developer',
-    courses: 5,
-    coursesCompleted: 2,
-    progress: 40,
-    lastActivity: '2024-02-28',
-    status: 'active',
-    ragStatus: 'amber',
-  };
-  
-  // Generate enhanced profile
-  return generateMockProfile(basicEmployee);
+  try {
+    // In a real app, this would be an API call to the backend
+    // For now, we'll simulate a network request
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    
+    // For demo purposes, look for a JSON file with this employee's data
+    const response = await fetch(`/data/employee_profile_${employeeId}.json`);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch profile for employee ${employeeId}`);
+    }
+    
+    const profileData = await response.json();
+    
+    // Cache the profile data for later use
+    DUMMY_PROFILES[employeeId] = profileData;
+    
+    return profileData;
+  } catch (error) {
+    console.error('Error fetching employee profile:', error);
+    throw error;
+  }
 };
 
 /**
- * Update an employee profile
+ * Update an employee's profile data
+ * 
+ * @param employeeId The ID of the employee to update
+ * @param profileData The updated profile data
+ * @returns A promise that resolves when the update is complete
  */
 export const updateEmployeeProfile = async (
-  employeeId: string, 
-  profileData: Partial<EnhancedEmployeeProfile>
-): Promise<EnhancedEmployeeProfile> => {
-  // Simulate API delay
-  await new Promise(resolve => setTimeout(resolve, 1000));
-  
-  // Get current profile
-  const currentProfile = await getEmployeeProfile(employeeId);
-  
-  // Merge updates (in a real implementation, this would be sent to the server)
-  const updatedProfile = {
-    ...currentProfile,
-    ...profileData,
-  };
-  
-  console.log('Profile updated:', updatedProfile);
-  
-  // Return the updated profile
-  return updatedProfile;
+  employeeId: string,
+  profileData: EnhancedEmployeeProfile
+): Promise<void> => {
+  try {
+    // In a real app, this would be an API call to the backend
+    // For now, we'll simulate a network request
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    
+    // Update the cached profile data
+    DUMMY_PROFILES[employeeId] = profileData;
+    
+    // In a real app, we would send the updated data to the backend
+    console.log(`Updated profile for employee ${employeeId}:`, profileData);
+    
+    return;
+  } catch (error) {
+    console.error('Error updating employee profile:', error);
+    throw error;
+  }
 };
 
 /**
