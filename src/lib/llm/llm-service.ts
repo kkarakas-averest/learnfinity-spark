@@ -178,24 +178,63 @@ export class LLMService {
     const employeeDataString = JSON.stringify(employeeData, null, 2);
     
     const prompt = `
-      I need to determine the RAG (Red, Amber, Green) status for the following employee based on their learning progress data:
+      I need a comprehensive RAG (Red, Amber, Green) status analysis for the following employee based on their learning progress data:
       
       ${employeeDataString}
       
       ${detailed ? `
-      Please provide a detailed analysis with:
-      1. The determined status (RED, AMBER, or GREEN)
-      2. Justification for this status
-      3. Key metrics that influenced your decision
-      4. Recommended actions based on this status
+      Please provide a detailed analysis with the following structure:
+      
+      ## RAG STATUS: [RED/AMBER/GREEN]
+      
+      ### Justification
+      [Provide a clear explanation of why this status was determined, citing specific metrics from the employee data]
+      
+      ### Key Metrics Analysis
+      - Progress Rate: [Analyze completion percentage]
+      - Engagement: [Analyze activity patterns and frequency]
+      - Performance: [If assessment data is available, analyze scores and completion]
+      - Comparative Standing: [How does this employee compare to departmental averages, if data available]
+      
+      ### Recommended Actions
+      1. [Primary action with highest priority]
+      2. [Secondary action]
+      3. [Additional actions as needed]
+      
+      ### Follow-up Timeline
+      [Recommendation for when to review progress, more urgent for RED status]
       ` : `
-      Please respond with just the RAG status (RED, AMBER, or GREEN) and a brief one-sentence justification.
+      Please respond with:
+      
+      STATUS: [RED/AMBER/GREEN]
+      REASON: [One-sentence justification for this status]
+      ACTION: [Single most important recommended action]
       `}
       
-      Guidelines for status determination:
-      - RED: Significant issues requiring immediate intervention (e.g., <30% completion rate, inactivity >30 days)
-      - AMBER: Moderate concerns or risks of falling behind (e.g., 30-70% completion rate, inactivity 14-30 days)
-      - GREEN: Satisfactory progress and engagement (e.g., >70% completion rate, active within 14 days)
+      When making your determination, please refer to these specific guidelines:
+      
+      - RED status indicators:
+        * Completion rate below 30%
+        * No activity for more than 30 days
+        * Failed assessments or consistently low scores
+        * Multiple missed deadlines
+        * Significant decline in engagement metrics
+      
+      - AMBER status indicators:
+        * Completion rate between 30-70%
+        * Activity gaps of 14-30 days
+        * Mixed assessment performance
+        * Occasional missed deadlines
+        * Inconsistent engagement patterns
+      
+      - GREEN status indicators:
+        * Completion rate above 70%
+        * Active within the last 14 days
+        * Satisfactory assessment performance
+        * Meeting deadlines consistently
+        * Steady or improving engagement metrics
+
+      Please consider the context of the employee's department, role, and any special circumstances indicated in the data.
     `.trim();
     
     return this.complete(prompt, {
