@@ -16,6 +16,7 @@ import HRDashboardMigrated from "./pages/HRDashboardMigrated";
 import CourseDetail from "./pages/CourseDetail";
 import Courses from "./pages/Courses";
 import ProtectedRoute from "./components/ProtectedRoute";
+import ProtectedRouteMigrated from "./components/ProtectedRouteMigrated";
 import DiagnosticTool from "./components/DiagnosticTool";
 import ExampleErrorHandling from "./components/ExampleErrorHandling";
 import FunctionalErrorBoundary from "./components/FunctionalErrorBoundary";
@@ -30,87 +31,90 @@ function App() {
           <Route path="/" element={<Index />} />
           <Route path="/login" element={<LoginPageMigrated />} />
           <Route path="/register" element={<RegisterPageMigrated />} />
+          
+          {/* Unified HR routes */}
           <Route path="/hr-login" element={<HRLoginMigrated />} />
           <Route path="/hr/login" element={<HRLoginMigrated />} />
           
           <Route 
             path="/dashboard" 
             element={
-              <ProtectedRoute allowedRoles={["learner", "mentor", "hr", "superadmin"]}>
+              <ProtectedRouteMigrated allowedRoles={["learner", "mentor", "hr", "superadmin"]}>
                 <Dashboard />
-              </ProtectedRoute>
+              </ProtectedRouteMigrated>
             } 
           />
           
           <Route 
             path="/admin" 
             element={
-              <ProtectedRoute allowedRoles={["superadmin"]}>
+              <ProtectedRouteMigrated allowedRoles={["superadmin"]}>
                 <SuperAdminDashboard />
-              </ProtectedRoute>
+              </ProtectedRouteMigrated>
             } 
           />
           
           <Route 
             path="/admin/*" 
             element={
-              <ProtectedRoute allowedRoles={["superadmin"]}>
+              <ProtectedRouteMigrated allowedRoles={["superadmin"]}>
                 <SuperAdminDashboard />
-              </ProtectedRoute>
+              </ProtectedRouteMigrated>
             } 
           />
           
+          {/* Unified HR Dashboard routes */}
           <Route 
             path="/hr-dashboard/*" 
             element={
-              <ProtectedRoute allowedRoles={["hr", "superadmin"]}>
-                <HRDashboard />
-              </ProtectedRoute>
+              <ProtectedRouteMigrated allowedRoles={["hr", "superadmin"]}>
+                <HRDashboardMigrated />
+              </ProtectedRouteMigrated>
             } 
           />
           
           <Route 
             path="/hr/dashboard/*" 
             element={
-              <ProtectedRoute allowedRoles={["hr", "superadmin"]}>
+              <ProtectedRouteMigrated allowedRoles={["hr", "superadmin"]}>
                 <HRDashboardMigrated />
-              </ProtectedRoute>
+              </ProtectedRouteMigrated>
             } 
           />
           
           <Route 
             path="/hr/*" 
             element={
-              <ProtectedRoute allowedRoles={["hr", "superadmin"]}>
+              <ProtectedRouteMigrated allowedRoles={["hr", "superadmin"]}>
                 <HRDashboardMigrated />
-              </ProtectedRoute>
+              </ProtectedRouteMigrated>
             } 
           />
           
           <Route 
             path="/mentor/*" 
             element={
-              <ProtectedRoute allowedRoles={["mentor", "superadmin"]}>
+              <ProtectedRouteMigrated allowedRoles={["mentor", "superadmin"]}>
                 <Navigate to="/dashboard" replace />
-              </ProtectedRoute>
+              </ProtectedRouteMigrated>
             } 
           />
           
           <Route 
             path="/profile" 
             element={
-              <ProtectedRoute>
+              <ProtectedRouteMigrated>
                 <ProfilePage />
-              </ProtectedRoute>
+              </ProtectedRouteMigrated>
             } 
           />
           
           <Route 
             path="/settings" 
             element={
-              <ProtectedRoute>
+              <ProtectedRouteMigrated>
                 <ProfileSettings />
-              </ProtectedRoute>
+              </ProtectedRouteMigrated>
             } 
           />
           
