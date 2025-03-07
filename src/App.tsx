@@ -83,15 +83,6 @@ function App() {
           />
           
           <Route 
-            path="/hr/*" 
-            element={
-              <ProtectedRouteMigrated allowedRoles={["hr", "superadmin"]}>
-                <HRDashboardMigrated />
-              </ProtectedRouteMigrated>
-            } 
-          />
-          
-          <Route 
             path="/mentor/*" 
             element={
               <ProtectedRouteMigrated allowedRoles={["mentor", "superadmin"]}>
