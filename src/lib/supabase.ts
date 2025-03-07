@@ -1,50 +1,37 @@
 import { createClient } from '@supabase/supabase-js';
 import { Database } from './database.types';
 
-const supabaseUrl = 'https://ujlqzkkkfatehxeqtbdl.supabase.co';
+// Get Supabase URL and key from environment variables
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://ujlqzkkkfatehxeqtbdl.supabase.co';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 // Create a Supabase client with improved error handling
 let supabase;
 
 try {
-  if (!supabaseAnonKey) {
-    console.warn('⚠️ Missing Supabase anonymous key. Authentication and database features will not work. Please set VITE_SUPABASE_ANON_KEY in your .env.local file.');
-    
-    // Log more detailed troubleshooting information in development
-    if (import.meta.env.DEV) {
-      console.info('📝 Development troubleshooting:');
-      console.info('1. Make sure you have a .env.local file in the project root');
-      console.info('2. Ensure VITE_SUPABASE_ANON_KEY is set correctly in your .env.local file');
-      console.info('3. Restart your development server after adding environment variables');
-    }
+  if (!supabaseUrl || !supabaseAnonKey) {
+    console.error('❌ Missing Supabase configuration. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env.local file.');
     
     // Create client with a placeholder key to prevent app from crashing
-    supabase = createClient<Database>(supabaseUrl, 'MISSING_KEY_PLACEHOLDER');
+    supabase = createClient<Database>(supabaseUrl || 'https://placeholder.supabase.co', 'MISSING_CONFIG_PLACEHOLDER');
   } else {
-    // Validate the key format before using it
-    if (typeof supabaseAnonKey !== 'string' || supabaseAnonKey.length < 20) {
-      console.error('❌ Invalid Supabase anonymous key format');
-      supabase = createClient<Database>(supabaseUrl, 'INVALID_KEY_FORMAT');
-    } else {
-      console.info('✅ Supabase client initialized successfully');
-      supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
-    }
+    console.info('✅ Initializing Supabase client');
+    supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
   }
 } catch (error) {
   console.error('❌ Error initializing Supabase client:', error);
   // Fallback client that will fail gracefully
-  supabase = createClient<Database>(supabaseUrl, 'ERROR_PLACEHOLDER');
+  supabase = createClient<Database>(supabaseUrl || 'https://placeholder.supabase.co', 'ERROR_PLACEHOLDER');
 }
 
 // Export a function to check if Supabase is properly configured
 export const isSupabaseConfigured = () => {
-  return !!supabaseAnonKey && 
+  return !!supabaseUrl && 
+    !!supabaseAnonKey && 
     typeof supabaseAnonKey === 'string' && 
     supabaseAnonKey.length >= 20 && 
-    supabaseAnonKey !== 'MISSING_KEY_PLACEHOLDER' && 
-    supabaseAnonKey !== 'ERROR_PLACEHOLDER' &&
-    supabaseAnonKey !== 'INVALID_KEY_FORMAT';
+    supabaseAnonKey !== 'MISSING_CONFIG_PLACEHOLDER' && 
+    supabaseAnonKey !== 'ERROR_PLACEHOLDER';
 };
 
 // Add a test function to verify connection
@@ -54,29 +41,31 @@ export const testSupabaseConnection = async () => {
     
     // First check if Supabase is properly configured
     if (!isSupabaseConfigured()) {
-      console.error('❌ Supabase is not properly configured');
       return { 
         success: false, 
-        error: new Error('Supabase is not properly configured. Check your VITE_SUPABASE_ANON_KEY.') 
+        error: new Error('Supabase is not properly configured. Check your environment variables.'),
+        details: 'Check that VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set in .env.local'
       };
     }
     
     // Try to access a public table
     const { data, error } = await supabase
-      .from('hr_departments')
-      .select('id, name')
+      .from('users')
+      .select('id')
       .limit(1);
     
     if (error) {
       console.error('❌ Supabase connection test failed:', error);
-      // Check for specific error types
-      if (error.message?.includes('relation "hr_departments" does not exist')) {
+      
+      // Provide helpful error messages for common issues
+      if (error.message?.includes('relation') && error.message?.includes('does not exist')) {
         return { 
           success: false, 
           error,
-          details: 'The hr_departments table does not exist. You may need to run the database initialization.'
+          details: 'Database table does not exist. You may need to initialize your Supabase tables.'
         };
       }
+      
       if (error.message?.includes('JWT')) {
         return { 
           success: false, 
@@ -84,14 +73,19 @@ export const testSupabaseConnection = async () => {
           details: 'Authentication error. Your Supabase key may be invalid.'
         };
       }
+      
       return { success: false, error };
     }
     
-    console.log('✅ Supabase connection test successful:', data);
+    console.log('✅ Supabase connection test successful');
     return { success: true, data };
   } catch (error) {
     console.error('❌ Supabase connection test failed with exception:', error);
-    return { success: false, error };
+    return { 
+      success: false, 
+      error, 
+      details: 'An unexpected error occurred when connecting to Supabase.'
+    };
   }
 };
 

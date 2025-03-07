@@ -1,4 +1,3 @@
-
 import { Routes, Route, Navigate } from "react-router-dom";
 import Index from "./pages/Index";
 import LoginPage from "./pages/LoginPage";
@@ -13,12 +12,14 @@ import CourseDetail from "./pages/CourseDetail";
 import Courses from "./pages/Courses";
 import ProtectedRoute from "./components/ProtectedRoute";
 import DiagnosticTool from "./components/DiagnosticTool";
+import ExampleErrorHandling from "./components/ExampleErrorHandling";
+import FunctionalErrorBoundary from "./components/FunctionalErrorBoundary";
 import { UserRole } from "./lib/database.types";
 import { Toaster } from "./components/ui/toaster";
 
 function App() {
   return (
-    <>
+    <FunctionalErrorBoundary>
       <Routes>
         <Route path="/" element={<Index />} />
         <Route path="/login" element={<LoginPage />} />
@@ -102,9 +103,13 @@ function App() {
         {/* Diagnostic route */}
         <Route path="/diagnostic" element={<DiagnosticTool />} />
         
+        {/* Error handling example route */}
+        <Route path="/error-examples" element={<ExampleErrorHandling />} />
+        
         <Route path="*" element={<NotFound />} />
       </Routes>
-    </>
+      <Toaster />
+    </FunctionalErrorBoundary>
   );
 }
 

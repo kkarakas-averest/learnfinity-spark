@@ -24,12 +24,17 @@
     "noImplicitAny": false,
     "noFallthroughCasesInSwitch": false,
 
+    /* React specific options */
+    "noImplicitThis": false,
+    "strictPropertyInitialization": false,
+    
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
-      "react": ["./node_modules/@types/react"]
+      "react": ["./node_modules/react"]
     },
-    "typeRoots": ["./node_modules/@types", "./src/types.d.ts"]
+    "typeRoots": ["./node_modules/@types", "./src/types"],
+    "types": ["node", "react", "react-dom"]
   },
   "include": ["src"]
 }

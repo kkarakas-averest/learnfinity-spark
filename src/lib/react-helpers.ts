@@ -1,9 +1,21 @@
 /**
  * This file provides consistent React imports for the entire application.
  * It centralizes React imports and re-exports them to prevent inconsistency issues.
+ * 
+ * DEPRECATED: This approach is being phased out. Please import directly from 'react'.
+ * Example: import React, { useState, useEffect } from 'react';
  */
 
 import React from 'react';
+
+// Add deprecation warning in development mode
+if (import.meta.env.DEV) {
+  console.warn(
+    'Warning: @/lib/react-helpers is deprecated. ' +
+    'Please import React directly from "react" instead. ' +
+    'Example: import React, { useState, useEffect } from "react";'
+  );
+}
 
 // Export the JSX runtime for Vite/SWC - using named imports to avoid name conflicts
 import * as jsxRuntime from 'react/jsx-runtime';
