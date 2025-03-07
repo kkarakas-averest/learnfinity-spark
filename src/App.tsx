@@ -9,6 +9,8 @@ import ProfileSettings from "./pages/ProfileSettings";
 import SuperAdminDashboard from "./pages/SuperAdminDashboard";
 import HRDashboard from "./pages/HRDashboard";
 import HRLogin from "./pages/HRLogin";
+import HRLoginMigrated from "./pages/HRLoginMigrated";
+import HRDashboardMigrated from "./pages/HRDashboardMigrated";
 import CourseDetail from "./pages/CourseDetail";
 import Courses from "./pages/Courses";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -26,6 +28,7 @@ function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/hr-login" element={<HRLogin />} />
+        <Route path="/hr/login" element={<HRLoginMigrated />} />
         
         <Route 
           path="/dashboard" 
@@ -64,10 +67,19 @@ function App() {
         />
         
         <Route 
+          path="/hr/dashboard/*" 
+          element={
+            <ProtectedRoute allowedRoles={["hr", "superadmin"]}>
+              <HRDashboardMigrated />
+            </ProtectedRoute>
+          } 
+        />
+        
+        <Route 
           path="/hr/*" 
           element={
             <ProtectedRoute allowedRoles={["hr", "superadmin"]}>
-              <HRDashboard />
+              <HRDashboardMigrated />
             </ProtectedRoute>
           } 
         />
