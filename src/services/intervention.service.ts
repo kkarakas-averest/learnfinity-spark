@@ -10,7 +10,10 @@ import {
   ScheduleAdjustment,
   MentorAssignment,
   FeedbackRequest,
-  InterventionTemplate
+  InterventionTemplate,
+  InterventionFilter,
+  InterventionUpdate,
+  Employee
 } from '@/types/intervention.types';
 import { RAGStatus } from '@/types/hr.types';
 import { NotificationService } from './notification.service';
@@ -26,6 +29,7 @@ import { NotificationService } from './notification.service';
 export class InterventionService {
   private static instance: InterventionService;
   private notificationService: NotificationService;
+  private interventions: Intervention[] = [];
 
   // Singleton pattern to ensure only one instance of the service
   public static getInstance(): InterventionService {
@@ -39,488 +43,376 @@ export class InterventionService {
     // Initialize service
     console.log('Intervention Service initialized');
     this.notificationService = NotificationService.getInstance();
+    this.initMockData();
+  }
+
+  /**
+   * Initialize mock data
+   */
+  private initMockData(): void {
+    this.interventions = [
+      {
+        id: 'int-001',
+        title: 'Content Simplification for Module 3',
+        description: 'Simplify the content in Module 3 to make it more accessible for the employee who is struggling with the technical concepts.',
+        type: 'content_modification',
+        status: 'active',
+        employeeId: 'emp-002',
+        employeeName: 'Jane Smith',
+        ragStatusAtCreation: 'red',
+        createdBy: 'hr-001',
+        createdAt: '2023-11-15T10:30:00Z',
+        updatedAt: '2023-11-15T10:30:00Z',
+        dueDate: '2023-11-30T23:59:59Z',
+        reason: 'Employee is struggling with technical concepts in Module 3',
+        contentModifications: [
+          {
+            contentId: 'content-003',
+            contentType: 'module',
+            originalContent: 'The advanced algorithms utilize polynomial time complexity to optimize the search space...',
+            modifiedContent: 'The algorithms use efficient methods to search through data quickly...',
+            reason: 'Simplify technical language'
+          }
+        ]
+      },
+      {
+        id: 'int-002',
+        title: 'Additional Resources for Data Analysis',
+        description: 'Provide supplementary resources to help the employee better understand data analysis concepts.',
+        type: 'resource_assignment',
+        status: 'completed',
+        employeeId: 'emp-005',
+        employeeName: 'Michael Johnson',
+        ragStatusAtCreation: 'amber',
+        createdBy: 'hr-001',
+        createdAt: '2023-11-10T14:15:00Z',
+        updatedAt: '2023-11-20T09:45:00Z',
+        completedAt: '2023-11-20T09:45:00Z',
+        reason: 'Employee requested additional materials on data analysis',
+        resourceAssignments: [
+          {
+            resourceId: 'res-001',
+            resourceType: 'video',
+            resourceName: 'Introduction to Data Analysis',
+            resourceUrl: 'https://learning.example.com/videos/data-analysis-intro',
+            assignmentReason: 'Foundational concepts'
+          },
+          {
+            resourceId: 'res-002',
+            resourceType: 'document',
+            resourceName: 'Data Analysis Cheat Sheet',
+            resourceUrl: 'https://learning.example.com/docs/data-analysis-cheatsheet',
+            assignmentReason: 'Quick reference guide'
+          }
+        ]
+      },
+      {
+        id: 'int-003',
+        title: 'Mentor Assignment for Leadership Skills',
+        description: 'Assign a mentor to help develop leadership skills for upcoming project management role.',
+        type: 'mentor_assignment',
+        status: 'pending',
+        employeeId: 'emp-008',
+        employeeName: 'Sarah Williams',
+        ragStatusAtCreation: 'green',
+        createdBy: 'hr-002',
+        createdAt: '2023-11-18T11:20:00Z',
+        updatedAt: '2023-11-18T11:20:00Z',
+        dueDate: '2023-12-15T23:59:59Z',
+        reason: 'Preparation for upcoming promotion to team lead',
+        notes: 'Sarah has shown great potential but needs guidance on team management aspects.'
+      }
+    ];
   }
 
   /**
    * Get interventions with optional filtering
    */
-  async getInterventions(options: {
-    employeeId?: string;
-    status?: InterventionStatus;
-    type?: InterventionType;
-    limit?: number;
-    offset?: number;
-  } = {}): Promise<Intervention[]> {
-    try {
-      if (!supabase) {
-        console.warn('Supabase not available, using mock data');
-        return this.getMockInterventions(options);
+  public async getInterventions(filter?: InterventionFilter): Promise<Intervention[]> {
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    let filteredInterventions = [...this.interventions];
+    
+    if (filter) {
+      if (filter.status) {
+        filteredInterventions = filteredInterventions.filter(i => i.status === filter.status);
       }
       
-      let query = supabase
-        .from('interventions')
-        .select('*')
-        .order('created_at', { ascending: false });
-      
-      // Apply filters
-      if (options.employeeId) {
-        query = query.eq('employee_id', options.employeeId);
+      if (filter.employeeId) {
+        filteredInterventions = filteredInterventions.filter(i => i.employeeId === filter.employeeId);
       }
       
-      if (options.status) {
-        query = query.eq('status', options.status);
+      if (filter.type) {
+        filteredInterventions = filteredInterventions.filter(i => i.type === filter.type);
       }
       
-      if (options.type) {
-        query = query.eq('type', options.type);
+      if (filter.createdBy) {
+        filteredInterventions = filteredInterventions.filter(i => i.createdBy === filter.createdBy);
       }
       
-      // Apply pagination
-      if (options.limit) {
-        query = query.limit(options.limit);
+      if (filter.fromDate) {
+        const fromDate = new Date(filter.fromDate);
+        filteredInterventions = filteredInterventions.filter(i => new Date(i.createdAt) >= fromDate);
       }
       
-      if (options.offset) {
-        query = query.range(options.offset, options.offset + (options.limit || 20) - 1);
+      if (filter.toDate) {
+        const toDate = new Date(filter.toDate);
+        filteredInterventions = filteredInterventions.filter(i => new Date(i.createdAt) <= toDate);
       }
-      
-      const { data, error } = await query;
-      
-      if (error) {
-        console.error('Error fetching interventions:', error);
-        throw error;
-      }
-      
-      // Convert from snake_case to camelCase
-      return data.map(this.snakeToCamelCase) as Intervention[];
-    } catch (error) {
-      console.error('Error in getInterventions:', error);
-      return this.getMockInterventions(options);
     }
+    
+    // Sort by creation date (newest first)
+    return filteredInterventions.sort((a, b) => 
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
   }
   
   /**
    * Get a single intervention by ID with all related details
    */
   async getInterventionById(id: string): Promise<Intervention | null> {
-    try {
-      if (!supabase) {
-        console.warn('Supabase not available, using mock data');
-        return this.getMockInterventionById(id);
-      }
-      
-      // Get main intervention data
-      const { data: interventionData, error: interventionError } = await supabase
-        .from('interventions')
-        .select('*')
-        .eq('id', id)
-        .single();
-      
-      if (interventionError) {
-        console.error('Error fetching intervention:', interventionError);
-        throw interventionError;
-      }
-      
-      if (!interventionData) {
-        return null;
-      }
-      
-      // Get related data
-      const contentModificationsPromise = supabase
-        .from('content_modifications')
-        .select('*')
-        .eq('intervention_id', id);
-        
-      const resourceAssignmentsPromise = supabase
-        .from('resource_assignments')
-        .select('*')
-        .eq('intervention_id', id);
-        
-      const scheduleAdjustmentsPromise = supabase
-        .from('schedule_adjustments')
-        .select('*')
-        .eq('intervention_id', id);
-        
-      const mentorAssignmentsPromise = supabase
-        .from('mentor_assignments')
-        .select('*')
-        .eq('intervention_id', id);
-        
-      const feedbackRequestsPromise = supabase
-        .from('feedback_requests')
-        .select('*')
-        .eq('intervention_id', id);
-      
-      // Wait for all related data to be fetched
-      const [
-        contentModificationsResult,
-        resourceAssignmentsResult,
-        scheduleAdjustmentsResult,
-        mentorAssignmentsResult,
-        feedbackRequestsResult
-      ] = await Promise.all([
-        contentModificationsPromise,
-        resourceAssignmentsPromise,
-        scheduleAdjustmentsPromise,
-        mentorAssignmentsPromise,
-        feedbackRequestsPromise
-      ]);
-      
-      // Convert data from snake_case to camelCase
-      const intervention = this.snakeToCamelCase(interventionData) as Intervention;
-      
-      // Add related data
-      if (!contentModificationsResult.error && contentModificationsResult.data) {
-        intervention.contentModifications = contentModificationsResult.data.map(
-          this.snakeToCamelCase
-        ) as ContentModification[];
-      }
-      
-      if (!resourceAssignmentsResult.error && resourceAssignmentsResult.data) {
-        intervention.resourceAssignments = resourceAssignmentsResult.data.map(
-          this.snakeToCamelCase
-        ) as ResourceAssignment[];
-      }
-      
-      if (!scheduleAdjustmentsResult.error && scheduleAdjustmentsResult.data && scheduleAdjustmentsResult.data.length > 0) {
-        intervention.scheduleAdjustment = this.snakeToCamelCase(
-          scheduleAdjustmentsResult.data[0]
-        ) as ScheduleAdjustment;
-      }
-      
-      if (!mentorAssignmentsResult.error && mentorAssignmentsResult.data && mentorAssignmentsResult.data.length > 0) {
-        intervention.mentorAssignment = this.snakeToCamelCase(
-          mentorAssignmentsResult.data[0]
-        ) as MentorAssignment;
-      }
-      
-      if (!feedbackRequestsResult.error && feedbackRequestsResult.data && feedbackRequestsResult.data.length > 0) {
-        intervention.feedbackRequest = this.snakeToCamelCase(
-          feedbackRequestsResult.data[0]
-        ) as FeedbackRequest;
-      }
-      
-      return intervention;
-    } catch (error) {
-      console.error('Error in getInterventionById:', error);
-      return this.getMockInterventionById(id);
-    }
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 300));
+    
+    const intervention = this.interventions.find(i => i.id === id);
+    return intervention || null;
   }
   
   /**
    * Create a new intervention
    */
-  async createIntervention(intervention: InterventionInput): Promise<Intervention> {
-    try {
-      if (!supabase) {
-        console.warn('Supabase not available, using mock data');
-        return this.createMockIntervention(intervention);
-      }
-      
-      // Convert from camelCase to snake_case
-      const snakeCaseData = this.camelToSnakeCase(intervention);
-      
-      // Separate the base intervention data from related data
-      const {
-        content_modifications,
-        resource_assignments,
-        schedule_adjustment,
-        mentor_assignment,
-        feedback_request,
-        ...baseInterventionData
-      } = snakeCaseData;
-      
-      // Add required timestamps
-      baseInterventionData.created_at = new Date().toISOString();
-      baseInterventionData.updated_at = new Date().toISOString();
-      
-      // Generate ID if not provided
-      if (!baseInterventionData.id) {
-        baseInterventionData.id = crypto.randomUUID();
-      }
-      
-      // Insert base intervention
-      const { data: insertedIntervention, error: insertError } = await supabase
-        .from('interventions')
-        .insert(baseInterventionData)
-        .select()
-        .single();
-      
-      if (insertError) {
-        console.error('Error creating intervention:', insertError);
-        throw insertError;
-      }
-      
-      const interventionId = insertedIntervention.id;
-      
-      // Insert related data if provided
-      const promises = [];
-      
-      if (content_modifications?.length) {
-        const contentModPromise = supabase
-          .from('content_modifications')
-          .insert(content_modifications.map(mod => ({
-            ...mod,
-            intervention_id: interventionId,
-            created_at: new Date().toISOString()
-          })));
-        promises.push(contentModPromise);
-      }
-      
-      if (resource_assignments?.length) {
-        const resourceAssignPromise = supabase
-          .from('resource_assignments')
-          .insert(resource_assignments.map(assignment => ({
-            ...assignment,
-            intervention_id: interventionId,
-            created_at: new Date().toISOString()
-          })));
-        promises.push(resourceAssignPromise);
-      }
-      
-      if (schedule_adjustment) {
-        const scheduleAdjPromise = supabase
-          .from('schedule_adjustments')
-          .insert({
-            ...schedule_adjustment,
-            intervention_id: interventionId,
-            created_at: new Date().toISOString()
-          });
-        promises.push(scheduleAdjPromise);
-      }
-      
-      if (mentor_assignment) {
-        const mentorAssignPromise = supabase
-          .from('mentor_assignments')
-          .insert({
-            ...mentor_assignment,
-            intervention_id: interventionId,
-            created_at: new Date().toISOString()
-          });
-        promises.push(mentorAssignPromise);
-      }
-      
-      if (feedback_request) {
-        const feedbackReqPromise = supabase
-          .from('feedback_requests')
-          .insert({
-            ...feedback_request,
-            intervention_id: interventionId,
-            created_at: new Date().toISOString()
-          });
-        promises.push(feedbackReqPromise);
-      }
-      
-      // Wait for all related data to be inserted
-      await Promise.all(promises);
-      
-      // Send notification
-      await this.sendInterventionNotification(intervention);
-      
-      // Return the full intervention with related data
-      return this.getInterventionById(interventionId) as Promise<Intervention>;
-    } catch (error) {
-      console.error('Error in createIntervention:', error);
-      return this.createMockIntervention(intervention);
-    }
+  async createIntervention(input: InterventionInput): Promise<Intervention> {
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 800));
+    
+    // Mock employee data lookup
+    const employeeName = this.getMockEmployeeName(input.employeeId);
+    
+    const now = new Date().toISOString();
+    const newIntervention: Intervention = {
+      id: `int-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`,
+      title: input.title,
+      description: input.description,
+      type: input.type,
+      status: 'pending',
+      employeeId: input.employeeId,
+      employeeName,
+      ragStatusAtCreation: this.getMockEmployeeRAGStatus(input.employeeId),
+      createdBy: 'hr-001', // In a real app, this would be the current user's ID
+      createdAt: now,
+      updatedAt: now,
+      dueDate: input.dueDate,
+      reason: input.reason,
+      contentModifications: input.contentModifications,
+      resourceAssignments: input.resourceAssignments,
+      notes: input.notes
+    };
+    
+    this.interventions.unshift(newIntervention);
+    return newIntervention;
   }
   
   /**
-   * Update an existing intervention
+   * Update an intervention
    */
-  async updateIntervention(id: string, updates: Partial<Intervention>): Promise<Intervention> {
-    try {
-      if (!supabase) {
-        console.warn('Supabase not available, using mock data');
-        return this.updateMockIntervention(id, updates);
-      }
-      
-      // Get current intervention
-      const currentIntervention = await this.getInterventionById(id);
-      if (!currentIntervention) {
-        throw new Error(`Intervention with ID ${id} not found`);
-      }
-      
-      // Convert from camelCase to snake_case
-      const snakeCaseUpdates = this.camelToSnakeCase(updates);
-      
-      // Separate the base intervention updates from related data updates
-      const {
-        content_modifications,
-        resource_assignments,
-        schedule_adjustment,
-        mentor_assignment,
-        feedback_request,
-        ...baseUpdates
-      } = snakeCaseUpdates;
-      
-      // Add updated timestamp
-      baseUpdates.updated_at = new Date().toISOString();
-      
-      // Update base intervention
-      const { error: updateError } = await supabase
-        .from('interventions')
-        .update(baseUpdates)
-        .eq('id', id);
-      
-      if (updateError) {
-        console.error('Error updating intervention:', updateError);
-        throw updateError;
-      }
-      
-      // Update related data if provided
-      const promises = [];
-      
-      if (content_modifications) {
-        // Delete existing and insert new content modifications
-        const deleteContentPromise = supabase
-          .from('content_modifications')
-          .delete()
-          .eq('intervention_id', id);
-          
-        promises.push(deleteContentPromise);
-        
-        if (content_modifications.length > 0) {
-          const insertContentPromise = supabase
-            .from('content_modifications')
-            .insert(content_modifications.map(mod => ({
-              ...mod,
-              intervention_id: id,
-              created_at: new Date().toISOString()
-            })));
-          promises.push(insertContentPromise);
-        }
-      }
-      
-      if (resource_assignments) {
-        // Delete existing and insert new resource assignments
-        const deleteResourcesPromise = supabase
-          .from('resource_assignments')
-          .delete()
-          .eq('intervention_id', id);
-          
-        promises.push(deleteResourcesPromise);
-        
-        if (resource_assignments.length > 0) {
-          const insertResourcesPromise = supabase
-            .from('resource_assignments')
-            .insert(resource_assignments.map(assignment => ({
-              ...assignment,
-              intervention_id: id,
-              created_at: new Date().toISOString()
-            })));
-          promises.push(insertResourcesPromise);
-        }
-      }
-      
-      if (schedule_adjustment !== undefined) {
-        // Delete existing schedule adjustment
-        const deleteSchedulePromise = supabase
-          .from('schedule_adjustments')
-          .delete()
-          .eq('intervention_id', id);
-          
-        promises.push(deleteSchedulePromise);
-        
-        if (schedule_adjustment) {
-          // Insert new schedule adjustment
-          const insertSchedulePromise = supabase
-            .from('schedule_adjustments')
-            .insert({
-              ...schedule_adjustment,
-              intervention_id: id,
-              created_at: new Date().toISOString()
-            });
-          promises.push(insertSchedulePromise);
-        }
-      }
-      
-      if (mentor_assignment !== undefined) {
-        // Delete existing mentor assignment
-        const deleteMentorPromise = supabase
-          .from('mentor_assignments')
-          .delete()
-          .eq('intervention_id', id);
-          
-        promises.push(deleteMentorPromise);
-        
-        if (mentor_assignment) {
-          // Insert new mentor assignment
-          const insertMentorPromise = supabase
-            .from('mentor_assignments')
-            .insert({
-              ...mentor_assignment,
-              intervention_id: id,
-              created_at: new Date().toISOString()
-            });
-          promises.push(insertMentorPromise);
-        }
-      }
-      
-      if (feedback_request !== undefined) {
-        // Delete existing feedback request
-        const deleteFeedbackPromise = supabase
-          .from('feedback_requests')
-          .delete()
-          .eq('intervention_id', id);
-          
-        promises.push(deleteFeedbackPromise);
-        
-        if (feedback_request) {
-          // Insert new feedback request
-          const insertFeedbackPromise = supabase
-            .from('feedback_requests')
-            .insert({
-              ...feedback_request,
-              intervention_id: id,
-              created_at: new Date().toISOString()
-            });
-          promises.push(insertFeedbackPromise);
-        }
-      }
-      
-      // Wait for all related data updates to complete
-      await Promise.all(promises);
-      
-      // Send update notification if status changed
-      if (updates.status && updates.status !== currentIntervention.status) {
-        await this.sendInterventionStatusUpdateNotification(id, updates.status);
-      }
-      
-      // Return the updated intervention
-      return this.getInterventionById(id) as Promise<Intervention>;
-    } catch (error) {
-      console.error('Error in updateIntervention:', error);
-      return this.updateMockIntervention(id, updates);
+  async updateIntervention(id: string, update: InterventionUpdate): Promise<Intervention> {
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 600));
+    
+    const index = this.interventions.findIndex(i => i.id === id);
+    if (index === -1) {
+      throw new Error(`Intervention with ID ${id} not found`);
     }
+    
+    const intervention = this.interventions[index];
+    const updatedIntervention: Intervention = {
+      ...intervention,
+      ...update,
+      updatedAt: new Date().toISOString(),
+      completedAt: update.status === 'completed' && intervention.status !== 'completed' 
+        ? new Date().toISOString() 
+        : intervention.completedAt
+    };
+    
+    this.interventions[index] = updatedIntervention;
+    return updatedIntervention;
   }
   
+  /**
+   * Delete an intervention
+   */
+  async deleteIntervention(id: string): Promise<boolean> {
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    const index = this.interventions.findIndex(i => i.id === id);
+    if (index === -1) {
+      return false;
+    }
+    
+    this.interventions.splice(index, 1);
+    return true;
+  }
+  
+  /**
+   * Get mock employees
+   */
+  async getEmployees(): Promise<Employee[]> {
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 400));
+    
+    return [
+      {
+        id: 'emp-001',
+        name: 'John Doe',
+        email: 'john.doe@example.com',
+        department: 'Engineering',
+        position: 'Software Developer',
+        ragStatus: 'green',
+        lastAssessmentDate: '2023-11-01T10:00:00Z'
+      },
+      {
+        id: 'emp-002',
+        name: 'Jane Smith',
+        email: 'jane.smith@example.com',
+        department: 'Engineering',
+        position: 'Junior Developer',
+        ragStatus: 'red',
+        lastAssessmentDate: '2023-11-05T14:30:00Z'
+      },
+      {
+        id: 'emp-003',
+        name: 'Robert Johnson',
+        email: 'robert.johnson@example.com',
+        department: 'Product',
+        position: 'Product Manager',
+        ragStatus: 'green',
+        lastAssessmentDate: '2023-10-28T09:15:00Z'
+      },
+      {
+        id: 'emp-004',
+        name: 'Emily Davis',
+        email: 'emily.davis@example.com',
+        department: 'Design',
+        position: 'UI Designer',
+        ragStatus: 'green',
+        lastAssessmentDate: '2023-11-02T11:45:00Z'
+      },
+      {
+        id: 'emp-005',
+        name: 'Michael Johnson',
+        email: 'michael.johnson@example.com',
+        department: 'Data Science',
+        position: 'Data Analyst',
+        ragStatus: 'amber',
+        lastAssessmentDate: '2023-11-08T13:20:00Z'
+      },
+      {
+        id: 'emp-006',
+        name: 'Lisa Brown',
+        email: 'lisa.brown@example.com',
+        department: 'Marketing',
+        position: 'Marketing Specialist',
+        ragStatus: 'green',
+        lastAssessmentDate: '2023-10-30T15:10:00Z'
+      },
+      {
+        id: 'emp-007',
+        name: 'David Wilson',
+        email: 'david.wilson@example.com',
+        department: 'Engineering',
+        position: 'DevOps Engineer',
+        ragStatus: 'amber',
+        lastAssessmentDate: '2023-11-07T10:30:00Z'
+      },
+      {
+        id: 'emp-008',
+        name: 'Sarah Williams',
+        email: 'sarah.williams@example.com',
+        department: 'Engineering',
+        position: 'Senior Developer',
+        ragStatus: 'green',
+        lastAssessmentDate: '2023-11-03T09:00:00Z'
+      }
+    ];
+  }
+  
+  /**
+   * Helper method to get mock employee name
+   */
+  private getMockEmployeeName(employeeId: string): string {
+    const employeeMap: Record<string, string> = {
+      'emp-001': 'John Doe',
+      'emp-002': 'Jane Smith',
+      'emp-003': 'Robert Johnson',
+      'emp-004': 'Emily Davis',
+      'emp-005': 'Michael Johnson',
+      'emp-006': 'Lisa Brown',
+      'emp-007': 'David Wilson',
+      'emp-008': 'Sarah Williams'
+    };
+    
+    return employeeMap[employeeId] || 'Unknown Employee';
+  }
+  
+  /**
+   * Helper method to get mock employee RAG status
+   */
+  private getMockEmployeeRAGStatus(employeeId: string): 'red' | 'amber' | 'green' {
+    const statusMap: Record<string, 'red' | 'amber' | 'green'> = {
+      'emp-001': 'green',
+      'emp-002': 'red',
+      'emp-003': 'green',
+      'emp-004': 'green',
+      'emp-005': 'amber',
+      'emp-006': 'green',
+      'emp-007': 'amber',
+      'emp-008': 'green'
+    };
+    
+    return statusMap[employeeId] || 'green';
+  }
+
   /**
    * Get intervention templates
    */
-  async getInterventionTemplates(): Promise<InterventionTemplate[]> {
-    try {
-      if (!supabase) {
-        console.warn('Supabase not available, using mock data');
-        return this.getMockInterventionTemplates();
+  public async getInterventionTemplates(): Promise<InterventionTemplate[]> {
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 400));
+    
+    return [
+      {
+        id: 'template-001',
+        name: 'Content Simplification',
+        description: 'Simplify complex content for better understanding',
+        type: 'content_modification',
+        reasonForUse: 'For employees struggling with technical concepts',
+        contentTemplate: 'The content in [MODULE] needs to be simplified by [SPECIFIC CHANGES].'
+      },
+      {
+        id: 'template-002',
+        name: 'Additional Learning Resources',
+        description: 'Provide supplementary resources for deeper understanding',
+        type: 'resource_assignment',
+        reasonForUse: 'For employees who need additional materials',
+        resourceIds: ['res-001', 'res-002', 'res-003']
+      },
+      {
+        id: 'template-003',
+        name: 'Mentor Support Program',
+        description: 'Assign a mentor for one-on-one guidance',
+        type: 'mentor_assignment',
+        reasonForUse: 'For employees who need personalized support'
+      },
+      {
+        id: 'template-004',
+        name: 'Schedule Extension',
+        description: 'Extend deadlines for specific modules',
+        type: 'schedule_adjustment',
+        reasonForUse: 'For employees who need more time to complete modules'
       }
-      
-      const { data, error } = await supabase
-        .from('intervention_templates')
-        .select('*')
-        .eq('is_active', true)
-        .order('name');
-      
-      if (error) {
-        console.error('Error fetching intervention templates:', error);
-        throw error;
-      }
-      
-      return data.map(this.snakeToCamelCase) as InterventionTemplate[];
-    } catch (error) {
-      console.error('Error in getInterventionTemplates:', error);
-      return this.getMockInterventionTemplates();
-    }
+    ];
   }
   
   /**
@@ -730,202 +622,5 @@ export class InterventionService {
       
       return result;
     }, {} as any);
-  }
-  
-  // Mock data methods for when Supabase is not available
-  private getMockInterventions(options: any): Intervention[] {
-    const mockInterventions: Intervention[] = [
-      {
-        id: '1',
-        employeeId: '101',
-        type: 'content_modification',
-        status: 'active',
-        reason: 'rag_status_change',
-        createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-        createdBy: '201',
-        ragStatusAtCreation: 'red',
-        title: 'Content Simplification',
-        description: 'Simplifying module 3 content for better understanding',
-        updatedAt: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString(),
-        contentModifications: [
-          {
-            contentId: '301',
-            contentType: 'module',
-            originalContent: 'Complex content...',
-            modifiedContent: 'Simplified content...',
-            reason: 'Too complex for beginner level'
-          }
-        ]
-      },
-      {
-        id: '2',
-        employeeId: '102',
-        type: 'resource_assignment',
-        status: 'pending',
-        reason: 'low_engagement',
-        createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-        createdBy: '202',
-        ragStatusAtCreation: 'amber',
-        title: 'Additional Learning Resources',
-        description: 'Supplementary videos and articles for module 2',
-        updatedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-        resourceAssignments: [
-          {
-            resourceId: '401',
-            resourceType: 'video',
-            resourceName: 'Introduction to Concept X',
-            resourceUrl: 'https://example.com/video1',
-            reason: 'Additional visual explanation',
-            isRequired: true
-          },
-          {
-            resourceId: '402',
-            resourceType: 'document',
-            resourceName: 'Concept X Explained',
-            resourceUrl: 'https://example.com/doc1',
-            reason: 'Detailed explanation with examples',
-            isRequired: false
-          }
-        ]
-      },
-      {
-        id: '3',
-        employeeId: '103',
-        type: 'mentor_assignment',
-        status: 'completed',
-        reason: 'poor_performance',
-        createdAt: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(),
-        createdBy: '203',
-        ragStatusAtCreation: 'red',
-        title: 'Mentor Support Program',
-        description: 'One-on-one mentoring sessions to improve understanding',
-        completedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-        updatedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-        mentorAssignment: {
-          mentorId: '501',
-          mentorName: 'Jane Smith',
-          sessionCount: 3,
-          startDate: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(),
-          endDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-          focusAreas: ['Module 3', 'Performance Optimization']
-        }
-      }
-    ];
-    
-    // Apply filters
-    let filteredInterventions = [...mockInterventions];
-    
-    if (options.employeeId) {
-      filteredInterventions = filteredInterventions.filter(
-        i => i.employeeId === options.employeeId
-      );
-    }
-    
-    if (options.status) {
-      filteredInterventions = filteredInterventions.filter(
-        i => i.status === options.status
-      );
-    }
-    
-    if (options.type) {
-      filteredInterventions = filteredInterventions.filter(
-        i => i.type === options.type
-      );
-    }
-    
-    // Apply pagination
-    if (options.limit) {
-      const offset = options.offset || 0;
-      filteredInterventions = filteredInterventions.slice(offset, offset + options.limit);
-    }
-    
-    return filteredInterventions;
-  }
-  
-  private getMockInterventionById(id: string): Intervention | null {
-    const mockInterventions = this.getMockInterventions({});
-    return mockInterventions.find(i => i.id === id) || null;
-  }
-  
-  private createMockIntervention(intervention: InterventionInput): Intervention {
-    const newIntervention: Intervention = {
-      ...intervention,
-      id: intervention.id || crypto.randomUUID(),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-    
-    return newIntervention;
-  }
-  
-  private updateMockIntervention(id: string, updates: Partial<Intervention>): Intervention {
-    const intervention = this.getMockInterventionById(id);
-    
-    if (!intervention) {
-      throw new Error(`Intervention with ID ${id} not found`);
-    }
-    
-    const updatedIntervention: Intervention = {
-      ...intervention,
-      ...updates,
-      updatedAt: new Date().toISOString()
-    };
-    
-    return updatedIntervention;
-  }
-  
-  private getMockInterventionTemplates(): InterventionTemplate[] {
-    return [
-      {
-        id: '1',
-        name: 'Performance Improvement Plan',
-        description: 'A structured plan for employees who are struggling with course completion',
-        type: 'content_modification',
-        reasonsForUse: ['poor_performance', 'progress_slowdown'],
-        contentTemplate: 'We have noticed that you are having some difficulty with the course material. This personalized plan is designed to help you overcome these challenges.',
-        feedbackQuestions: [
-          'What specific challenges are you facing with the current content?',
-          'What learning style works best for you?',
-          'Is there anything specific we can do to better support your learning?'
-        ],
-        createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-        updatedAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-        createdBy: '201',
-        isActive: true
-      },
-      {
-        id: '2',
-        name: 'Additional Resources Package',
-        description: 'Supplementary materials for employees who need more context',
-        type: 'resource_assignment',
-        reasonsForUse: ['low_engagement', 'poor_performance'],
-        contentTemplate: 'To help you better understand the concepts, we have assigned these additional resources.',
-        feedbackQuestions: [
-          'Did you find these additional resources helpful?',
-          'Which format of materials do you prefer?'
-        ],
-        createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-        updatedAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-        createdBy: '201',
-        isActive: true
-      },
-      {
-        id: '3',
-        name: 'Mentor Support Program',
-        description: 'One-on-one guidance with an experienced mentor',
-        type: 'mentor_assignment',
-        reasonsForUse: ['rag_status_change', 'poor_performance'],
-        contentTemplate: 'To provide additional support, we have assigned a mentor who will guide you through the challenging aspects of this course.',
-        suggestedMentorIds: ['501', '502', '503'],
-        feedbackQuestions: [
-          'How helpful were the mentoring sessions?',
-          'What specific areas did the mentor help you with?'
-        ],
-        createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-        updatedAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-        createdBy: '201',
-        isActive: true
-      }
-    ];
   }
 } 

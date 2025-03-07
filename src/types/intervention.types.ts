@@ -1,124 +1,136 @@
 /**
- * HR Intervention Type Definitions
+ * Intervention Types
+ * 
+ * This file contains all the type definitions for the HR intervention system.
  */
-import { RAGStatus } from './hr.types';
 
-// Types of interventions
+/**
+ * Intervention Status
+ */
+export type InterventionStatus = 'pending' | 'active' | 'completed' | 'cancelled';
+
+/**
+ * Intervention Type
+ */
 export type InterventionType = 
-  | 'content_modification'   // Modifying learning content
-  | 'resource_assignment'    // Assigning additional resources
-  | 'schedule_adjustment'    // Adjusting learning schedule
-  | 'mentor_assignment'      // Assigning a mentor for guidance
-  | 'feedback_request'       // Requesting specific feedback
-  | 'custom';                // Custom intervention type
+  | 'content_modification' 
+  | 'resource_assignment' 
+  | 'schedule_adjustment' 
+  | 'mentor_assignment'
+  | 'feedback_request';
 
-// Status of an intervention
-export type InterventionStatus = 
-  | 'pending'      // Intervention created but not yet applied
-  | 'active'       // Intervention is currently active
-  | 'completed'    // Intervention has been completed
-  | 'cancelled';   // Intervention was cancelled
+/**
+ * RAG Status
+ */
+export type RAGStatus = 'red' | 'amber' | 'green';
 
-// Reason for intervention
-export type InterventionReason = 
-  | 'rag_status_change'      // Changes in RAG status
-  | 'progress_slowdown'      // Slowed progress
-  | 'low_engagement'         // Low engagement with content
-  | 'poor_performance'       // Poor performance in assessments
-  | 'employee_request'       // Requested by employee
-  | 'periodic_review'        // Part of regular review
-  | 'custom';                // Custom reason
-
-// Basic intervention structure
-export interface Intervention {
-  id: string;
-  employeeId: string;
-  type: InterventionType;
-  status: InterventionStatus;
-  reason: InterventionReason;
-  createdAt: string;
-  createdBy: string;        // ID of HR user who created it
-  ragStatusAtCreation: RAGStatus;
-  title: string;
-  description: string;
-  dueDate?: string;         // Optional due date
-  completedAt?: string;     // Date when intervention was completed
-  updatedAt: string;
-  contentModifications?: ContentModification[];
-  resourceAssignments?: ResourceAssignment[];
-  scheduleAdjustment?: ScheduleAdjustment;
-  mentorAssignment?: MentorAssignment;
-  feedbackRequest?: FeedbackRequest;
-  customFields?: Record<string, any>;
-  metadata?: Record<string, any>;
-}
-
-// Input for creating a new intervention
-export type InterventionInput = Omit<Intervention, 'id' | 'createdAt' | 'updatedAt'> & {
-  id?: string;
-};
-
-// Content modification details
+/**
+ * Content Modification
+ */
 export interface ContentModification {
   contentId: string;
-  contentType: 'module' | 'quiz' | 'video' | 'document' | 'other';
-  originalContent?: string;
+  contentType: string;
+  originalContent: string;
   modifiedContent: string;
   reason: string;
 }
 
-// Resource assignment details
+/**
+ * Resource Assignment
+ */
 export interface ResourceAssignment {
   resourceId: string;
-  resourceType: 'document' | 'video' | 'course' | 'quiz' | 'other';
+  resourceType: string;
   resourceName: string;
-  resourceUrl: string;
-  reason: string;
+  resourceUrl?: string;
+  assignmentReason: string;
+}
+
+/**
+ * Intervention
+ */
+export interface Intervention {
+  id: string;
+  title: string;
+  description: string;
+  type: InterventionType;
+  status: InterventionStatus;
+  employeeId: string;
+  employeeName: string;
+  ragStatusAtCreation: RAGStatus;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
   dueDate?: string;
-  isRequired: boolean;
-}
-
-// Schedule adjustment details
-export interface ScheduleAdjustment {
-  originalDueDate?: string;
-  newDueDate: string;
-  affectedContentIds: string[];
+  completedAt?: string;
   reason: string;
-}
-
-// Mentor assignment details
-export interface MentorAssignment {
-  mentorId: string;
-  mentorName: string;
-  sessionCount: number;
-  startDate: string;
-  endDate?: string;
-  focusAreas: string[];
+  contentModifications?: ContentModification[];
+  resourceAssignments?: ResourceAssignment[];
   notes?: string;
 }
 
-// Feedback request details
-export interface FeedbackRequest {
-  questions: string[];
-  dueDate: string;
-  isAnonymous: boolean;
-  feedbackType: 'course' | 'content' | 'experience' | 'progress' | 'other';
-  targetContentIds?: string[];
+/**
+ * Intervention Input
+ */
+export interface InterventionInput {
+  title: string;
+  description: string;
+  type: InterventionType;
+  employeeId: string;
+  reason: string;
+  dueDate?: string;
+  contentModifications?: ContentModification[];
+  resourceAssignments?: ResourceAssignment[];
+  notes?: string;
 }
 
-// Intervention template for quick creation
+/**
+ * Intervention Filter
+ */
+export interface InterventionFilter {
+  status?: InterventionStatus;
+  employeeId?: string;
+  type?: InterventionType;
+  createdBy?: string;
+  fromDate?: string;
+  toDate?: string;
+}
+
+/**
+ * Intervention Update
+ */
+export interface InterventionUpdate {
+  title?: string;
+  description?: string;
+  status?: InterventionStatus;
+  dueDate?: string;
+  notes?: string;
+  contentModifications?: ContentModification[];
+  resourceAssignments?: ResourceAssignment[];
+}
+
+/**
+ * Employee
+ */
+export interface Employee {
+  id: string;
+  name: string;
+  email: string;
+  department: string;
+  position: string;
+  ragStatus: RAGStatus;
+  lastAssessmentDate?: string;
+}
+
+/**
+ * Intervention Template
+ */
 export interface InterventionTemplate {
   id: string;
   name: string;
   description: string;
   type: InterventionType;
-  reasonsForUse: InterventionReason[];
-  contentTemplate: string;
-  requiredResourceIds?: string[];
-  suggestedMentorIds?: string[];
-  feedbackQuestions?: string[];
-  createdAt: string;
-  updatedAt: string;
-  createdBy: string;
-  isActive: boolean;
+  reasonForUse: string;
+  contentTemplate?: string;
+  resourceIds?: string[];
 } 
