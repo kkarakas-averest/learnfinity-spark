@@ -69,7 +69,7 @@ const ProtectedRouteMigrated: React.FC<ProtectedRouteProps> = ({
   }, [user, toast, location.pathname]);
 
   // If authentication is still loading, show a loading indicator
-  if ((isLoading && !requireHRAuth) || (hrIsLoading && requireHRAuth) && !timeoutReached) {
+  if ((!timeoutReached) && ((isLoading && !requireHRAuth) || (hrIsLoading && requireHRAuth))) {
     console.log("Protected route - Authentication is still loading");
     return (
       <div className="flex items-center justify-center h-screen">

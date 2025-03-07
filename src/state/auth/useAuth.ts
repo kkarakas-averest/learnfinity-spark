@@ -113,7 +113,7 @@ export function useAuth() {
       if (error) {
         console.error('Error fetching user details:', error);
         // Add fallback behavior for missing profile
-        if (error.code === 'PGRST116') {
+        if (error.code === 'PGRST116' || error.message?.includes('does not exist')) {
           console.log('User profile not found, creating default profile');
           const userDetails: UserDetails = {
             id: userId,
@@ -122,6 +122,8 @@ export function useAuth() {
             role: 'learner',
           };
           dispatch(setUserDetails(userDetails));
+          // Important: Make sure loading state is cleared
+          dispatch(setAuthSuccess(await supabase.auth.getUser().then(res => res.data.user)));
           return;
         }
         throw error;
@@ -137,6 +139,20 @@ export function useAuth() {
         };
         
         dispatch(setUserDetails(userDetails));
+        // Important: Make sure loading state is cleared after setting user details
+        dispatch(setAuthSuccess(await supabase.auth.getUser().then(res => res.data.user)));
+      } else {
+        // If no data but also no error, create default profile
+        console.log('No user details found but no error, creating default profile');
+        const userDetails: UserDetails = {
+          id: userId,
+          name: 'New User',
+          email: '',
+          role: 'learner',
+        };
+        dispatch(setUserDetails(userDetails));
+        // Important: Make sure loading state is cleared
+        dispatch(setAuthSuccess(await supabase.auth.getUser().then(res => res.data.user)));
       }
     } catch (error) {
       console.error('Error fetching user details:', error);
@@ -152,6 +168,13 @@ export function useAuth() {
           role: 'learner',
         };
         dispatch(setUserDetails(fallbackDetails));
+        
+        // Important: Make sure loading state is cleared even on error
+        dispatch(setAuthSuccess(userData.user));
+      } else {
+        // If we can't get user data, clear the loading state anyway to prevent getting stuck
+        console.log('Could not get user data, clearing loading state');
+        dispatch(setAuthSuccess(null));
       }
     }
   }, [dispatch]);
