@@ -11,32 +11,14 @@ import { SparklesIcon } from '@heroicons/react/24/outline';
 import { Link } from "react-router-dom";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Activity, Edit, MessageSquare, User, MoreHorizontal } from "lucide-react";
+import { RAGStatusBadge } from './RAGStatusBadge';
+import RAGStatusHistory, { StatusHistoryEntry } from './RAGStatusHistory';
+import { ragStatusService } from '@/services/rag-status.service';
 
 interface EmployeeManagementProps {
   onViewDetails: (employee: Employee) => void;
   onIntervene: (employee: Employee) => void;
 }
-
-// RAG status badge component
-const RAGStatusBadge = ({ status }: { status: RAGStatus }) => {
-  const variants = {
-    green: "bg-green-500 hover:bg-green-600",
-    amber: "bg-amber-500 hover:bg-amber-600",
-    red: "bg-red-500 hover:bg-red-600"
-  };
-  
-  const labels = {
-    green: "On Track",
-    amber: "Needs Attention",
-    red: "Urgent Intervention"
-  };
-  
-  return (
-    <Badge className={variants[status]}>
-      {labels[status]}
-    </Badge>
-  );
-};
 
 // Complete component with RAG status filtering
 const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ onViewDetails, onIntervene }) => {
@@ -47,6 +29,8 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ onViewDetails, 
   // State for agent analysis
   const [isAnalyzing, setIsAnalyzing] = React.useState(false);
   const [employeesBeingAnalyzed, setEmployeesBeingAnalyzed] = React.useState<Record<string, boolean>>({});
+  // State for status history
+  const [statusHistories, setStatusHistories] = React.useState<Record<string, StatusHistoryEntry[]>>({});
   
   // Get the agent system hooks
   const { 
@@ -75,6 +59,25 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ onViewDetails, 
       const mockEmployees = generateMockEmployees();
       setEmployees(mockEmployees);
       setFilteredEmployees(mockEmployees);
+      
+      // Fetch status histories for all employees
+      const histories: Record<string, StatusHistoryEntry[]> = {};
+      
+      for (const employee of mockEmployees) {
+        try {
+          const history = await ragStatusService.getEmployeeRAGHistory(employee.id);
+          histories[employee.id] = history.entries.map(entry => ({
+            status: entry.status,
+            date: entry.createdAt,
+            reason: entry.reason
+          }));
+        } catch (error) {
+          console.error(`Error fetching history for employee ${employee.id}:`, error);
+          histories[employee.id] = [];
+        }
+      }
+      
+      setStatusHistories(histories);
     } catch (error) {
       console.error('Error fetching employees:', error);
       toast({
@@ -360,8 +363,19 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ onViewDetails, 
                   <div className="text-sm text-gray-500">
                     {employee.department} · {employee.position || 'No position'}
                   </div>
-                  <div className="mt-2 flex items-center space-x-2">
-                    <RAGStatusBadge status={employee.ragStatus} />
+                  <div className="mt-2 flex items-center space-x-3">
+                    <RAGStatusBadge 
+                      status={employee.ragStatus} 
+                      size="md" 
+                      animate={employeesBeingAnalyzed[employee.id]}
+                    />
+                    {statusHistories[employee.id] && statusHistories[employee.id].length > 0 && (
+                      <RAGStatusHistory 
+                        history={statusHistories[employee.id]} 
+                        maxEntries={5}
+                        size="sm"
+                      />
+                    )}
                     <span className="text-xs text-gray-500">
                       Last activity: {new Date(employee.lastActivity).toLocaleDateString()}
                     </span>
