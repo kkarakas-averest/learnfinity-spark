@@ -15,10 +15,10 @@ This document tracks our progress in migrating components to use the new state m
 | `src/pages/HRDashboard.tsx` | ✅ Created migrated version | Created `HRDashboardMigrated.tsx` that uses useHRAuth and useUI hooks |
 | `src/pages/Courses.tsx` | ✅ Created migrated version | Created `CoursesMigrated.tsx` that uses useCourses hook |
 | `src/components/ProtectedRoute.tsx` | ✅ Created migrated version | Created `ProtectedRouteMigrated.tsx` that uses useAuth hook |
+| `src/components/Navbar.tsx` | ✅ Created migrated version | Created `NavbarMigrated.tsx` that uses useAuth and useUI hooks |
+| `src/components/DashboardLayout.tsx` | ✅ Created migrated version | Created `DashboardLayoutMigrated.tsx` that uses useAuth and useUI hooks |
 | `src/pages/Dashboard.tsx` | ❌ Not migrated | Uses old AuthContext |
 | `src/pages/ProfilePage.tsx` | ❌ Not migrated | Uses old AuthContext |
-| `src/components/Navbar.tsx` | ❌ Not migrated | Uses old AuthContext |
-| `src/components/DashboardLayout.tsx` | ❌ Not migrated | Uses old AuthContext |
 | `src/components/DiagnosticTool.tsx` | ❌ Not migrated | Uses old AuthContext |
 | `src/components/learner/AgentGeneratedCourses.jsx` | ❌ Not migrated | Uses old AuthContext |
 | `src/hooks/useLearningData.ts` | ❌ Not migrated | Uses old AuthContext |
