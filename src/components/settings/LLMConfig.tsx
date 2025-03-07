@@ -40,24 +40,58 @@ export default function LLMConfig() {
         setModel(config.model);
         setEnableLLM(config.provider === 'groq');
         
-        // Try to load API key from secure storage
-        const { data, error } = await supabase
-          .from('user_preferences')
-          .select('llm_config')
-          .single();
+        let apiKeyFound = false;
+        
+        // Try to load API key from Supabase first
+        try {
+          const { data, error } = await supabase
+            .from('user_preferences')
+            .select('llm_config')
+            .single();
           
-        if (error) {
-          console.warn('Could not load LLM config from preferences:', error);
-        } else if (data?.llm_config?.apiKey) {
-          // Mask API key for display ("sk-...XXXX")
-          const key = data.llm_config.apiKey;
-          setApiKey(key.startsWith('sk-') ? `sk-...${key.slice(-4)}` : "(stored)");
+          if (error) {
+            console.warn('Could not load LLM config from database:', error);
+          } else if (data?.llm_config?.apiKey) {
+            // Mask API key for display ("sk-...XXXX")
+            const key = data.llm_config.apiKey;
+            setApiKey(key.startsWith('sk-') ? `sk-...${key.slice(-4)}` : "(stored)");
+            apiKeyFound = true;
+          }
+        } catch (dbError) {
+          console.warn('Error accessing database for config:', dbError);
+        }
+        
+        // If no API key found in Supabase, check localStorage
+        if (!apiKeyFound) {
+          try {
+            const localConfig = localStorage.getItem('llm_config');
+            if (localConfig) {
+              const parsedConfig = JSON.parse(localConfig);
+              if (parsedConfig.apiKey) {
+                const key = parsedConfig.apiKey;
+                setApiKey(key.startsWith('sk-') ? `sk-...${key.slice(-4)}` : "(stored locally)");
+                // Also update the LLM service if needed
+                if (!isConfigured) {
+                  llmService.setProvider(
+                    parsedConfig.provider || 'groq',
+                    {
+                      apiKey: parsedConfig.apiKey,
+                      model: parsedConfig.model || model
+                    }
+                  );
+                }
+                apiKeyFound = true;
+              }
+            }
+          } catch (storageError) {
+            console.warn('Error accessing localStorage for config:', storageError);
+          }
         }
         
         setStatus({
           configured: isConfigured,
           message: isConfigured 
-            ? "✅ LLM service is configured and ready to use" 
+            ? "✅ LLM service is configured and ready to use" + (apiKeyFound ? "" : " (but API key display unavailable)")
             : "❌ LLM service is not configured"
         });
       } catch (error) {
@@ -78,33 +112,57 @@ export default function LLMConfig() {
     setIsSaving(true);
     
     try {
-      const currentUser = await supabase.auth.getUser();
-      if (!currentUser.data?.user?.id) {
-        throw new Error('User not authenticated');
-      }
-
       // Only save if the API key is provided and not masked
       if (apiKey && !apiKey.includes('...')) {
-        // Save API key to user preferences in database
-        const { error } = await supabase
-          .from('user_preferences')
-          .upsert({
-            user_id: currentUser.data.user.id,
-            llm_config: {
-              apiKey,
+        let savedToDatabase = false;
+        
+        // Try to save to Supabase first
+        try {
+          const currentUser = await supabase.auth.getUser();
+          
+          // Only attempt database save if we have a valid user
+          if (currentUser.data?.user?.id) {
+            const { error } = await supabase
+              .from('user_preferences')
+              .upsert({
+                user_id: currentUser.data.user.id,
+                llm_config: {
+                  apiKey,
+                  model,
+                  provider: enableLLM ? 'groq' : 'mock',
+                  timestamp: new Date().toISOString()
+                }
+              });
+              
+            if (error) {
+              console.warn('Supabase error when saving API key:', error);
+              // Don't throw here, we'll fall back to localStorage
+            } else {
+              savedToDatabase = true;
+              console.log('Successfully saved API key to database');
+            }
+          } else {
+            console.warn('No authenticated user found for database storage');
+          }
+        } catch (dbError) {
+          console.warn('Failed to save to database, falling back to localStorage:', dbError);
+        }
+        
+        // If database save failed or user isn't authenticated, fall back to localStorage
+        if (!savedToDatabase) {
+          try {
+            // Store the config in localStorage as fallback (less secure but functional)
+            localStorage.setItem('llm_config', JSON.stringify({
+              apiKey, 
               model,
               provider: enableLLM ? 'groq' : 'mock',
               timestamp: new Date().toISOString()
-            }
-          });
-          
-        if (error) {
-          console.error('Supabase error when saving API key:', error);
-          // If the table doesn't exist, provide a specific message
-          if (error.message.includes('does not exist')) {
-            throw new Error(`Database table 'user_preferences' doesn't exist. Please run the setup SQL script.`);
+            }));
+            console.log('Saved API key to localStorage (fallback storage)');
+          } catch (storageError) {
+            console.error('Failed to save to localStorage:', storageError);
+            throw new Error('Could not save configuration to any storage mechanism');
           }
-          throw new Error(`Failed to save API key: ${error.message}`);
         }
         
         // Update LLM service configuration
@@ -118,7 +176,7 @@ export default function LLMConfig() {
         
         setStatus({
           configured: llmService.isConfigured(),
-          message: "✅ Configuration saved and updated"
+          message: "✅ Configuration saved and updated" + (!savedToDatabase ? " (using local storage)" : "")
         });
       } else {
         // Just update the model and provider
