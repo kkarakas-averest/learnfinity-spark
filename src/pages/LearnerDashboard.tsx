@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Home, BookOpen, Trophy, User } from "lucide-react";
 import DashboardHeader from "@/components/learner/DashboardHeader";
+import TestNotificationButton from "@/components/learner/TestNotificationButton";
 
 const LearnerDashboard: React.FC = () => {
   const { user, userDetails, isLoading } = useAuth();
@@ -34,6 +35,12 @@ const LearnerDashboard: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <DashboardHeader />
+      
+      {/* Temporary User ID Display - Remove after testing */}
+      <div className="bg-blue-100 p-2 text-sm text-center">
+        <p>Your User ID: <strong>{user?.id}</strong> (Copy this for your test notifications)</p>
+        <TestNotificationButton />
+      </div>
       
       <main className="container mx-auto px-4 py-8">
         <Tabs defaultValue={activeTab} onValueChange={setActiveTab} className="space-y-4">

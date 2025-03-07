@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import { Notification, NotificationType } from '@/types/notifications';
+import { Notification } from '@/types/notifications';
 
 export const notificationService = {
   /**
@@ -26,9 +26,22 @@ export const notificationService = {
       
       if (error) throw error;
       
+      // Map the data to ensure compatibility with our interface
+      const notifications = data.map(notification => ({
+        ...notification,
+        // Ensure consistency with our frontend model regardless of DB structure
+        id: notification.id,
+        recipient_id: notification.recipient_id,
+        title: notification.title || 'Notification',
+        message: notification.message || '',
+        is_read: !!notification.is_read,
+        created_at: notification.created_at,
+        actionLink: notification.action_link || notification.actionLink,
+      }));
+      
       return { 
         success: true, 
-        notifications: data as Notification[] 
+        notifications 
       };
     } catch (error) {
       console.error('Error fetching notifications:', error);
