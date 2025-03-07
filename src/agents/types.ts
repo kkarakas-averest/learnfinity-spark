@@ -5,6 +5,18 @@
 import { RAGStatus, RAGStatusDetails } from "@/types/hr.types";
 
 /**
+ * Message type for agent communication
+ */
+export interface AgentMessage {
+  id: string;
+  from: string;
+  to: string;
+  content: string;
+  timestamp: Date;
+  metadata?: Record<string, any>;
+}
+
+/**
  * Base configuration for all agents
  */
 export interface AgentConfig {
@@ -20,8 +32,11 @@ export interface AgentConfig {
  * Base agent interface
  */
 export interface Agent {
+  id: string;
   config: AgentConfig;
   initialize: () => Promise<{ success: boolean; message?: string }>;
+  processTask: (task: any) => Promise<any>;
+  receiveMessage: (message: AgentMessage) => Promise<AgentMessage | null>;
 }
 
 /**

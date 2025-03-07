@@ -156,4 +156,22 @@ export interface Notification {
   isRead: boolean;
   createdAt: string;
   actionLink?: string;
+}
+
+// Employee Progress tracking type for detailed monitoring
+export interface EmployeeProgress {
+  employeeId: string;
+  employeeName: string;
+  department: string;
+  role: string;
+  programName: string;
+  currentStatus: RAGStatus;
+  progress: number;
+  lastActivityDate: string;
+  upcomingDeadlines?: {
+    title: string;
+    date: string;
+    completed: boolean;
+  }[];
+  notes?: string;
 } 
