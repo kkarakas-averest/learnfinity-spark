@@ -25,6 +25,7 @@ import { UserRole } from "./lib/database.types";
 import { Toaster } from "./components/ui/toaster";
 import { useAuth, useHRAuth } from "./state";
 import { Button } from "./components/ui/button";
+import SystemHealthCheck from "./pages/SystemHealthCheck";
 
 // Simple diagnostic component for auth debugging
 const AuthDiagnostic = () => {
@@ -152,6 +153,9 @@ function App() {
           
           {/* Diagnostic route */}
           <Route path="/diagnostic" element={<DiagnosticTool />} />
+          
+          {/* System Health Check */}
+          <Route path="/health-check" element={<SystemHealthCheck />} />
           
           {/* Error handling example route */}
           <Route path="/error-examples" element={<ExampleErrorHandling />} />
