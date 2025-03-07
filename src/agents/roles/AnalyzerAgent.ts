@@ -8,8 +8,12 @@
 import { BaseAgent, AgentMessage } from '../core/BaseAgent';
 import { AgentConfig } from '../types';
 import { RAGStatus, RAGStatusDetails } from '@/types/hr.types';
+import { LLMService } from '@/lib/llm/llm-service';
 
 export class AnalyzerAgent extends BaseAgent {
+  private llmService: LLMService;
+  private useLLM: boolean;
+
   constructor(config?: Partial<AgentConfig>) {
     super({
       name: "Analyzer Agent",
@@ -18,6 +22,17 @@ export class AnalyzerAgent extends BaseAgent {
       backstory: "You specialize in interpreting learning patterns and identifying when intervention is needed.",
       ...config
     });
+
+    // Initialize LLM service
+    this.llmService = LLMService.getInstance({
+      debugMode: process.env.NODE_ENV === 'development'
+    });
+
+    // Check if we have a configured LLM
+    this.useLLM = this.llmService.isConfigured();
+    if (!this.useLLM && process.env.NODE_ENV === 'development') {
+      console.warn('AnalyzerAgent: LLM not configured, using rule-based approach');
+    }
   }
   
   /**
@@ -66,6 +81,107 @@ export class AnalyzerAgent extends BaseAgent {
    * Determine RAG status for a single employee
    */
   async determineRAGStatus(employeeData: any): Promise<RAGStatusDetails> {
+    // If LLM is configured, use it for advanced analysis
+    if (this.useLLM) {
+      try {
+        return await this.determineRAGStatusUsingLLM(employeeData);
+      } catch (error) {
+        console.error('Error using LLM for RAG status determination:', error);
+        // Fall back to rule-based approach
+        return this.determineRAGStatusRuleBased(employeeData);
+      }
+    } 
+    
+    // Otherwise use rule-based approach
+    return this.determineRAGStatusRuleBased(employeeData);
+  }
+
+  /**
+   * Determine RAG status using LLM
+   */
+  private async determineRAGStatusUsingLLM(employeeData: any): Promise<RAGStatusDetails> {
+    // Get LLM analysis
+    const llmResponse = await this.llmService.determineRAGStatus(employeeData);
+    
+    // Parse the LLM response to extract status
+    let status: RAGStatus = 'green';
+    let justification = '';
+    let recommendedActions: string[] = [];
+    
+    // Extract the status from the response
+    if (llmResponse.includes('Status: RED') || llmResponse.toUpperCase().includes('RED')) {
+      status = 'red';
+    } else if (llmResponse.includes('Status: AMBER') || llmResponse.toUpperCase().includes('AMBER')) {
+      status = 'amber';
+    }
+    
+    // Extract justification - look for lines following the status
+    const lines = llmResponse.split('\n');
+    const statusLineIndex = lines.findIndex(line => 
+      line.includes('Status:') || 
+      line.toUpperCase().includes('RED') || 
+      line.toUpperCase().includes('AMBER') || 
+      line.toUpperCase().includes('GREEN')
+    );
+    
+    if (statusLineIndex >= 0 && statusLineIndex + 1 < lines.length) {
+      // Take the next non-empty line as justification
+      for (let i = statusLineIndex + 1; i < lines.length; i++) {
+        if (lines[i].trim() && !lines[i].includes('Recommended actions')) {
+          justification = lines[i].trim();
+          break;
+        }
+      }
+    }
+    
+    // Extract recommended actions
+    const actionHeaderIndex = lines.findIndex(line => 
+      line.includes('Recommended actions') || 
+      line.includes('Actions:')
+    );
+    
+    if (actionHeaderIndex >= 0) {
+      // Collect all numbered points as actions
+      for (let i = actionHeaderIndex + 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+        
+        if (line.match(/^\d+\.\s/) || line.match(/^-\s/)) {
+          recommendedActions.push(line.replace(/^\d+\.\s|-\s/, '').trim());
+        } else if (recommendedActions.length > 0 && !line.includes(':')) {
+          // Stop collecting at section boundary
+          break;
+        }
+      }
+    }
+    
+    // If we couldn't extract a justification, use a default one
+    if (!justification) {
+      justification = status === 'green' 
+        ? 'Employee is maintaining good progress.'
+        : status === 'amber'
+        ? 'Employee shows some signs of falling behind.'
+        : 'Employee requires immediate intervention.';
+    }
+    
+    // If we couldn't extract actions, use defaults
+    if (recommendedActions.length === 0) {
+      recommendedActions = this.getDefaultActions(status);
+    }
+    
+    return {
+      status,
+      justification,
+      lastUpdated: new Date().toISOString(),
+      updatedBy: 'analyzer-agent-llm',
+      recommendedActions
+    };
+  }
+  
+  /**
+   * Rule-based RAG status determination (fallback method)
+   */
+  private determineRAGStatusRuleBased(employeeData: any): RAGStatusDetails {
     // For MVP, we'll use a simple rule-based approach
     // In a real implementation, this could use an ML model
     
@@ -101,9 +217,40 @@ export class AnalyzerAgent extends BaseAgent {
       status,
       justification,
       lastUpdated: new Date().toISOString(),
-      updatedBy: 'analyzer-agent',
-      recommendedActions: this.getRecommendedActions(status, employeeData)
+      updatedBy: 'analyzer-agent-rules',
+      recommendedActions: this.getDefaultActions(status)
     };
+  }
+  
+  /**
+   * Get default actions based on status
+   */
+  private getDefaultActions(status: RAGStatus): string[] {
+    switch (status) {
+      case 'green':
+        return [
+          'Continue with current learning path',
+          'Consider additional challenge materials',
+          'Provide positive reinforcement'
+        ];
+      case 'amber':
+        return [
+          'Send engagement reminder',
+          'Schedule check-in conversation',
+          'Review upcoming deadlines with employee',
+          'Consider simplifying immediate next steps'
+        ];
+      case 'red':
+        return [
+          'Schedule immediate intervention meeting',
+          'Reassess learning path difficulty',
+          'Provide supplementary materials for current module',
+          'Consider extending deadlines',
+          'Assign mentor for additional support'
+        ];
+      default:
+        return ['Assess current learning status'];
+    }
   }
   
   /**
@@ -112,9 +259,37 @@ export class AnalyzerAgent extends BaseAgent {
   async determineRAGStatusBatch(employeesData: any[]): Promise<Map<string, RAGStatusDetails>> {
     const results = new Map<string, RAGStatusDetails>();
     
-    for (const employee of employeesData) {
-      const status = await this.determineRAGStatus(employee);
-      results.set(employee.id, status);
+    // Process in small batches to avoid overwhelming the system
+    const batchSize = 5;
+    for (let i = 0; i < employeesData.length; i += batchSize) {
+      const batch = employeesData.slice(i, i + batchSize);
+      
+      // Process each employee in the batch concurrently
+      const batchPromises = batch.map(employee => 
+        this.determineRAGStatus(employee)
+          .then(status => ({ employee, status }))
+          .catch(error => {
+            console.error(`Error processing employee ${employee.id}:`, error);
+            return { 
+              employee, 
+              status: {
+                status: 'unknown' as RAGStatus,
+                justification: 'Error processing employee data',
+                lastUpdated: new Date().toISOString(),
+                updatedBy: 'analyzer-agent-error',
+                recommendedActions: ['Review employee data for errors']
+              }
+            };
+          })
+      );
+      
+      // Wait for all employees in this batch to be processed
+      const batchResults = await Promise.all(batchPromises);
+      
+      // Add results to the map
+      for (const { employee, status } of batchResults) {
+        results.set(employee.id, status);
+      }
     }
     
     return results;
@@ -211,46 +386,14 @@ export class AnalyzerAgent extends BaseAgent {
   }
   
   /**
-   * Get recommended actions based on status
-   */
-  private getRecommendedActions(status: RAGStatus, employeeData: any): string[] {
-    switch (status) {
-      case 'green':
-        return [
-          'Continue with current learning path',
-          'Consider additional challenge materials',
-          'Provide positive reinforcement'
-        ];
-      case 'amber':
-        return [
-          'Send engagement reminder',
-          'Schedule check-in conversation',
-          'Review upcoming deadlines with employee',
-          'Consider simplifying immediate next steps'
-        ];
-      case 'red':
-        return [
-          'Schedule immediate intervention meeting',
-          'Reassess learning path difficulty',
-          'Provide supplementary materials for current module',
-          'Consider extending deadlines',
-          'Assign mentor for additional support'
-        ];
-      default:
-        return ['Assess current learning status'];
-    }
-  }
-  
-  /**
    * Calculate days since a given date
    */
   private daysSince(dateString?: string): number {
     if (!dateString) return 30; // Default to 30 days if no date provided
     
     const date = new Date(dateString);
-    const now = new Date();
-    
-    const timeDiff = now.getTime() - date.getTime();
+    const today = new Date();
+    const timeDiff = today.getTime() - date.getTime();
     return Math.floor(timeDiff / (1000 * 3600 * 24));
   }
 } 
