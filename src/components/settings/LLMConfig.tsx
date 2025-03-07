@@ -78,12 +78,18 @@ export default function LLMConfig() {
     setIsSaving(true);
     
     try {
+      const currentUser = await supabase.auth.getUser();
+      if (!currentUser.data?.user?.id) {
+        throw new Error('User not authenticated');
+      }
+
       // Only save if the API key is provided and not masked
       if (apiKey && !apiKey.includes('...')) {
         // Save API key to user preferences in database
         const { error } = await supabase
           .from('user_preferences')
           .upsert({
+            user_id: currentUser.data.user.id,
             llm_config: {
               apiKey,
               model,
@@ -93,6 +99,11 @@ export default function LLMConfig() {
           });
           
         if (error) {
+          console.error('Supabase error when saving API key:', error);
+          // If the table doesn't exist, provide a specific message
+          if (error.message.includes('does not exist')) {
+            throw new Error(`Database table 'user_preferences' doesn't exist. Please run the setup SQL script.`);
+          }
           throw new Error(`Failed to save API key: ${error.message}`);
         }
         

@@ -176,18 +176,46 @@ export const getEmployeeProfile = async (employeeId: string): Promise<EnhancedEm
     // For now, we'll simulate a network request
     await new Promise((resolve) => setTimeout(resolve, 500));
     
-    // For demo purposes, look for a JSON file with this employee's data
-    const response = await fetch(`/data/employee_profile_${employeeId}.json`);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch profile for employee ${employeeId}`);
+    try {
+      // For demo purposes, look for a JSON file with this employee's data
+      const response = await fetch(`/data/employee_profile_${employeeId}.json`);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch profile for employee ${employeeId}`);
+      }
+      
+      const profileData = await response.json();
+      
+      // Cache the profile data for later use
+      DUMMY_PROFILES[employeeId] = profileData;
+      
+      return profileData;
+    } catch (error) {
+      console.error('Error fetching employee profile JSON:', error);
+      console.log('Using mock employee data instead of API response');
+      
+      // Generate basic employee for mock data
+      const basicEmployee: Employee = {
+        id: employeeId,
+        name: `Employee ${employeeId}`,
+        email: `employee-${employeeId}@example.com`,
+        department: 'Engineering',
+        position: 'Software Developer',
+        courses: 5,
+        coursesCompleted: 2,
+        progress: 40,
+        lastActivity: new Date().toISOString().split('T')[0],
+        status: 'active',
+        ragStatus: 'amber',
+      };
+      
+      // Generate mock profile
+      const mockProfile = generateMockProfile(basicEmployee);
+      
+      // Cache the mock profile
+      DUMMY_PROFILES[employeeId] = mockProfile;
+      
+      return mockProfile;
     }
-    
-    const profileData = await response.json();
-    
-    // Cache the profile data for later use
-    DUMMY_PROFILES[employeeId] = profileData;
-    
-    return profileData;
   } catch (error) {
     console.error('Error fetching employee profile:', error);
     throw error;
