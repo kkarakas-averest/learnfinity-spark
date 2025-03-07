@@ -18,8 +18,9 @@ const queryClient = new QueryClient({
   },
 });
 
+// Remove StrictMode temporarily to prevent double initialization
 ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
+  // <React.StrictMode>
     <BrowserRouter>
       <QueryClientProvider client={queryClient}>
         <StateProvider>
@@ -30,5 +31,5 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         </StateProvider>
       </QueryClientProvider>
     </BrowserRouter>
-  </React.StrictMode>
+  // </React.StrictMode>
 );

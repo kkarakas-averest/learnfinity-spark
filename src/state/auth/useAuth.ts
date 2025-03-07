@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect } from '@/lib/react-helpers';
+import React, { useCallback, useEffect, useRef } from '@/lib/react-helpers';
 import { useAuthState, useAuthDispatch } from '../StateContext';
 import { supabase } from '@/lib/supabase';
 import { 
@@ -19,10 +19,26 @@ import { UserDetails } from '../types';
 export function useAuth() {
   const state = useAuthState();
   const dispatch = useAuthDispatch();
+  // Add initialization tracking ref
+  const isInitializing = useRef(false);
+  const hasInitialized = useRef(false);
   
   // Initialize auth state
   const initialize = useCallback(async () => {
+    // Prevent multiple simultaneous initializations
+    if (isInitializing.current) {
+      console.log("Auth: Already initializing, skipping duplicate call");
+      return;
+    }
+    
+    // Only initialize once
+    if (hasInitialized.current) {
+      console.log("Auth: Already initialized, skipping");
+      return;
+    }
+    
     try {
+      isInitializing.current = true;
       dispatch(setLoading());
       console.log("Auth: Initializing auth state");
       
@@ -60,6 +76,7 @@ export function useAuth() {
         }
       );
       
+      hasInitialized.current = true;
       return () => {
         subscription.unsubscribe();
       };
@@ -74,6 +91,8 @@ export function useAuth() {
           dispatch(setAuthSuccess(null));
         }
       }, 3000);
+    } finally {
+      isInitializing.current = false;
     }
   }, [dispatch, state.loading]);
   
@@ -218,14 +237,15 @@ export function useAuth() {
     }
   }, [dispatch]);
   
-  // Set up auth listener on mount
+  // Set up auth listener on mount - with a stable dependency array
   useEffect(() => {
     const cleanup = initialize();
     return () => {
-      cleanup.then((unsubscribe) => {
+      cleanup?.then((unsubscribe) => {
         if (unsubscribe) unsubscribe();
       });
     };
+  // Remove state.loading from dependency array to prevent re-initialization
   }, [initialize]);
   
   return {
