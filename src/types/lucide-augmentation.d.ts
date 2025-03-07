@@ -1,4 +1,3 @@
-
 // This file provides type augmentations for Lucide-React components
 import type { LucideIcon } from 'lucide-react';
 
@@ -27,6 +26,7 @@ declare module 'lucide-react' {
   export const ArrowDown: LucideIconComponent;
   export const ArrowUp: LucideIconComponent;
   export const BarChart2: LucideIconComponent;
+  export const Bell: LucideIconComponent;
   export const Book: LucideIconComponent;
   export const BrainCircuit: LucideIconComponent;
   export const Building: LucideIconComponent;
