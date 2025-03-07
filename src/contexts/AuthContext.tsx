@@ -532,7 +532,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         navigate('/admin');
         break;
       case 'hr':
-        navigate('/hr');
+        navigate('/hr-dashboard');
         break;
       case 'mentor':
         navigate('/mentor');
