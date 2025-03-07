@@ -13,6 +13,10 @@ import { getEmployeeProfile } from '@/services/employee-profile.service';
 import { EnhancedEmployeeProfile } from '@/types/employee-profile.types';
 import { RAGStatus } from '@/types/hr.types';
 
+// Components
+import SkillsInventory from '@/components/hr/profile/SkillsInventory';
+import LearningHistory from '@/components/hr/profile/LearningHistory';
+
 // This will be broken down into separate components later
 const PersonalInfoSection = ({ profile, loading }: { profile: EnhancedEmployeeProfile | null, loading: boolean }) => {
   if (loading) {
@@ -189,21 +193,33 @@ const SkillsSection = ({ profile }: { profile: EnhancedEmployeeProfile | null })
       <CardDescription>Skills and competencies assessment</CardDescription>
     </CardHeader>
     <CardContent>
-      <p>Skills inventory will be implemented here</p>
+      {profile ? (
+        <SkillsInventory skills={profile.skills} isEditable={false} />
+      ) : (
+        <p>No skills data available</p>
+      )}
     </CardContent>
   </Card>
 );
 
-const LearningHistorySection = ({ profile }: { profile: EnhancedEmployeeProfile | null }) => (
-  <Card className="w-full mb-6">
-    <CardHeader>
-      <CardTitle>Learning History</CardTitle>
-      <CardDescription>Course completions and learning activities</CardDescription>
-    </CardHeader>
-    <CardContent>
-      <p>Learning history will be implemented here</p>
-    </CardContent>
-  </Card>
+const LearningHistorySection = ({ profile, loading }: { profile: EnhancedEmployeeProfile | null, loading: boolean }) => (
+  profile ? (
+    <LearningHistory 
+      completedCourses={profile.completedCourses} 
+      learningActivities={profile.learningActivities}
+      isLoading={loading}
+    />
+  ) : (
+    <Card className="w-full mb-6">
+      <CardHeader>
+        <CardTitle>Learning History</CardTitle>
+        <CardDescription>Course completions and learning activities</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <p>No learning history data available</p>
+      </CardContent>
+    </Card>
+  )
 );
 
 const CareerDevelopmentSection = ({ profile }: { profile: EnhancedEmployeeProfile | null }) => (
@@ -347,7 +363,7 @@ const EmployeeProfilePage: React.FC = () => {
             </TabsContent>
             
             <TabsContent value="learning-history">
-              <LearningHistorySection profile={profile} />
+              <LearningHistorySection profile={profile} loading={loading} />
             </TabsContent>
             
             <TabsContent value="career-development">
