@@ -63,15 +63,23 @@ const HRDashboardMigrated: React.FC = () => {
           }
 
           // Now that the database is ready, initialize the agent system
-          await initializeAgentSystem();
-          if (agentSystemError) {
-            console.error('Failed to initialize agent system:', agentSystemError);
+          try {
+            await initializeAgentSystem();
+            if (agentSystemError) {
+              console.error('Failed to initialize agent system:', agentSystemError);
+              toastError({
+                title: "Agent System Error",
+                description: "Failed to initialize AI agents. Some advanced features may not be available."
+              });
+            } else {
+              console.log('Agent system initialized successfully');
+            }
+          } catch (initError) {
+            console.error('Exception during agent system initialization:', initError);
             toastError({
-              title: "Agent System Error",
-              description: "Failed to initialize AI agents. Some advanced features may not be available."
+              title: "Agent System Initialization Failed",
+              description: "Could not initialize the AI system. Some features will be unavailable."
             });
-          } else {
-            console.log('Agent system initialized successfully');
           }
         } else {
           console.error('Failed to initialize HR database:', result?.error);
@@ -117,7 +125,14 @@ const HRDashboardMigrated: React.FC = () => {
     return () => {
       hasInitializedRef.current = false;
     };
-  }, [isAuthenticated]); // Remove toastSuccess, toastError, initializingDB from dependencies
+  }, [
+    isAuthenticated, 
+    initializingDB, 
+    toastSuccess, 
+    toastError, 
+    initializeAgentSystem, 
+    agentSystemError
+  ]);
 
   // Redirect if not authenticated
   if (!isLoading && !isAuthenticated) {

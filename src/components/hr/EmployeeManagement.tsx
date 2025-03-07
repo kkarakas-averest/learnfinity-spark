@@ -186,17 +186,20 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ onViewDetails, 
       let processedCount = 0;
       let updatedCount = 0;
       
+      // Create a copy of the employees array to avoid direct mutations
+      let updatedEmployees = [...employees];
+      
       // Create batches of employees
       for (let i = 0; i < totalEmployees; i += batchSize) {
         const batch = employees.slice(i, i + batchSize);
         
         // Process each employee in the batch in parallel
-        await Promise.all(batch.map(async (employee) => {
+        const batchResults = await Promise.all(batch.map(async (employee) => {
           try {
             const analysisResult = await determineRAGStatus(employee);
             
             if (analysisResult && analysisResult.status) {
-              // Update the employee with the new RAG status
+              // Create updated employee object
               const updatedEmployee = {
                 ...employee,
                 ragStatus: analysisResult.status,
@@ -209,25 +212,42 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ onViewDetails, 
                 }
               };
               
-              // Update the employee in the employees array
-              employees[employees.findIndex(emp => emp.id === employee.id)] = updatedEmployee;
-              updatedCount++;
+              // Return the updated employee and success status
+              return { 
+                success: true, 
+                employee: updatedEmployee,
+                id: employee.id
+              };
             }
+            
+            return { success: false, id: employee.id };
           } catch (error) {
             console.error(`Error analyzing employee ${employee.id}:`, error);
+            return { success: false, id: employee.id };
           } finally {
             processedCount++;
           }
         }));
         
+        // Update our employees array with the successful results
+        batchResults.forEach(result => {
+          if (result.success && result.employee) {
+            updatedCount++;
+            const index = updatedEmployees.findIndex(e => e.id === result.id);
+            if (index !== -1) {
+              updatedEmployees[index] = result.employee;
+            }
+          }
+        });
+        
         // Update the state every batch to show progress
-        setEmployees([...employees]);
+        setEmployees(updatedEmployees);
         
         // Apply the filter to the updated employees
         if (statusFilter !== 'all') {
-          setFilteredEmployees(employees.filter(emp => emp.ragStatus === statusFilter));
+          setFilteredEmployees(updatedEmployees.filter(emp => emp.ragStatus === statusFilter));
         } else {
-          setFilteredEmployees([...employees]);
+          setFilteredEmployees(updatedEmployees);
         }
       }
       
