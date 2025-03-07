@@ -48,42 +48,47 @@ export class LLMService {
     if (!isFeatureEnabled('enableLLM')) {
       this.config.provider = 'mock';
       if (envConfig.debug) {
-        console.log('LLM Service: LLM feature disabled, using mock provider');
+        console.log('LLM feature disabled, using mock provider');
       }
     }
     
     // Initialize the appropriate provider
     try {
-      if (this.config.provider === 'groq' && isApiConfigured('groq')) {
-        this.provider = new GroqAPI(
-          this.config.apiKey, 
-          this.config.model, 
-          { 
-            maxRetries: this.config.retryAttempts, 
-            debug: this.config.debugMode 
+      switch (this.config.provider) {
+        case 'groq':
+          if (this.config.apiKey) {
+            this.provider = new GroqAPI(
+              this.config.apiKey, 
+              this.config.model,
+              { 
+                maxRetries: this.config.retryAttempts,
+                debug: this.config.debugMode
+              }
+            );
+            if (envConfig.debug) {
+              console.log(`Initialized Groq provider with model: ${this.config.model}`);
+            }
+          } else {
+            console.warn('Groq API key not provided, falling back to mock provider');
+            this.provider = new MockLLMProvider();
+            this.config.provider = 'mock';
           }
-        );
-        
-        if (this.config.debugMode) {
-          console.log(`LLM Service: Using Groq provider with model ${this.config.model}`);
-        }
-      } else {
-        // Fall back to mock provider if no API key or requested
-        this.provider = new MockLLMProvider(
-          this.config.model, 
-          this.config.debugMode
-        );
-        
-        if (this.config.debugMode) {
-          console.log('LLM Service: Using Mock provider (no API key or mock requested)');
-        }
+          break;
+          
+        case 'mock':
+        default:
+          this.provider = new MockLLMProvider();
+          if (envConfig.debug && this.config.provider !== 'mock') {
+            console.warn(`Provider ${this.config.provider} not supported, using mock provider`);
+          } else if (envConfig.debug) {
+            console.log('Using mock LLM provider');
+          }
+          this.config.provider = 'mock';
       }
     } catch (error) {
-      console.error('Failed to initialize LLM provider, falling back to mock:', error);
-      this.provider = new MockLLMProvider(
-        fallbackLLMConfig.model, 
-        true
-      );
+      console.error('Error initializing LLM provider, falling back to mock provider:', error);
+      this.provider = new MockLLMProvider();
+      this.config.provider = 'mock';
     }
   }
   

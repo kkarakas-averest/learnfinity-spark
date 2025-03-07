@@ -1,4 +1,6 @@
-import { Groq } from 'groq-sdk';
+// Using dynamic import for groq-sdk to handle build-time issues
+// The actual import will happen at runtime
+let Groq: any = null;
 
 /**
  * GroqAPI class for interacting with Groq's LLM models
@@ -7,11 +9,12 @@ import { Groq } from 'groq-sdk';
  * Groq's large language models, handling authentication and API calls.
  */
 export class GroqAPI {
-  private client: Groq;
+  private client: any;
   private apiKey: string;
   private model: string;
   private maxRetries: number;
   private debug: boolean;
+  private isInitialized: boolean = false;
 
   /**
    * Initialize the Groq API client
@@ -30,18 +33,38 @@ export class GroqAPI {
     this.maxRetries = options.maxRetries || 3;
     this.debug = options.debug || false;
     
-    // Initialize the Groq client
-    this.client = new Groq({
-      apiKey: this.apiKey
-    });
-    
-    if (this.debug) {
-      console.log(`GroqAPI initialized with model: ${this.model}`);
-    }
-    
     // Validate API key
     if (!this.apiKey) {
       console.warn('Groq API key not provided. LLM functionality will not work.');
+    }
+  }
+  
+  /**
+   * Lazy initialization of the Groq client
+   * This ensures the SDK is only loaded at runtime when needed
+   */
+  private async initializeClient(): Promise<boolean> {
+    if (this.isInitialized) return true;
+    
+    try {
+      // Dynamically import the Groq SDK
+      const groqModule = await import('groq-sdk');
+      Groq = groqModule.Groq;
+      
+      // Initialize the Groq client
+      this.client = new Groq({
+        apiKey: this.apiKey
+      });
+      
+      if (this.debug) {
+        console.log(`GroqAPI initialized with model: ${this.model}`);
+      }
+      
+      this.isInitialized = true;
+      return true;
+    } catch (error) {
+      console.error('Failed to initialize Groq client:', error);
+      return false;
     }
   }
   
@@ -64,6 +87,12 @@ export class GroqAPI {
   ): Promise<{ text: string, usage: { prompt_tokens: number, completion_tokens: number, total_tokens: number } }> {
     if (!this.apiKey) {
       throw new Error('Groq API key not provided. Cannot generate completions.');
+    }
+    
+    // Initialize the client if not already done
+    const initialized = await this.initializeClient();
+    if (!initialized) {
+      throw new Error('Failed to initialize Groq client. Cannot generate completions.');
     }
     
     // Set default options

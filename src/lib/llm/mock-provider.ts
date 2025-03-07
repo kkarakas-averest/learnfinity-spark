@@ -6,6 +6,8 @@
  * without making actual API calls.
  */
 
+import { LLMProvider } from './llm-service';
+
 // Token usage simulation constants
 const TOKENS_PER_CHAR = 0.25;
 const MIN_COMPLETION_TOKENS = 20;
@@ -13,7 +15,7 @@ const MIN_COMPLETION_TOKENS = 20;
 /**
  * MockLLMProvider class for testing without API calls
  */
-export class MockLLMProvider {
+export class MockLLMProvider implements LLMProvider {
   private debug: boolean;
   private model: string;
   
