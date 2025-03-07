@@ -26,6 +26,12 @@ import { Toaster } from "./components/ui/toaster";
 import { useAuth, useHRAuth } from "./state";
 import { Button } from "./components/ui/button";
 import SystemHealthCheck from "./pages/SystemHealthCheck";
+import React from "@/lib/react-helpers";
+
+// Import HR dashboard pages
+import EmployeesPage from "./pages/hr/EmployeesPage";
+import ProgramsPage from "./pages/hr/ProgramsPage";
+import ReportsPage from "./pages/hr/ReportsPage";
 
 // Simple diagnostic component for auth debugging
 const AuthDiagnostic = () => {
@@ -117,6 +123,40 @@ function App() {
             element={
               <ProtectedRouteMigrated allowedRoles={["hr", "superadmin"]} requireHRAuth={true}>
                 <HRDashboardMigrated />
+              </ProtectedRouteMigrated>
+            } 
+          />
+          
+          {/* HR Dashboard Sub-pages */}
+          <Route 
+            path="/hr-dashboard/employees" 
+            element={
+              <ProtectedRouteMigrated allowedRoles={["hr", "superadmin"]} requireHRAuth={true}>
+                <React.Suspense fallback={<div className="flex items-center justify-center h-screen"><p>Loading...</p></div>}>
+                  <EmployeesPage />
+                </React.Suspense>
+              </ProtectedRouteMigrated>
+            } 
+          />
+          
+          <Route 
+            path="/hr-dashboard/programs" 
+            element={
+              <ProtectedRouteMigrated allowedRoles={["hr", "superadmin"]} requireHRAuth={true}>
+                <React.Suspense fallback={<div className="flex items-center justify-center h-screen"><p>Loading...</p></div>}>
+                  <ProgramsPage />
+                </React.Suspense>
+              </ProtectedRouteMigrated>
+            } 
+          />
+          
+          <Route 
+            path="/hr-dashboard/reports" 
+            element={
+              <ProtectedRouteMigrated allowedRoles={["hr", "superadmin"]} requireHRAuth={true}>
+                <React.Suspense fallback={<div className="flex items-center justify-center h-screen"><p>Loading...</p></div>}>
+                  <ReportsPage />
+                </React.Suspense>
               </ProtectedRouteMigrated>
             } 
           />
