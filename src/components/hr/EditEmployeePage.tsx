@@ -76,13 +76,11 @@ const EditEmployeePage = () => {
           continue;
         }
         
-        // Create explicit return value with proper typing
-        const successResult: RetryOperationResult<Employee> = {
+        // Success case - properly type the return value
+        return { 
           success: true,
-          // @ts-expect-error Property is defined in RetryOperationResult but ESLint is not recognizing it
-          data: response.data
+          data: response.data as Employee // Explicitly cast the data to ensure type safety
         };
-        return successResult;
         
       } catch (error) {
         // Handle unexpected errors
@@ -167,7 +165,7 @@ const EditEmployeePage = () => {
     try {
       const result = await updateEmployeeWithRetry(id, formData);
       
-      if (result.success) {
+      if (result.success && result.data) {
         toast({
           title: "Employee updated successfully",
           variant: "default"

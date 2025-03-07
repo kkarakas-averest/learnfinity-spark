@@ -1,3 +1,4 @@
+
 import React from "@/lib/react-helpers";
 import { Link, useNavigate } from "react-router-dom";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -32,11 +33,36 @@ const loginSchema = z.object({
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
-  const { signIn } = useAuth();
+  const { signIn, userDetails } = useAuth();
   const navigate = useNavigate();
   
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  
+  // Redirect if already logged in
+  React.useEffect(() => {
+    if (userDetails) {
+      redirectBasedOnRole(userDetails.role);
+    }
+  }, [userDetails]);
+  
+  const redirectBasedOnRole = (role: string) => {
+    switch (role) {
+      case 'superadmin':
+        navigate('/admin');
+        break;
+      case 'hr':
+        navigate('/hr-dashboard');
+        break;
+      case 'mentor':
+        navigate('/mentor');
+        break;
+      case 'learner':
+      default:
+        navigate('/dashboard');
+        break;
+    }
+  };
   
   const form = useForm({
     resolver: zodResolver(loginSchema),
@@ -68,7 +94,7 @@ export default function LoginPage() {
         description: "You've successfully logged in.",
       });
       
-      navigate("/dashboard");
+      // Navigation is handled by the useEffect above
     } catch (error: Error | unknown) {
       console.error("Login error:", error);
       const errorMessage = error instanceof Error 
@@ -100,7 +126,7 @@ export default function LoginPage() {
         description: "You've successfully logged in as admin.",
       });
       
-      navigate("/admin");
+      // Navigation is handled by the useEffect above
     } catch (error: Error | unknown) {
       console.error("Admin login error:", error);
       const errorMessage = error instanceof Error 
