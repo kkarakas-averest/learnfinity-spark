@@ -97,10 +97,10 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ onViewDetails, 
   const loadMockData = async () => {
     console.log("Loading mock employee data...");
     
-    // Mock employee data
+    // Mock employee data with consistent IDs to prevent re-renders
     const mockEmployees: Employee[] = [
       {
-        id: '1',
+        id: 'mock-1',
         name: 'John Doe',
         email: 'john.doe@example.com',
         department: 'Engineering',
@@ -119,7 +119,7 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ onViewDetails, 
         }
       },
       {
-        id: '2',
+        id: 'mock-2',
         name: 'Jane Smith',
         email: 'jane.smith@example.com',
         department: 'Marketing',
@@ -138,7 +138,7 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ onViewDetails, 
         }
       },
       {
-        id: '3',
+        id: 'mock-3',
         name: 'Robert Brown',
         email: 'robert.brown@example.com',
         department: 'Sales',
@@ -158,14 +158,21 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ onViewDetails, 
       }
     ];
     
+    // For consistency between renders, use the same data
     setEmployees(mockEmployees);
-    setFilteredEmployees(mockEmployees);
+    setFilteredEmployees(
+      statusFilter === 'all' 
+        ? mockEmployees 
+        : mockEmployees.filter(emp => emp.ragStatus === statusFilter)
+    );
     
     toast({
       title: "Using Mock Data",
-      description: "Showing mock employee data because the API is unavailable.",
+      description: "Showing sample employee data because the database is unavailable.",
       variant: "default",
     });
+    
+    return mockEmployees;
   };
 
   React.useEffect(() => {

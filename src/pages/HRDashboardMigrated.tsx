@@ -12,14 +12,19 @@ const HRDashboardMigrated: React.FC = () => {
   const navigate = useNavigate();
   // Add state for database initialization
   const [initializingDB, setInitializingDB] = React.useState(false);
+  // Add a ref to track if initialization has been completed
+  const hasInitializedRef = React.useRef(false);
   
   console.log("HRDashboard - Current state:", { hrUser, isAuthenticated, isLoading });
 
   // Add effect for database initialization
   React.useEffect(() => {
+    // Skip initialization if already completed or in progress
+    if (!isAuthenticated || initializingDB || hasInitializedRef.current) {
+      return;
+    }
+    
     const initializeHRDatabase = async () => {
-      if (!isAuthenticated || initializingDB) return;
-      
       try {
         setInitializingDB(true);
         console.log('Initializing HR database...');
@@ -58,19 +63,30 @@ const HRDashboardMigrated: React.FC = () => {
             });
           }
         }
+        
+        // Mark initialization as complete regardless of result
+        hasInitializedRef.current = true;
       } catch (error) {
         console.error('Error initializing HR database:', error);
         toastError({
           title: "Database Connection Error",
           description: "Could not connect to the database. Check your network connection or contact support."
         });
+        
+        // Still mark as initialized to prevent infinite loops
+        hasInitializedRef.current = true;
       } finally {
         setInitializingDB(false);
       }
     };
     
     initializeHRDatabase();
-  }, [isAuthenticated, toastError, toastSuccess, initializingDB]);
+    
+    // Cleanup function to reset initialization state if component unmounts
+    return () => {
+      hasInitializedRef.current = false;
+    };
+  }, [isAuthenticated]); // Remove toastSuccess, toastError, initializingDB from dependencies
 
   // Redirect if not authenticated
   if (!isLoading && !isAuthenticated) {

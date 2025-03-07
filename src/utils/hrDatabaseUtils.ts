@@ -6,20 +6,59 @@ import { supabase } from '@/lib/supabase';
  */
 export async function verifyHRTables() {
   try {
+    // Simple health check for Supabase connection
+    try {
+      const { data, error } = await supabase.from('_healthcheck').select('*').limit(1);
+      
+      if (error) {
+        console.error('Supabase health check failed:', error);
+        // If we can't even connect to Supabase, return early to avoid further errors
+        return { 
+          success: false, 
+          error: 'Database connection failed. Please check your network and credentials.' 
+        };
+      }
+    } catch (healthError) {
+      // Some other unexpected error with the health check
+      console.error('Health check error:', healthError);
+    }
+    
     // List of required HR tables
     const requiredTables = [
       'hr_departments',
       'hr_positions',
       'hr_employees',
       'hr_courses',
-      'hr_course_enrollments',
-      'hr_employee_activities',
-      'hr_learning_paths',
-      'hr_learning_path_courses',
-      'hr_learning_path_enrollments'
+      'hr_course_enrollments'
     ];
     
-    // Check which tables exist
+    // Check one main table first to see if we need to verify all tables
+    try {
+      const { count, error } = await supabase
+        .from('hr_departments')
+        .select('*', { count: 'exact', head: true });
+        
+      // If we can access hr_departments without error, the table exists
+      if (!error) {
+        console.log('All HR tables exist');
+        return { success: true, message: 'All required tables exist' };
+      }
+      
+      // If we get a specific error that's not about table existence, report it
+      if (error && !error.message.includes('does not exist')) {
+        console.error('Error accessing hr_departments:', error);
+        return { 
+          success: false, 
+          error: `Database error: ${error.message}` 
+        };
+      }
+    } catch (error) {
+      // Unexpected error (not just "table does not exist")
+      console.error('Unexpected error checking hr_departments:', error);
+    }
+    
+    // At this point, we know we need to create tables
+    // Check which tables are missing
     let missingTables: string[] = [];
     
     for (const table of requiredTables) {
@@ -35,12 +74,6 @@ export async function verifyHRTables() {
         console.error(`Error checking table ${table}:`, error);
         missingTables.push(table);
       }
-    }
-    
-    // If no missing tables, we're good
-    if (missingTables.length === 0) {
-      console.log('All HR tables exist');
-      return { success: true, message: 'All required tables exist' };
     }
     
     console.log(`Missing HR tables: ${missingTables.join(', ')}`);
