@@ -19,14 +19,11 @@ import ExampleErrorHandling from "./components/ExampleErrorHandling";
 import FunctionalErrorBoundary from "./components/FunctionalErrorBoundary";
 import { UserRole } from "./lib/database.types";
 import { Toaster } from "./components/ui/toaster";
-import NavbarMigrated from "./components/NavbarMigrated";
 
 function App() {
   return (
     <FunctionalErrorBoundary>
-      <NavbarMigrated />
-      
-      <main className="pt-16">
+      <main>
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/login" element={<LoginPage />} />

@@ -61,26 +61,31 @@ const UserAvatar = ({ name, email, role }: { name?: string; email?: string; role
 };
 
 // User menu component
-const UserMenu = ({ userDetails, signOut }: { userDetails: UserType; signOut: () => Promise<void> }) => {
-  if (!userDetails) return null;
+const UserMenu = ({ userDetails, signOut }: { userDetails: UserType | null; signOut: () => Promise<void> }) => {
+  // Don't return null anymore, use fallback data instead
+  const userData = userDetails || { 
+    name: "User", 
+    email: "", 
+    role: "learner" as const 
+  };
   
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-          <UserAvatar name={userDetails.name} email={userDetails.email} role={userDetails.role} />
+          <UserAvatar name={userData.name} email={userData.email} role={userData.role} />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56" align="end" forceMount>
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
-            <p className="text-sm font-medium leading-none">{userDetails?.name}</p>
+            <p className="text-sm font-medium leading-none">{userData.name}</p>
             <p className="text-xs leading-none text-muted-foreground">
-              {userDetails?.email}
+              {userData.email}
             </p>
-            {userDetails?.role && (
+            {userData.role && (
               <Badge className="mt-1 w-fit">
-                {userDetails.role}
+                {userData.role}
               </Badge>
             )}
           </div>
