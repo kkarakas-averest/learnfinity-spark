@@ -1,4 +1,3 @@
-
 import type { Config } from "tailwindcss";
 import animatePlugin from "tailwindcss-animate";
 
@@ -100,6 +99,10 @@ export default {
           "0%, 100%": { opacity: "1" },
           "50%": { opacity: "0.5" },
         },
+        "status-pulse": {
+          "0%, 100%": { opacity: "1", transform: "scale(1)" },
+          "50%": { opacity: "0.8", transform: "scale(1.05)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -111,6 +114,7 @@ export default {
         "scale-in": "scale-in 0.5s ease-out",
         "scale-out": "scale-out 0.5s ease-out",
         pulse: "pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
+        "status-change": "status-pulse 1s ease-in-out",
       },
     },
   },
