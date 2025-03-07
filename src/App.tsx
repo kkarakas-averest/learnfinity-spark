@@ -5,6 +5,7 @@ import LoginPageMigrated from "./pages/LoginPageMigrated";
 import RegisterPage from "./pages/RegisterPage";
 import RegisterPageMigrated from "./pages/RegisterPageMigrated";
 import Dashboard from "./pages/Dashboard";
+import LearnerDashboard from "./pages/LearnerDashboard";
 import NotFound from "./pages/NotFound";
 import ProfilePage from "./pages/ProfilePage";
 import ProfileSettings from "./pages/ProfileSettings";
@@ -77,7 +78,7 @@ function App() {
             path="/dashboard" 
             element={
               <ProtectedRouteMigrated allowedRoles={["learner", "mentor", "hr", "superadmin"]}>
-                <Dashboard />
+                <LearnerDashboard />
               </ProtectedRouteMigrated>
             } 
           />
