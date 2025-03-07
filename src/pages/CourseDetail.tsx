@@ -1,7 +1,7 @@
-import React from "@/lib/react-helpers";
-import { useParams } from "react-router-dom";
+import React from '@/lib/react-helpers';
+import { useParams } from 'react-router-dom';
 import { Clock, BarChart2, Users, FileText } from "lucide-react";
-import Navbar from "@/components/Navbar";
+import NavbarMigrated from "@/components/NavbarMigrated";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -46,7 +46,7 @@ const CourseDetail = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-secondary/20">
-      <Navbar />
+      <NavbarMigrated />
 
       <main className="flex-1 pt-24 pb-16">
         <div className="container px-4 md:px-6">

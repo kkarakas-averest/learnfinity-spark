@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 import { ArrowRight, Bookmark, Layers, Zap } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import Navbar from "@/components/Navbar";
+import NavbarMigrated from "@/components/NavbarMigrated";
 import Hero from "@/components/Hero";
 import { type ClassValue } from "clsx";
 
@@ -78,7 +78,7 @@ const Index = () => {
     console.log("[Index] Rendering main content");
     return (
       <div className="min-h-screen flex flex-col">
-        <Navbar />
+        <NavbarMigrated />
         <main className="flex-1">
           <Hero />
 
