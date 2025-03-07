@@ -134,32 +134,24 @@ export const hrServices = {
    */
   async initializeHRDatabase() {
     try {
-      // First, ensure tables exist
-      const tablesResult = await this.createHRTablesIfNotExist();
-      if (!tablesResult.success) {
-        throw new Error(`Failed to create tables: ${tablesResult.error}`);
+      console.log('Importing verifyHRTables function dynamically...');
+      
+      // Import the utility function dynamically to avoid circular dependencies
+      const { verifyHRTables } = await import('../../utils/hrDatabaseUtils');
+      
+      console.log('Verifying HR tables...');
+      const result = await verifyHRTables();
+      
+      if (!result.success) {
+        console.error('Failed to initialize HR database:', result.error);
+        return { success: false, error: result.error };
       }
       
-      // Check if we need to seed data
-      const { data: depts, error: deptError } = await supabase
-        .from('hr_departments')
-        .select('id')
-        .limit(1);
-        
-      if (deptError) {
-        throw new Error(`Failed to check departments: ${deptError.message}`);
-      }
-      
-      // If no departments exist, seed the database
-      if (depts.length === 0) {
-        console.log('No departments found. Seeding HR database...');
-        await seedHRDatabase(supabase);
-      }
-      
-      return { success: true };
+      console.log('HR database initialized successfully:', result.message);
+      return { success: true, message: result.message };
     } catch (error) {
       console.error('Error initializing HR database:', error);
-      return { success: false, error: error.message };
+      return { success: false, error: error.message || 'Unknown error' };
     }
   },
   

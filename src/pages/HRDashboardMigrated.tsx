@@ -3,13 +3,74 @@ import { Navigate, useNavigate } from "react-router-dom";
 import { useHRAuth, useUI } from "@/state";
 import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
+// Import the services for database initialization
+import { hrServices } from '@/lib/services/hrServices';
 
 const HRDashboardMigrated: React.FC = () => {
   const { hrUser, isAuthenticated, isLoading, logout } = useHRAuth();
-  const { toastSuccess } = useUI();
+  const { toastSuccess, toastError } = useUI();
   const navigate = useNavigate();
+  // Add state for database initialization
+  const [initializingDB, setInitializingDB] = React.useState(false);
   
   console.log("HRDashboard - Current state:", { hrUser, isAuthenticated, isLoading });
+
+  // Add effect for database initialization
+  React.useEffect(() => {
+    const initializeHRDatabase = async () => {
+      if (!isAuthenticated || initializingDB) return;
+      
+      try {
+        setInitializingDB(true);
+        console.log('Initializing HR database...');
+        
+        // Initialize the HR database
+        const result = await hrServices.initializeHRDatabase();
+        
+        if (result && result.success) {
+          console.log('HR database initialized successfully:', result.message);
+          
+          // Show success message only if tables were created or seeded
+          if (result.message && !result.message.includes('All required tables exist')) {
+            toastSuccess({
+              title: "Database Ready",
+              description: "HR database initialized successfully with sample data."
+            });
+          }
+        } else {
+          console.error('Failed to initialize HR database:', result?.error);
+          
+          // Different error messaging based on error type
+          if (result?.error?.includes('permission denied')) {
+            toastError({
+              title: "Permission Denied",
+              description: "Your account doesn't have permission to access the HR database. Please contact your administrator."
+            });
+          } else if (result?.error?.includes('does not exist')) {
+            toastError({
+              title: "Database Setup Issue",
+              description: "Required database tables could not be created. Using mock data instead."
+            });
+          } else {
+            toastError({
+              title: "Database Error",
+              description: "Failed to initialize HR database. Employee data may be unavailable."
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Error initializing HR database:', error);
+        toastError({
+          title: "Database Connection Error",
+          description: "Could not connect to the database. Check your network connection or contact support."
+        });
+      } finally {
+        setInitializingDB(false);
+      }
+    };
+    
+    initializeHRDatabase();
+  }, [isAuthenticated, toastError, toastSuccess, initializingDB]);
 
   // Redirect if not authenticated
   if (!isLoading && !isAuthenticated) {
@@ -18,11 +79,14 @@ const HRDashboardMigrated: React.FC = () => {
   }
 
   // Show loading state
-  if (isLoading) {
-    console.log("HRDashboard: Auth is loading, showing spinner");
+  if (isLoading || initializingDB) {
+    console.log("HRDashboard: Auth is loading or initializing DB, showing spinner");
     return (
       <div className="flex items-center justify-center h-screen">
         <LoadingSpinner size="xl" />
+        <span className="ml-2 text-gray-500">
+          {initializingDB ? "Initializing database..." : "Loading..."}
+        </span>
       </div>
     );
   }
