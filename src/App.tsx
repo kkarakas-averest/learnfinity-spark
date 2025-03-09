@@ -38,6 +38,14 @@ import EmployeeProfilePage from "./pages/hr/EmployeeProfilePage";
 // Import learner components
 import CourseView from "./components/learner/CourseView";
 
+// Import Course Builder components
+import CourseTemplates from "./components/admin/course-builder/CourseTemplates";
+import ModuleEditor from "./components/admin/course-builder/ModuleEditor";
+import CourseBuilderPage from "./pages/hr/CourseBuilderPage";
+
+// Import HR dashboard root layout
+import HRDashboardRoot from "./pages/hr/HRDashboardRoot";
+
 // Simple diagnostic component for auth debugging
 const AuthDiagnostic = () => {
   const { user, userDetails, isLoading, error } = useAuth();
@@ -113,80 +121,91 @@ function App() {
             } 
           />
           
-          {/* Unified HR Dashboard routes */}
-          <Route 
-            path="/hr-dashboard/*" 
+          {/* HR Dashboard routes */}
+          <Route
+            path="/hr-dashboard"
             element={
               <ProtectedRouteMigrated allowedRoles={["hr", "superadmin"]} requireHRAuth={true}>
-                <HRDashboardMigrated />
+                <HRDashboardRoot />
               </ProtectedRouteMigrated>
-            } 
+            }
+          />
+          <Route
+            path="/hr-dashboard/employees"
+            element={
+              <ProtectedRouteMigrated allowedRoles={["hr", "superadmin"]} requireHRAuth={true}>
+                <HRDashboardRoot />
+              </ProtectedRouteMigrated>
+            }
+          />
+          <Route
+            path="/hr-dashboard/programs"
+            element={
+              <ProtectedRouteMigrated allowedRoles={["hr", "superadmin"]} requireHRAuth={true}>
+                <HRDashboardRoot />
+              </ProtectedRouteMigrated>
+            }
+          />
+          <Route
+            path="/hr-dashboard/reports"
+            element={
+              <ProtectedRouteMigrated allowedRoles={["hr", "superadmin"]} requireHRAuth={true}>
+                <HRDashboardRoot />
+              </ProtectedRouteMigrated>
+            }
+          />
+          <Route
+            path="/hr-dashboard/settings"
+            element={
+              <ProtectedRouteMigrated allowedRoles={["hr", "superadmin"]} requireHRAuth={true}>
+                <HRDashboardRoot />
+              </ProtectedRouteMigrated>
+            }
+          />
+          <Route
+            path="/hr-dashboard/employees/:employeeId/profile"
+            element={
+              <ProtectedRouteMigrated allowedRoles={["hr", "superadmin"]} requireHRAuth={true}>
+                <HRDashboardRoot />
+              </ProtectedRouteMigrated>
+            }
+          />
+          <Route
+            path="/hr-dashboard/course-builder"
+            element={
+              <ProtectedRouteMigrated allowedRoles={["hr", "superadmin"]} requireHRAuth={true}>
+                <HRDashboardRoot />
+              </ProtectedRouteMigrated>
+            }
+          />
+          <Route
+            path="/hr-dashboard/course-builder/templates"
+            element={
+              <ProtectedRouteMigrated allowedRoles={["hr", "superadmin"]} requireHRAuth={true}>
+                <HRDashboardRoot />
+              </ProtectedRouteMigrated>
+            }
+          />
+          <Route
+            path="/hr-dashboard/course-builder/modules"
+            element={
+              <ProtectedRouteMigrated allowedRoles={["hr", "superadmin"]} requireHRAuth={true}>
+                <HRDashboardRoot />
+              </ProtectedRouteMigrated>
+            }
+          />
+          <Route
+            path="/hr-dashboard/course-builder/modules/:moduleId"
+            element={
+              <ProtectedRouteMigrated allowedRoles={["hr", "superadmin"]} requireHRAuth={true}>
+                <HRDashboardRoot />
+              </ProtectedRouteMigrated>
+            }
           />
           
-          <Route 
-            path="/hr/dashboard/*" 
-            element={
-              <ProtectedRouteMigrated allowedRoles={["hr", "superadmin"]} requireHRAuth={true}>
-                <HRDashboardMigrated />
-              </ProtectedRouteMigrated>
-            } 
-          />
-          
-          {/* HR Dashboard Sub-pages */}
-          <Route 
-            path="/hr-dashboard/employees" 
-            element={
-              <ProtectedRouteMigrated allowedRoles={["hr", "superadmin"]} requireHRAuth={true}>
-                <React.Suspense fallback={<div className="flex items-center justify-center h-screen"><p>Loading...</p></div>}>
-                  <EmployeesPage />
-                </React.Suspense>
-              </ProtectedRouteMigrated>
-            } 
-          />
-          
-          <Route 
-            path="/hr-dashboard/programs" 
-            element={
-              <ProtectedRouteMigrated allowedRoles={["hr", "superadmin"]} requireHRAuth={true}>
-                <React.Suspense fallback={<div className="flex items-center justify-center h-screen"><p>Loading...</p></div>}>
-                  <ProgramsPage />
-                </React.Suspense>
-              </ProtectedRouteMigrated>
-            } 
-          />
-          
-          <Route 
-            path="/hr-dashboard/reports" 
-            element={
-              <ProtectedRouteMigrated allowedRoles={["hr", "superadmin"]} requireHRAuth={true}>
-                <React.Suspense fallback={<div className="flex items-center justify-center h-screen"><p>Loading...</p></div>}>
-                  <ReportsPage />
-                </React.Suspense>
-              </ProtectedRouteMigrated>
-            } 
-          />
-          
-          <Route 
-            path="/hr-dashboard/settings" 
-            element={
-              <ProtectedRouteMigrated allowedRoles={["hr", "superadmin"]} requireHRAuth={true}>
-                <React.Suspense fallback={<div className="flex items-center justify-center h-screen"><p>Loading...</p></div>}>
-                  <SettingsPage />
-                </React.Suspense>
-              </ProtectedRouteMigrated>
-            } 
-          />
-          
-          <Route 
-            path="/hr-dashboard/employees/:employeeId/profile" 
-            element={
-              <ProtectedRouteMigrated allowedRoles={["hr", "superadmin"]} requireHRAuth={true}>
-                <React.Suspense fallback={<div className="flex items-center justify-center h-screen"><p>Loading...</p></div>}>
-                  <EmployeeProfilePage />
-                </React.Suspense>
-              </ProtectedRouteMigrated>
-            } 
-          />
+          {/* Legacy HR routes - redirect to new routes */}
+          <Route path="/hr-dashboard-legacy" element={<Navigate to="/hr-dashboard" replace />} />
+          <Route path="/hr/dashboard" element={<Navigate to="/hr-dashboard" replace />} />
           
           <Route 
             path="/mentor/*" 

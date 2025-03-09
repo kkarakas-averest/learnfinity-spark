@@ -1,5 +1,5 @@
 import React from "@/lib/react-helpers";
-import { Navigate, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useHRAuth, useUI } from "@/state";
 import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
@@ -7,11 +7,13 @@ import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { hrServices } from '@/lib/services/hrServices';
 // Import the agent system hook
 import { useAgentSystem } from '@/hooks/useAgentSystem';
-// Import the header component
-import HRDashboardHeader from '@/components/hr/HRDashboardHeader';
 
+/**
+ * HR Dashboard Index Page
+ * Shows overview cards and stats for quick navigation
+ */
 const HRDashboardMigrated: React.FC = () => {
-  const { hrUser, isAuthenticated, isLoading, logout } = useHRAuth();
+  const { isAuthenticated, isLoading } = useHRAuth();
   const { toastSuccess, toastError } = useUI();
   const navigate = useNavigate();
   // Add state for database initialization
@@ -28,14 +30,6 @@ const HRDashboardMigrated: React.FC = () => {
   } = useAgentSystem({ 
     autoInitialize: false, // We'll initialize manually after DB is ready
     debug: process.env.NODE_ENV === 'development'
-  });
-
-  console.log("HRDashboard - Current state:", { 
-    hrUser, 
-    isAuthenticated, 
-    isLoading,
-    isAgentSystemInitialized,
-    isAgentSystemInitializing 
   });
 
   // Add effect for database initialization
@@ -136,12 +130,6 @@ const HRDashboardMigrated: React.FC = () => {
     agentSystemError
   ]);
 
-  // Redirect if not authenticated
-  if (!isLoading && !isAuthenticated) {
-    console.log("HRDashboard: Not authenticated, redirecting to HR login");
-    return <Navigate to="/hr-login" />;
-  }
-
   // Show loading state
   if (isLoading || initializingDB || isAgentSystemInitializing) {
     const loadingMessage = 
@@ -149,20 +137,13 @@ const HRDashboardMigrated: React.FC = () => {
       initializingDB ? "Initializing database..." : 
       "Loading...";
       
-    console.log(`HRDashboard: ${loadingMessage}`);
     return (
-      <div className="flex items-center justify-center h-screen">
+      <div className="flex items-center justify-center h-full">
         <LoadingSpinner size="xl" />
         <span className="ml-2 text-gray-500">{loadingMessage}</span>
       </div>
     );
   }
-
-  // Handle logout
-  const handleLogout = () => {
-    logout();
-    toastSuccess("Logged out", "You have been successfully logged out of HR portal");
-  };
 
   // Navigation handlers
   const navigateToEmployees = () => {
@@ -177,45 +158,49 @@ const HRDashboardMigrated: React.FC = () => {
     navigate("/hr-dashboard/reports");
   };
 
-  console.log("HRDashboard: Rendering for user:", hrUser?.username);
+  const navigateToCourseBuilder = () => {
+    navigate("/hr-dashboard/course-builder");
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <HRDashboardHeader 
-        username={hrUser?.username || "HR Admin"} 
-        onLogout={handleLogout} 
-      />
+    <div className="container mx-auto px-4">
+      <h1 className="text-2xl font-bold tracking-tight mb-6">Dashboard Overview</h1>
       
-      <div className="container pt-8 pb-12 mx-auto px-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-medium mb-2">Employee Management</h3>
-            <p className="text-gray-600 mb-4">Manage employee records, onboarding, and roles.</p>
-            <Button variant="outline" onClick={navigateToEmployees}>View Employees</Button>
-          </div>
-          
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-medium mb-2">Learning Programs</h3>
-            <p className="text-gray-600 mb-4">Assign courses and track employee progress.</p>
-            <Button variant="outline" onClick={navigateToPrograms}>Manage Programs</Button>
-          </div>
-          
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-medium mb-2">Performance Analytics</h3>
-            <p className="text-gray-600 mb-4">View completion rates and assessment scores.</p>
-            <Button variant="outline" onClick={navigateToReports}>View Reports</Button>
-          </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+        <div className="bg-white rounded-lg shadow p-6">
+          <h3 className="text-lg font-medium mb-2">Employee Management</h3>
+          <p className="text-gray-600 mb-4">Manage employee records, onboarding, and roles.</p>
+          <Button variant="outline" onClick={navigateToEmployees}>View Employees</Button>
         </div>
         
-        {!isAgentSystemInitialized && agentSystemError && (
-          <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-md p-4 mt-4">
-            <h3 className="font-medium">AI Assistant Limited</h3>
-            <p className="text-sm">
-              The AI agent system could not be initialized. Basic functionality will work, 
-              but advanced features like automated RAG status analysis may be limited.
-            </p>
-          </div>
-        )}
+        <div className="bg-white rounded-lg shadow p-6">
+          <h3 className="text-lg font-medium mb-2">Learning Programs</h3>
+          <p className="text-gray-600 mb-4">Assign courses and track employee progress.</p>
+          <Button variant="outline" onClick={navigateToPrograms}>Manage Programs</Button>
+        </div>
+        
+        <div className="bg-white rounded-lg shadow p-6">
+          <h3 className="text-lg font-medium mb-2">Performance Analytics</h3>
+          <p className="text-gray-600 mb-4">View completion rates and assessment scores.</p>
+          <Button variant="outline" onClick={navigateToReports}>View Reports</Button>
+        </div>
+        
+        <div className="bg-white rounded-lg shadow p-6">
+          <h3 className="text-lg font-medium mb-2">Course Builder</h3>
+          <p className="text-gray-600 mb-4">Create and manage learning content for your organization.</p>
+          <Button variant="outline" onClick={navigateToCourseBuilder}>Open Course Builder</Button>
+        </div>
       </div>
+      
+      {!isAgentSystemInitialized && agentSystemError && (
+        <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-md p-4 mt-4">
+          <h3 className="font-medium">AI Assistant Limited</h3>
+          <p className="text-sm">
+            The AI agent system could not be initialized. Basic functionality will work, 
+            but advanced features like automated RAG status analysis may be limited.
+          </p>
+        </div>
+      )}
     </div>
   );
 };

@@ -3,8 +3,6 @@
  * Types for managing organizational hierarchy, departments, and teams
  */
 
-import { Employee } from './employee.types';
-
 /**
  * Role within a team
  */

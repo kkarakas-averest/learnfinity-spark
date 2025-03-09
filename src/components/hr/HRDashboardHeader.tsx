@@ -5,7 +5,7 @@ import NotificationPanel from '../learner/NotificationPanel';
 import { Button } from '@/components/ui/button';
 import { useHRAuth } from '@/state';
 import { useNavigate } from 'react-router-dom';
-import { Settings, User } from 'lucide-react';
+import { Settings, User, ChevronDown, FileText, Layers, BookOpen } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -40,7 +40,19 @@ const HRDashboardHeader: React.FC<HRDashboardHeaderProps> = ({
   const navigateToSettings = () => {
     navigate('/hr-dashboard/settings');
   };
-  
+
+  const navigateToTemplates = () => {
+    navigate('/hr-dashboard/course-builder/templates');
+  };
+
+  const navigateToModules = () => {
+    navigate('/hr-dashboard/course-builder/modules');
+  };
+
+  const navigateToMainCourseBuilder = () => {
+    navigate('/hr-dashboard/course-builder');
+  };
+
   return (
     <header className="bg-white border-b shadow-sm py-2">
       <div className="container mx-auto px-4 flex justify-between items-center">
@@ -51,6 +63,29 @@ const HRDashboardHeader: React.FC<HRDashboardHeaderProps> = ({
             <a href="/hr-dashboard/employees" className="text-sm font-medium hover:text-primary">Employees</a>
             <a href="/hr-dashboard/programs" className="text-sm font-medium hover:text-primary">Programs</a>
             <a href="/hr-dashboard/reports" className="text-sm font-medium hover:text-primary">Reports</a>
+            
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="text-sm font-medium hover:text-primary flex items-center">
+                  Course Builder
+                  <ChevronDown className="h-4 w-4 ml-1" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem onClick={navigateToMainCourseBuilder}>
+                  <BookOpen className="mr-2 h-4 w-4" />
+                  <span>Overview</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={navigateToTemplates}>
+                  <FileText className="mr-2 h-4 w-4" />
+                  <span>Course Templates</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={navigateToModules}>
+                  <Layers className="mr-2 h-4 w-4" />
+                  <span>Module Editor</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </nav>
         </div>
         
