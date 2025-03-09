@@ -1,7 +1,7 @@
-# Implementation Plan: Employee Profile Page
+# Implementation Plan: Employee Profile Page & Data Structure Foundation
 
 ## Overview
-This document outlines the implementation plan for the Employee Profile Page feature in the LearnFinity HR Dashboard. This feature will provide comprehensive information about employees, including personal details, learning preferences, skills, and history, serving as a data source for LLM agents to personalize learning content.
+This document outlines the implementation plan for the Employee Profile Page and foundational data structures in the LearnFinity HR Dashboard. These features will provide comprehensive information about employees, including personal details, learning preferences, skills, and history, serving as a data source for LLM agents to personalize learning content, while also establishing the core data models needed for course creation and management.
 
 ## Goals
 - Create a comprehensive employee profile page for HR administrators
@@ -9,6 +9,7 @@ This document outlines the implementation plan for the Employee Profile Page fea
 - Build UI components for viewing and editing employee profiles
 - Develop data collection strategy for learning preferences and styles
 - Integrate with the LLM service for personalized learning content
+- Establish foundational data structures for courses, assessments, and agent interactions
 
 ## Component Structure
 
@@ -120,6 +121,84 @@ Add new routes in `App.tsx`:
 - Provide keyboard navigation for all interactive elements
 - Use ARIA attributes appropriately for complex UI components
 - Ensure color contrast meets WCAG standards
+
+## Core Data Structure Implementation Plan
+
+### Phase 1: Foundation Data Models (2 weeks)
+
+#### Week 1: Learner & Course Content Schema
+- **Enhanced Employee/Learner Schema**:
+  - Create `src/types/learner.types.ts` with comprehensive interfaces
+  - Develop database schema in `src/db/learner-history-schema.sql`
+  
+- **Course Content Data Models**:
+  - Define course structure in `src/types/course.types.ts`
+  - Create relational schema in `src/db/course-content-schema.sql`
+  
+- **Assessment Framework**:
+  - Build assessment types in `src/types/assessment.types.ts`
+  - Develop assessment database schema in `src/db/assessment-schema.sql`
+
+#### Week 2: HR & Agent Data Models
+- **Enhanced Intervention Models**:
+  - Extend intervention types in `src/types/intervention.types.ts`
+  - Enhance database schema in `src/db/intervention-schema.sql`
+  
+- **Department & Team Structures**:
+  - Create organizational models in `src/types/organization.types.ts`
+  - Implement hierarchy schema in `src/db/organization-schema.sql`
+  
+- **Agent State & Communication**:
+  - Define agent persistence in `src/types/agent-state.types.ts`
+  - Create communication protocol in `src/types/agent-communication.types.ts`
+
+### Phase 2: Service Layer Development (2 weeks)
+
+#### Week 3-4: Core Services
+- **Learner Profile Service**: `src/services/learner-profile.service.ts`
+- **Course Content Service**: `src/services/course-content.service.ts`
+- **Assessment Service**: `src/services/assessment.service.ts`
+- **Enhanced Intervention Service**: Extend `src/services/intervention.service.ts`
+- **Department Metrics Service**: `src/services/organization-metrics.service.ts`
+- **Agent State Management Service**: `src/services/agent-state.service.ts`
+
+### Phase 3: Course Creation System (2 weeks)
+
+#### Week 5-6: Course Creator Components
+- **Course Template System**: `src/components/admin/CourseTemplates.tsx`
+- **Module Editor**: `src/components/admin/ModuleEditor.tsx`
+- **Section Management**: `src/components/admin/SectionManager.tsx`
+- **Assessment Builder**: `src/components/admin/AssessmentBuilder.tsx`
+- **Learning Path Designer**: `src/components/admin/LearningPathDesigner.tsx`
+- **Course Publisher**: `src/components/admin/CoursePublisher.tsx`
+
+### Phase 4: Agent Integration (2 weeks)
+
+#### Week 7-8: Agent-Course Integration
+- **Learning Context Provider**: `src/agents/context/LearningContextProvider.ts`
+- **Agent Decision Logger**: `src/agents/logging/AgentDecisionLogger.ts`
+- **Agent Communication Hub**: `src/agents/communication/AgentCommunicationHub.ts`
+- **Content Recommendation Engine**: `src/agents/engines/ContentRecommendationEngine.ts`
+- **Learning Path Adjuster**: `src/agents/engines/LearningPathAdjuster.ts`
+- **Integration Testing & Metrics**: `src/agents/testing/IntegrationTests.ts`
+
+## Additional Dependencies
+
+```json
+{
+  "dependencies": {
+    "dexie": "^3.2.4",
+    "react-beautiful-dnd": "^13.1.1",
+    "slate": "^0.94.1",
+    "slate-react": "^0.94.1",
+    "uuid": "^9.0.1",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/uuid": "^9.0.7"
+  }
+}
+```
 
 ---
 
