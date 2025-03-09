@@ -12,12 +12,29 @@ export type InterventionStatus = 'pending' | 'active' | 'completed' | 'cancelled
 /**
  * Intervention Type
  */
-export type InterventionType = 
-  | 'content_modification' 
-  | 'resource_assignment' 
-  | 'schedule_adjustment' 
-  | 'mentor_assignment'
-  | 'feedback_request';
+export enum InterventionType {
+  // Content-based interventions
+  ADDITIONAL_MATERIALS = 'additional_materials',
+  SIMPLIFIED_CONTENT = 'simplified_content',
+  ALTERNATIVE_FORMAT = 'alternative_format',
+  PRACTICE_EXERCISES = 'practice_exercises',
+  
+  // Schedule-based interventions
+  EXTENDED_DEADLINE = 'extended_deadline',
+  ADJUSTED_PACE = 'adjusted_pace',
+  LEARNING_BREAK = 'learning_break',
+  
+  // Support-based interventions
+  MENTOR_ASSIGNMENT = 'mentor_assignment',
+  PEER_GROUP = 'peer_group',
+  HR_MEETING = 'hr_meeting',
+  COACHING_SESSION = 'coaching_session',
+  
+  // Motivation-based interventions
+  RECOGNITION = 'recognition',
+  INCENTIVE = 'incentive',
+  PROGRESS_HIGHLIGHT = 'progress_highlight'
+}
 
 /**
  * RAG Status
@@ -129,8 +146,73 @@ export interface InterventionTemplate {
   id: string;
   name: string;
   description: string;
-  type: InterventionType;
-  reasonForUse: string;
+  interventionType: InterventionType;
+  defaultDuration: number; // in days
   contentTemplate?: string;
-  resourceIds?: string[];
+  targetRagStatus: 'amber' | 'red';
+  suggestedFollowUp?: InterventionType[];
+  createdBy: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/**
+ * Measures the effectiveness of an intervention
+ */
+export enum InterventionEffectivenessRating {
+  HIGHLY_EFFECTIVE = 'highly_effective',
+  EFFECTIVE = 'effective',
+  NEUTRAL = 'neutral',
+  INEFFECTIVE = 'ineffective',
+  COUNTERPRODUCTIVE = 'counterproductive'
+}
+
+/**
+ * Records the effectiveness of interventions for future reference
+ */
+export interface InterventionEffectiveness {
+  id: string;
+  interventionId: string;
+  rating: InterventionEffectivenessRating;
+  ragStatusBefore: 'amber' | 'red';
+  ragStatusAfter: 'green' | 'amber' | 'red';
+  timeToStatusChange?: number; // in days
+  learnerFeedback?: string;
+  hrNotes?: string;
+  evaluatedAt: Date;
+}
+
+/**
+ * Historical record of an intervention
+ */
+export interface InterventionHistoryRecord {
+  interventionId: string;
+  employeeId: string;
+  employeeName: string;
+  interventionType: InterventionType;
+  startDate: Date;
+  endDate?: Date;
+  effectiveness?: InterventionEffectivenessRating;
+  ragStatusChange: {
+    before: 'amber' | 'red';
+    after: 'green' | 'amber' | 'red';
+  };
+}
+
+/**
+ * Aggregated metrics about intervention effectiveness
+ */
+export interface InterventionMetrics {
+  totalInterventions: number;
+  byType: Record<InterventionType, number>;
+  effectiveness: {
+    highlyEffective: number;
+    effective: number;
+    neutral: number;
+    ineffective: number;
+    counterproductive: number;
+  };
+  averageDaysToImprovement: number;
+  mostEffectiveType: InterventionType;
+  leastEffectiveType: InterventionType;
 } 
