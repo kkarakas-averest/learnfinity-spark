@@ -4,12 +4,8 @@ import {
   InterventionInput, 
   InterventionType,
   InterventionStatus,
-  InterventionReason,
   ContentModification,
   ResourceAssignment,
-  ScheduleAdjustment,
-  MentorAssignment,
-  FeedbackRequest,
   InterventionTemplate,
   InterventionFilter,
   InterventionUpdate,
@@ -438,33 +434,27 @@ export class InterventionService {
       const interventionInput: InterventionInput = {
         employeeId,
         type: template.type,
-        status: 'pending',
-        reason: template.reasonsForUse[0] as InterventionReason,
-        createdBy,
-        ragStatusAtCreation: ragStatusAtCreation as RAGStatus,
+        reason: template.reasonForUse,
         title: template.name,
-        description: template.contentTemplate || template.description,
-        customFields,
+        description: template.contentTemplate || template.description
       };
       
-      // Add template-specific data
-      if (template.type === 'feedback_request' && template.feedbackQuestions) {
-        const questions = Array.isArray(template.feedbackQuestions) 
-          ? template.feedbackQuestions 
-          : JSON.parse(template.feedbackQuestions as string);
-          
-        interventionInput.feedbackRequest = {
-          questions,
-          dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 1 week from now
-          isAnonymous: false,
-          feedbackType: 'experience'
-        };
+      // Add resource assignments if available
+      if (template.type === 'resource_assignment' && template.resourceIds && template.resourceIds.length > 0) {
+        // In a real app, we would fetch the resources by IDs
+        // For now, we'll create mock resource assignments
+        interventionInput.resourceAssignments = template.resourceIds.map(id => ({
+          resourceId: id,
+          resourceType: 'document',
+          resourceName: `Resource ${id}`,
+          assignmentReason: 'Assigned from template'
+        }));
       }
       
       // Create intervention
       return this.createIntervention(interventionInput);
     } catch (error) {
-      console.error('Error in createInterventionFromTemplate:', error);
+      console.error('Error creating intervention from template:', error);
       throw error;
     }
   }
@@ -474,49 +464,49 @@ export class InterventionService {
    */
   private async sendInterventionNotification(intervention: InterventionInput): Promise<void> {
     try {
-      // Format notification based on intervention type
-      let title = 'New intervention';
+      // Create a new intervention first to get an ID
+      const createdIntervention = await this.createIntervention(intervention);
+      
+      // Now we can use the created intervention which has an ID
+      let title = 'New Intervention Created';
       let message = 'A new intervention has been created for you.';
       let actionText = 'View Details';
       
+      // Customize message based on intervention type
       switch (intervention.type) {
         case 'content_modification':
-          title = 'Learning Content Updated';
-          message = 'Your learning content has been modified to better suit your needs.';
+          message = 'Content has been modified to better suit your learning needs.';
+          actionText = 'View Modified Content';
           break;
         case 'resource_assignment':
-          title = 'Additional Resources Assigned';
-          message = 'New learning resources have been assigned to help with your progress.';
+          message = 'New learning resources have been assigned to you.';
           actionText = 'View Resources';
           break;
         case 'schedule_adjustment':
-          title = 'Learning Schedule Adjusted';
-          message = 'Your learning schedule has been adjusted. Please check the new deadlines.';
+          message = 'Your learning schedule has been adjusted.';
           actionText = 'View Schedule';
           break;
         case 'mentor_assignment':
-          title = 'Mentor Assigned';
-          message = 'A mentor has been assigned to assist with your learning journey.';
-          actionText = 'Meet Your Mentor';
+          message = 'A mentor has been assigned to help with your learning.';
+          actionText = 'View Mentor Details';
           break;
         case 'feedback_request':
-          title = 'Feedback Requested';
           message = 'Your feedback is requested on your learning experience.';
           actionText = 'Provide Feedback';
           break;
       }
       
-      // Send notification
+      // Send notification using the created intervention which has all required fields
       await this.notificationService.createNotification({
-        recipientId: intervention.employeeId,
-        senderId: intervention.createdBy,
+        recipientId: createdIntervention.employeeId,
+        senderId: createdIntervention.createdBy,
         title,
         message,
         type: 'intervention',
         priority: 'medium',
         actionText,
-        actionLink: `/learner-dashboard/interventions/${intervention.id}`,
-        relatedEntityId: intervention.id,
+        actionLink: `/learner-dashboard/interventions/${createdIntervention.id}`,
+        relatedEntityId: createdIntervention.id,
         relatedEntityType: 'intervention'
       });
     } catch (error) {

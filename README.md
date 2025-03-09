@@ -92,3 +92,101 @@ We don't support custom domains (yet). If you want to deploy your project under 
   - Their background and experience
 
 ## Getting Started
+
+# LearnFinity HR Dashboard
+
+LearnFinity is a comprehensive HR dashboard designed for employee training, management, and analytics. It provides a unified interface for HR professionals to track employee progress, manage training resources, and make data-driven decisions.
+
+## Features
+
+- **User Authentication**: Secure login with role-based access control
+- **Training Management**: Create, assign, and track training modules
+- **Employee Profiles**: Comprehensive employee data management
+- **Analytics Dashboard**: Visualize key HR metrics and training outcomes
+- **Notification System**: Real-time notifications for users with customizable preferences
+- **LLM Integration**: AI-powered features for content generation and analysis
+
+## Technologies
+
+- **Frontend**: Next.js, React, TypeScript, Tailwind CSS, shadcn/ui
+- **Backend**: Supabase for authentication, database, and storage
+- **State Management**: React Context API and custom hooks
+- **Analytics**: Chart.js for data visualization
+- **AI Integration**: OpenAI API for LLM features
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js 18+ and npm/yarn
+- Supabase account
+- OpenAI API key (for LLM features)
+
+### Installation
+
+1. Clone the repository
+```bash
+git clone https://github.com/yourusername/learnfinity.git
+cd learnfinity
+```
+
+2. Install dependencies
+```bash
+npm install
+# or
+yarn install
+```
+
+3. Configure environment variables
+```bash
+cp .env.example .env.local
+# Edit .env.local with your Supabase and OpenAI credentials
+```
+
+4. Run the development server
+```bash
+npm run dev
+# or
+yarn dev
+```
+
+5. Set up the database
+```bash
+# Run the SQL scripts in the src/db directory to set up your database schema
+```
+
+## Project Structure
+
+- `/src/components` - Reusable UI components
+  - `/ui` - Base UI components
+  - `/dashboard` - Dashboard-specific components
+  - `/notifications` - Notification system components
+- `/src/pages` - Next.js pages and routing
+- `/src/services` - Service classes for data handling
+- `/src/hooks` - Custom React hooks
+- `/src/types` - TypeScript type definitions
+- `/src/lib` - Utility functions and shared code
+- `/src/db` - Database schema and migration scripts
+
+## Notification System
+
+LearnFinity includes a comprehensive notification system for keeping users informed about important events:
+
+- Real-time in-app notifications
+- Various notification types (system, alerts, assignments, etc.)
+- Notification preferences for personalization
+- Priority-based notification display
+- Mark as read/unread functionality
+
+See `/src/components/notifications/README.md` for detailed documentation.
+
+## Contributing
+
+1. Create a feature branch from `main`
+2. Make your changes
+3. Submit a pull request
+4. Ensure all tests pass
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.

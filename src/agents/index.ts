@@ -16,9 +16,9 @@
  * as it's critical for the HR Dashboard functionality.
  */
 
-import { RAGSystemAgentImpl } from './rag-agent';
 import { RAGStatus, RAGStatusDetails } from '@/types/hr.types';
 import { RAGSystemAgent } from './types';
+import { RAGSystemAgentImpl } from './rag-agent';
 
 // This file will export the agents once they are implemented
 export const VERSION = '0.1.0';

@@ -13,6 +13,11 @@ import { Badge } from '@/components/ui/badge';
 import { ExternalLinkIcon } from '@/components/ui/custom-icons';
 import { ResourceAssignment } from '@/types/intervention.types';
 
+// Extend ResourceAssignment interface for UI functionality
+interface ResourceAssignmentExtended extends ResourceAssignment {
+  isRequired?: boolean; // Optional property for UI
+}
+
 // Available resource mock data
 const availableResources = [
   {
@@ -71,7 +76,9 @@ const ResourceAssignmentPanel: React.FC<ResourceAssignmentPanelProps> = ({
   showHeader = true
 }) => {
   // State for selected resources
-  const [selectedResources, setSelectedResources] = useState<ResourceAssignment[]>(initialResources);
+  const [selectedResources, setSelectedResources] = useState<ResourceAssignmentExtended[]>(
+    initialResources.map(r => ({ ...r, isRequired: true }))
+  );
   const [filterType, setFilterType] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState<string>('');
   
@@ -92,12 +99,12 @@ const ResourceAssignmentPanel: React.FC<ResourceAssignmentPanelProps> = ({
   const addResource = (resource: any) => {
     if (isResourceSelected(resource.id)) return;
     
-    const newResource: ResourceAssignment = {
+    const newResource: ResourceAssignmentExtended = {
       resourceId: resource.id,
       resourceType: resource.type,
       resourceName: resource.title,
       resourceUrl: resource.url,
-      reason: '',
+      assignmentReason: '',
       isRequired: true
     };
     
@@ -109,8 +116,8 @@ const ResourceAssignmentPanel: React.FC<ResourceAssignmentPanelProps> = ({
     setSelectedResources(selectedResources.filter(r => r.resourceId !== resourceId));
   };
   
-  // Update resource details
-  const updateResource = (resourceId: string, updates: Partial<ResourceAssignment>) => {
+  // Update resource with new values
+  const updateResource = (resourceId: string, updates: Partial<ResourceAssignmentExtended>) => {
     setSelectedResources(selectedResources.map(r => 
       r.resourceId === resourceId ? { ...r, ...updates } : r
     ));
@@ -118,7 +125,18 @@ const ResourceAssignmentPanel: React.FC<ResourceAssignmentPanelProps> = ({
   
   // Handle save button click
   const handleSave = () => {
-    onSave(selectedResources);
+    // Convert back to standard ResourceAssignment by removing UI-specific properties
+    const standardResources: ResourceAssignment[] = selectedResources
+      .filter(r => r.assignmentReason) // Only include resources with a reason
+      .map(({ resourceId, resourceType, resourceName, resourceUrl, assignmentReason }) => ({
+        resourceId,
+        resourceType,
+        resourceName,
+        resourceUrl,
+        assignmentReason
+      }));
+    
+    onSave(standardResources);
   };
   
   // Generate counts for each resource type
@@ -255,8 +273,8 @@ const ResourceAssignmentPanel: React.FC<ResourceAssignmentPanelProps> = ({
                         <Textarea
                           id={`reason-${resource.resourceId}`}
                           placeholder="Why is this resource being assigned?"
-                          value={resource.reason}
-                          onChange={(e) => updateResource(resource.resourceId, { reason: e.target.value })}
+                          value={resource.assignmentReason}
+                          onChange={(e) => updateResource(resource.resourceId, { assignmentReason: e.target.value })}
                           rows={2}
                         />
                       </div>
@@ -304,7 +322,7 @@ const ResourceAssignmentPanel: React.FC<ResourceAssignmentPanelProps> = ({
           
           <Button 
             onClick={handleSave}
-            disabled={selectedResources.length === 0 || selectedResources.some(r => !r.reason)}
+            disabled={selectedResources.length === 0 || selectedResources.some(r => !r.assignmentReason)}
           >
             Save Assignments
           </Button>
