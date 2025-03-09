@@ -107,7 +107,7 @@ const ProtectedRouteMigrated: React.FC<ProtectedRouteProps> = ({
       case "superadmin":
         return <Navigate to="/admin" replace />;
       case "hr":
-        return <Navigate to="/hr/dashboard" replace />;
+        return <Navigate to="/hr-dashboard" replace />;
       case "mentor":
         return <Navigate to="/mentor" replace />;
       case "learner":

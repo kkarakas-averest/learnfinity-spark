@@ -122,8 +122,8 @@ function App() {
           />
           
           {/* HR Dashboard routes */}
-          <Route
-            path="/hr-dashboard"
+          <Route 
+            path="/hr-dashboard" 
             element={
               <ProtectedRouteMigrated allowedRoles={["hr", "superadmin"]} requireHRAuth={true}>
                 <HRDashboardRoot />
@@ -131,7 +131,7 @@ function App() {
             }
           />
           <Route
-            path="/hr-dashboard/employees"
+            path="/hr-dashboard/:path"
             element={
               <ProtectedRouteMigrated allowedRoles={["hr", "superadmin"]} requireHRAuth={true}>
                 <HRDashboardRoot />
@@ -139,7 +139,7 @@ function App() {
             }
           />
           <Route
-            path="/hr-dashboard/programs"
+            path="/hr-dashboard/:path/:subpath"
             element={
               <ProtectedRouteMigrated allowedRoles={["hr", "superadmin"]} requireHRAuth={true}>
                 <HRDashboardRoot />
@@ -147,55 +147,7 @@ function App() {
             }
           />
           <Route
-            path="/hr-dashboard/reports"
-            element={
-              <ProtectedRouteMigrated allowedRoles={["hr", "superadmin"]} requireHRAuth={true}>
-                <HRDashboardRoot />
-              </ProtectedRouteMigrated>
-            }
-          />
-          <Route
-            path="/hr-dashboard/settings"
-            element={
-              <ProtectedRouteMigrated allowedRoles={["hr", "superadmin"]} requireHRAuth={true}>
-                <HRDashboardRoot />
-              </ProtectedRouteMigrated>
-            }
-          />
-          <Route
-            path="/hr-dashboard/employees/:employeeId/profile"
-            element={
-              <ProtectedRouteMigrated allowedRoles={["hr", "superadmin"]} requireHRAuth={true}>
-                <HRDashboardRoot />
-              </ProtectedRouteMigrated>
-            }
-          />
-          <Route
-            path="/hr-dashboard/course-builder"
-            element={
-              <ProtectedRouteMigrated allowedRoles={["hr", "superadmin"]} requireHRAuth={true}>
-                <HRDashboardRoot />
-              </ProtectedRouteMigrated>
-            }
-          />
-          <Route
-            path="/hr-dashboard/course-builder/templates"
-            element={
-              <ProtectedRouteMigrated allowedRoles={["hr", "superadmin"]} requireHRAuth={true}>
-                <HRDashboardRoot />
-              </ProtectedRouteMigrated>
-            }
-          />
-          <Route
-            path="/hr-dashboard/course-builder/modules"
-            element={
-              <ProtectedRouteMigrated allowedRoles={["hr", "superadmin"]} requireHRAuth={true}>
-                <HRDashboardRoot />
-              </ProtectedRouteMigrated>
-            }
-          />
-          <Route
-            path="/hr-dashboard/course-builder/modules/:moduleId"
+            path="/hr-dashboard/:path/:subpath/:id"
             element={
               <ProtectedRouteMigrated allowedRoles={["hr", "superadmin"]} requireHRAuth={true}>
                 <HRDashboardRoot />
