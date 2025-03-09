@@ -6,14 +6,7 @@
  */
 
 // Import environment variables from .env file if in development
-if (process.env.NODE_ENV === 'development') {
-  try {
-    // dotenv may already be loaded by Vite
-    require('dotenv').config();
-  } catch (e) {
-    console.warn('Failed to load dotenv, continuing with existing environment variables');
-  }
-}
+// Note: Vite automatically loads .env files, so this section is not needed
 
 // Define the shape of our environment configuration
 interface EnvConfig {
@@ -45,26 +38,26 @@ interface EnvConfig {
  */
 export const envConfig: EnvConfig = {
   // Application configuration
-  appName: process.env.APP_NAME || 'Learnfinity',
-  environment: (process.env.NODE_ENV || 'development') as 'development' | 'production' | 'test',
-  isDevelopment: process.env.NODE_ENV === 'development',
-  isProduction: process.env.NODE_ENV === 'production',
-  isTest: process.env.NODE_ENV === 'test',
-  debug: process.env.DEBUG === 'true' || process.env.NODE_ENV === 'development',
+  appName: import.meta.env.VITE_APP_NAME || 'Learnfinity',
+  environment: (import.meta.env.MODE || 'development') as 'development' | 'production' | 'test',
+  isDevelopment: import.meta.env.MODE === 'development',
+  isProduction: import.meta.env.MODE === 'production',
+  isTest: import.meta.env.MODE === 'test',
+  debug: import.meta.env.VITE_DEBUG === 'true' || import.meta.env.MODE === 'development',
   
   // API keys - read from environment variables
-  supabaseUrl: process.env.VITE_SUPABASE_URL || '',
-  supabaseAnonKey: process.env.VITE_SUPABASE_ANON_KEY || '',
-  groqApiKey: process.env.GROQ_API_KEY || process.env.VITE_GROQ_API_KEY || null,
+  supabaseUrl: import.meta.env.VITE_SUPABASE_URL || '',
+  supabaseAnonKey: import.meta.env.VITE_SUPABASE_ANON_KEY || '',
+  groqApiKey: import.meta.env.VITE_GROQ_API_KEY || null,
   
   // Feature flags
-  enableLLM: process.env.ENABLE_LLM !== 'false',
-  enableBatchProcessing: process.env.ENABLE_BATCH_PROCESSING !== 'false',
-  enableNotifications: process.env.ENABLE_NOTIFICATIONS !== 'false',
+  enableLLM: import.meta.env.VITE_ENABLE_LLM !== 'false',
+  enableBatchProcessing: import.meta.env.VITE_ENABLE_BATCH_PROCESSING !== 'false',
+  enableNotifications: import.meta.env.VITE_ENABLE_NOTIFICATIONS !== 'false',
   
   // Performance settings
-  batchSize: parseInt(process.env.BATCH_SIZE || '5', 10),
-  maxConcurrentRequests: parseInt(process.env.MAX_CONCURRENT_REQUESTS || '3', 10),
+  batchSize: parseInt(import.meta.env.VITE_BATCH_SIZE || '5', 10),
+  maxConcurrentRequests: parseInt(import.meta.env.VITE_MAX_CONCURRENT_REQUESTS || '3', 10),
 };
 
 /**

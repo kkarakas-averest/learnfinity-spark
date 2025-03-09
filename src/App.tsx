@@ -35,6 +35,9 @@ import ReportsPage from "./pages/hr/ReportsPage";
 import SettingsPage from "./pages/hr/SettingsPage";
 import EmployeeProfilePage from "./pages/hr/EmployeeProfilePage";
 
+// Import learner components
+import CourseView from "./components/learner/CourseView";
+
 // Simple diagnostic component for auth debugging
 const AuthDiagnostic = () => {
   const { user, userDetails, isLoading, error } = useAuth();
@@ -214,6 +217,16 @@ function App() {
           
           <Route path="/courses" element={<Courses />} />
           <Route path="/courses/:id" element={<CourseDetail />} />
+          
+          {/* Learner Course View Route */}
+          <Route 
+            path="/learning/course/:courseId" 
+            element={
+              <ProtectedRouteMigrated allowedRoles={["learner", "mentor", "hr", "superadmin"]}>
+                <CourseView />
+              </ProtectedRouteMigrated>
+            } 
+          />
           
           {/* Diagnostic route */}
           <Route path="/diagnostic" element={<DiagnosticTool />} />

@@ -1,11 +1,11 @@
 import React from "@/lib/react-helpers";
-import { Navigate } from "react-router-dom";
+import { Navigate, Link } from "react-router-dom";
 import { useAuth } from "@/state";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
-import { Home, BookOpen, Trophy, User } from "lucide-react";
+import { Home, BookOpen, Trophy, User, ArrowRight } from "lucide-react";
 import DashboardHeader from "@/components/learner/DashboardHeader";
 import TestNotificationButton from "@/components/learner/TestNotificationButton";
 
@@ -195,6 +195,30 @@ const LearnerDashboard: React.FC = () => {
                 <p>You are currently enrolled in 4 courses.</p>
                 <div className="mt-4 space-y-4">
                   <Button variant="outline" className="w-full">View all courses</Button>
+                  
+                  {/* Demo course link */}
+                  <div className="mt-6 pt-6 border-t">
+                    <h3 className="text-lg font-medium mb-2">Featured Course</h3>
+                    <Card className="bg-slate-50">
+                      <CardContent className="p-4">
+                        <div className="flex items-start gap-4">
+                          <div className="rounded-md overflow-hidden bg-slate-200 w-20 h-20 flex-shrink-0 flex items-center justify-center">
+                            <BookOpen className="h-8 w-8 text-slate-500" />
+                          </div>
+                          <div className="flex-1">
+                            <h4 className="text-base font-medium">Introduction to Machine Learning</h4>
+                            <p className="text-sm text-muted-foreground mb-3">Learn the fundamentals of machine learning algorithms.</p>
+                            <Link to="/learning/course/demo-ml-101">
+                              <Button size="sm" className="flex items-center">
+                                <ArrowRight className="h-4 w-4 mr-2" />
+                                Start Learning
+                              </Button>
+                            </Link>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
                 </div>
               </CardContent>
             </Card>

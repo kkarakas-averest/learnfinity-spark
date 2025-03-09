@@ -19,9 +19,9 @@ export interface LLMConfig {
 // Default configuration used when no override is provided
 export const defaultLLMConfig: LLMConfig = {
   provider: 'groq',
-  apiKey: process.env.GROQ_API_KEY || '',
+  apiKey: import.meta.env.VITE_GROQ_API_KEY || '',
   model: 'llama-3.1-70b-versatile',
-  debugMode: process.env.NODE_ENV === 'development',
+  debugMode: import.meta.env.MODE === 'development',
   maxTokens: 1024,
   temperature: 0.7,
   retryAttempts: 3,

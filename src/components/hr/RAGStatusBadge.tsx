@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from '@/lib/react-helpers';
+import React, { useState, useEffect, useRef } from '@/lib/react-helpers';
 import { RAGStatus } from '@/types/hr.types';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -11,6 +11,9 @@ export interface RAGStatusBadgeProps {
   animate?: boolean;
   size?: 'sm' | 'md' | 'lg';
   className?: string;
+  showTransition?: boolean;
+  previousStatus?: RAGStatus | null;
+  transitionDuration?: number;
 }
 
 /**
@@ -27,8 +30,14 @@ export const RAGStatusBadge: React.FC<RAGStatusBadgeProps> = ({
   animate = false,
   size = 'md',
   className = '',
+  showTransition = false,
+  previousStatus = null,
+  transitionDuration = 1500,
 }) => {
   const [isAnimating, setIsAnimating] = useState(false);
+  const [displayedStatus, setDisplayedStatus] = useState<RAGStatus>(status);
+  const [transitioning, setTransitioning] = useState(false);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // Handle animation when status changes or animation is explicitly requested
   useEffect(() => {
@@ -38,6 +47,38 @@ export const RAGStatusBadge: React.FC<RAGStatusBadgeProps> = ({
       return () => clearTimeout(timer);
     }
   }, [status, animate]);
+
+  // Handle status transition animation
+  useEffect(() => {
+    // If previous status exists and is different from current status
+    if (showTransition && previousStatus && previousStatus !== status) {
+      setTransitioning(true);
+      setDisplayedStatus(previousStatus);
+      
+      // First half of transition - old status fades out
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+      
+      timeoutRef.current = setTimeout(() => {
+        // Second half of transition - new status fades in
+        setDisplayedStatus(status);
+        
+        // End transition
+        timeoutRef.current = setTimeout(() => {
+          setTransitioning(false);
+        }, transitionDuration / 2);
+      }, transitionDuration / 2);
+      
+      return () => {
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+        }
+      };
+    } else {
+      setDisplayedStatus(status);
+    }
+  }, [status, previousStatus, showTransition, transitionDuration]);
 
   // Color variants for each status
   const variants = {
@@ -67,15 +108,16 @@ export const RAGStatusBadge: React.FC<RAGStatusBadgeProps> = ({
     lg: "px-3 py-1"
   };
   
-  const displayLabel = label || defaultLabels[status];
-  const displayTooltip = tooltipContent || defaultTooltips[status];
+  const displayLabel = label || defaultLabels[displayedStatus];
+  const displayTooltip = tooltipContent || defaultTooltips[status]; // Always show tooltip for current status
   
   const badgeContent = (
     <Badge 
       className={`
-        ${variants[status]} 
+        ${variants[displayedStatus]} 
         ${sizeClasses[size]}
         ${isAnimating ? 'animate-rag-status-pulse' : ''}
+        ${transitioning ? 'animate-rag-status-transition' : ''}
         ${className}
       `}
     >

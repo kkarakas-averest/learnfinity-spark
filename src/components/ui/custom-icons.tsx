@@ -385,4 +385,45 @@ export const PackageIcon: React.FC<IconProps> = (props) => (
     <polyline points="3.29 7 12 12 20.71 7" />
     <line x1="12" y1="22" x2="12" y2="12" />
   </svg>
+);
+
+/**
+ * Play Icon
+ */
+export const PlayIcon: React.FC<IconProps> = (props) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    {...props}
+  >
+    <polygon points="5 3 19 12 5 21 5 3" />
+  </svg>
+);
+
+/**
+ * RotateCcw Icon
+ */
+export const RotateCcwIcon: React.FC<IconProps> = (props) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    {...props}
+  >
+    <path d="M3 2v6h6" />
+    <path d="M3 8a9 9 0 1 0 2.83-6.36L3 5" />
+  </svg>
 ); 

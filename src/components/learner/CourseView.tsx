@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from '@/lib/react-helpers';
+import React from '@/lib/react-helpers';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -14,39 +14,9 @@ import {
 import { useToast } from '@/components/ui/use-toast';
 import { RAGStatusBadge } from '@/components/hr/RAGStatusBadge';
 import { RAGStatus } from '@/types/hr.types';
-
-// Types
-interface CourseModule {
-  id: string;
-  title: string;
-  description: string;
-  duration: string;
-  contentType: 'text' | 'video' | 'quiz' | 'interactive';
-  content: string;
-  resources?: Resource[];
-  completed: boolean;
-}
-
-interface Resource {
-  id: string;
-  title: string;
-  type: 'pdf' | 'link' | 'video' | 'file';
-  url: string;
-}
-
-interface CourseData {
-  id: string;
-  title: string;
-  description: string;
-  imageUrl: string;
-  level: 'Beginner' | 'Intermediate' | 'Advanced';
-  duration: string;
-  progress: number;
-  enrolledDate: string;
-  lastAccessed?: string;
-  ragStatus: RAGStatus;
-  modules: CourseModule[];
-}
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { FeedbackForm } from './FeedbackForm';
+import courseService, { CourseData, CourseModule, Resource } from '@/services/courseService';
 
 /**
  * CourseView component
@@ -54,245 +24,158 @@ interface CourseData {
  * Displays a complete course with all its modules and tracks user progress
  */
 const CourseView: React.FC = () => {
+  // @ts-ignore - Using courseId without type parameter
   const { courseId } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
   
   // States
-  const [course, setCourse] = useState<CourseData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [activeModule, setActiveModule] = useState<string | null>(null);
-  const [bookmarks, setBookmarks] = useState<Record<string, number>>({});
-  const [currentTab, setCurrentTab] = useState('content');
-  const [showFeedbackForm, setShowFeedbackForm] = useState(false);
+  const [course, setCourse] = React.useState<CourseData | null>(null);
+  const [loading, setLoading] = React.useState(true);
+  const [activeModule, setActiveModule] = React.useState<string | null>(null);
+  const [bookmarks, setBookmarks] = React.useState<Record<string, number>>({});
+  const [currentTab, setCurrentTab] = React.useState('content');
+  const [showFeedbackForm, setShowFeedbackForm] = React.useState(false);
   
   // Effect to fetch course data
-  useEffect(() => {
+  React.useEffect(() => {
     const fetchCourseData = async () => {
+      if (!courseId) return;
+      
       try {
         setLoading(true);
+        const courseData = await courseService.getCourseById(courseId);
         
-        // In a real implementation, this would be a call to your API
-        // For now, use mock data
-        const mockCourse: CourseData = {
-          id: courseId || 'course-1',
-          title: 'Introduction to Machine Learning',
-          description: 'Learn the fundamentals of machine learning algorithms and their applications in real-world scenarios.',
-          imageUrl: 'https://images.unsplash.com/photo-1620712943543-bcc4688e7485?w=1600&h=900',
-          level: 'Beginner',
-          duration: '8 hours',
-          progress: 35,
-          enrolledDate: '2023-12-10',
-          lastAccessed: '2023-12-15',
-          ragStatus: 'green',
-          modules: [
-            {
-              id: 'module-1',
-              title: 'Introduction to ML Concepts',
-              description: 'Understand the basic concepts and terminology of machine learning.',
-              duration: '1 hour',
-              contentType: 'text',
-              content: `
-                # Introduction to Machine Learning
-                
-                Machine learning is a subset of artificial intelligence that focuses on developing systems that can learn from and make decisions based on data.
-                
-                ## Key Concepts
-                
-                - **Supervised Learning**: The algorithm is trained on labeled data.
-                - **Unsupervised Learning**: The algorithm finds patterns in unlabeled data.
-                - **Reinforcement Learning**: The algorithm learns through trial and error.
-                
-                ## Applications
-                
-                Machine learning is used in various fields including:
-                - Image and speech recognition
-                - Natural language processing
-                - Recommendation systems
-                - Fraud detection
-              `,
-              resources: [
-                { id: 'res-1', title: 'ML Glossary', type: 'pdf', url: '/resources/ml-glossary.pdf' },
-                { id: 'res-2', title: 'Introduction Video', type: 'video', url: 'https://example.com/videos/intro-ml' }
-              ],
-              completed: true
-            },
-            {
-              id: 'module-2',
-              title: 'Supervised Learning',
-              description: 'Learn about classification and regression techniques.',
-              duration: '2 hours',
-              contentType: 'video',
-              content: 'https://example.com/videos/supervised-learning',
-              resources: [
-                { id: 'res-3', title: 'Classification Guide', type: 'pdf', url: '/resources/classification.pdf' },
-                { id: 'res-4', title: 'Regression Examples', type: 'link', url: 'https://example.com/regression' }
-              ],
-              completed: true
-            },
-            {
-              id: 'module-3',
-              title: 'Unsupervised Learning',
-              description: 'Explore clustering and dimensionality reduction.',
-              duration: '2 hours',
-              contentType: 'text',
-              content: `
-                # Unsupervised Learning
-                
-                Unsupervised learning involves training algorithms to find patterns in data without predefined labels.
-                
-                ## Clustering
-                
-                Clustering groups similar data points together. Common algorithms include:
-                - K-means
-                - Hierarchical clustering
-                - DBSCAN
-                
-                ## Dimensionality Reduction
-                
-                These techniques reduce the number of variables in data while preserving important information:
-                - Principal Component Analysis (PCA)
-                - t-SNE
-                - Autoencoders
-              `,
-              resources: [
-                { id: 'res-5', title: 'Clustering Tutorial', type: 'pdf', url: '/resources/clustering.pdf' }
-              ],
-              completed: false
-            },
-            {
-              id: 'module-4',
-              title: 'Model Evaluation',
-              description: 'Learn how to evaluate and improve machine learning models.',
-              duration: '1.5 hours',
-              contentType: 'quiz',
-              content: 'quiz-data-would-be-here',
-              completed: false
-            },
-            {
-              id: 'module-5',
-              title: 'Practical Applications',
-              description: 'Real-world applications and case studies of machine learning.',
-              duration: '1.5 hours',
-              contentType: 'interactive',
-              content: 'interactive-content-placeholder',
-              completed: false
-            }
-          ]
-        };
-        
-        // Simulate network delay
-        setTimeout(() => {
-          setCourse(mockCourse);
-          
-          // Set active module (either first incomplete or first module)
-          const incompleteModule = mockCourse.modules.find(module => !module.completed);
-          setActiveModule(incompleteModule ? incompleteModule.id : mockCourse.modules[0].id);
-          
-          // Load bookmarks from localStorage if any
-          const savedBookmarks = localStorage.getItem(`bookmarks-${courseId}`);
-          if (savedBookmarks) {
-            setBookmarks(JSON.parse(savedBookmarks));
+        if (courseData) {
+          setCourse(courseData);
+          // Set the first module as active by default if none is selected
+          if (!activeModule && courseData.modules.length > 0) {
+            setActiveModule(courseData.modules[0].id);
           }
-          
-          setLoading(false);
-        }, 1000);
-        
+        }
       } catch (error) {
         console.error('Error fetching course data:', error);
         toast({
           title: 'Error',
-          description: 'Failed to load course content. Please try again later.',
+          description: 'Failed to load course content. Please try again.',
           variant: 'destructive'
         });
+      } finally {
         setLoading(false);
       }
     };
     
     fetchCourseData();
-  }, [courseId, toast]);
+  }, [courseId, toast, activeModule]);
   
   // Handle module change
   const handleModuleChange = (moduleId: string) => {
     setActiveModule(moduleId);
-    
-    // In a real app, you would also update the user's progress on the server
-    if (course) {
-      const updatedCourse = { ...course };
-      // Mark current module as viewed/completed if needed
-      setCourse(updatedCourse);
-    }
+    // Reset current tab to content when changing modules
+    setCurrentTab('content');
   };
   
-  // Handle bookmarking
-  const handleBookmark = () => {
-    if (!activeModule || !course) return;
+  // Handle module bookmark
+  const handleBookmark = (moduleId: string, timeInSeconds: number) => {
+    setBookmarks(prev => ({
+      ...prev,
+      [moduleId]: timeInSeconds
+    }));
     
-    // Get content element to determine scroll position
-    const contentElement = document.getElementById('module-content');
-    if (!contentElement) return;
-    
-    const scrollPosition = contentElement.scrollTop;
-    
-    // Update bookmarks state
-    const updatedBookmarks = {
-      ...bookmarks,
-      [activeModule]: scrollPosition
-    };
-    
-    setBookmarks(updatedBookmarks);
-    
-    // Save to localStorage
-    localStorage.setItem(`bookmarks-${courseId}`, JSON.stringify(updatedBookmarks));
-    
-    toast({
-      title: 'Bookmark added',
-      description: 'Your place in this module has been saved.',
-    });
+    // In a real app, save this to the server
+    courseService.updateBookmark(courseId || '', moduleId, timeInSeconds)
+      .then(success => {
+        if (success) {
+          toast({
+            title: 'Bookmark saved',
+            description: `Saved your progress at ${Math.floor(timeInSeconds / 60)}:${(timeInSeconds % 60).toString().padStart(2, '0')}`,
+          });
+        }
+      })
+      .catch(error => {
+        console.error('Error saving bookmark:', error);
+      });
   };
   
   // Handle module completion
-  const handleCompleteModule = () => {
-    if (!activeModule || !course) return;
+  const handleCompleteModule = async () => {
+    if (!course || !activeModule) return;
     
-    const updatedCourse = { ...course };
-    const moduleIndex = updatedCourse.modules.findIndex(m => m.id === activeModule);
-    
-    if (moduleIndex !== -1) {
-      updatedCourse.modules[moduleIndex].completed = true;
+    try {
+      const success = await courseService.updateModuleCompletion(course.id, activeModule, true);
       
-      // Update progress percentage
-      const completedCount = updatedCourse.modules.filter(m => m.completed).length;
-      updatedCourse.progress = Math.round((completedCount / updatedCourse.modules.length) * 100);
-      
-      // Update course data
-      setCourse(updatedCourse);
-      
-      // In a real app, send this update to the server
-      
-      toast({
-        title: 'Module completed',
-        description: 'Your progress has been updated.',
-      });
-      
-      // Check if next module exists and navigate to it
-      if (moduleIndex < updatedCourse.modules.length - 1) {
-        setActiveModule(updatedCourse.modules[moduleIndex + 1].id);
+      if (success) {
+        // Update local state
+        setCourse(prevCourse => {
+          if (!prevCourse) return null;
+          
+          return {
+            ...prevCourse,
+            modules: prevCourse.modules.map(module => 
+              module.id === activeModule ? { ...module, completed: true } : module
+            ),
+            // Recalculate progress
+            progress: Math.round(
+              ((prevCourse.modules.filter(m => m.completed || m.id === activeModule).length) / 
+              prevCourse.modules.length) * 100
+            )
+          };
+        });
+        
+        toast({
+          title: 'Module completed',
+          description: 'Your progress has been saved.',
+        });
       }
+    } catch (error) {
+      console.error('Error completing module:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update module status. Please try again.',
+        variant: 'destructive'
+      });
     }
   };
   
   // Navigate to next/previous module
-  const navigateModule = (direction: 'prev' | 'next') => {
+  const navigateModule = (direction: 'next' | 'prev') => {
     if (!course || !activeModule) return;
     
     const currentIndex = course.modules.findIndex(m => m.id === activeModule);
     if (currentIndex === -1) return;
     
-    if (direction === 'prev' && currentIndex > 0) {
-      setActiveModule(course.modules[currentIndex - 1].id);
-    } else if (direction === 'next' && currentIndex < course.modules.length - 1) {
-      setActiveModule(course.modules[currentIndex + 1].id);
+    const targetIndex = direction === 'next' ? currentIndex + 1 : currentIndex - 1;
+    
+    if (targetIndex >= 0 && targetIndex < course.modules.length) {
+      setActiveModule(course.modules[targetIndex].id);
+      setCurrentTab('content');
+      
+      // Scroll to top
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+  
+  // Handle feedback submission
+  const handleFeedbackSubmit = async (data: { rating: number; comments: string }) => {
+    if (!course) return;
+    
+    try {
+      const success = await courseService.submitFeedback(course.id, data);
+      
+      if (success) {
+        toast({
+          title: 'Feedback submitted',
+          description: 'Thank you for your feedback!',
+        });
+        setShowFeedbackForm(false);
+      }
+    } catch (error) {
+      console.error('Error submitting feedback:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to submit feedback. Please try again.',
+        variant: 'destructive'
+      });
     }
   };
   
@@ -367,7 +250,7 @@ const CourseView: React.FC = () => {
       <div className="flex flex-col items-center justify-center min-h-screen p-4">
         <h2 className="text-2xl font-bold mb-2">Course Not Found</h2>
         <p className="text-muted-foreground mb-6">The course you're looking for doesn't exist or you don't have access to it.</p>
-        <Button onClick={() => navigate('/learner-dashboard')}>Return to Dashboard</Button>
+        <Button onClick={() => navigate('/dashboard')}>Return to Dashboard</Button>
       </div>
     );
   }
@@ -384,7 +267,7 @@ const CourseView: React.FC = () => {
               variant="ghost" 
               size="sm" 
               className="text-slate-300 hover:text-white mb-4 md:mb-0 -ml-2 md:ml-0"
-              onClick={() => navigate('/learner-dashboard')}
+              onClick={() => navigate('/dashboard')}
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back to Dashboard
@@ -467,23 +350,32 @@ const CourseView: React.FC = () => {
           </div>
           
           {/* Module Content */}
-          <div className="lg:col-span-2 order-1 lg:order-2">
+          <div className="order-1 lg:order-2 lg:col-span-2">
             {activeModuleData ? (
               <Card>
-                <CardHeader className="flex flex-row items-start justify-between space-y-0">
-                  <div>
-                    <CardTitle className="text-xl mb-1">{activeModuleData.title}</CardTitle>
-                    <p className="text-sm text-muted-foreground">{activeModuleData.description}</p>
+                <CardHeader>
+                  <div className="flex flex-col md:flex-row md:justify-between md:items-start">
+                    <div>
+                      <CardTitle className="text-xl mb-1">{activeModuleData.title}</CardTitle>
+                      <p className="text-sm text-muted-foreground">{activeModuleData.description}</p>
+                    </div>
+                    <div className="flex items-center mt-4 md:mt-0 space-x-2">
+                      <div className="text-sm text-muted-foreground">
+                        <Clock className="w-4 h-4 inline-block mr-1" />
+                        {activeModuleData.duration}
+                      </div>
+                      
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="ml-auto md:ml-0"
+                        onClick={() => handleBookmark(activeModuleData.id, 0)}
+                      >
+                        <Bookmark className="w-4 h-4 mr-2" />
+                        Bookmark
+                      </Button>
+                    </div>
                   </div>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={handleBookmark}
-                    className="ml-4 flex-shrink-0"
-                  >
-                    <Bookmark className="w-4 h-4 mr-2" />
-                    Bookmark
-                  </Button>
                 </CardHeader>
                 
                 <Separator />
@@ -503,31 +395,32 @@ const CourseView: React.FC = () => {
                   <TabsContent value="resources" className="m-0">
                     <CardContent className="p-6">
                       {activeModuleData.resources && activeModuleData.resources.length > 0 ? (
-                        <div className="space-y-3">
-                          {activeModuleData.resources.map(resource => (
-                            <a 
-                              key={resource.id}
-                              href={resource.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center p-3 bg-muted/50 rounded-lg hover:bg-muted transition-colors"
-                            >
-                              <div className="bg-primary/10 p-2 rounded mr-3">
-                                {getResourceIcon(resource.type)}
-                              </div>
-                              <div>
-                                <div className="font-medium">{resource.title}</div>
-                                <div className="text-xs text-muted-foreground">
-                                  {resource.type.toUpperCase()}
-                                </div>
-                              </div>
-                              <ArrowUpRight className="w-4 h-4 ml-auto text-muted-foreground" />
-                            </a>
-                          ))}
+                        <div className="space-y-4">
+                          <h3 className="text-lg font-medium">Additional Resources</h3>
+                          <ul className="space-y-2">
+                            {activeModuleData.resources.map(resource => (
+                              <li key={resource.id}>
+                                <a 
+                                  href={resource.url} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="flex items-center p-2 hover:bg-muted rounded-md transition-colors"
+                                >
+                                  <div className="flex items-center justify-center w-8 h-8 bg-primary/10 text-primary rounded-md mr-3">
+                                    {getResourceIcon(resource.type)}
+                                  </div>
+                                  <div>
+                                    <p className="font-medium">{resource.title}</p>
+                                    <p className="text-xs text-muted-foreground capitalize">{resource.type}</p>
+                                  </div>
+                                </a>
+                              </li>
+                            ))}
+                          </ul>
                         </div>
                       ) : (
-                        <p className="text-muted-foreground text-center py-6">
-                          No resources available for this module.
+                        <p className="text-center text-muted-foreground py-4">
+                          No additional resources available for this module.
                         </p>
                       )}
                     </CardContent>
@@ -580,33 +473,16 @@ const CourseView: React.FC = () => {
               </Button>
             </div>
             
-            {/* Feedback Form would be implemented here */}
-            {showFeedbackForm && (
-              <Card className="mt-4">
-                <CardHeader>
-                  <CardTitle className="text-lg">Provide Feedback</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-muted-foreground mb-4">
-                    Your feedback helps us improve our course content and your learning experience.
-                  </p>
-                  <div className="space-y-4">
-                    {/* Feedback form fields would go here */}
-                    <p className="text-center text-muted-foreground">
-                      Feedback form would be implemented here.
-                    </p>
-                  </div>
-                </CardContent>
-                <CardFooter className="flex justify-end space-x-2">
-                  <Button variant="outline" onClick={() => setShowFeedbackForm(false)}>
-                    Cancel
-                  </Button>
-                  <Button>
-                    Submit Feedback
-                  </Button>
-                </CardFooter>
-              </Card>
-            )}
+            {/* Feedback Dialog */}
+            <Dialog open={showFeedbackForm} onOpenChange={setShowFeedbackForm}>
+              <DialogContent className="sm:max-w-[500px]">
+                <FeedbackForm 
+                  courseId={course.id}
+                  onSubmit={handleFeedbackSubmit}
+                  onCancel={() => setShowFeedbackForm(false)}
+                />
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
       </div>

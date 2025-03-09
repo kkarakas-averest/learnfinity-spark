@@ -19,6 +19,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/components/ui/use-toast';
 import { hrEmployeeService } from '@/lib/services/hrEmployeeService';
 import { hrServices } from '@/lib/services/hrServices';
+import RAGStatusDemo from '@/components/hr/visualization/RAGStatusDemo';
 
 // Define an extended type for hrServices
 type HRServicesExtended = typeof hrServices & {
@@ -133,97 +134,104 @@ const DashboardOverview: React.FC = () => {
     <div className="space-y-6">
       <h2 className="text-3xl font-bold tracking-tight">Dashboard Overview</h2>
       
-      {/* RAG Summary Section */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Employees On Track</CardTitle>
+      {/* RAG Status Overview */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <Card className="xl:col-span-2">
+          <CardHeader>
+            <CardTitle>Employee RAG Status</CardTitle>
+            <CardDescription>
+              Overview of employee learning progress status
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center">
-              <div className="mr-2 h-4 w-4 rounded-full bg-green-500"></div>
-              <div className="text-2xl font-bold">{ragSummary.green}</div>
-              <div className="ml-2 text-sm text-muted-foreground">
-                ({Math.round((ragSummary.green / (ragSummary.total || 1)) * 100)}%)
-              </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Card className="bg-green-50 border-green-100">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg flex items-center">
+                    <CheckCircle className="mr-2 h-5 w-5 text-green-500" />
+                    <span>Green Status</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{ragSummary.green}</div>
+                  <p className="text-sm text-muted-foreground">Employees on track</p>
+                </CardContent>
+                <CardFooter>
+                  <Button 
+                    variant="ghost" 
+                    className="w-full text-green-700" 
+                    onClick={() => viewEmployeesByStatus('green')}
+                  >
+                    View Employees
+                  </Button>
+                </CardFooter>
+              </Card>
+              
+              <Card className="bg-amber-50 border-amber-100">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg flex items-center">
+                    <AlertTriangle className="mr-2 h-5 w-5 text-amber-500" />
+                    <span>Amber Status</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{ragSummary.amber}</div>
+                  <p className="text-sm text-muted-foreground">Employees needing attention</p>
+                </CardContent>
+                <CardFooter>
+                  <Button 
+                    variant="ghost" 
+                    className="w-full text-amber-700" 
+                    onClick={() => viewEmployeesByStatus('amber')}
+                  >
+                    View Employees
+                  </Button>
+                </CardFooter>
+              </Card>
+              
+              <Card className="bg-red-50 border-red-100">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg flex items-center">
+                    <Activity className="mr-2 h-5 w-5 text-red-500" />
+                    <span>Red Status</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{ragSummary.red}</div>
+                  <p className="text-sm text-muted-foreground">Employees requiring intervention</p>
+                </CardContent>
+                <CardFooter>
+                  <Button 
+                    variant="ghost" 
+                    className="w-full text-red-700" 
+                    onClick={() => viewEmployeesByStatus('red')}
+                  >
+                    View Employees
+                  </Button>
+                </CardFooter>
+              </Card>
             </div>
           </CardContent>
-          <CardFooter>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="text-green-600 hover:text-green-800"
-              onClick={() => viewEmployeesByStatus('green')}
-            >
-              View Employees
-            </Button>
-          </CardFooter>
         </Card>
         
+        {/* New RAG Status Demo Card */}
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Employees Needing Attention</CardTitle>
+          <CardHeader>
+            <CardTitle>RAG Status Animation</CardTitle>
+            <CardDescription>
+              Visualize employee status transitions
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center">
-              <div className="mr-2 h-4 w-4 rounded-full bg-amber-500"></div>
-              <div className="text-2xl font-bold">{ragSummary.amber}</div>
-              <div className="ml-2 text-sm text-muted-foreground">
-                ({Math.round((ragSummary.amber / (ragSummary.total || 1)) * 100)}%)
-              </div>
-            </div>
+            <RAGStatusDemo 
+              title="Status Transitions" 
+              description="Interactive demo of status change animations"
+              initialStatus="green"
+              showControls={true}
+            />
           </CardContent>
-          <CardFooter>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="text-amber-600 hover:text-amber-800"
-              onClick={() => viewEmployeesByStatus('amber')}
-            >
-              View Employees
-            </Button>
-          </CardFooter>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Employees Requiring Intervention</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center">
-              <div className="mr-2 h-4 w-4 rounded-full bg-red-500"></div>
-              <div className="text-2xl font-bold">{ragSummary.red}</div>
-              <div className="ml-2 text-sm text-muted-foreground">
-                ({Math.round((ragSummary.red / (ragSummary.total || 1)) * 100)}%)
-              </div>
-            </div>
-          </CardContent>
-          <CardFooter>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="text-red-600 hover:text-red-800"
-              onClick={() => viewEmployeesByStatus('red')}
-            >
-              View Employees
-            </Button>
-          </CardFooter>
         </Card>
       </div>
-      
-      {/* Alert for Red status employees */}
-      {ragSummary.red > 0 && (
-        <Alert variant="destructive" className="mb-6">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>Urgent Attention Required</AlertTitle>
-          <AlertDescription className="flex items-center justify-between">
-            <span>{ragSummary.red} employee(s) are flagged as requiring immediate intervention.</span>
-            <Button variant="outline" size="sm" onClick={() => viewEmployeesByStatus('red')}>
-              View Employees
-            </Button>
-          </AlertDescription>
-        </Alert>
-      )}
       
       {/* Original key metrics grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
