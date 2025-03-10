@@ -12,7 +12,8 @@ import {
   Layers, 
   Library,
   Bot,
-  Sparkles
+  Sparkles,
+  Activity
 } from 'lucide-react';
 
 type NavItemProps = {
@@ -95,6 +96,12 @@ const DashboardSidebar: React.FC = () => {
           isActive: currentPath === "/hr-dashboard/programs"
         },
         {
+          title: "Learner Progress",
+          href: "/hr-dashboard/learner-progress",
+          icon: <Activity className="h-4 w-4" />,
+          isActive: currentPath === "/hr-dashboard/learner-progress"
+        },
+        {
           title: "Reports",
           href: "/hr-dashboard/reports",
           icon: <BarChart2 className="h-4 w-4" />,
@@ -152,6 +159,34 @@ const DashboardSidebar: React.FC = () => {
           isActive: currentPath === "/hr-dashboard/settings"
         }
       ]
+    }
+  ];
+
+  // Management section items
+  const managementItems = [
+    {
+      title: "Employees",
+      href: "/hr-dashboard/employees",
+      icon: <Users className="h-4 w-4" />,
+      isActive: currentPath === "/hr-dashboard/employees"
+    },
+    {
+      title: "Learning Programs",
+      href: "/hr-dashboard/programs",
+      icon: <Layers className="h-4 w-4" />,
+      isActive: currentPath === "/hr-dashboard/programs"
+    },
+    {
+      title: "Course Builder",
+      href: "/hr-dashboard/courses",
+      icon: <Library className="h-4 w-4" />,
+      isActive: currentPath === "/hr-dashboard/courses"
+    },
+    {
+      title: "Learner Progress",
+      href: "/hr-dashboard/learner-progress",
+      icon: <Activity className="h-4 w-4" />,
+      isActive: currentPath === "/hr-dashboard/learner-progress"
     }
   ];
 

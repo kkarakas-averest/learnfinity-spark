@@ -3,6 +3,8 @@ import { useLocation, useParams } from 'react-router-dom';
 import HRDashboardHeader from '@/components/hr/HRDashboardHeader';
 import DashboardSidebar from '@/components/hr/DashboardSidebar';
 import { useHRAuth } from '@/state';
+import { Button } from '@/components/ui/button';
+import { Activity } from 'lucide-react';
 
 // Import all pages
 import HRDashboardMigrated from '@/pages/HRDashboardMigrated';
@@ -15,6 +17,7 @@ import CourseBuilderPage from '@/pages/hr/CourseBuilderPage';
 import CourseTemplates from '@/pages/hr/CourseTemplates';
 import ModuleEditor from '@/pages/hr/ModuleEditor';
 import AgentManagement from '@/components/hr/AgentManagement';
+import LearnerProgressSummary from '@/components/hr/LearnerProgressSummary';
 
 /**
  * Root layout component for the HR Dashboard
@@ -62,6 +65,9 @@ const HRDashboardRoot: React.FC = () => {
     if (path.startsWith('/hr-dashboard/course-builder/modules/')) {
       return <ModuleEditor />;
     }
+    
+    // Add a new case for 'learner-progress'
+    if (path === '/hr-dashboard/learner-progress') return <LearnerProgressSummary period="month" />;
     
     // Default to dashboard
     return <HRDashboardMigrated />;

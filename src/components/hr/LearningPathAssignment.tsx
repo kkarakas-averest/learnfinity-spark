@@ -34,9 +34,9 @@ interface LearningPath {
 }
 
 interface LearningPathAssignmentProps {
-  isOpen: boolean;
-  onClose: () => void;
-  employeeId?: string;  // Optional - if provided, preselects an employee
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  programId: string;  // Required - learning program ID to be assigned
 }
 
 const DatePicker = ({ date, setDate, disabled = false }: { 
@@ -62,14 +62,14 @@ const DatePicker = ({ date, setDate, disabled = false }: {
 };
 
 const LearningPathAssignment: React.FC<LearningPathAssignmentProps> = ({
-  isOpen,
-  onClose,
-  employeeId
+  open,
+  onOpenChange,
+  programId
 }) => {
   const { user } = useAuth();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [learningPaths, setLearningPaths] = useState<LearningPath[]>([]);
-  const [selectedEmployee, setSelectedEmployee] = useState<string | null>(employeeId || null);
+  const [selectedEmployee, setSelectedEmployee] = useState<string | null>(null);
   const [selectedPath, setSelectedPath] = useState<string>('');
   const [priority, setPriority] = useState<'high' | 'medium' | 'low'>('medium');
   const [isMandatory, setIsMandatory] = useState<boolean>(false);
@@ -86,11 +86,20 @@ const LearningPathAssignment: React.FC<LearningPathAssignmentProps> = ({
   const [showGenerateOptions, setShowGenerateOptions] = useState<boolean>(false);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   
+  const onClose = () => {
+    onOpenChange(false);
+  };
+  
   useEffect(() => {
-    if (isOpen) {
+    if (open) {
       fetchData();
+      
+      // Set the selected learning path if programId is provided
+      if (programId) {
+        setSelectedPath(programId);
+      }
     }
-  }, [isOpen]);
+  }, [open, programId]);
   
   const fetchData = async () => {
     setIsLoading(true);
@@ -147,8 +156,8 @@ const LearningPathAssignment: React.FC<LearningPathAssignmentProps> = ({
       setLearningPaths(transformedPaths);
       
       // Set the selected employee if provided
-      if (employeeId) {
-        setSelectedEmployee(employeeId);
+      if (programId) {
+        setSelectedPath(programId);
       }
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -270,11 +279,11 @@ const LearningPathAssignment: React.FC<LearningPathAssignmentProps> = ({
     }
   };
   
-  if (!isOpen) return null;
+  if (!open) return null;
   
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Assign Learning Path</DialogTitle>
           <DialogDescription>
@@ -302,7 +311,7 @@ const LearningPathAssignment: React.FC<LearningPathAssignmentProps> = ({
               <Select 
                 value={selectedEmployee || ''} 
                 onValueChange={handleEmployeeChange}
-                disabled={isSubmitting || Boolean(employeeId)}
+                disabled={isSubmitting}
               >
                 <SelectTrigger id="employee">
                   <SelectValue placeholder="Select an employee" />

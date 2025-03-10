@@ -2,6 +2,12 @@
 -- These tables form the connection between the HR management system and 
 -- the learner experience platform.
 
+-- First, let's get information about the hr_employees table
+-- Comment this out after you've identified the correct column name
+SELECT column_name, data_type 
+FROM information_schema.columns 
+WHERE table_name = 'hr_employees';
+
 -- Learning Path Assignments Table
 -- Tracks which learning paths are assigned to which users by HR
 CREATE TABLE IF NOT EXISTS learning_path_assignments (
@@ -71,14 +77,22 @@ ADD COLUMN IF NOT EXISTS last_activity TIMESTAMP WITH TIME ZONE;
 -- Learning Path Assignments policies
 ALTER TABLE learning_path_assignments ENABLE ROW LEVEL SECURITY;
 
+-- First, drop any existing policies to avoid errors
+DROP POLICY IF EXISTS "HR users can view all learning path assignments" ON learning_path_assignments;
+DROP POLICY IF EXISTS "HR users can insert learning path assignments" ON learning_path_assignments;
+DROP POLICY IF EXISTS "HR users can update learning path assignments" ON learning_path_assignments;
+DROP POLICY IF EXISTS "Learners can view their own assignments" ON learning_path_assignments;
+
 -- HR users can view and manage all assignments
+-- Since hr_employees doesn't have a direct auth link, we'll use email
 CREATE POLICY "HR users can view all learning path assignments"
   ON learning_path_assignments
   FOR SELECT
   USING (
     EXISTS (
-      SELECT 1 FROM hr_employees
-      WHERE hr_employees.auth_id = auth.uid()
+      SELECT 1 FROM hr_employees, auth.users
+      WHERE hr_employees.email = auth.users.email
+      AND auth.users.id = auth.uid()
     )
   );
 
@@ -87,8 +101,9 @@ CREATE POLICY "HR users can insert learning path assignments"
   FOR INSERT
   WITH CHECK (
     EXISTS (
-      SELECT 1 FROM hr_employees
-      WHERE hr_employees.auth_id = auth.uid()
+      SELECT 1 FROM hr_employees, auth.users
+      WHERE hr_employees.email = auth.users.email
+      AND auth.users.id = auth.uid()
     )
   );
 
@@ -97,8 +112,9 @@ CREATE POLICY "HR users can update learning path assignments"
   FOR UPDATE
   USING (
     EXISTS (
-      SELECT 1 FROM hr_employees
-      WHERE hr_employees.auth_id = auth.uid()
+      SELECT 1 FROM hr_employees, auth.users
+      WHERE hr_employees.email = auth.users.email
+      AND auth.users.id = auth.uid()
     )
   );
 
@@ -113,14 +129,20 @@ CREATE POLICY "Learners can view their own assignments"
 -- Agent Activities policies
 ALTER TABLE agent_activities ENABLE ROW LEVEL SECURITY;
 
+-- Drop existing policies for agent activities
+DROP POLICY IF EXISTS "HR users can view all agent activities" ON agent_activities;
+DROP POLICY IF EXISTS "HR users can insert agent activities" ON agent_activities;
+DROP POLICY IF EXISTS "Learners can view their own agent activities" ON agent_activities;
+
 -- HR users can view all agent activities
 CREATE POLICY "HR users can view all agent activities"
   ON agent_activities
   FOR SELECT
   USING (
     EXISTS (
-      SELECT 1 FROM hr_employees
-      WHERE hr_employees.auth_id = auth.uid()
+      SELECT 1 FROM hr_employees, auth.users
+      WHERE hr_employees.email = auth.users.email
+      AND auth.users.id = auth.uid()
     )
   );
 
@@ -130,8 +152,9 @@ CREATE POLICY "HR users can insert agent activities"
   FOR INSERT
   WITH CHECK (
     EXISTS (
-      SELECT 1 FROM hr_employees
-      WHERE hr_employees.auth_id = auth.uid()
+      SELECT 1 FROM hr_employees, auth.users
+      WHERE hr_employees.email = auth.users.email
+      AND auth.users.id = auth.uid()
     )
   );
 
@@ -146,14 +169,21 @@ CREATE POLICY "Learners can view their own agent activities"
 -- Employee User Mapping policies
 ALTER TABLE employee_user_mapping ENABLE ROW LEVEL SECURITY;
 
+-- Drop existing policies for employee user mapping
+DROP POLICY IF EXISTS "HR users can view all employee user mappings" ON employee_user_mapping;
+DROP POLICY IF EXISTS "HR users can insert employee user mappings" ON employee_user_mapping;
+DROP POLICY IF EXISTS "HR users can update employee user mappings" ON employee_user_mapping;
+DROP POLICY IF EXISTS "Learners can view their own mapping" ON employee_user_mapping;
+
 -- HR users can view and manage all mappings
 CREATE POLICY "HR users can view all employee user mappings"
   ON employee_user_mapping
   FOR SELECT
   USING (
     EXISTS (
-      SELECT 1 FROM hr_employees
-      WHERE hr_employees.auth_id = auth.uid()
+      SELECT 1 FROM hr_employees, auth.users
+      WHERE hr_employees.email = auth.users.email
+      AND auth.users.id = auth.uid()
     )
   );
 
@@ -162,8 +192,9 @@ CREATE POLICY "HR users can insert employee user mappings"
   FOR INSERT
   WITH CHECK (
     EXISTS (
-      SELECT 1 FROM hr_employees
-      WHERE hr_employees.auth_id = auth.uid()
+      SELECT 1 FROM hr_employees, auth.users
+      WHERE hr_employees.email = auth.users.email
+      AND auth.users.id = auth.uid()
     )
   );
 
@@ -172,8 +203,9 @@ CREATE POLICY "HR users can update employee user mappings"
   FOR UPDATE
   USING (
     EXISTS (
-      SELECT 1 FROM hr_employees
-      WHERE hr_employees.auth_id = auth.uid()
+      SELECT 1 FROM hr_employees, auth.users
+      WHERE hr_employees.email = auth.users.email
+      AND auth.users.id = auth.uid()
     )
   );
 
