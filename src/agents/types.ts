@@ -1,42 +1,48 @@
 /**
  * Type definitions for the Multi-Agent System
+ * 
+ * This file serves as a bridge between our agent system and external types.
+ * It re-exports types from our interfaces directory and from external type files.
  */
 
-import { RAGStatus, RAGStatusDetails } from "@/types/hr.types";
+import { Agent, AgentConfig } from './interfaces/Agent';
+import { AgentMessage } from './core/BaseAgent';
+import { 
+  ContentType, 
+  DifficultyLevel,
+  LearnerProfile,
+  ContentGenerationRequest,
+  PersonalizationParams,
+  GeneratedContent,
+  GeneratedQuiz
+} from '@/types/ai-content.types';
+import { RAGStatus, RAGStatusDetails } from '@/types/hr.types';
+
+// Re-export all types to ensure they are used consistently
+export type { 
+  Agent,
+  AgentConfig,
+  AgentMessage,
+  ContentType,
+  DifficultyLevel,
+  LearnerProfile,
+  ContentGenerationRequest,
+  PersonalizationParams,
+  GeneratedContent,
+  GeneratedQuiz,
+  RAGStatus,
+  RAGStatusDetails
+};
 
 /**
- * Message type for agent communication
+ * ContentCreatorAgent specific interface
  */
-export interface AgentMessage {
-  id: string;
-  from: string;
-  to: string;
-  content: string;
-  timestamp: Date;
-  metadata?: Record<string, any>;
-}
-
-/**
- * Base configuration for all agents
- */
-export interface AgentConfig {
-  name: string;
-  role: string;
-  goal: string;
-  backstory: string;
-  allowDelegation?: boolean;
-  verbose?: boolean;
-}
-
-/**
- * Base agent interface
- */
-export interface Agent {
-  id: string;
-  config: AgentConfig;
-  initialize: () => Promise<{ success: boolean; message?: string }>;
-  processTask: (task: any) => Promise<any>;
-  receiveMessage: (message: AgentMessage) => Promise<AgentMessage | null>;
+export interface ContentCreatorAgent extends Agent {
+  generateRemediationContent: (learningGap: string, learnerPreferences: any) => Promise<any>;
+  adaptContent: (contentId: string, learnerData: any) => Promise<any>;
+  generateContentForRequest: (request: ContentGenerationRequest) => Promise<GeneratedContent>;
+  personalizeContent: (params: PersonalizationParams) => Promise<GeneratedContent>;
+  generateQuiz: (topic: string, difficultyLevel: DifficultyLevel, questionCount: number) => Promise<GeneratedQuiz>;
 }
 
 /**
@@ -54,14 +60,6 @@ export interface RAGSystemAgent extends Agent {
 export interface PersonalizationAgent extends Agent {
   generateLearningPath: (employeeProfile: any, courseLibrary: any) => Promise<any>;
   recommendNextSteps: (employeeId: string, currentProgress: any) => Promise<any[]>;
-}
-
-/**
- * Content Creator Agent specific interface
- */
-export interface ContentCreatorAgent extends Agent {
-  generateRemediationContent: (learningGap: string, learnerPreferences: any) => Promise<any>;
-  adaptContent: (contentId: string, learnerData: any) => Promise<any>;
 }
 
 /**

@@ -5,9 +5,19 @@
  * orchestrating tasks and communication between specialized agents.
  */
 
-import { Agent, AgentMessage } from '../types';
-import { ContentCreatorAgent } from '../types';
-import { RAGSystemAgent } from '../types';
+import { Agent } from './Agent';
+
+/**
+ * Message type for agent communication
+ */
+export interface AgentMessage {
+  id: string;
+  from: string;
+  to: string;
+  content: any;
+  timestamp: Date;
+  metadata?: Record<string, any>;
+}
 
 /**
  * Agent registry map for storing references to registered agents
@@ -15,7 +25,7 @@ import { RAGSystemAgent } from '../types';
 export type AgentRegistry = Map<string, Agent>;
 
 /**
- * Task execution status
+ * Task status enumeration
  */
 export enum TaskStatus {
   PENDING = 'pending',
@@ -25,7 +35,7 @@ export enum TaskStatus {
 }
 
 /**
- * Task execution result
+ * Result of a completed task
  */
 export interface TaskResult {
   taskId: string;
@@ -37,71 +47,81 @@ export interface TaskResult {
 }
 
 /**
- * Task definition for agent execution
+ * Represents a task that can be assigned to an agent
  */
 export interface AgentTask {
   id: string;
+  name: string;
   type: string;
-  targetAgent: string;
-  priority: 'low' | 'medium' | 'high';
-  data: any;
-  dependencies?: string[]; // IDs of tasks that must complete before this one
-  status: TaskStatus;
+  targetAgent?: string;
+  priority?: 'low' | 'medium' | 'high';
+  status: 'pending' | 'in_progress' | 'completed' | 'failed';
   createdAt: Date;
   updatedAt: Date;
-  result?: TaskResult;
+  completedAt?: Date;
+  data: any;
+  result?: any;
+  error?: string;
+  dependencies?: string[]; // IDs of tasks that must complete before this one
 }
 
 /**
- * Manager Agent interface extending the base Agent interface
+ * Interface for manager agent that coordinates other agents
  */
-export interface ManagerAgent extends Agent {
+export interface IManagerAgent extends Agent {
   /**
    * Register an agent with the manager
+   * @param agent The agent to register
    */
-  registerAgent: (agent: Agent) => Promise<boolean>;
+  registerAgent(agent: Agent): Promise<void>;
   
   /**
    * Unregister an agent from the manager
+   * @param agentId The ID of the agent to unregister
    */
-  unregisterAgent: (agentId: string) => Promise<boolean>;
+  unregisterAgent(agentId: string): Promise<void>;
   
   /**
-   * Get a registered agent by ID or type
+   * Get a registered agent by ID
+   * @param agentId The ID of the agent to retrieve
    */
-  getAgent: <T extends Agent>(idOrType: string) => Promise<T | null>;
+  getAgent(agentId: string): Promise<Agent | null>;
   
   /**
-   * Submit a task for execution
+   * Submit a task for processing
+   * @param task The task to process
    */
-  submitTask: (task: Omit<AgentTask, 'id' | 'status' | 'createdAt' | 'updatedAt'>) => Promise<string>;
+  submitTask(task: Omit<AgentTask, 'id' | 'status' | 'createdAt' | 'updatedAt'>): Promise<string>;
   
   /**
-   * Get task status by ID
+   * Get the status of a task
+   * @param taskId The ID of the task
    */
-  getTaskStatus: (taskId: string) => Promise<TaskStatus>;
+  getTaskStatus(taskId: string): Promise<'pending' | 'in_progress' | 'completed' | 'failed'>;
   
   /**
-   * Get task result by ID
+   * Get the result of a completed task
+   * @param taskId The ID of the task
    */
-  getTaskResult: (taskId: string) => Promise<TaskResult | null>;
+  getTaskResult(taskId: string): Promise<any>;
   
   /**
-   * Execute a workflow involving multiple agents
+   * Execute a predefined workflow
+   * @param workflowName The name of the workflow to execute
+   * @param data The data to pass to the workflow
    */
-  executeWorkflow: (
-    workflowName: string, 
-    initialData: any, 
-    config?: Record<string, any>
-  ) => Promise<TaskResult>;
+  executeWorkflow(workflowName: string, data: any): Promise<string>;
   
   /**
-   * Monitor the health and status of all registered agents
+   * Check the health of all registered agents
    */
-  monitorAgentHealth: () => Promise<Record<string, boolean>>;
+  monitorAgentHealth(): Promise<Record<string, { status: 'healthy' | 'warning' | 'error'; lastActive?: Date }>>;
   
   /**
-   * Handle agent communication by routing messages
+   * Route a message to the appropriate agent
+   * @param message The message to route
+   * @param from The sender of the message
+   * @param to The intended recipient of the message
    */
-  routeMessage: (message: AgentMessage) => Promise<void>;
+  routeMessage(message: any, from: string, to: string): Promise<any>;
 } 
