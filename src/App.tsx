@@ -52,6 +52,9 @@ import AIEngineTester from "./pages/AIEngineTester";
 // Import the AI Learning Center component
 import AILearningCenter from "./pages/AILearningCenter";
 
+// Import the AI Testing Page
+import AITestingPage from "./pages/AITestingPage";
+
 // Simple diagnostic component for auth debugging
 const AuthDiagnostic = () => {
   const { user, userDetails, isLoading, error } = useAuth();
@@ -106,6 +109,16 @@ function App() {
             element={
               <ProtectedRouteMigrated allowedRoles={["hr", "superadmin"]}>
                 <AIEngineTester />
+              </ProtectedRouteMigrated>
+            } 
+          />
+          
+          {/* AI Testing Page for Content Generation */}
+          <Route 
+            path="/ai-testing" 
+            element={
+              <ProtectedRouteMigrated allowedRoles={["learner", "mentor", "hr", "superadmin"]}>
+                <AITestingPage />
               </ProtectedRouteMigrated>
             } 
           />
