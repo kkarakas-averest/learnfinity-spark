@@ -8,7 +8,8 @@ import {
   Settings, 
   Home,
   User,
-  LogOut
+  LogOut,
+  Sparkles
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { 
@@ -40,6 +41,7 @@ const NAV_ITEMS = {
     { name: "Home", href: "/", icon: Home },
     { name: "Courses", href: "/courses", icon: Book },
     { name: "My Learning", href: "/dashboard", icon: GraduationCap },
+    { name: "AI Testing", href: "/ai-testing", icon: Sparkles },
   ]
 };
 
