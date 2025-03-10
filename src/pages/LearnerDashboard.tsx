@@ -2,12 +2,13 @@ import React from "@/lib/react-helpers";
 import { Navigate, Link } from "react-router-dom";
 import { useAuth } from "@/state";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
-import { Home, BookOpen, Trophy, User, ArrowRight } from "lucide-react";
+import { Home, BookOpen, Trophy, User, ArrowRight, Sparkles } from "lucide-react";
 import DashboardHeader from "@/components/learner/DashboardHeader";
 import TestNotificationButton from "@/components/learner/TestNotificationButton";
+import AICourseRecommendations from "@/components/learner/AICourseRecommendations";
 
 const LearnerDashboard: React.FC = () => {
   const { user, userDetails, isLoading } = useAuth();
@@ -183,6 +184,52 @@ const LearnerDashboard: React.FC = () => {
                   </div>
                 </CardContent>
               </Card>
+            </div>
+
+            <Card className="mt-8 border-primary/20 bg-primary/5">
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Sparkles className="mr-2 h-5 w-5 text-primary" />
+                  AI-Enhanced Learning Experience
+                </CardTitle>
+                <CardDescription>
+                  Experience personalized learning powered by our AI Assistant
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div className="space-y-2">
+                    <h3 className="font-medium">Personal Learning Paths</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Get custom learning journeys based on your skills, goals, and learning style.
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <h3 className="font-medium">Smart Recommendations</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Discover courses and resources tailored to your needs and interests.
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <h3 className="font-medium">Adaptive Content</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Learn with content that adjusts to your pace and highlights what matters most.
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+              <CardFooter>
+                <Button variant="outline" className="w-full sm:w-auto">
+                  <Link to="/ai-learning-center" className="flex items-center">
+                    <Sparkles className="mr-2 h-4 w-4 text-primary" />
+                    Explore AI Features
+                  </Link>
+                </Button>
+              </CardFooter>
+            </Card>
+
+            <div className="mt-8">
+              <AICourseRecommendations />
             </div>
           </TabsContent>
 

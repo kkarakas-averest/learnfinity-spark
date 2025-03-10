@@ -46,6 +46,12 @@ import CourseBuilderPage from "./pages/hr/CourseBuilderPage";
 // Import HR dashboard root layout
 import HRDashboardRoot from "./pages/hr/HRDashboardRoot";
 
+// Import the AIEngineTester component
+import AIEngineTester from "./pages/AIEngineTester";
+
+// Import the AI Learning Center component
+import AILearningCenter from "./pages/AILearningCenter";
+
 // Simple diagnostic component for auth debugging
 const AuthDiagnostic = () => {
   const { user, userDetails, isLoading, error } = useAuth();
@@ -93,6 +99,26 @@ function App() {
           
           {/* Auth diagnostic route */}
           <Route path="/auth-diagnostic" element={<AuthDiagnostic />} />
+          
+          {/* AI Engine Tester */}
+          <Route 
+            path="/ai-tester" 
+            element={
+              <ProtectedRouteMigrated allowedRoles={["hr", "superadmin"]}>
+                <AIEngineTester />
+              </ProtectedRouteMigrated>
+            } 
+          />
+          
+          {/* AI Learning Center */}
+          <Route 
+            path="/ai-learning-center" 
+            element={
+              <ProtectedRouteMigrated allowedRoles={["learner", "mentor", "hr", "superadmin"]}>
+                <AILearningCenter />
+              </ProtectedRouteMigrated>
+            } 
+          />
           
           <Route 
             path="/dashboard" 

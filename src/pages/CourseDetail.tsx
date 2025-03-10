@@ -1,11 +1,16 @@
-import React from '@/lib/react-helpers';
-import { useParams } from 'react-router-dom';
+import React, { useState, useEffect } from '@/lib/react-helpers';
+import { useParams, Link } from 'react-router-dom';
 import { Clock, BarChart2, Users, FileText } from "lucide-react";
 import NavbarMigrated from "@/components/NavbarMigrated";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { useAuth } from '@/state';
+import { useToast } from '@/components/ui/use-toast';
+import { supabase } from '@/lib/supabase-client';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Sparkles } from 'lucide-react';
 
 // Mock data (replace with actual data fetching)
 const mockCourse = {
@@ -41,6 +46,79 @@ const CourseDetail = () => {
         return "bg-purple-100 text-purple-800";
       default:
         return "bg-gray-100 text-gray-800";
+    }
+  };
+
+  // New state and function for enrollment
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [isEnrolled, setIsEnrolled] = useState(false);
+  const [isEnrolling, setIsEnrolling] = useState(false);
+  
+  // Check if user is enrolled
+  useEffect(() => {
+    if (user?.id && courseId) {
+      checkEnrollmentStatus();
+    }
+  }, [user?.id, courseId]);
+
+  const checkEnrollmentStatus = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('hr_course_enrollments')
+        .select('id')
+        .eq('course_id', courseId)
+        .eq('employee_id', user?.id)
+        .single();
+        
+      if (error && error.code !== 'PGRST116') {
+        throw error;
+      }
+      
+      setIsEnrolled(!!data);
+    } catch (error) {
+      console.error('Error checking enrollment:', error);
+    }
+  };
+
+  const handleEnroll = async () => {
+    if (!user?.id) {
+      toast({
+        title: 'Login Required',
+        description: 'Please login to enroll in this course.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    setIsEnrolling(true);
+    try {
+      const { error } = await supabase
+        .from('hr_course_enrollments')
+        .insert({
+          course_id: courseId,
+          employee_id: user.id,
+          status: 'enrolled',
+          progress: 0,
+          enrollment_date: new Date().toISOString(),
+        });
+        
+      if (error) throw error;
+      
+      setIsEnrolled(true);
+      toast({
+        title: 'Successfully Enrolled',
+        description: 'You have been enrolled in this course. Start learning now!',
+      });
+    } catch (error) {
+      console.error('Error enrolling in course:', error);
+      toast({
+        title: 'Enrollment Failed',
+        description: 'Unable to enroll in this course. Please try again later.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsEnrolling(false);
     }
   };
 
@@ -84,7 +162,37 @@ const CourseDetail = () => {
                 </div>
               </div>
 
-              <Button className="w-full md:w-auto">Start Course</Button>
+              <div className="flex flex-col sm:flex-row gap-2">
+                {isEnrolled ? (
+                  <>
+                    <Button asChild>
+                      <Link to={`/courses/${courseId}/learn`}>Continue Learning</Link>
+                    </Button>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="outline" asChild>
+                            <Link to={`/courses/${courseId}/learn-ai`} className="flex items-center">
+                              <Sparkles className="mr-2 h-4 w-4 text-yellow-500" />
+                              AI-Enhanced Learning
+                            </Link>
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="max-w-xs">Experience this course with AI-powered personalized learning path and insights</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </>
+                ) : (
+                  <Button 
+                    onClick={handleEnroll} 
+                    disabled={isEnrolling}
+                  >
+                    {isEnrolling ? 'Enrolling...' : 'Enroll in Course'}
+                  </Button>
+                )}
+              </div>
             </div>
 
             {/* Course Content */}
