@@ -9,6 +9,7 @@ import { Home, BookOpen, Trophy, User, ArrowRight, Sparkles } from "lucide-react
 import DashboardHeader from "@/components/learner/DashboardHeader";
 import TestNotificationButton from "@/components/learner/TestNotificationButton";
 import AICourseRecommendations from "@/components/learner/AICourseRecommendations";
+import PersonalizedPathDisplay from "@/components/learner/PersonalizedPathDisplay";
 
 const LearnerDashboard: React.FC = () => {
   const { user, userDetails, isLoading } = useAuth();
@@ -69,167 +70,85 @@ const LearnerDashboard: React.FC = () => {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">
-                    Courses Enrolled
+                    Courses In Progress
+                  </CardTitle>
+                  <div className="h-4 w-4 rounded-full bg-blue-100 text-blue-500 flex items-center justify-center text-xs">
+                    3
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">8 hours remaining</div>
+                  <p className="text-xs text-muted-foreground">
+                    Last activity: Yesterday
+                  </p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">
+                    Overall Completion
                   </CardTitle>
                   <BookOpen className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">4</div>
+                  <div className="text-2xl font-bold">67%</div>
                   <p className="text-xs text-muted-foreground">
-                    +1 from last month
+                    +5% from last week
                   </p>
                 </CardContent>
               </Card>
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">
-                    Completed Courses
+                    Achievements
                   </CardTitle>
                   <Trophy className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">2</div>
+                  <div className="text-2xl font-bold">12</div>
                   <p className="text-xs text-muted-foreground">
-                    +1 from last month
+                    2 new this month
                   </p>
                 </CardContent>
               </Card>
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">
-                    Learning Hours
+                    Learning Streak
                   </CardTitle>
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    className="h-4 w-4 text-muted-foreground"
-                  >
-                    <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-                  </svg>
+                  <Sparkles className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">28.5</div>
+                  <div className="text-2xl font-bold">5 days</div>
                   <p className="text-xs text-muted-foreground">
-                    +7.2 from last month
-                  </p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">
-                    Certificates
-                  </CardTitle>
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    className="h-4 w-4 text-muted-foreground"
-                  >
-                    <rect width="20" height="14" x="2" y="5" rx="2" />
-                    <path d="M2 10h20" />
-                  </svg>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">2</div>
-                  <p className="text-xs text-muted-foreground">
-                    +1 from last month
+                    Keep it up!
                   </p>
                 </CardContent>
               </Card>
             </div>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <Card className="col-span-2">
-                <CardHeader>
-                  <CardTitle>Continue Learning</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-8">
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div className="font-semibold">Modern JavaScript</div>
-                        <div className="text-sm text-muted-foreground">65%</div>
-                      </div>
-                      <div className="h-2 bg-secondary rounded-full overflow-hidden">
-                        <div className="h-full bg-primary rounded-full" style={{ width: "65%" }}></div>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div className="font-semibold">React Essentials</div>
-                        <div className="text-sm text-muted-foreground">28%</div>
-                      </div>
-                      <div className="h-2 bg-secondary rounded-full overflow-hidden">
-                        <div className="h-full bg-primary rounded-full" style={{ width: "28%" }}></div>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div className="font-semibold">Intro to Machine Learning</div>
-                        <div className="text-sm text-muted-foreground">12%</div>
-                      </div>
-                      <div className="h-2 bg-secondary rounded-full overflow-hidden">
-                        <div className="h-full bg-primary rounded-full" style={{ width: "12%" }}></div>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            <Card className="mt-8 border-primary/20 bg-primary/5">
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Sparkles className="mr-2 h-5 w-5 text-primary" />
-                  AI-Enhanced Learning Experience
-                </CardTitle>
-                <CardDescription>
-                  Experience personalized learning powered by our AI Assistant
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-4 md:grid-cols-3">
-                  <div className="space-y-2">
-                    <h3 className="font-medium">Personal Learning Paths</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Get custom learning journeys based on your skills, goals, and learning style.
-                    </p>
-                  </div>
-                  <div className="space-y-2">
-                    <h3 className="font-medium">Smart Recommendations</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Discover courses and resources tailored to your needs and interests.
-                    </p>
-                  </div>
-                  <div className="space-y-2">
-                    <h3 className="font-medium">Adaptive Content</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Learn with content that adjusts to your pace and highlights what matters most.
-                    </p>
-                  </div>
+            
+            <div className="grid gap-4 grid-cols-1 lg:grid-cols-7">
+              {/* Personalized Learning Path - Takes 4/7 columns on larger screens */}
+              <div className="lg:col-span-4">
+                <div className="mb-4">
+                  <h2 className="text-xl font-semibold">Your Learning Path</h2>
+                  <p className="text-sm text-muted-foreground">
+                    Personalized courses curated by AI based on your preferences and goals
+                  </p>
                 </div>
-              </CardContent>
-              <CardFooter>
-                <Button variant="outline" className="w-full sm:w-auto">
-                  <Link to="/ai-learning-center" className="flex items-center">
-                    <Sparkles className="mr-2 h-4 w-4 text-primary" />
-                    Explore AI Features
-                  </Link>
-                </Button>
-              </CardFooter>
-            </Card>
-
-            <div className="mt-8">
-              <AICourseRecommendations />
+                <PersonalizedPathDisplay />
+              </div>
+              
+              {/* AI Course Recommendations - Takes 3/7 columns on larger screens */}
+              <div className="lg:col-span-3">
+                <div className="mb-4">
+                  <h2 className="text-xl font-semibold">Recommended For You</h2>
+                  <p className="text-sm text-muted-foreground">
+                    Additional courses that match your interests
+                  </p>
+                </div>
+                <AICourseRecommendations />
+              </div>
             </div>
           </TabsContent>
 

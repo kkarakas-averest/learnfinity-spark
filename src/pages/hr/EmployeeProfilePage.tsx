@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, Pencil, Clock, FileText, Book, Award, Activity, Star, MessageSquare } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
+import { Progress } from '@/components/ui/progress';
 
 // Service and types
 import { getEmployeeProfile, updateEmployeeProfile } from '@/services/employee-profile.service';
@@ -259,6 +260,204 @@ const CareerDevelopmentSection = ({ profile }: { profile: EnhancedEmployeeProfil
   )
 );
 
+const AILearningSection = ({ profile }: { profile: EnhancedEmployeeProfile | null }) => {
+  if (!profile) return null;
+
+  // Get RAG status color function (same as in the PersonalInfoSection)
+  const getRagStatusColor = (status: RAGStatus): string => {
+    switch (status) {
+      case 'red': return 'bg-destructive text-destructive-foreground';
+      case 'amber': return 'bg-yellow-500 text-white';
+      case 'green': return 'bg-green-500 text-white';
+      default: return 'bg-secondary text-secondary-foreground';
+    }
+  };
+
+  // Generate mock data if no learning path exists yet
+  const mockLearningPath = {
+    courses: [
+      {
+        id: 'course-1',
+        title: 'Introduction to Project Management',
+        description: 'Learn the fundamentals of project management and team leadership.',
+        duration: '4 hours',
+        matchScore: 92,
+        ragStatus: 'green' as RAGStatus,
+        progress: 75,
+        sections: 12,
+        completedSections: 9,
+        skills: ['leadership', 'communication', 'organization'],
+        requiredForCertification: true
+      },
+      {
+        id: 'course-2',
+        title: 'Effective Communication in Teams',
+        description: 'Develop essential communication skills for collaborative environments.',
+        duration: '3 hours',
+        matchScore: 85,
+        ragStatus: 'amber' as RAGStatus,
+        progress: 30,
+        sections: 10,
+        completedSections: 3,
+        skills: ['communication', 'teamwork', 'empathy'],
+        requiredForCertification: true
+      }
+    ],
+    updatedAt: new Date().toISOString()
+  };
+
+  // Mock agent activity data
+  const mockAgentActivity = [
+    {
+      type: 'recommendation',
+      description: 'Recommended additional resources for Problem-Solving module based on recent assessment results',
+      agent: 'Content Recommendation Agent',
+      timestamp: new Date().toISOString()
+    },
+    {
+      type: 'alert',
+      description: 'Employee showing signs of difficulty with technical concepts in Programming Fundamentals course',
+      agent: 'Learning Progress Agent',
+      timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
+    },
+    {
+      type: 'update',
+      description: 'Learning path updated based on new skill acquisition in Project Management',
+      agent: 'Personalization Agent',
+      timestamp: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+    }
+  ];
+
+  // Use existing data or mock data
+  const learningPath = profile.learningPath || mockLearningPath;
+  const agentActivity = profile.agentActivity || mockAgentActivity;
+
+  return (
+    <>
+      <Card className="mb-4">
+        <CardHeader>
+          <CardTitle>AI-Personalized Learning Path</CardTitle>
+          <CardDescription>
+            Learning path automatically curated by AI agents based on employee's profile, skills, and performance
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {learningPath && learningPath.courses ? (
+              <>
+                <div className="grid gap-4">
+                  {learningPath.courses.map((course: any) => (
+                    <div key={course.id} className="border rounded-md p-4">
+                      <div className="flex items-start justify-between mb-2">
+                        <div>
+                          <h3 className="font-medium">{course.title}</h3>
+                          <p className="text-sm text-muted-foreground">{course.description}</p>
+                        </div>
+                        <Badge className={`${getRagStatusColor(course.ragStatus)} capitalize`}>
+                          {course.ragStatus}
+                        </Badge>
+                      </div>
+                      
+                      <div className="space-y-1 mt-4">
+                        <div className="flex justify-between text-sm">
+                          <span>Progress</span>
+                          <span className="font-medium">{course.progress}%</span>
+                        </div>
+                        <Progress value={course.progress} className="h-2" />
+                      </div>
+                      
+                      <div className="flex items-center text-sm mt-2 justify-between">
+                        <div className="text-muted-foreground">
+                          Match Score: <span className="font-semibold">{course.matchScore}%</span>
+                        </div>
+                        <div className="text-muted-foreground">
+                          Estimated Duration: <span className="font-semibold">{course.duration}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                
+                <div className="text-sm text-muted-foreground italic mt-4">
+                  Last updated: {new Date(learningPath.updatedAt).toLocaleDateString()}
+                </div>
+              </>
+            ) : (
+              <div className="flex items-center justify-center p-8 border rounded-md bg-muted/50">
+                <div className="text-center">
+                  <h3 className="font-medium mb-2">No Learning Path Available</h3>
+                  <p className="text-sm text-muted-foreground">
+                    This employee doesn't have a personalized learning path yet.
+                    They may need to complete the onboarding process.
+                  </p>
+                  <Button 
+                    variant="outline" 
+                    className="mt-4"
+                    onClick={() => {
+                      // Here we would trigger the AI agent to generate a learning path
+                      toast({
+                        title: "AI Request Sent",
+                        description: "Request to generate a personalized learning path has been sent to the AI system."
+                      });
+                    }}
+                  >
+                    <Activity className="mr-2 h-4 w-4" />
+                    Generate Learning Path
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+      
+      <Card>
+        <CardHeader>
+          <CardTitle>AI Agent Activity</CardTitle>
+          <CardDescription>
+            Recent AI actions and recommendations for this employee
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {agentActivity && agentActivity.length > 0 ? (
+              <div className="border rounded-md divide-y">
+                {agentActivity.map((activity: any, index: number) => (
+                  <div key={index} className="p-3">
+                    <div className="flex items-start">
+                      <div className={`w-2 h-2 mt-1.5 rounded-full ${
+                        activity.type === 'recommendation' ? 'bg-blue-500' :
+                        activity.type === 'alert' ? 'bg-amber-500' :
+                        'bg-green-500'
+                      } mr-2`}></div>
+                      <div>
+                        <p className="text-sm font-medium">{activity.description}</p>
+                        <div className="flex items-center mt-1">
+                          <span className="text-xs text-muted-foreground">{activity.agent}</span>
+                          <span className="inline-block mx-2 text-muted-foreground">•</span>
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(activity.timestamp).toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center p-6 border rounded-md bg-muted/50">
+                <p className="text-sm text-muted-foreground">
+                  No recent AI agent activity for this employee.
+                </p>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </>
+  );
+};
+
 /**
  * Employee Profile Page Component
  * 
@@ -379,6 +578,7 @@ const EmployeeProfilePage: React.FC = () => {
     'learning-history': <Clock className="h-4 w-4 mr-2" />,
     'career-development': <Activity className="h-4 w-4 mr-2" />,
     'feedback': <MessageSquare className="h-4 w-4 mr-2" />,
+    'ai-learning': <Star className="h-4 w-4 mr-2" />,
   };
   
   return (
@@ -434,6 +634,10 @@ const EmployeeProfilePage: React.FC = () => {
                 {tabIcons['feedback']}
                 <span className="hidden md:inline">Feedback</span>
               </TabsTrigger>
+              <TabsTrigger value="ai-learning" className="flex items-center">
+                {tabIcons['ai-learning']}
+                <span className="hidden md:inline">AI Learning</span>
+              </TabsTrigger>
             </TabsList>
             
             <TabsContent value="personal-info">
@@ -467,6 +671,10 @@ const EmployeeProfilePage: React.FC = () => {
                 isEditable={true}
                 onEdit={handleEditFeedbackPreferences}
               />
+            </TabsContent>
+            
+            <TabsContent value="ai-learning">
+              <AILearningSection profile={profile} />
             </TabsContent>
           </Tabs>
           

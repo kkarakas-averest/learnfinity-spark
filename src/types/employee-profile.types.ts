@@ -91,6 +91,33 @@ export interface LearningPreferences {
   additionalPreferences?: string;
 }
 
+// Add these interfaces
+export interface LearningPathCourse {
+  id: string;
+  title: string;
+  description: string;
+  duration: string;
+  matchScore: number;
+  ragStatus: RAGStatus;
+  progress: number;
+  sections: number;
+  completedSections: number;
+  skills: string[];
+  requiredForCertification: boolean;
+}
+
+export interface LearningPath {
+  courses: LearningPathCourse[];
+  updatedAt: string;
+}
+
+export interface AgentActivity {
+  type: 'recommendation' | 'alert' | 'update';
+  description: string;
+  agent: string;
+  timestamp: string;
+}
+
 // Complete enhanced employee profile
 export interface EnhancedEmployeeProfile extends Employee {
   // Basic profile extensions
@@ -129,6 +156,10 @@ export interface EnhancedEmployeeProfile extends Employee {
       date: string;
     }[];
   };
+  
+  // Add the new properties for AI-driven learning
+  learningPath?: LearningPath;
+  agentActivity?: AgentActivity[];
 }
 
 // For creating/updating profiles

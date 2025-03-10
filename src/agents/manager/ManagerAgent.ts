@@ -17,6 +17,7 @@ export enum ManagerTaskType {
   COORDINATE_LEARNING_PATH = 'coordinate_learning_path',
   HANDLE_RAG_ALERT = 'handle_rag_alert',
   GENERATE_REPORTS = 'generate_reports',
+  PERSONALIZE_LEARNING = 'personalize_learning',
 }
 
 /**
@@ -183,16 +184,16 @@ export class ManagerAgent implements BaseAgent {
   }
   
   /**
-   * Execute a task based on its type
+   * Execute a task with the Manager Agent
    */
   public async executeTask(task: AgentTask): Promise<AgentTask> {
-    console.info(`Manager Agent executing task: ${task.type}`, task);
+    console.info(`Manager Agent executing task: ${task.id} (${task.type})`);
     
-    // Update task status
-    task.status = 'running';
-    this.tasks.set(task.id, task);
+    // Store the task
+    this.tasks.set(task.id, { ...task, status: 'running' });
     
     try {
+      // Route the task based on its type
       switch (task.type) {
         case ManagerTaskType.INITIALIZE_AGENTS:
           await this.initializeAgents(task);
@@ -210,40 +211,34 @@ export class ManagerAgent implements BaseAgent {
           await this.generateReports(task);
           break;
           
+        case 'personalize_learning':
+          await this.personalizeLearning(task);
+          break;
+          
         default:
+          // For unknown task types, log an error
+          console.warn(`Unknown task type: ${task.type}. Task will be marked as failed.`);
           throw new Error(`Unknown task type: ${task.type}`);
+          break;
       }
       
-      // Mark task as completed
-      task.status = 'completed';
-      task.endTime = new Date();
+      // Update task as completed
+      this.tasks.set(task.id, { ...task, status: 'completed', endTime: new Date() });
       
     } catch (error) {
-      console.error(`Error executing task ${task.type}:`, error);
+      console.error(`Error executing task ${task.id}:`, error);
       
-      // Mark task as failed
-      task.status = 'failed';
-      task.endTime = new Date();
-      task.error = error instanceof Error ? error.message : String(error);
+      // Update task as failed
+      this.tasks.set(task.id, { 
+        ...task, 
+        status: 'failed', 
+        endTime: new Date(),
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
     }
     
-    // Update task in storage
-    this.tasks.set(task.id, task);
-    
-    // Publish task completion event
-    await AgentEventBus.publish({
-      source: this.id,
-      type: 'task.completed',
-      data: {
-        taskId: task.id,
-        taskType: task.type,
-        status: task.status,
-        result: task.result,
-        error: task.error,
-      },
-    });
-    
-    return task;
+    // Return the updated task
+    return this.tasks.get(task.id) as AgentTask;
   }
   
   /**
@@ -397,6 +392,82 @@ export class ManagerAgent implements BaseAgent {
       reportType,
       companyId,
     };
+  }
+  
+  /**
+   * Handle personalization tasks for a learner
+   */
+  private async personalizeLearning(task: AgentTask): Promise<void> {
+    console.info(`Processing personalization task: ${task.id}`);
+    
+    const { userId, learnerProfile } = task.data;
+    
+    if (!userId || !learnerProfile) {
+      throw new Error('Missing required data for personalization task');
+    }
+    
+    try {
+      // Find the personalization agent
+      const personalizationAgent = Array.from(this.agents.values()).find(
+        agent => agent.type === 'personalization'
+      );
+      
+      if (!personalizationAgent) {
+        throw new Error('Personalization agent not found');
+      }
+      
+      console.info(`Delegating personalization task to agent: ${personalizationAgent.id}`);
+      
+      // Create event for personalization
+      const event: AgentEvent = {
+        id: uuidv4(),
+        type: 'personalization.create_path',
+        source: this.id,
+        target: personalizationAgent.id,
+        timestamp: new Date(),
+        data: {
+          userId,
+          learnerProfile
+        }
+      };
+      
+      // Publish the event
+      await AgentEventBus.publish(event);
+      
+      // Log the personalization task
+      await supabase.from('agent_tasks')
+        .insert({
+          task_id: task.id,
+          agent_id: this.id,
+          task_type: 'personalize_learning',
+          status: 'delegated',
+          data: {
+            userId,
+            event_id: event.id,
+            assigned_to: personalizationAgent.id
+          },
+          created_at: new Date().toISOString()
+        });
+      
+      console.info(`Personalization task ${task.id} delegated to ${personalizationAgent.id}`);
+      
+      // For now, we'll consider this task complete once we delegate to the personalization agent
+      // In a more complete implementation, we would wait for the personalization to complete
+      
+      // Update task status
+      this.tasks.set(task.id, {
+        ...task,
+        status: 'completed',
+        result: {
+          status: 'Learning path creation delegated to personalization agent',
+          agentId: personalizationAgent.id
+        }
+      });
+      
+    } catch (error) {
+      console.error(`Error in personalization task:`, error);
+      throw error;
+    }
   }
   
   /**
