@@ -1,5 +1,7 @@
 import { z } from 'zod';
 import { GeneratedCourse } from '@/services/agent-service';
+import { CourseService } from '@/services/course-service';
+import { auth } from '@/lib/auth';
 
 // Define the request and response types for simpler implementation
 type NextRequest = Request;
@@ -13,9 +15,6 @@ function createJsonResponse(data: any, options: { status?: number } = {}) {
     status: options.status || 200,
   });
 }
-
-// In-memory storage for saved courses (simulating database)
-const savedCourses: Record<string, GeneratedCourse> = {};
 
 // Course save request schema
 const courseSaveSchema = z.object({
@@ -74,6 +73,17 @@ const courseSaveSchema = z.object({
  */
 export async function POST(req: NextRequest) {
   try {
+    // Get the user session
+    const session = await auth();
+    
+    // Check if user is authenticated
+    if (!session || !session.user || !session.user.id) {
+      return createJsonResponse(
+        { error: "Unauthorized - You must be logged in to save courses" },
+        { status: 401 }
+      );
+    }
+    
     // Parse the request body
     const body = await req.json();
     
@@ -92,25 +102,24 @@ export async function POST(req: NextRequest) {
     
     const { course } = validationResult.data;
     
-    // In a real app, this would save to a database
-    savedCourses[course.id] = course;
-    
-    // Add metadata about when the course was saved
-    const savedCourse = {
-      ...course,
-      metadata: {
-        savedAt: new Date(),
-        status: "published",
-        version: 1
-      }
-    };
-    
-    // Return success response
-    return createJsonResponse({
-      success: true,
-      message: "Course saved successfully",
-      course: savedCourse
-    });
+    // Save to database using our service
+    try {
+      const courseService = CourseService.getInstance();
+      const courseId = await courseService.saveCourse(course, session.user.id);
+      
+      // Return success response with the new course ID
+      return createJsonResponse({
+        success: true,
+        message: "Course saved successfully to database",
+        courseId
+      });
+    } catch (dbError) {
+      console.error("Database error:", dbError);
+      return createJsonResponse(
+        { error: "Failed to save course to database" },
+        { status: 500 }
+      );
+    }
     
   } catch (error) {
     console.error("Error saving course:", error);
@@ -126,13 +135,35 @@ export async function POST(req: NextRequest) {
  */
 export async function GET() {
   try {
-    // In a real app, this would query a database
-    const courses = Object.values(savedCourses);
+    // Get the user session
+    const session = await auth();
     
-    return createJsonResponse({
-      courses,
-      count: courses.length
-    });
+    // Check if user is authenticated
+    if (!session || !session.user || !session.user.id) {
+      return createJsonResponse(
+        { error: "Unauthorized - You must be logged in to view courses" },
+        { status: 401 }
+      );
+    }
+    
+    // Get courses from database using our service
+    try {
+      const courseService = CourseService.getInstance();
+      const result = await courseService.getCourses({
+        userId: session.user.id
+      });
+      
+      return createJsonResponse({
+        courses: result.courses,
+        count: result.total
+      });
+    } catch (dbError) {
+      console.error("Database error:", dbError);
+      return createJsonResponse(
+        { error: "Failed to retrieve courses from database" },
+        { status: 500 }
+      );
+    }
     
   } catch (error) {
     console.error("Error retrieving courses:", error);

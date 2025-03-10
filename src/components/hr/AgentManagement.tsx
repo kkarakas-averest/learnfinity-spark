@@ -83,6 +83,7 @@ export default function AgentManagement() {
   const [agentStatusData, setAgentStatusData] = React.useState<any>(null);
   const [isLoadingStatus, setIsLoadingStatus] = React.useState(true);
   const [statusError, setStatusError] = React.useState<string | null>(null);
+  const [savedCourseId, setSavedCourseId] = React.useState<string | null>(null);
   
   React.useEffect(() => {
     // Load agent data when the component mounts
@@ -340,8 +341,13 @@ export default function AgentManagement() {
       // Success message
       setSaveMessage({
         type: 'success',
-        text: data.message || 'Course successfully saved to the library!'
+        text: `Course successfully saved to the database! ${data.courseId ? `ID: ${data.courseId}` : ''}`
       });
+      
+      // Set the saved course ID
+      if (data.courseId) {
+        setSavedCourseId(data.courseId);
+      }
       
       // In a real implementation, you would redirect to the course page or show options
       // to customize the course further
@@ -1319,6 +1325,21 @@ export default function AgentManagement() {
       {saveMessage && (
         <div className={`mt-4 p-3 rounded-md ${saveMessage.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
           {saveMessage.text}
+        </div>
+      )}
+      
+      {saveMessage && saveMessage.type === 'success' && savedCourseId && (
+        <div className="mt-2">
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => {
+              // In a real app, this would navigate to the course view
+              window.open(`/course/${savedCourseId}`, '_blank');
+            }}
+          >
+            View Saved Course
+          </Button>
         </div>
       )}
     </div>
