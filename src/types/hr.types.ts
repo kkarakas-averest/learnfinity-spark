@@ -125,7 +125,7 @@ export interface Department {
 }
 
 // HRDashboard tab type
-export type HRDashboardTab = 'overview' | 'employees' | 'courses' | 'reports' | 'analytics';
+export type HRDashboardTab = 'overview' | 'employees' | 'courses' | 'reports' | 'analytics' | 'agents';
 
 // Legacy types kept for backward compatibility
 export interface HRUser {

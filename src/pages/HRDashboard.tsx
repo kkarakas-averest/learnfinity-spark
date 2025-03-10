@@ -3,7 +3,7 @@ import { Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useHRAuth } from '@/contexts/HRAuthContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from '@/components/ui/button';
-import { LogOut, Users, BookOpen, BarChart2, AlertCircle } from 'lucide-react';
+import { LogOut, Users, BookOpen, BarChart2, AlertCircle, Activity } from 'lucide-react';
 import { HRDashboardTab } from '@/types/hr.types';
 import { useToast } from '@/components/ui/use-toast';
 import { hrServices } from '@/lib/services/hrServices';
@@ -18,6 +18,9 @@ import EmployeeIntervention from '@/components/hr/EmployeeIntervention';
 // Import HR components
 const DashboardOverview = React.lazy(() => import('@/components/hr/DashboardOverview'));
 const EmployeeManagement = React.lazy(() => import('@/components/hr/EmployeeManagement'));
+const EmployeeDataDashboard = React.lazy(() => import('@/components/hr/EmployeeDataDashboard'));
+const CourseCreationWizard = React.lazy(() => import('@/components/hr/CourseCreationWizard'));
+const AgentManagement = React.lazy(() => import('@/components/hr/AgentManagement'));
 
 // Define an extended type for hrServices
 type HRServicesExtended = typeof hrServices & {
@@ -44,7 +47,7 @@ export default function HRDashboard() {
   React.useEffect(() => {
     const params = new URLSearchParams(location.search);
     const tabParam = params.get('tab');
-    if (tabParam && ['overview', 'employees', 'courses', 'reports'].includes(tabParam)) {
+    if (tabParam && ['overview', 'employees', 'courses', 'reports', 'analytics'].includes(tabParam)) {
       setActiveTab(tabParam as HRDashboardTab);
     }
   }, [location]);
@@ -181,7 +184,7 @@ export default function HRDashboard() {
         )}
         
         <Tabs defaultValue="overview" value={activeTab} onValueChange={handleTabChange}>
-          <TabsList className="grid w-full max-w-3xl grid-cols-4 mb-8">
+          <TabsList className="grid w-full max-w-3xl grid-cols-6 mb-8">
             <TabsTrigger value="overview" className="flex items-center">
               <BarChart2 className="mr-2 h-4 w-4" />
               Overview
@@ -197,6 +200,14 @@ export default function HRDashboard() {
             <TabsTrigger value="reports" className="flex items-center">
               <BarChart2 className="mr-2 h-4 w-4" />
               Reports
+            </TabsTrigger>
+            <TabsTrigger value="analytics" className="flex items-center">
+              <Activity className="mr-2 h-4 w-4" />
+              Analytics
+            </TabsTrigger>
+            <TabsTrigger value="agents" className="flex items-center">
+              <BookOpen className="mr-2 h-4 w-4" />
+              Agents
             </TabsTrigger>
           </TabsList>
           
@@ -217,13 +228,27 @@ export default function HRDashboard() {
             </TabsContent>
             
             <TabsContent value="courses">
-              <div className="rounded-lg border bg-card p-6">
-                <h2 className="text-2xl font-bold mb-4">Course Management</h2>
-                <p className="text-muted-foreground">
-                  Manage your organization's courses, curricula, and learning paths.
-                  This feature is under development.
-                </p>
-              </div>
+              <Tabs defaultValue="overview">
+                <TabsList className="mb-4">
+                  <TabsTrigger value="overview">Courses Overview</TabsTrigger>
+                  <TabsTrigger value="create">Create Course</TabsTrigger>
+                </TabsList>
+                <TabsContent value="overview">
+                  <div className="rounded-lg border bg-card p-6">
+                    <h2 className="text-2xl font-bold mb-4">Course Management</h2>
+                    <p className="text-muted-foreground mb-6">
+                      Manage your organization's courses, curricula, and learning paths.
+                    </p>
+                    <div className="flex gap-4">
+                      <Button>View All Courses</Button>
+                      <Button variant="outline">Import Courses</Button>
+                    </div>
+                  </div>
+                </TabsContent>
+                <TabsContent value="create">
+                  <CourseCreationWizard />
+                </TabsContent>
+              </Tabs>
             </TabsContent>
             
             <TabsContent value="reports">
@@ -234,6 +259,14 @@ export default function HRDashboard() {
                   This feature is under development.
                 </p>
               </div>
+            </TabsContent>
+            
+            <TabsContent value="analytics">
+              <EmployeeDataDashboard />
+            </TabsContent>
+            
+            <TabsContent value="agents">
+              <AgentManagement />
             </TabsContent>
           </React.Suspense>
         </Tabs>
