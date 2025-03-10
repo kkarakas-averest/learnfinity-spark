@@ -33,6 +33,7 @@ import { useAuth, useUser, useUI } from "@/state";
 // Navigation items configuration
 const NAV_ITEMS = {
   public: [
+    { name: "Courses", href: "/courses", icon: Book },
     { name: "Register", href: "/register", icon: User },
   ],
   authenticated: [

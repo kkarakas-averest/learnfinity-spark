@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, sql, count } from "drizzle-orm";
 import { db } from "@/db";
 import {
   courses,
@@ -45,9 +45,11 @@ export class CourseService {
             estimatedDuration: generatedCourse.estimatedDuration,
             learningObjectives: generatedCourse.learningObjectives,
             createdBy: userId,
-            generatedBy: "EducatorAgent", // Hardcoded for now
-            generationModel: "gpt-4", // Hardcoded for now
-            generationConfig: {} // Empty for now
+            // Optional metadata fields
+            generationPrompt: "",
+            generatedBy: "EducatorAgent",
+            generationModel: "gpt-4",
+            generationConfig: {}
           })
           .returning({ id: courses.id });
 
@@ -207,7 +209,7 @@ export class CourseService {
     const offset = (page - 1) * limit;
 
     try {
-      // Build query based on options
+      // Build query for courses
       let query = db.select().from(courses);
 
       // Filter by published status if specified
@@ -221,17 +223,17 @@ export class CourseService {
       }
 
       // Get total count for pagination
-      const totalResult = await db
-        .select({ count: db.fn.count() })
-        .from(courses)
-        .execute();
-      const total = Number(totalResult[0]?.count || 0);
+      const totalCountResult = await db.select({ 
+        value: sql<number>`count(*)`
+      }).from(courses);
+      
+      const total = totalCountResult[0]?.value || 0;
 
       // Execute the paginated query
-      const results = await query.limit(limit).offset(offset).execute();
+      const coursesResult = await query.limit(limit).offset(offset).execute();
 
       return {
-        courses: results,
+        courses: coursesResult,
         total
       };
     } catch (error) {
