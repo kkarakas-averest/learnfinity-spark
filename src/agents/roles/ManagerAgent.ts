@@ -7,29 +7,28 @@
 
 import { v4 as uuidv4 } from 'uuid';
 import { BaseAgent, AgentMessage } from '../core/BaseAgent';
-import { Agent, AgentConfig } from '../types';
 import { 
-  ManagerAgent as IManagerAgent,
-  AgentRegistry,
-  AgentTask,
+  AgentRegistry, 
+  AgentTask, 
+  IManagerAgent, 
   TaskStatus,
   TaskResult
 } from '../interfaces/ManagerAgent';
+import { Agent } from '../interfaces/Agent';
+import { Agent, AgentConfig } from '../types';
 import { isFeatureEnabled } from '@/lib/env-config';
 
 /**
- * Definition of a workflow that can be executed by the manager agent
+ * WorkflowDefinition defines a sequence of steps that are executed in order
  */
 interface WorkflowDefinition {
   name: string;
   description: string;
   steps: Array<{
-    id: string;
-    description: string;
-    targetAgent: string;
-    taskType: string;
-    dataMapper?: (data: any, previousResults?: Record<string, any>) => any;
-    dependencies?: string[];
+    name: string;
+    type: string;
+    targetAgent?: string;
+    dependsOn?: string[];
   }>;
   options?: Record<string, any>;
 }
@@ -46,7 +45,56 @@ export class ManagerAgent extends BaseAgent implements IManagerAgent {
    * Register predefined workflows
    */
   private registerPredefinedWorkflows(): void {
-    // Implementation will go here
+    // Register Content Generation workflow
+    this.workflows.set("Content Generation", {
+      name: "Content Generation",
+      description: "Generate course content based on request parameters",
+      steps: [
+        {
+          name: "Generate Content",
+          type: "generate_content",
+          targetAgent: "educator-agent"
+        }
+      ]
+    });
+    
+    // Register Learning Path Generation workflow
+    this.workflows.set("Learning Path Generation", {
+      name: "Learning Path Generation",
+      description: "Create a personalized learning path for a learner",
+      steps: [
+        {
+          name: "Analyze Learner Profile",
+          type: "analyze_profile",
+          targetAgent: "rag-system-agent"
+        },
+        {
+          name: "Generate Learning Path",
+          type: "generate_path",
+          targetAgent: "educator-agent",
+          dependsOn: ["Analyze Learner Profile"]
+        }
+      ]
+    });
+    
+    // Register Employee Intervention workflow
+    this.workflows.set("Employee Intervention", {
+      name: "Employee Intervention",
+      description: "Identify and create interventions for at-risk employees",
+      steps: [
+        {
+          name: "Identify At-Risk",
+          type: "identify_at_risk",
+          targetAgent: "rag-system-agent"
+        },
+        {
+          name: "Generate Intervention",
+          type: "generate_intervention",
+          targetAgent: "educator-agent",
+          dependsOn: ["Identify At-Risk"]
+        }
+      ]
+    });
   }
 
   /**
@@ -198,6 +246,10 @@ export class ManagerAgent extends BaseAgent implements IManagerAgent {
         
       case 'monitor_health':
         return this.monitorAgentHealth();
+        
+      case 'route_message':
+        await this.routeMessage(task.data.message, task.data.from, task.data.to);
+        return { success: true };
         
       default:
         throw new Error(`Unknown task type: ${taskType}`);
@@ -379,7 +431,7 @@ export class ManagerAgent extends BaseAgent implements IManagerAgent {
         
         // Submit the task
         const taskId = await this.submitTask({
-          type: step.taskType,
+          type: step.type,
           targetAgent: step.targetAgent,
           priority: 'medium',
           data: taskData,
@@ -387,7 +439,7 @@ export class ManagerAgent extends BaseAgent implements IManagerAgent {
         });
         
         // Store task ID for dependency tracking
-        taskResults[step.id] = { taskId };
+        taskResults[step.name] = { taskId };
       }
       
       // Wait for all tasks to complete
@@ -395,10 +447,10 @@ export class ManagerAgent extends BaseAgent implements IManagerAgent {
       await this.waitForTasks(allTaskIds);
       
       // Collect all results
-      for (const [stepId, result] of Object.entries(taskResults)) {
+      for (const [stepName, result] of Object.entries(taskResults)) {
         const taskResult = await this.getTaskResult(result.taskId);
         if (taskResult) {
-          taskResults[stepId] = taskResult;
+          taskResults[stepName] = taskResult;
         }
       }
       
@@ -465,15 +517,24 @@ export class ManagerAgent extends BaseAgent implements IManagerAgent {
   /**
    * Handle agent communication by routing messages
    */
-  async routeMessage(message: AgentMessage): Promise<void> {
+  async routeMessage(message: any, from: string, to: string): Promise<any> {
     this.ensureInitialized();
     
-    const targetAgent = await this.getAgent(message.to);
+    const targetAgent = await this.getAgent(to);
     if (!targetAgent) {
-      throw new Error(`Target agent ${message.to} not found`);
+      throw new Error(`Target agent ${to} not found`);
     }
     
-    // Route the message to the target agent
-    await targetAgent.receiveMessage(message);
+    // Create a properly formatted message
+    const formattedMessage: AgentMessage = {
+      id: uuidv4(),
+      from,
+      to,
+      content: message,
+      timestamp: new Date()
+    };
+    
+    // Send the message to the target agent
+    return targetAgent.receiveMessage(formattedMessage, from);
   }
 }
