@@ -1,214 +1,174 @@
-import React from 'react';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Book, Clock, Award, ArrowRight, Sparkles } from 'lucide-react';
-import { Skeleton } from '@/components/ui/skeleton';
-import { useToast } from '@/components/ui/use-toast';
-import { useAuth } from '@/state';
-import { AgentFactory } from '@/agents/AgentFactory';
+import React from "@/lib/react-helpers";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Sparkles, Star, Clock, AlertCircle, RefreshCw } from "lucide-react";
+import { useAuth } from "@/state";
+import { useToast } from "@/components/ui/use-toast";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { Badge } from "@/components/ui/badge";
+import { Link } from "react-router-dom";
 
-const { useState, useEffect } = React;
-
-interface Course {
+interface CourseRecommendation {
   id: string;
   title: string;
   description: string;
-  category: string;
-  duration: string;
-  level: 'Beginner' | 'Intermediate' | 'Advanced';
-  matchScore: number; // Personalization match score (0-100)
-  skills: string[];
-  aiGenerated: boolean;
+  matchScore: number;
+  duration: number;
+  tags: string[];
 }
 
-interface EnhancedUserDetails {
-  id?: string;
-  name?: string;
-  email?: string;
-  ragStatus?: string;
-  skills?: Array<{ name: string }>;
+interface PathCourse {
+  id: string;
+  title: string;
+  description: string;
+  [key: string]: any; // For other properties that might be in the course
+}
+
+interface LearningPathData {
+  id: string;
+  title: string;
+  description: string;
+  courses: PathCourse[];
+  [key: string]: any; // For other properties that might be in the learning path
 }
 
 const AICourseRecommendations: React.FC = () => {
-  const { user, userDetails } = useAuth();
-  const enhancedUserDetails = userDetails as EnhancedUserDetails;
+  const { user } = useAuth();
   const { toast } = useToast();
-  const [recommendations, setRecommendations] = useState<Course[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [enrolling, setEnrolling] = useState<string | null>(null);
+  const [recommendations, setRecommendations] = React.useState<CourseRecommendation[]>([]);
+  const [isLoading, setIsLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = React.useState(false);
 
-  // Instead, create a simple mock educator agent
-  const educatorAgent = {
-    processTask: async (task: any) => {
-      console.log('Mock educator agent processing task:', task);
-      return []; // Return empty array as fallback
-    }
-  };
-
-  useEffect(() => {
-    if (user?.id) {
-      loadRecommendations();
-    }
-  }, [user?.id]);
-
-  const loadRecommendations = async () => {
-    setLoading(true);
+  const fetchRecommendations = React.useCallback(async () => {
+    if (!user?.id) return;
+    
     try {
-      const recommendationTask = {
-        type: 'recommend_resources',
-        data: {
-          employeeId: user?.id,
-          currentStatus: enhancedUserDetails?.ragStatus || 'GREEN',
-          topics: enhancedUserDetails?.skills?.map(s => s.name) || ['Programming', 'Leadership', 'Communication'],
-          count: 5
+      setIsLoading(true);
+      setError(null);
+      
+      // This would normally be a separate API endpoint, but for now
+      // we'll use the learning path API and transform the data
+      const response = await fetch(`/api/learner/learning-path?userId=${user.id}`);
+      
+      if (!response.ok) {
+        if (response.status === 404) {
+          // No learning path found, which means no recommendations yet
+          setRecommendations([]);
+          return;
         }
-      };
-
-      setRecommendations(getSampleRecommendations());
+        throw new Error('Failed to fetch course recommendations');
+      }
       
-      // Uncomment this for real agent use:
-      // const result = await educatorAgent.processTask(recommendationTask);
-      // 
-      // // Transform agent results into course format
-      // const recommendedCourses = result.map((resource, index) => ({
-      //   id: resource.id || `ai-course-${index}`,
-      //   title: resource.title,
-      //   description: resource.description,
-      //   category: resource.topics ? resource.topics[0] : 'AI Generated',
-      //   duration: `${resource.duration} min`,
-      //   level: resource.difficulty.charAt(0).toUpperCase() + resource.difficulty.slice(1) as 'Beginner' | 'Intermediate' | 'Advanced',
-      //   matchScore: Math.floor(Math.random() * 30) + 70, // For demo, random 70-100% match
-      //   skills: resource.topics || [],
-      //   aiGenerated: true
-      // }));
-      //
-      // setRecommendations(recommendedCourses);
+      const data = await response.json() as LearningPathData;
+      
+      // Generate some additional recommendations based on the learning path
+      // In a real implementation, this would come from a dedicated recommendations API
+      if (data && data.courses && data.courses.length > 0) {
+        const mainPathCourseIds = new Set<string>(data.courses.map(course => course.id));
+        const relatedRecommendations = generateRelatedRecommendations(data.courses, mainPathCourseIds);
+        setRecommendations(relatedRecommendations);
+      } else {
+        setRecommendations([]);
+      }
     } catch (error) {
-      console.error('Error fetching AI recommendations:', error);
+      console.error('Error fetching course recommendations:', error);
+      setError('Failed to load course recommendations');
+      
       toast({
-        title: 'Recommendation Error',
-        description: 'Failed to load personalized recommendations. Please try again later.',
         variant: 'destructive',
-      });
-      
-      // Fallback to sample recommendations
-      setRecommendations(getSampleRecommendations());
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleEnroll = async (courseId: string) => {
-    setEnrolling(courseId);
-    try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      toast({
-        title: 'Successfully Enrolled',
-        description: 'You have been enrolled in this course. Start learning now!',
-        variant: 'default',
-      });
-      
-      // Remove from recommendations or mark as enrolled
-      setRecommendations(prev => prev.filter(course => course.id !== courseId));
-    } catch (error) {
-      console.error('Error enrolling in course:', error);
-      toast({
-        title: 'Enrollment Failed',
-        description: 'Unable to enroll in this course. Please try again later.',
-        variant: 'destructive',
+        title: 'Error loading recommendations',
+        description: 'Could not load your course recommendations. Please try again later.'
       });
     } finally {
-      setEnrolling(null);
+      setIsLoading(false);
+      setIsRefreshing(false);
     }
+  }, [user?.id, toast]);
+
+  // Generate related recommendations based on the courses in the learning path
+  const generateRelatedRecommendations = (pathCourses: PathCourse[], existingCourseIds: Set<string>): CourseRecommendation[] => {
+    // This is a placeholder implementation that would be replaced by a real AI recommendation engine
+    const relatedCourses: CourseRecommendation[] = [
+      {
+        id: 'rec-1',
+        title: 'Advanced Data Visualization',
+        description: 'Master techniques for creating compelling data visualizations for complex datasets.',
+        matchScore: 87,
+        duration: 4,
+        tags: ['data', 'visualization', 'analytics']
+      },
+      {
+        id: 'rec-2',
+        title: 'Business Communication Essentials',
+        description: 'Enhance your written and verbal communication skills for professional environments.',
+        matchScore: 92,
+        duration: 3,
+        tags: ['communication', 'business', 'skills']
+      },
+      {
+        id: 'rec-3',
+        title: 'Design Thinking Workshop',
+        description: 'Learn creative problem-solving techniques used by leading design firms.',
+        matchScore: 79,
+        duration: 2,
+        tags: ['design', 'creativity', 'innovation']
+      },
+      {
+        id: 'rec-4',
+        title: 'Emotional Intelligence at Work',
+        description: 'Develop emotional awareness and relationship management skills for workplace success.',
+        matchScore: 84,
+        duration: 3,
+        tags: ['emotional-intelligence', 'leadership', 'psychology']
+      }
+    ].filter(course => !existingCourseIds.has(course.id))
+     .sort((a, b) => b.matchScore - a.matchScore)
+     .slice(0, 3); // Limit to 3 recommendations
+    
+    return relatedCourses;
   };
 
-  const getLevelColor = (level: string) => {
-    switch (level) {
-      case 'Beginner':
-        return 'bg-green-100 text-green-800';
-      case 'Intermediate':
-        return 'bg-blue-100 text-blue-800';
-      case 'Advanced':
-        return 'bg-purple-100 text-purple-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
+  const refreshRecommendations = async () => {
+    setIsRefreshing(true);
+    await fetchRecommendations();
   };
 
-  const getSampleRecommendations = (): Course[] => [
-    {
-      id: 'sample-1',
-      title: 'Advanced Data Analytics',
-      description: 'Master data analysis techniques using modern tools and methodologies.',
-      category: 'Data Science',
-      duration: '6 hours',
-      level: 'Intermediate',
-      matchScore: 95,
-      skills: ['Analytics', 'Python', 'Statistics'],
-      aiGenerated: true
-    },
-    {
-      id: 'sample-2',
-      title: 'Leadership Communication',
-      description: 'Enhance your leadership communication skills for effective team management.',
-      category: 'Leadership',
-      duration: '3 hours',
-      level: 'Beginner',
-      matchScore: 89,
-      skills: ['Communication', 'Leadership', 'Management'],
-      aiGenerated: true
-    },
-    {
-      id: 'sample-3',
-      title: 'AI-Assisted Project Management',
-      description: 'Learn how to leverage AI tools for more efficient project management.',
-      category: 'Project Management',
-      duration: '4 hours',
-      level: 'Intermediate',
-      matchScore: 82,
-      skills: ['Project Management', 'AI Tools', 'Productivity'],
-      aiGenerated: true
-    }
-  ];
-  
-  if (loading) {
+  // Fetch recommendations on component mount and when user changes
+  React.useEffect(() => {
+    fetchRecommendations();
+  }, [user?.id, fetchRecommendations]);
+
+  if (isLoading && !isRefreshing) {
     return (
-      <div className="space-y-3">
-        <Skeleton className="h-8 w-3/4" />
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1, 2, 3].map(i => (
-            <Card key={i} className="overflow-hidden">
-              <CardHeader className="pb-0">
-                <Skeleton className="h-5 w-1/3 mb-2" />
-                <Skeleton className="h-6 w-full" />
-              </CardHeader>
-              <CardContent>
-                <Skeleton className="h-20 w-full" />
-              </CardContent>
-              <CardFooter>
-                <Skeleton className="h-9 w-full" />
-              </CardFooter>
-            </Card>
-          ))}
-        </div>
-      </div>
+      <Card className="w-full h-64 flex items-center justify-center">
+        <CardContent>
+          <div className="flex flex-col items-center space-y-4">
+            <LoadingSpinner size="lg" />
+            <p className="text-sm text-muted-foreground">Loading course recommendations...</p>
+          </div>
+        </CardContent>
+      </Card>
     );
   }
 
-  if (recommendations.length === 0) {
+  if (error) {
     return (
-      <Card className="bg-muted/50">
+      <Card className="border-red-200 bg-red-50">
         <CardContent className="pt-6">
-          <div className="text-center py-8">
-            <p className="text-muted-foreground">No personalized recommendations available yet.</p>
+          <div className="flex flex-col items-center gap-4 text-center">
+            <AlertCircle className="h-10 w-10 text-red-500" />
+            <div>
+              <h3 className="text-lg font-semibold text-red-800">Error Loading Recommendations</h3>
+              <p className="text-sm text-red-700 mt-1">{error}</p>
+            </div>
             <Button 
               variant="outline" 
-              onClick={loadRecommendations} 
-              className="mt-4"
+              className="mt-2"
+              onClick={fetchRecommendations}
             >
-              Generate Recommendations
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Try Again
             </Button>
           </div>
         </CardContent>
@@ -216,74 +176,92 @@ const AICourseRecommendations: React.FC = () => {
     );
   }
 
+  if (!recommendations || recommendations.length === 0) {
+    return (
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex flex-col items-center gap-4 text-center py-10">
+            <Sparkles className="h-12 w-12 text-orange-400" />
+            <div>
+              <h3 className="text-xl font-semibold">No Recommendations Yet</h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                Complete some courses in your learning path to get personalized recommendations.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
-    <div className="space-y-3">
-      <div className="flex justify-between items-center mb-2">
-        <h2 className="text-2xl font-bold flex items-center">
-          <Sparkles className="mr-2 h-5 w-5 text-primary" /> 
-          AI-Recommended Courses
-        </h2>
-        <Button variant="ghost" size="sm" onClick={loadRecommendations}>
-          Refresh
-        </Button>
-      </div>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {recommendations.map(course => (
-          <Card key={course.id} className="overflow-hidden flex flex-col">
-            <CardHeader className="pb-2">
-              <div className="flex justify-between">
-                <Badge className="text-xs">{course.category}</Badge>
-                <Badge variant="outline" className="bg-primary/10 text-xs">
-                  {course.matchScore}% Match
+    <Card>
+      <CardHeader className="pb-3">
+        <div className="flex justify-between items-center">
+          <CardTitle className="text-lg flex items-center">
+            <Sparkles className="h-5 w-5 mr-2 text-orange-400" />
+            AI Recommended Courses
+          </CardTitle>
+          <Button 
+            variant="ghost" 
+            size="sm"
+            className="text-xs"
+            onClick={refreshRecommendations}
+            disabled={isRefreshing}
+          >
+            <RefreshCw className={`h-3.5 w-3.5 mr-1 ${isRefreshing ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-3">
+          {recommendations.map(course => (
+            <div 
+              key={course.id} 
+              className="border rounded-lg p-3 hover:shadow-sm transition-shadow"
+            >
+              <div className="flex items-start justify-between mb-2">
+                <div>
+                  <h3 className="font-medium">{course.title}</h3>
+                  <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                    {course.description}
+                  </p>
+                </div>
+                <Badge className="bg-orange-100 text-orange-800 ml-1 text-xs">
+                  <Star className="h-3 w-3 mr-1 fill-orange-500 text-orange-500" />
+                  {course.matchScore}%
                 </Badge>
               </div>
-              <CardTitle className="text-lg mt-2">{course.title}</CardTitle>
-            </CardHeader>
-            
-            <CardContent className="flex-grow pb-2">
-              <CardDescription className="line-clamp-3">
-                {course.description}
-              </CardDescription>
               
-              <div className="flex flex-wrap gap-1 mt-3">
-                {course.skills.map((skill, i) => (
-                  <Badge key={i} variant="secondary" className="text-xs">
-                    {skill}
+              <div className="flex items-center justify-between mt-3">
+                <div className="flex items-center text-xs text-muted-foreground">
+                  <Clock className="h-3.5 w-3.5 mr-1" /> 
+                  {course.duration} hours
+                </div>
+                <Link to={`/course/${course.id}`}>
+                  <Button variant="outline" size="sm" className="text-xs h-7">
+                    View Course
+                  </Button>
+                </Link>
+              </div>
+              
+              <div className="flex flex-wrap gap-1 mt-2">
+                {course.tags.map(tag => (
+                  <Badge 
+                    key={tag} 
+                    variant="secondary" 
+                    className="text-xs font-normal px-1.5 py-0"
+                  >
+                    {tag}
                   </Badge>
                 ))}
               </div>
-            </CardContent>
-            
-            <div className="px-6 pb-2">
-              <div className="flex justify-between text-xs text-muted-foreground mb-2">
-                <div className="flex items-center">
-                  <Clock className="h-3 w-3 mr-1" />
-                  <span>{course.duration}</span>
-                </div>
-                <div className="flex items-center">
-                  <Award className="h-3 w-3 mr-1" />
-                  <span className={`px-1.5 py-0.5 rounded-full ${getLevelColor(course.level)}`}>
-                    {course.level}
-                  </span>
-                </div>
-              </div>
             </div>
-            
-            <CardFooter className="pt-0">
-              <Button 
-                className="w-full" 
-                onClick={() => handleEnroll(course.id)}
-                disabled={enrolling === course.id}
-              >
-                {enrolling === course.id ? 'Enrolling...' : 'Enroll Now'}
-                {enrolling !== course.id && <ArrowRight className="ml-2 h-4 w-4" />}
-              </Button>
-            </CardFooter>
-          </Card>
-        ))}
-      </div>
-    </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
   );
 };
 

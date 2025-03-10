@@ -5,17 +5,71 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
-import { Home, BookOpen, Trophy, User, ArrowRight, Sparkles } from "lucide-react";
+import { Home, BookOpen, Trophy, User, ArrowRight, Sparkles, AlertCircle } from "lucide-react";
 import DashboardHeader from "@/components/learner/DashboardHeader";
 import TestNotificationButton from "@/components/learner/TestNotificationButton";
 import AICourseRecommendations from "@/components/learner/AICourseRecommendations";
 import PersonalizedPathDisplay from "@/components/learner/PersonalizedPathDisplay";
+import { useToast } from "@/components/ui/use-toast";
+import { Progress } from "@/components/ui/progress";
 
 const LearnerDashboard: React.FC = () => {
   const { user, userDetails, isLoading } = useAuth();
+  const { toast } = useToast();
   const [activeTab, setActiveTab] = React.useState("overview");
+  const [learnerStats, setLearnerStats] = React.useState({
+    coursesInProgress: 0,
+    hoursRemaining: 0,
+    overallCompletion: 0,
+    completionChange: 0,
+    achievements: 0,
+    newAchievements: 0,
+    learningStreak: 0
+  });
+  const [statsLoading, setStatsLoading] = React.useState(true);
+  const [statsError, setStatsError] = React.useState<string | null>(null);
   
-  console.log("LearnerDashboard - Current state:", { user, userDetails, isLoading });
+  // Fetch learner stats
+  React.useEffect(() => {
+    if (!user?.id) return;
+    
+    const fetchLearnerStats = async () => {
+      try {
+        setStatsLoading(true);
+        setStatsError(null);
+        
+        const response = await fetch(`/api/learner/stats?userId=${user.id}`);
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch learner stats');
+        }
+        
+        const data = await response.json();
+        setLearnerStats(data);
+      } catch (error) {
+        console.error('Error fetching learner stats:', error);
+        setStatsError('Failed to load your dashboard stats');
+        
+        // Show error toast
+        toast({
+          variant: 'destructive',
+          title: 'Error loading stats',
+          description: 'Could not load your learning stats. Please try again later.'
+        });
+      } finally {
+        setStatsLoading(false);
+      }
+    };
+    
+    fetchLearnerStats();
+    
+    // Refresh stats every 5 minutes
+    const interval = setInterval(fetchLearnerStats, 5 * 60 * 1000);
+    
+    return () => clearInterval(interval);
+  }, [user?.id, toast]);
+  
+  console.log("LearnerDashboard - Current state:", { user, userDetails, isLoading, learnerStats });
 
   // Redirect if not authenticated
   if (!isLoading && !user) {
@@ -38,11 +92,13 @@ const LearnerDashboard: React.FC = () => {
     <div className="min-h-screen bg-gray-50">
       <DashboardHeader />
       
-      {/* Temporary User ID Display - Remove after testing */}
-      <div className="bg-blue-100 p-2 text-sm text-center">
-        <p>Your User ID: <strong>{user?.id}</strong> (Copy this for your test notifications)</p>
-        <TestNotificationButton />
-      </div>
+      {/* Development User ID Display - Remove in production */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="bg-blue-100 p-2 text-sm text-center">
+          <p>Your User ID: <strong>{user?.id}</strong> (Development mode)</p>
+          <TestNotificationButton />
+        </div>
+      )}
       
       <main className="container mx-auto px-4 py-8">
         <Tabs defaultValue={activeTab} onValueChange={setActiveTab} className="space-y-4">
@@ -66,6 +122,17 @@ const LearnerDashboard: React.FC = () => {
           </TabsList>
 
           <TabsContent value="overview" className="space-y-4">
+            {statsError && (
+              <Card className="border-red-200 bg-red-50 mb-4">
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-2 text-red-800">
+                    <AlertCircle className="h-5 w-5" />
+                    <p>{statsError}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+            
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -73,11 +140,21 @@ const LearnerDashboard: React.FC = () => {
                     Courses In Progress
                   </CardTitle>
                   <div className="h-4 w-4 rounded-full bg-blue-100 text-blue-500 flex items-center justify-center text-xs">
-                    3
+                    {statsLoading ? (
+                      <LoadingSpinner size="xs" />
+                    ) : (
+                      learnerStats.coursesInProgress
+                    )}
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">8 hours remaining</div>
+                  <div className="text-2xl font-bold">
+                    {statsLoading ? (
+                      <div className="h-8 w-24 bg-gray-200 animate-pulse rounded"></div>
+                    ) : (
+                      `${learnerStats.hoursRemaining} hours remaining`
+                    )}
+                  </div>
                   <p className="text-xs text-muted-foreground">
                     Last activity: Yesterday
                   </p>
@@ -91,9 +168,19 @@ const LearnerDashboard: React.FC = () => {
                   <BookOpen className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">67%</div>
+                  <div className="text-2xl font-bold">
+                    {statsLoading ? (
+                      <div className="h-8 w-16 bg-gray-200 animate-pulse rounded"></div>
+                    ) : (
+                      `${learnerStats.overallCompletion}%`
+                    )}
+                  </div>
                   <p className="text-xs text-muted-foreground">
-                    +5% from last week
+                    {statsLoading ? (
+                      <div className="h-4 w-20 bg-gray-200 animate-pulse rounded"></div>
+                    ) : (
+                      `+${learnerStats.completionChange}% from last week`
+                    )}
                   </p>
                 </CardContent>
               </Card>
@@ -105,9 +192,19 @@ const LearnerDashboard: React.FC = () => {
                   <Trophy className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">12</div>
+                  <div className="text-2xl font-bold">
+                    {statsLoading ? (
+                      <div className="h-8 w-12 bg-gray-200 animate-pulse rounded"></div>
+                    ) : (
+                      learnerStats.achievements
+                    )}
+                  </div>
                   <p className="text-xs text-muted-foreground">
-                    2 new this month
+                    {statsLoading ? (
+                      <div className="h-4 w-20 bg-gray-200 animate-pulse rounded"></div>
+                    ) : (
+                      `${learnerStats.newAchievements} new this month`
+                    )}
                   </p>
                 </CardContent>
               </Card>
@@ -119,7 +216,13 @@ const LearnerDashboard: React.FC = () => {
                   <Sparkles className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">5 days</div>
+                  <div className="text-2xl font-bold">
+                    {statsLoading ? (
+                      <div className="h-8 w-16 bg-gray-200 animate-pulse rounded"></div>
+                    ) : (
+                      `${learnerStats.learningStreak} days`
+                    )}
+                  </div>
                   <p className="text-xs text-muted-foreground">
                     Keep it up!
                   </p>

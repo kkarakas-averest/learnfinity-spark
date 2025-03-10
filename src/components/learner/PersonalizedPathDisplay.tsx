@@ -4,11 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
-import { BookOpen, ChevronRight, Award, Clock, CheckCircle, AlertTriangle, AlertCircle } from "lucide-react";
+import { BookOpen, ChevronRight, Award, Clock, CheckCircle, AlertTriangle, AlertCircle, ArrowRight, Sparkles, RefreshCw } from "lucide-react";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { useAuth } from "@/state";
 import { supabase } from "@/lib/supabase";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
+import { useToast } from "@/components/ui/use-toast";
 
 interface LearningPathCourse {
   id: string;
@@ -29,101 +30,106 @@ interface LearningPath {
   name: string;
   description: string;
   createdAt: string;
+  updatedAt: string;
   courses: LearningPathCourse[];
   certificationName?: string;
 }
 
 const PersonalizedPathDisplay: React.FC = () => {
   const { user } = useAuth();
+  const { toast } = useToast();
   const navigate = useNavigate();
-  const [loading, setLoading] = React.useState(true);
-  const [error, setError] = React.useState<string | null>(null);
   const [learningPath, setLearningPath] = React.useState<LearningPath | null>(null);
-  
-  // Fetch personalized learning path
-  React.useEffect(() => {
+  const [isLoading, setIsLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+  const [isGenerating, setIsGenerating] = React.useState(false);
+
+  const fetchLearningPath = React.useCallback(async () => {
     if (!user?.id) return;
     
-    const fetchLearningPath = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        
-        // Fetch learning path data from Supabase
-        const { data, error } = await supabase
-          .from('learning_paths')
-          .select(`
-            id, 
-            name, 
-            description, 
-            created_at,
-            certification_name,
-            courses:learning_path_courses(
-              id,
-              course_id,
-              courses(
-                id,
-                title,
-                description,
-                estimated_duration,
-                skills,
-                required_for_certification
-              ),
-              match_score,
-              rag_status,
-              progress,
-              sections,
-              completed_sections
-            )
-          `)
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .single();
-        
-        if (error) throw error;
-        
-        if (!data) {
-          // No learning path found, we'll use mock data for now
-          setLearningPath(getMockLearningPath());
-        } else {
-          // Transform the data to match our interface
-          const transformedPath: LearningPath = {
-            id: data.id,
-            name: data.name,
-            description: data.description,
-            createdAt: data.created_at,
-            certificationName: data.certification_name,
-            courses: data.courses.map((courseData: any) => ({
-              id: courseData.course_id,
-              title: courseData.courses.title,
-              description: courseData.courses.description,
-              duration: courseData.courses.estimated_duration,
-              matchScore: courseData.match_score,
-              ragStatus: courseData.rag_status,
-              progress: courseData.progress,
-              sections: courseData.sections,
-              completedSections: courseData.completed_sections,
-              skills: courseData.courses.skills,
-              requiredForCertification: courseData.courses.required_for_certification
-            }))
-          };
-          
-          setLearningPath(transformedPath);
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      const response = await fetch(`/api/learner/learning-path?userId=${user.id}`);
+      
+      if (!response.ok) {
+        if (response.status === 404) {
+          // No learning path found, this is expected for new users
+          setLearningPath(null);
+          return;
         }
-      } catch (err) {
-        console.error('Error fetching learning path:', err);
-        setError('Failed to load your personalized learning path');
-        // Set mock data as fallback
-        setLearningPath(getMockLearningPath());
-      } finally {
-        setLoading(false);
+        throw new Error('Failed to fetch learning path');
       }
-    };
+      
+      const data = await response.json();
+      setLearningPath(data);
+    } catch (error) {
+      console.error('Error fetching learning path:', error);
+      setError('Failed to load your personalized learning path');
+      
+      toast({
+        variant: 'destructive',
+        title: 'Error loading learning path',
+        description: 'Could not load your personalized learning path. Please try again later.'
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user?.id, toast]);
+
+  const generateLearningPath = async () => {
+    if (!user?.id) return;
     
+    try {
+      setIsGenerating(true);
+      setError(null);
+      
+      toast({
+        title: 'Generating your personalized learning path',
+        description: 'Our AI is analyzing your profile to create a custom path. This may take a moment...',
+        duration: 5000,
+      });
+      
+      const response = await fetch('/api/learner/learning-path', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userId: user.id }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to generate learning path');
+      }
+      
+      toast({
+        title: 'Learning path created!',
+        description: 'Your personalized learning path has been created successfully.',
+        duration: 3000,
+      });
+      
+      // Fetch the newly created learning path
+      fetchLearningPath();
+    } catch (error) {
+      console.error('Error generating learning path:', error);
+      setError('Failed to generate your personalized learning path');
+      
+      toast({
+        variant: 'destructive',
+        title: 'Error generating learning path',
+        description: 'Could not generate your personalized learning path. Please try again later.'
+      });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  // Fetch learning path on component mount and when user changes
+  React.useEffect(() => {
     fetchLearningPath();
-  }, [user?.id]);
-  
+  }, [user?.id, fetchLearningPath]);
+
   // Navigate to course
   const handleNavigateToCourse = (courseId: string) => {
     navigate(`/course/${courseId}`);
@@ -155,96 +161,95 @@ const PersonalizedPathDisplay: React.FC = () => {
     }
   };
   
-  // Mock data function for development
-  const getMockLearningPath = (): LearningPath => {
-    return {
-      id: 'mock-path-1',
-      name: 'Personalized Learning Path',
-      description: 'This learning path has been created based on your profile and preferences.',
-      createdAt: new Date().toISOString(),
-      certificationName: 'Professional Development Certificate',
-      courses: [
-        {
-          id: 'course-1',
-          title: 'Introduction to Project Management',
-          description: 'Learn the fundamentals of project management and team leadership.',
-          duration: '4 hours',
-          matchScore: 92,
-          ragStatus: 'green',
-          progress: 75,
-          sections: 12,
-          completedSections: 9,
-          skills: ['leadership', 'communication', 'organization'],
-          requiredForCertification: true
-        },
-        {
-          id: 'course-2',
-          title: 'Effective Communication in Teams',
-          description: 'Develop essential communication skills for collaborative environments.',
-          duration: '3 hours',
-          matchScore: 85,
-          ragStatus: 'amber',
-          progress: 30,
-          sections: 10,
-          completedSections: 3,
-          skills: ['communication', 'teamwork', 'empathy'],
-          requiredForCertification: true
-        },
-        {
-          id: 'course-3',
-          title: 'Problem-Solving Techniques',
-          description: 'Master practical approaches to solving complex problems in the workplace.',
-          duration: '5 hours',
-          matchScore: 88,
-          ragStatus: 'red',
-          progress: 10,
-          sections: 8,
-          completedSections: 1,
-          skills: ['problem-solving', 'creativity', 'critical-thinking'],
-          requiredForCertification: false
-        }
-      ]
-    };
+  const getStatusColor = (status: 'red' | 'amber' | 'green') => {
+    switch (status) {
+      case 'red':
+        return 'text-red-500 bg-red-100';
+      case 'amber':
+        return 'text-amber-500 bg-amber-100';
+      case 'green':
+        return 'text-green-500 bg-green-100';
+      default:
+        return 'text-gray-500 bg-gray-100';
+    }
   };
-  
-  if (loading) {
+
+  if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center py-12">
-        <LoadingSpinner size="lg" />
-        <p className="mt-4 text-muted-foreground">Loading your personalized learning path...</p>
-      </div>
-    );
-  }
-  
-  if (error && !learningPath) {
-    return (
-      <Card className="border-red-200 bg-red-50">
-        <CardHeader>
-          <CardTitle className="text-red-800">Error Loading Learning Path</CardTitle>
-          <CardDescription className="text-red-700">
-            {error}
-          </CardDescription>
-        </CardHeader>
-        <CardFooter>
-          <Button variant="outline" onClick={() => window.location.reload()}>
-            Try Again
-          </Button>
-        </CardFooter>
+      <Card className="w-full h-64 flex items-center justify-center">
+        <CardContent>
+          <div className="flex flex-col items-center space-y-4">
+            <LoadingSpinner size="lg" />
+            <p className="text-sm text-muted-foreground">Loading your personalized learning path...</p>
+          </div>
+        </CardContent>
       </Card>
     );
   }
-  
-  if (!learningPath) {
-    return null;
+
+  if (error) {
+    return (
+      <Card className="border-red-200 bg-red-50">
+        <CardContent className="pt-6">
+          <div className="flex flex-col items-center gap-4 text-center">
+            <AlertCircle className="h-10 w-10 text-red-500" />
+            <div>
+              <h3 className="text-lg font-semibold text-red-800">Error Loading Learning Path</h3>
+              <p className="text-sm text-red-700 mt-1">{error}</p>
+            </div>
+            <Button 
+              variant="outline" 
+              className="mt-2"
+              onClick={fetchLearningPath}
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Try Again
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
   }
-  
+
+  if (!learningPath) {
+    return (
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex flex-col items-center gap-4 text-center py-10">
+            <Sparkles className="h-12 w-12 text-blue-500" />
+            <div>
+              <h3 className="text-xl font-semibold">No Learning Path Yet</h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                You haven't created a personalized learning path yet. Let our AI generate one for you based on your profile.
+              </p>
+            </div>
+            <Button 
+              className="mt-4" 
+              onClick={generateLearningPath}
+              disabled={isGenerating}
+            >
+              {isGenerating ? (
+                <>
+                  <LoadingSpinner size="sm" className="mr-2" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Generate Learning Path
+                </>
+              )}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
-    <Card className="shadow-sm">
+    <Card className="w-full border-l-4 border-l-blue-500">
       <CardHeader>
-        <CardTitle className="text-xl flex items-center">
-          <BookOpen className="mr-2 h-5 w-5 text-primary" />
-          {learningPath.name}
-        </CardTitle>
+        <CardTitle>{learningPath.name}</CardTitle>
         <CardDescription>
           {learningPath.description}
         </CardDescription>
@@ -255,68 +260,67 @@ const PersonalizedPathDisplay: React.FC = () => {
           </Badge>
         )}
       </CardHeader>
-      
-      <CardContent className="space-y-6">
-        {/* Display courses in the learning path */}
-        {learningPath.courses.map((course, index) => (
-          <div key={course.id} className="space-y-3">
-            {index > 0 && <Separator />}
-            
-            <div className="pt-3">
-              <div className="flex items-start justify-between">
-                <div className="space-y-1">
-                  <h3 className="font-medium text-base">{course.title}</h3>
-                  <p className="text-sm text-muted-foreground">{course.description}</p>
-                </div>
+      <CardContent>
+        <div className="space-y-4">
+          {learningPath.courses.map((course, index) => (
+            <div key={course.id} className="border rounded-lg p-4 transition-all hover:shadow-md">
+              <div className="flex justify-between items-start mb-2">
                 <div>
-                  {renderRagStatusBadge(course.ragStatus)}
+                  <h3 className="font-medium text-lg flex items-center">
+                    <span className="bg-blue-100 text-blue-800 rounded-full h-6 w-6 flex items-center justify-center text-xs mr-2">
+                      {index + 1}
+                    </span>
+                    {course.title}
+                  </h3>
+                  <p className="text-sm text-gray-600 mt-1">{course.description}</p>
                 </div>
+                <Badge className={`${getStatusColor(course.ragStatus)} ml-2`}>
+                  {course.ragStatus === 'green' ? 'On Track' : 
+                   course.ragStatus === 'amber' ? 'Needs Attention' : 
+                   'Falling Behind'}
+                </Badge>
               </div>
               
-              <div className="mt-4 space-y-2">
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-muted-foreground">Progress: {course.completedSections}/{course.sections} sections</span>
-                  <span className="font-medium">{course.progress}%</span>
+              <div className="flex items-center space-x-2 text-sm text-gray-500 mb-2">
+                <Clock className="h-4 w-4" />
+                <span>{course.duration} hours</span>
+                <span className="mx-2">•</span>
+                <BookOpen className="h-4 w-4" />
+                <span>{course.completedSections}/{course.sections} sections</span>
+              </div>
+              
+              <div className="space-y-1">
+                <div className="flex justify-between text-xs">
+                  <span>Progress</span>
+                  <span>{course.progress}%</span>
                 </div>
                 <Progress value={course.progress} className="h-2" />
               </div>
               
-              <div className="flex flex-wrap gap-2 mt-3">
-                {course.skills.map(skill => (
-                  <Badge key={skill} variant="outline" className="text-xs">
-                    {skill}
-                  </Badge>
-                ))}
-                <div className="flex items-center text-xs text-muted-foreground ml-auto">
-                  <Clock className="w-3 h-3 mr-1" /> {course.duration}
-                </div>
-              </div>
-              
-              <div className="mt-4 flex items-center justify-between">
-                <div className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded-full">
-                  {course.matchScore}% Match with Your Profile
-                </div>
-                <Button 
-                  size="sm" 
-                  variant="ghost" 
-                  className="text-primary flex items-center"
-                  onClick={() => handleNavigateToCourse(course.id)}
-                >
-                  Continue Learning
-                  <ChevronRight className="w-4 h-4 ml-1" />
-                </Button>
+              <div className="mt-3 flex justify-end">
+                <Link to={`/course/${course.id}`}>
+                  <Button variant="ghost" size="sm" className="text-blue-500 hover:text-blue-700">
+                    Continue <ArrowRight className="ml-1 h-4 w-4" />
+                  </Button>
+                </Link>
               </div>
             </div>
-          </div>
-        ))}
-      </CardContent>
-      
-      <CardFooter className="border-t bg-muted/50 flex justify-between pt-4">
-        <div className="text-sm text-muted-foreground">
-          Last updated: {new Date(learningPath.createdAt).toLocaleDateString()}
+          ))}
         </div>
-        <Button variant="outline" size="sm" onClick={() => navigate('/dashboard/learning-paths')}>
-          View All Learning Paths
+      </CardContent>
+      <CardFooter className="border-t p-4 flex justify-between items-center">
+        <div className="text-sm text-muted-foreground">
+          Last updated: {new Date(learningPath.updatedAt).toLocaleDateString()}
+        </div>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          className="text-blue-500"
+          onClick={() => fetchLearningPath()}
+          disabled={isLoading}
+        >
+          <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+          Refresh
         </Button>
       </CardFooter>
     </Card>
