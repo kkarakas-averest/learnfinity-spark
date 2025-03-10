@@ -17,12 +17,31 @@ export interface User {
 // RAG Status types
 export type RAGStatus = 'green' | 'amber' | 'red';
 
+// RAG Status enum for use as values
+export enum RAGStatusEnum {
+  GREEN = 'green',
+  AMBER = 'amber',
+  RED = 'red'
+}
+
 export interface RAGStatusDetails {
   status: RAGStatus;
   justification: string;
   lastUpdated: string;
   updatedBy: string | 'system';
   recommendedActions?: string[];
+  // Additional properties needed by RAGSystemAgent
+  learnerId?: string;
+  confidence?: number;
+  timestamp?: Date;
+  reasons?: string[];
+  metrics?: {
+    completionRate: number;
+    lastActivityDate?: Date;
+    deadlinesMet?: number;
+    deadlinesMissed?: number;
+    [key: string]: any;
+  };
 }
 
 // HR Dashboard types
@@ -106,7 +125,7 @@ export interface Department {
 }
 
 // HRDashboard tab type
-export type HRDashboardTab = 'overview' | 'employees' | 'courses' | 'reports';
+export type HRDashboardTab = 'overview' | 'employees' | 'courses' | 'reports' | 'analytics';
 
 // Legacy types kept for backward compatibility
 export interface HRUser {

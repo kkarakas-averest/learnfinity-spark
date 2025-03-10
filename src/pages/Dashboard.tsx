@@ -7,9 +7,10 @@ import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Button } from "@/components/ui/button";
 
 const Dashboard = () => {
+  // Call useAuth hook unconditionally at the top level
+  const { user, userDetails, isLoading } = useAuth();
+  
   try {
-    const { user, userDetails, isLoading } = useAuth();
-
     // Redirect if not authenticated
     if (!isLoading && !user) {
       console.log("Dashboard: No user found, redirecting to login");

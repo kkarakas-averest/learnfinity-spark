@@ -1,23 +1,30 @@
-import { NextApiRequest, NextApiResponse } from 'next';
-import { supabase } from '@/lib/supabase';
-import { v4 as uuidv4 } from 'uuid';
-import { AgentService } from '@/agents/AgentService';
-
 /**
  * Course enrollment API endpoint
  * 
  * Handles enrollment requests, records the enrollment,
  * and uses AI agents to create personalized learning paths
  */
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
-) {
-  // Only allow POST requests
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
+import { supabase } from '@/lib/supabase';
+import { v4 as uuidv4 } from 'uuid';
+import { AgentService } from '@/agents/AgentService';
+import { AgentTask } from '@/agents/interfaces/BaseAgent';
 
+type EnrollRequest = {
+  courseId: string;
+  userId: string;
+};
+
+type EnrollResponse = {
+  success?: boolean;
+  error?: string;
+  message: string;
+  enrollmentId?: string;
+};
+
+// Express-compatible handler for course enrollment
+export async function enrollCourse(req: { body: EnrollRequest }, res: {
+  status: (code: number) => { json: (data: EnrollResponse) => void };
+}) {
   const { courseId, userId } = req.body;
 
   // Validate required fields
@@ -88,7 +95,7 @@ export default async function handler(
 
     // Use AI agents to create personalized learning path
     try {
-      const agentService = new AgentService();
+      const agentService = AgentService.getInstance();
       
       // Get course details
       const { data: courseData } = await supabase
@@ -106,8 +113,8 @@ export default async function handler(
       
       // Only proceed with AI personalization if we have both course and employee data
       if (courseData && employeeData) {
-        // Use the EducatorAgent to create a personalized learning path
-        const personalizationTask = {
+        // Create a partial task object with just the required fields for the service
+        const task: Partial<AgentTask> = {
           type: 'adapt_content',
           data: {
             employeeId: userId,
@@ -124,7 +131,7 @@ export default async function handler(
         };
         
         // Execute the task asynchronously (don't await)
-        agentService.executeTask('educator', personalizationTask)
+        agentService.executeTask(task as Omit<AgentTask, 'id' | 'startTime' | 'status'>)
           .then(result => {
             console.log('AI personalization complete:', result);
           })
@@ -133,7 +140,7 @@ export default async function handler(
           });
       }
     } catch (aiError) {
-      console.error('Error during AI processing:', aiError);
+      console.error('Error during AI processing:', aiError instanceof Error ? aiError.message : String(aiError));
       // Continue even if AI processing fails
     }
 
@@ -147,7 +154,10 @@ export default async function handler(
     console.error('Enrollment error:', error);
     return res.status(500).json({
       error: 'Enrollment failed',
-      message: error.message || 'An error occurred during enrollment'
+      message: error instanceof Error ? error.message : 'An error occurred during enrollment'
     });
   }
-} 
+}
+
+// Export a default handler for compatibility with various frameworks
+export default enrollCourse; 
