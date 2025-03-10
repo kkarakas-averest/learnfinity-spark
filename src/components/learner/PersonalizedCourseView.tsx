@@ -12,7 +12,7 @@ import { Accordion, AccordionContent, AccordionTrigger } from '@/components/ui/a
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { supabase } from '@/lib/supabase-client';
+import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/state';
 import { useToast } from '@/components/ui/use-toast';
 import { AgentFactory } from '@/agents/AgentFactory';

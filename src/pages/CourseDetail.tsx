@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from '@/lib/react-helpers';
 import { useParams, Link } from 'react-router-dom';
-import { Clock, BarChart2, Users, FileText } from "lucide-react";
+import { Clock, BarChart2, Users, FileText, Sparkles } from "lucide-react";
 import NavbarMigrated from "@/components/NavbarMigrated";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -8,9 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from '@/state';
 import { useToast } from '@/components/ui/use-toast';
-import { supabase } from '@/lib/supabase-client';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Sparkles } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 // Mock data (replace with actual data fetching)
 const mockCourse = {
