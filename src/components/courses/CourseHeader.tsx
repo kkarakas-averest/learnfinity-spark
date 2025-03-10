@@ -25,7 +25,7 @@ export function CourseHeader({
           Filter
         </Button>
         {showCreateButton && (
-          <Link href="/hr/agent-management" passHref>
+          <Link href="/hr-dashboard/agent-management" passHref>
             <Button size="sm">
               <BookOpen className="mr-2 h-4 w-4" />
               Create Course

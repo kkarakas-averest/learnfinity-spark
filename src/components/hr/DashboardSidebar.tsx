@@ -10,7 +10,9 @@ import {
   Settings, 
   FileText, 
   Layers, 
-  Library 
+  Library,
+  Bot,
+  Sparkles
 } from 'lucide-react';
 
 type NavItemProps = {
@@ -126,6 +128,17 @@ const DashboardSidebar: React.FC = () => {
           href: "/hr-dashboard/course-builder/library",
           icon: <Library className="h-4 w-4" />,
           isActive: currentPath === "/hr-dashboard/course-builder/library"
+        }
+      ]
+    },
+    {
+      title: "AI Systems",
+      items: [
+        {
+          title: "Agent Management",
+          href: "/hr-dashboard/agent-management",
+          icon: <Bot className="h-4 w-4" />,
+          isActive: currentPath === "/hr-dashboard/agent-management"
         }
       ]
     },

@@ -14,6 +14,7 @@ import EmployeeProfilePage from '@/pages/hr/EmployeeProfilePage';
 import CourseBuilderPage from '@/pages/hr/CourseBuilderPage';
 import CourseTemplates from '@/pages/hr/CourseTemplates';
 import ModuleEditor from '@/pages/hr/ModuleEditor';
+import AgentManagement from '@/components/hr/AgentManagement';
 
 /**
  * Root layout component for the HR Dashboard
@@ -47,6 +48,7 @@ const HRDashboardRoot: React.FC = () => {
     if (path === '/hr-dashboard/reports') return <ReportsPage />;
     if (path === '/hr-dashboard/settings') return <SettingsPage />;
     if (path === '/hr-dashboard/course-builder') return <CourseBuilderPage />;
+    if (path === '/hr-dashboard/agent-management') return <AgentManagement />;
     
     // Second-level pages
     if (path === '/hr-dashboard/course-builder/templates') return <CourseTemplates />;
