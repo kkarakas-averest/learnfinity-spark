@@ -4,6 +4,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { ChevronLeft, BookOpen, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import LearningPathAssignment from "@/components/hr/LearningPathAssignment";
+import { supabase } from "@/lib/supabase";
+import { toast } from "@/components/ui/use-toast";
 
 interface LearningProgram {
   id: string;
@@ -21,45 +23,70 @@ export default function ProgramsPage() {
   const [assignDialogOpen, setAssignDialogOpen] = React.useState(false);
   const [selectedProgramId, setSelectedProgramId] = React.useState<string | null>(null);
 
-  // Fetch programs from the server (mock data for now)
+  // Fetch real learning programs from the database
   const fetchPrograms = async () => {
     try {
       setIsLoading(true);
-      // Simulate API call with mock data
-      const mockPrograms: LearningProgram[] = [
-        {
-          id: "prog-1",
-          title: "Leadership Fundamentals",
-          description: "Essential leadership skills for new managers",
-          enrolledCount: 24,
-          moduleCount: 5,
-          duration: "10 weeks"
-        },
-        {
-          id: "prog-2",
-          title: "Technical Writing",
-          description: "Learn to create clear technical documentation",
-          enrolledCount: 15,
-          moduleCount: 4,
-          duration: "6 weeks"
-        },
-        {
-          id: "prog-3",
-          title: "Project Management",
-          description: "Master the art of project execution",
-          enrolledCount: 32,
-          moduleCount: 8,
-          duration: "12 weeks"
-        }
-      ];
+      setError(null);
       
-      // Simulate network delay
-      setTimeout(() => {
-        setPrograms(mockPrograms);
-        setIsLoading(false);
-      }, 1000);
-    } catch (err) {
-      setError("Failed to load learning programs");
+      // Fetch learning paths from Supabase
+      const { data: pathsData, error: pathsError } = await supabase
+        .from('learning_paths')
+        .select('*')
+        .order('title');
+      
+      if (pathsError) {
+        throw new Error(pathsError.message);
+      }
+      
+      // For each learning path, fetch enrollment count and module count
+      const transformedPrograms = await Promise.all(pathsData.map(async (path) => {
+        // Get enrollment count from learning_path_assignments
+        const { count: enrolledCount, error: enrollmentError } = await supabase
+          .from('learning_path_assignments')
+          .select('id', { count: 'exact', head: true })
+          .eq('learning_path_id', path.id);
+        
+        if (enrollmentError) {
+          console.error(`Error fetching enrollment count for path ${path.id}:`, enrollmentError);
+        }
+        
+        // Get module/course count
+        const { data: modulesData, error: modulesError } = await supabase
+          .from('learning_path_courses')
+          .select('id', { count: 'exact' })
+          .eq('learning_path_id', path.id);
+        
+        if (modulesError) {
+          console.error(`Error fetching modules for path ${path.id}:`, modulesError);
+        }
+        
+        // Calculate weeks based on expected hours per week (assuming 5 hours/week)
+        const durationWeeks = path.estimated_hours 
+          ? Math.ceil(path.estimated_hours / 5) 
+          : 'Varies';
+          
+        return {
+          id: path.id,
+          title: path.title || 'Untitled Program',
+          description: path.description || 'No description available',
+          enrolledCount: enrolledCount || 0,
+          moduleCount: modulesData?.length || 0,
+          duration: typeof durationWeeks === 'number' ? `${durationWeeks} weeks` : durationWeeks
+        };
+      }));
+      
+      setPrograms(transformedPrograms);
+    } catch (err: any) {
+      console.error('Error fetching learning programs:', err);
+      setError(err.message || 'Failed to load learning programs');
+      
+      toast({
+        variant: 'destructive',
+        title: 'Error loading programs',
+        description: 'There was a problem loading the learning programs. Please try again later.'
+      });
+    } finally {
       setIsLoading(false);
     }
   };
@@ -100,6 +127,18 @@ export default function ProgramsPage() {
       ) : error ? (
         <div className="bg-red-50 p-4 rounded-md text-red-600">
           {error}
+          <Button variant="outline" size="sm" className="ml-4" onClick={fetchPrograms}>
+            Retry
+          </Button>
+        </div>
+      ) : programs.length === 0 ? (
+        <div className="text-center py-12 bg-gray-50 rounded-lg">
+          <h3 className="text-xl font-medium mb-2">No Learning Programs Found</h3>
+          <p className="text-gray-500 mb-4">There are no learning programs available at this time.</p>
+          <Button className="flex items-center mx-auto">
+            <span className="mr-2">+</span>
+            Create First Program
+          </Button>
         </div>
       ) : (
         <>

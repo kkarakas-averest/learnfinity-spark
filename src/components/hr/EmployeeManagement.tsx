@@ -42,28 +42,31 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ onViewDetails, 
   const fetchEmployees = async () => {
     setIsLoading(true);
     try {
-      // First try to get data from the real API
+      // Get employees from the HR service
       const result = await hrEmployeeService.getEmployees();
       
-      if (result && result.success && Array.isArray(result.employees)) {
-        // Try to use the employees array from the success response
-        if (result.employees && result.employees.length > 0) {
-          setEmployees(result.employees);
-          setFilteredEmployees(result.employees);
-          return;
-        }
+      if (!result || !result.success) {
+        throw new Error(result?.error || 'Failed to fetch employees');
       }
-
-      // If we reach here, we'll use mock data
-      console.log('Using mock employee data instead of API response');
-      const mockEmployees = generateMockEmployees();
-      setEmployees(mockEmployees);
-      setFilteredEmployees(mockEmployees);
+      
+      if (!Array.isArray(result.employees) || result.employees.length === 0) {
+        toast({
+          title: 'No employees found',
+          description: 'There are no employees in the system yet.',
+          variant: 'default',
+        });
+        setEmployees([]);
+        setFilteredEmployees([]);
+        return;
+      }
+      
+      setEmployees(result.employees);
+      setFilteredEmployees(result.employees);
       
       // Fetch status histories for all employees
       const histories: Record<string, StatusHistoryEntry[]> = {};
       
-      for (const employee of mockEmployees) {
+      for (const employee of result.employees) {
         try {
           const history = await ragStatusService.getEmployeeRAGHistory(employee.id);
           histories[employee.id] = history.entries.map(entry => ({
@@ -86,10 +89,8 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ onViewDetails, 
         variant: 'destructive',
       });
       
-      // Fallback to mock data on error
-      const mockEmployees = generateMockEmployees();
-      setEmployees(mockEmployees);
-      setFilteredEmployees(mockEmployees);
+      setEmployees([]);
+      setFilteredEmployees([]);
     } finally {
       setIsLoading(false);
     }
@@ -460,54 +461,6 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ onViewDetails, 
       )}
     </div>
   );
-};
-
-// Generate mock employee data for the component
-const generateMockEmployees = (): Employee[] => {
-  // ... existing mock data generation code ...
-  
-  // Mock data generation would go here
-  return [
-    {
-      id: "1",
-      name: "John Doe",
-      email: "john.doe@example.com",
-      department: "Engineering",
-      position: "Senior Developer",
-      courses: 5,
-      coursesCompleted: 4,
-      progress: 80,
-      lastActivity: new Date().toISOString(),
-      status: "active",
-      ragStatus: "green",
-    },
-    {
-      id: "2",
-      name: "Jane Smith",
-      email: "jane.smith@example.com",
-      department: "Marketing",
-      position: "Marketing Manager",
-      courses: 4,
-      coursesCompleted: 2,
-      progress: 50,
-      lastActivity: new Date().toISOString(),
-      status: "active",
-      ragStatus: "amber",
-    },
-    {
-      id: "3",
-      name: "Bob Johnson",
-      email: "bob.johnson@example.com",
-      department: "Sales",
-      position: "Sales Representative",
-      courses: 3,
-      coursesCompleted: 0,
-      progress: 10,
-      lastActivity: new Date().toISOString(),
-      status: "active",
-      ragStatus: "red",
-    },
-  ];
 };
 
 export default EmployeeManagement;

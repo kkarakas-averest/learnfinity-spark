@@ -1,14 +1,18 @@
-import { EducatorAgent } from '@/agents/roles/EducatorAgent';
-
 /**
  * Agent Service
  * Provides a centralized way to access and utilize AI agents in the application
  */
 export class AgentService {
-  private educatorAgent: EducatorAgent;
+  private static instance: AgentService;
   
-  constructor() {
-    this.educatorAgent = new EducatorAgent();
+  /**
+   * Get the singleton instance of the AgentService
+   */
+  public static getInstance(): AgentService {
+    if (!AgentService.instance) {
+      AgentService.instance = new AgentService();
+    }
+    return AgentService.instance;
   }
   
   /**
@@ -32,81 +36,72 @@ export class AgentService {
         goals: [`Become proficient in ${userProfile.role} role in ${userProfile.department}`]
       };
       
-      // Generate the learning path
-      const learningPath = await this.educatorAgent.generateLearningPath(employeeProfile);
+      // Default learning path for testing (replace with actual AI integration)
+      const defaultPath = {
+        name: `${userProfile.role} Development Path`,
+        description: `Customized learning path for ${userProfile.role} in ${userProfile.department}`,
+        modules: [
+          {
+            name: 'Core Skills',
+            description: 'Essential skills for your role',
+            resources: [
+              {
+                title: 'Introduction to Professional Development',
+                description: 'Learn the foundations of professional growth',
+                duration: 60,
+                skills: ['communication', 'career planning'],
+                type: 'course'
+              },
+              {
+                title: `${userProfile.department} Fundamentals`,
+                description: `Core knowledge for working in ${userProfile.department}`,
+                duration: 120,
+                skills: [userProfile.department.toLowerCase(), 'team collaboration'],
+                type: 'course'
+              }
+            ]
+          },
+          {
+            name: 'Advanced Topics',
+            description: 'Specialized knowledge for your career growth',
+            resources: [
+              {
+                title: `Advanced ${userProfile.role}`,
+                description: `Take your ${userProfile.role} skills to the next level`,
+                duration: 180,
+                skills: [userProfile.role.toLowerCase(), 'leadership'],
+                type: 'course'
+              }
+            ]
+          }
+        ]
+      };
       
-      // Transform the agent's response into a consistent format
+      // In a real implementation, this would call an AI model
       return {
         success: true,
-        data: {
-          name: learningPath.name || `${userProfile.role} Development Path`,
-          description: learningPath.description || `Custom learning path for ${userProfile.role} in ${userProfile.department}`,
-          courses: learningPath.modules.flatMap(module => 
-            module.resources.map(resource => ({
-              title: resource.title,
-              description: resource.description,
-              duration: resource.duration || 60, // Default to 60 minutes if not specified
-              skills: resource.skills || [],
-              sections: 10, // Default value
-              matchScore: resource.matchScore || 85 // Default match score
-            }))
-          )
-        }
+        data: defaultPath
       };
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error generating learning path:', error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to generate learning path'
+        error: error.message || 'An unknown error occurred while generating the learning path'
       };
     }
   }
   
   /**
-   * Determine the RAG status for a course based on current progress
+   * Determine the Red/Amber/Green status for a learner based on their progress
    */
-  async determineRAGStatus(
-    userId: string,
-    courseProgress: number,
-    previousStatus: 'red' | 'amber' | 'green',
-    metadata: any
-  ): Promise<{ 
-    success: boolean; 
-    data?: { 
-      status: 'red' | 'amber' | 'green';
-      reason: string;
-    };
-    error?: string 
-  }> {
-    try {
-      // Simple rules-based logic for now - this could be enhanced with ML/AI
-      let newStatus: 'red' | 'amber' | 'green';
-      let reason: string;
-      
-      if (courseProgress < 25) {
-        newStatus = 'red';
-        reason = 'Progress is significantly behind schedule';
-      } else if (courseProgress < 60) {
-        newStatus = 'amber';
-        reason = 'Progress is slightly behind schedule';
-      } else {
-        newStatus = 'green';
-        reason = 'Progress is on track or ahead of schedule';
-      }
-      
-      return {
-        success: true,
-        data: {
-          status: newStatus,
-          reason
-        }
-      };
-    } catch (error) {
-      console.error('Error determining RAG status:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to determine RAG status'
-      };
+  async determineRAGStatus(userId: string, courseId: string, progress: number): Promise<'red' | 'amber' | 'green'> {
+    // Simple implementation that bases RAG status on progress percentage
+    if (progress < 25) {
+      return 'red';
+    } else if (progress < 75) {
+      return 'amber';
+    } else {
+      return 'green';
     }
   }
 } 

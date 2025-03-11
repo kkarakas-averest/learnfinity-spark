@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/components/ui/use-toast';
 import { AgentService } from '@/services/agent.service';
+import { checkRequiredTables } from '@/utils/database/tableExists';
 
 // Type for learner profile
 interface LearnerProfile {
@@ -30,6 +31,17 @@ interface LearningPathAssignment {
   notes?: string;
 }
 
+// Required tables for the HR-Learner connection
+const REQUIRED_TABLES = [
+  'learning_paths',
+  'learning_path_courses',
+  'learning_path_assignments',
+  'course_enrollments',
+  'agent_activities',
+  'hr_employees',
+  'hr_departments'
+];
+
 // Helper function to handle errors
 const handleError = (error: any, defaultMessage: string) => {
   console.error(`${defaultMessage}:`, error);
@@ -46,6 +58,14 @@ const handleError = (error: any, defaultMessage: string) => {
  * Bridges the gap between HR employee management and learner profiles
  */
 export const hrLearnerService = {
+  /**
+   * Check if all required tables exist for the HR-Learner connection
+   * @returns {Promise<boolean>} True if all required tables exist
+   */
+  async checkRequiredTablesExist(): Promise<boolean> {
+    return await checkRequiredTables(REQUIRED_TABLES);
+  },
+
   /**
    * Create a learner profile from HR employee data
    * This is called during employee onboarding or when updating an employee
@@ -426,71 +446,178 @@ export const hrLearnerService = {
    */
   async getLearnerProgressSummary(): Promise<{ success: boolean; data?: any; error?: string }> {
     try {
+      // First check if required tables exist
+      const tablesExist = await this.checkRequiredTablesExist();
+      
+      if (!tablesExist) {
+        return {
+          success: false,
+          error: 'Required database tables do not exist. Please set up the database schema first.'
+        };
+      }
+      
       // Get the count of all users
-      const { count: totalUsers, error: countError } = await supabase
-        .from('users')
+      const { count: totalEmployees, error: countError } = await supabase
+        .from('hr_employees')
         .select('id', { count: 'exact', head: true });
         
       if (countError) throw countError;
       
-      // Get counts of users with learning paths
-      const { count: usersWithPaths, error: pathError } = await supabase
-        .from('learning_paths')
-        .select('user_id', { count: 'exact', head: true })
-        .not('user_id', 'is', null);
+      // Get active learning paths - paths with at least one employee assigned
+      const { data: activePaths, error: pathsError } = await supabase
+        .from('learning_path_assignments')
+        .select('learning_path_id')
+        .order('created_at', { ascending: false });
         
-      if (pathError) throw pathError;
+      if (pathsError) throw pathsError;
       
-      // Get counts of users who have completed at least one course
-      const { count: usersWithCompletions, error: completionError } = await supabase
+      // Count unique learning paths
+      const uniquePaths = new Set(activePaths.map(p => p.learning_path_id));
+      const activePathsCount = uniquePaths.size;
+      
+      // Get recent completions (courses completed in the last 30 days)
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      
+      const { data: recentCompletions, error: completionsError } = await supabase
         .from('course_enrollments')
-        .select('user_id', { count: 'exact', head: true })
-        .eq('progress', 100);
+        .select('id')
+        .eq('progress', 100)
+        .gte('updated_at', thirtyDaysAgo.toISOString());
         
-      if (completionError) throw completionError;
+      if (completionsError) throw completionsError;
       
-      // Get average progress across all enrollments
-      const { data: progressData, error: progressError } = await supabase
+      // Calculate overall average progress across all enrollments
+      const { data: enrollmentProgress, error: progressError } = await supabase
         .from('course_enrollments')
         .select('progress');
         
       if (progressError) throw progressError;
       
-      const averageProgress = progressData.length > 0
-        ? progressData.reduce((sum, item) => sum + item.progress, 0) / progressData.length
+      const avgProgress = enrollmentProgress.length > 0
+        ? Math.round(enrollmentProgress.reduce((sum, item) => sum + item.progress, 0) / enrollmentProgress.length)
         : 0;
       
-      // Get RAG status distribution
-      const { data: ragData, error: ragError } = await supabase
+      // Count employees who are "at risk" (RAG status is red)
+      const { data: atRiskEmployees, error: riskError } = await supabase
         .from('course_enrollments')
-        .select('rag_status, count', { count: 'exact' })
-        .neq('rag_status', null)
-        .groupBy('rag_status');
+        .select('user_id')
+        .eq('rag_status', 'red');
         
-      if (ragError) throw ragError;
+      if (riskError) throw riskError;
       
-      const ragDistribution = {
-        green: 0,
-        amber: 0,
-        red: 0
-      };
+      // Get unique at-risk employees
+      const uniqueAtRiskEmployees = new Set(atRiskEmployees.map(e => e.user_id));
+      const atRiskCount = uniqueAtRiskEmployees.size;
       
-      ragData.forEach(item => {
-        if (item.rag_status in ragDistribution) {
-          ragDistribution[item.rag_status as keyof typeof ragDistribution] = item.count;
+      // Calculate completion rate
+      const { data: completedPaths, error: completeError } = await supabase
+        .from('learning_path_assignments')
+        .select('id, learning_path_id, user_id')
+        .eq('status', 'completed');
+        
+      if (completeError) throw completeError;
+      
+      const completionRate = activePathsCount > 0 
+        ? Math.round((completedPaths.length / activePathsCount) * 100) 
+        : 0;
+      
+      // Now fetch detailed employee progress data
+      const { data: employees, error: employeesError } = await supabase
+        .from('hr_employees')
+        .select('id, name, email, department:hr_departments(name)')
+        .eq('status', 'active')
+        .order('name');
+        
+      if (employeesError) throw employeesError;
+      
+      // For each employee, fetch their progress data
+      const employeeProgress = await Promise.all(employees.map(async (employee) => {
+        // Count active learning paths for this employee
+        const { count: activePathCount, error: pathCountError } = await supabase
+          .from('learning_path_assignments')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', employee.id);
+          
+        if (pathCountError) {
+          console.error(`Error fetching path count for employee ${employee.id}:`, pathCountError);
         }
-      });
+        
+        // Calculate average progress across all courses
+        const { data: coursesProgress, error: courseProgressError } = await supabase
+          .from('course_enrollments')
+          .select('progress, rag_status')
+          .eq('user_id', employee.id);
+          
+        if (courseProgressError) {
+          console.error(`Error fetching course progress for employee ${employee.id}:`, courseProgressError);
+        }
+        
+        const employeeAvgProgress = coursesProgress?.length > 0
+          ? Math.round(coursesProgress.reduce((sum, course) => sum + course.progress, 0) / coursesProgress.length)
+          : 0;
+          
+        // Determine overall RAG status for the employee
+        let overallRagStatus: 'red' | 'amber' | 'green' = 'green';
+        
+        if (coursesProgress?.length > 0) {
+          const redCount = coursesProgress.filter(c => c.rag_status === 'red').length;
+          const amberCount = coursesProgress.filter(c => c.rag_status === 'amber').length;
+          
+          if (redCount > 0) {
+            overallRagStatus = 'red';
+          } else if (amberCount > 0) {
+            overallRagStatus = 'amber';
+          }
+        } else {
+          overallRagStatus = 'amber'; // Default to amber if no courses
+        }
+        
+        // Get most recent activity
+        const { data: recentActivity, error: activityError } = await supabase
+          .from('agent_activities')
+          .select('description, created_at')
+          .eq('user_id', employee.id)
+          .order('created_at', { ascending: false })
+          .limit(1);
+          
+        if (activityError) {
+          console.error(`Error fetching recent activity for employee ${employee.id}:`, activityError);
+        }
+        
+        // Format the last active date
+        const lastActive = recentActivity?.length > 0
+          ? new Date(recentActivity[0].created_at).toLocaleDateString()
+          : 'Never';
+          
+        return {
+          user_id: employee.id,
+          name: employee.name,
+          email: employee.email,
+          department: employee.department?.name || 'Unknown',
+          active_paths: activePathCount || 0,
+          avg_progress: employeeAvgProgress,
+          rag_status: overallRagStatus,
+          recent_activity: recentActivity?.length > 0
+            ? recentActivity[0].description
+            : 'No recent activity',
+          last_active: lastActive
+        };
+      }));
       
+      // Return the complete data
       return {
         success: true,
         data: {
-          totalUsers,
-          usersWithPaths,
-          usersWithCompletions,
-          averageProgress: Math.round(averageProgress),
-          coveragePercentage: totalUsers > 0 ? Math.round((usersWithPaths / totalUsers) * 100) : 0,
-          completionPercentage: usersWithPaths > 0 ? Math.round((usersWithCompletions / usersWithPaths) * 100) : 0,
-          ragDistribution
+          statistics: {
+            total_employees: totalEmployees || 0,
+            active_paths: activePathsCount,
+            completion_rate: completionRate,
+            at_risk_count: atRiskCount,
+            avg_progress: avgProgress,
+            recent_completions: recentCompletions?.length || 0
+          },
+          employees: employeeProgress
         }
       };
     } catch (error) {
