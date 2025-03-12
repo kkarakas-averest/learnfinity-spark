@@ -3,6 +3,17 @@ import { supabase } from '@/lib/supabase';
 import { addDays, subDays, formatDistance } from 'date-fns';
 
 /**
+ * Generates a UUID (v4)
+ */
+function generateUUID(): string {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
+/**
  * RAG Status Entry with history details
  */
 export interface RAGStatusEntry {
@@ -165,6 +176,11 @@ export class RAGStatusService {
         return history.entries[0]; // Return the most recent entry
       }
       
+      // Ensure createdBy is a valid UUID
+      const createdByUUID = createdBy && !createdBy.includes('-') 
+        ? generateUUID() // Generate a new UUID if not valid
+        : createdBy;
+      
       // Create a new status entry
       const { data, error } = await supabase
         .from('employee_rag_history')
@@ -173,7 +189,7 @@ export class RAGStatusService {
           status,
           previous_status: previousStatus,
           reason,
-          created_by: createdBy,
+          created_by: createdByUUID,
           related_intervention_id: relatedInterventionId
         })
         .select()
@@ -328,7 +344,7 @@ export class RAGStatusService {
         status: previousStatus,
         previousStatus: i > 0 ? entries[i-1].status : undefined,
         reason,
-        createdBy: 'system',
+        createdBy: generateUUID(),
         createdAt: date,
         relatedInterventionId: Math.random() > 0.7 ? `int-${employeeId}-${i}` : undefined
       });

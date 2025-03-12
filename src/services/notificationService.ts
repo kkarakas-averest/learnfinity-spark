@@ -14,7 +14,11 @@ export const notificationService = {
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
-        throw new Error('User not authenticated');
+        console.log('User not authenticated, returning empty notifications array');
+        return {
+          success: true,
+          notifications: []
+        };
       }
       
       const { data, error } = await supabase
@@ -121,7 +125,11 @@ export const notificationService = {
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
-        throw new Error('User not authenticated');
+        console.log('User not authenticated, returning 0 unread count');
+        return {
+          success: true,
+          count: 0
+        };
       }
       
       const { count, error } = await supabase

@@ -1,6 +1,6 @@
 import React from "@/lib/react-helpers";
 import { toast } from "@/components/ui/use-toast";
-import { hrEmployeeService } from '@/services/hrEmployeeService';
+import { hrEmployeeService } from '@/lib/services/hrEmployeeService';
 import { Badge } from "@/components/ui/badge";
 import { Employee, RAGStatus } from "@/types/hr.types";
 // Import the agent system hook

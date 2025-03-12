@@ -58,7 +58,9 @@ const HRDashboardRoot: React.FC = () => {
     if (path === '/hr-dashboard/course-builder/modules') return <ModuleEditor />;
     
     // Dynamic routes
-    if (path.startsWith('/hr-dashboard/employees/') && path.endsWith('/profile')) {
+    if (path.includes('/hr-dashboard/employees/') && path.includes('/profile')) {
+      // Extract the employee ID from the path
+      const employeeId = path.split('/').filter(Boolean)[2];
       return <EmployeeProfilePage />;
     }
     

@@ -33,7 +33,9 @@ const PersonalInfoSection = ({ profile, loading, onEditPersonal }: {
       <Card className="w-full mb-6">
         <CardHeader>
           <CardTitle><Skeleton className="h-8 w-40" /></CardTitle>
-          <CardDescription><Skeleton className="h-4 w-64" /></CardDescription>
+          <div className="text-sm text-muted-foreground">
+            <Skeleton className="h-4 w-64" />
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <Skeleton className="h-32 w-full" />
@@ -470,7 +472,7 @@ const EmployeeProfilePage: React.FC = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = React.useState('personal-info');
   const [profile, setProfile] = React.useState<EnhancedEmployeeProfile | null>(null);
-  const [loading, setLoading] = React.useState(true);
+  const [loading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   
   // State for edit modals
@@ -482,13 +484,33 @@ const EmployeeProfilePage: React.FC = () => {
   
   const fetchProfile = async () => {
     if (!employeeId) {
-      setError('Employee ID is required');
-      setLoading(false);
-      return;
+      // Try to extract employee ID from URL if params don't have it
+      const pathParts = window.location.pathname.split('/');
+      const potentialEmployeeId = pathParts[pathParts.indexOf('employees') + 1];
+      
+      if (potentialEmployeeId && potentialEmployeeId !== 'profile') {
+        // Use the employee ID from the URL
+        try {
+          setIsLoading(true);
+          const profileData = await getEmployeeProfile(potentialEmployeeId);
+          setProfile(profileData);
+          setError(null);
+          return;
+        } catch (err) {
+          console.error('Error fetching employee profile:', err);
+          setError('Failed to load employee profile');
+        } finally {
+          setIsLoading(false);
+        }
+      } else {
+        setError('Employee ID is required');
+        setIsLoading(false);
+        return;
+      }
     }
     
     try {
-      setLoading(true);
+      setIsLoading(true);
       const profileData = await getEmployeeProfile(employeeId);
       setProfile(profileData);
       setError(null);
@@ -496,7 +518,7 @@ const EmployeeProfilePage: React.FC = () => {
       console.error('Error fetching employee profile:', err);
       setError('Failed to load employee profile');
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
   
@@ -582,114 +604,96 @@ const EmployeeProfilePage: React.FC = () => {
   };
   
   return (
-    <div className="container py-6">
-      <div className="flex items-center mb-6">
-        <Button variant="ghost" onClick={handleGoBack} className="mr-4">
-          <ArrowLeft className="h-4 w-4 mr-2" />
+    <div className="container mx-auto py-6 max-w-screen-xl">
+      {/* Error message */}
+      {error && (
+        <div className="mb-6 p-4 bg-red-100 text-red-800 rounded-md">
+          <h3 className="font-bold text-lg">Error</h3>
+          <p>{error}</p>
+          <Button 
+            variant="outline" 
+            className="mt-2" 
+            onClick={handleGoBack}
+          >
+            Back to Employees
+          </Button>
+        </div>
+      )}
+
+      {/* Back button */}
+      <div className="mb-4">
+        <Button 
+          variant="ghost" 
+          className="flex items-center text-gray-600"
+          onClick={handleGoBack}
+        >
+          <ArrowLeft className="mr-2 h-4 w-4" />
           Back to Employees
         </Button>
-        <h1 className="text-2xl font-bold">Employee Profile</h1>
       </div>
       
-      {error ? (
-        <Card className="w-full mb-6">
-          <CardContent className="pt-6">
-            <p className="text-destructive">{error}</p>
-            <Button variant="outline" onClick={handleGoBack} className="mt-4">
-              Return to Employees
-            </Button>
-          </CardContent>
-        </Card>
-      ) : (
-        <>
+      {/* Profile Editor Modal */}
+      {editSection && (
+        <ProfileEditor 
+          section={editSection} 
+          profile={profile} 
+          onClose={handleCloseEditor} 
+          onSave={handleSaveProfileSection}
+          isLoading={loading}
+        />
+      )}
+
+      {/* Main content */}
+      <Tabs defaultValue="personal-info" value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <div className="flex justify-between items-center mb-4">
+          <TabsList>
+            <TabsTrigger value="personal-info" className="text-sm md:text-base">Personal Info</TabsTrigger>
+            <TabsTrigger value="learning-preferences" className="text-sm md:text-base">Learning Preferences</TabsTrigger>
+            <TabsTrigger value="skills" className="text-sm md:text-base">Skills</TabsTrigger>
+            <TabsTrigger value="learning-history" className="text-sm md:text-base">Learning History</TabsTrigger>
+            <TabsTrigger value="career-development" className="text-sm md:text-base">Career Development</TabsTrigger>
+          </TabsList>
+        </div>
+      
+        <TabsContent value="personal-info" className="space-y-6">
           <PersonalInfoSection 
             profile={profile} 
             loading={loading} 
-            onEditPersonal={handleEditPersonal} 
+            onEditPersonal={handleEditPersonal}
           />
-          
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid grid-cols-3 md:grid-cols-6 mb-6">
-              <TabsTrigger value="personal-info" className="flex items-center">
-                {tabIcons['personal-info']}
-                <span className="hidden md:inline">Info</span>
-              </TabsTrigger>
-              <TabsTrigger value="learning-preferences" className="flex items-center">
-                {tabIcons['learning-preferences']}
-                <span className="hidden md:inline">Preferences</span>
-              </TabsTrigger>
-              <TabsTrigger value="skills" className="flex items-center">
-                {tabIcons['skills']}
-                <span className="hidden md:inline">Skills</span>
-              </TabsTrigger>
-              <TabsTrigger value="learning-history" className="flex items-center">
-                {tabIcons['learning-history']}
-                <span className="hidden md:inline">History</span>
-              </TabsTrigger>
-              <TabsTrigger value="career-development" className="flex items-center">
-                {tabIcons['career-development']}
-                <span className="hidden md:inline">Career</span>
-              </TabsTrigger>
-              <TabsTrigger value="feedback" className="flex items-center">
-                {tabIcons['feedback']}
-                <span className="hidden md:inline">Feedback</span>
-              </TabsTrigger>
-              <TabsTrigger value="ai-learning" className="flex items-center">
-                {tabIcons['ai-learning']}
-                <span className="hidden md:inline">AI Learning</span>
-              </TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="personal-info">
-              <div className="space-y-4">
-                {/* Personal info is already shown above */}
-              </div>
-            </TabsContent>
-            
-            <TabsContent value="learning-preferences">
-              <LearningPreferencesSection 
-                profile={profile}
-                onEdit={handleEditLearningPreferences}
-              />
-            </TabsContent>
-            
-            <TabsContent value="skills">
-              <SkillsSection profile={profile} />
-            </TabsContent>
-            
-            <TabsContent value="learning-history">
-              <LearningHistorySection profile={profile} loading={loading} />
-            </TabsContent>
-            
-            <TabsContent value="career-development">
-              <CareerDevelopmentSection profile={profile} />
-            </TabsContent>
-            
-            <TabsContent value="feedback">
-              <FeedbackPreferences 
-                profile={profile} 
-                isEditable={true}
-                onEdit={handleEditFeedbackPreferences}
-              />
-            </TabsContent>
-            
-            <TabsContent value="ai-learning">
-              <AILearningSection profile={profile} />
-            </TabsContent>
-          </Tabs>
-          
-          {/* Profile Editor Modal */}
-          {profile && editSection && (
-            <ProfileEditor
-              profile={profile}
-              section={editSection}
-              isOpen={!!editSection}
-              onClose={handleCloseEditor}
-              onSave={handleSaveProfileSection}
-            />
-          )}
-        </>
-      )}
+          <AILearningSection profile={profile} />
+        </TabsContent>
+        
+        <TabsContent value="learning-preferences" className="space-y-6">
+          <LearningPreferencesSection 
+            profile={profile}
+            onEdit={handleEditLearningPreferences}
+          />
+        </TabsContent>
+        
+        <TabsContent value="skills" className="space-y-6">
+          <SkillsSection profile={profile} />
+          <SkillsInventory skills={profile?.skills || []} isLoading={loading} />
+        </TabsContent>
+        
+        <TabsContent value="learning-history" className="space-y-6">
+          <LearningHistorySection profile={profile} loading={loading} />
+          <LearningHistory 
+            activities={profile?.learningActivities || []}
+            completedCourses={profile?.completedCourses || []}
+            isLoading={loading}
+          />
+        </TabsContent>
+        
+        <TabsContent value="career-development" className="space-y-6">
+          <CareerDevelopmentSection profile={profile} />
+          <CareerDevelopment
+            goals={profile?.careerGoals || []} 
+            skills={profile?.skills || []}
+            isLoading={loading}
+          />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
