@@ -40,68 +40,197 @@ export class AgentService {
       const defaultPath = {
         name: `${userProfile.role} Development Path`,
         description: `Customized learning path for ${userProfile.role} in ${userProfile.department}`,
-        modules: [
+        courses: [
           {
-            name: 'Core Skills',
-            description: 'Essential skills for your role',
-            resources: [
-              {
-                title: 'Introduction to Professional Development',
-                description: 'Learn the foundations of professional growth',
-                duration: 60,
-                skills: ['communication', 'career planning'],
-                type: 'course'
-              },
-              {
-                title: `${userProfile.department} Fundamentals`,
-                description: `Core knowledge for working in ${userProfile.department}`,
-                duration: 120,
-                skills: [userProfile.department.toLowerCase(), 'team collaboration'],
-                type: 'course'
-              }
-            ]
+            id: '1',
+            title: 'Introduction to Professional Skills',
+            description: 'Learn the fundamentals of professional development',
+            estimatedHours: 10
           },
           {
-            name: 'Advanced Topics',
-            description: 'Specialized knowledge for your career growth',
-            resources: [
-              {
-                title: `Advanced ${userProfile.role}`,
-                description: `Take your ${userProfile.role} skills to the next level`,
-                duration: 180,
-                skills: [userProfile.role.toLowerCase(), 'leadership'],
-                type: 'course'
-              }
-            ]
+            id: '2',
+            title: `${userProfile.department} Fundamentals`,
+            description: `Core concepts for ${userProfile.department} professionals`,
+            estimatedHours: 15
+          },
+          {
+            id: '3',
+            title: `Advanced ${userProfile.role} Skills`,
+            description: `Specialized skills for ${userProfile.role} positions`,
+            estimatedHours: 20
           }
-        ]
+        ],
+        estimatedCompletionTime: '45 hours',
+        skillsAddressed: [...userProfile.skills, 'communication', 'problem-solving'],
+        generatedBy: 'AI Learning Path Designer'
       };
       
-      // In a real implementation, this would call an AI model
+      // TODO: Replace with actual AI agent call when integrated
       return {
         success: true,
-        data: defaultPath
+        data: {
+          learningPath: defaultPath,
+          userId: userProfile.userId
+        }
       };
     } catch (error: any) {
       console.error('Error generating learning path:', error);
       return {
         success: false,
-        error: error.message || 'An unknown error occurred while generating the learning path'
+        error: error.message || 'Failed to generate learning path'
       };
     }
   }
   
   /**
-   * Determine the Red/Amber/Green status for a learner based on their progress
+   * Determine RAG (Red-Amber-Green) status for a learner's course enrollment
+   * This helps identify learners who may need intervention
    */
-  async determineRAGStatus(userId: string, courseId: string, progress: number): Promise<'red' | 'amber' | 'green'> {
-    // Simple implementation that bases RAG status on progress percentage
-    if (progress < 25) {
-      return 'red';
-    } else if (progress < 75) {
-      return 'amber';
-    } else {
-      return 'green';
+  async determineRAGStatus(params: {
+    enrollmentId: string;
+    userId: string;
+    courseId: string;
+    currentProgress: number;
+    recentActivity: Date | null;
+  }): Promise<{ success: boolean; ragStatus: 'red' | 'amber' | 'green'; reasoning: string }> {
+    try {
+      const { currentProgress, recentActivity } = params;
+      
+      // Simple RAG determination logic (can be replaced with more sophisticated AI analysis)
+      let ragStatus: 'red' | 'amber' | 'green' = 'green';
+      let reasoning = '';
+      
+      // If no activity in the last 14 days, that's concerning
+      const twoWeeksAgo = new Date();
+      twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+      
+      if (!recentActivity || recentActivity < twoWeeksAgo) {
+        if (currentProgress < 30) {
+          ragStatus = 'red';
+          reasoning = 'Low progress and no recent activity - learner may have abandoned the course';
+        } else {
+          ragStatus = 'amber';
+          reasoning = 'No recent activity despite previous progress - learner may need re-engagement';
+        }
+      } else {
+        // Recent activity exists
+        if (currentProgress < 20) {
+          ragStatus = 'amber';
+          reasoning = 'Limited progress despite recent activity - learner may be struggling';
+        } else if (currentProgress < 10) {
+          ragStatus = 'red';
+          reasoning = 'Very low progress despite activity - learner may need significant help';
+        } else {
+          ragStatus = 'green';
+          reasoning = 'Satisfactory progress with recent activity - learner is on track';
+        }
+      }
+      
+      return {
+        success: true,
+        ragStatus,
+        reasoning
+      };
+    } catch (error: any) {
+      console.error('Error determining RAG status:', error);
+      return {
+        success: false,
+        ragStatus: 'amber', // Default to amber when there's an error - indicates attention needed
+        reasoning: `Error determining status: ${error.message}`
+      };
+    }
+  }
+  
+  /**
+   * Suggest interventions for learners who need support
+   * This provides actionable recommendations for HR or managers
+   */
+  async suggestInterventions(params: {
+    userId: string;
+    enrollmentId: string;
+    courseId: string;
+    ragStatus: string;
+    progress: number;
+    lastActivity: Date | null;
+  }): Promise<{ 
+    success: boolean; 
+    interventions?: Array<{
+      type: string;
+      description: string;
+      priority: 'high' | 'medium' | 'low';
+    }>;
+    error?: string;
+  }> {
+    try {
+      const { ragStatus, progress, lastActivity } = params;
+      const interventions = [];
+      
+      // Generate different interventions based on RAG status and other factors
+      if (ragStatus === 'red') {
+        interventions.push({
+          type: 'direct_contact',
+          description: 'Schedule a one-on-one meeting to discuss learning challenges',
+          priority: 'high'
+        });
+        
+        interventions.push({
+          type: 'course_adjustment',
+          description: 'Consider reassigning to a more appropriate course or providing prerequisites',
+          priority: 'medium'
+        });
+      } else if (ragStatus === 'amber') {
+        interventions.push({
+          type: 'check_in',
+          description: 'Send a supportive email checking on progress and offering assistance',
+          priority: 'medium'
+        });
+        
+        // If progress is low but there is recent activity
+        if (progress < 30 && lastActivity) {
+          const daysSinceActivity = Math.floor((Date.now() - lastActivity.getTime()) / (1000 * 60 * 60 * 24));
+          
+          if (daysSinceActivity < 7) {
+            interventions.push({
+              type: 'additional_resources',
+              description: 'Provide supplementary learning materials for the current module',
+              priority: 'medium'
+            });
+          }
+        }
+      } else {
+        // Green status - still can provide enhancement interventions
+        interventions.push({
+          type: 'positive_reinforcement',
+          description: 'Acknowledge good progress and encourage continued engagement',
+          priority: 'low'
+        });
+        
+        if (progress > 75) {
+          interventions.push({
+            type: 'next_steps',
+            description: 'Suggest advanced courses to take after completion',
+            priority: 'low'
+          });
+        }
+      }
+      
+      // Always include this for all statuses
+      interventions.push({
+        type: 'peer_connection',
+        description: 'Connect with other learners taking the same course for study groups',
+        priority: ragStatus === 'red' ? 'medium' : 'low'
+      });
+      
+      return {
+        success: true,
+        interventions
+      };
+    } catch (error: any) {
+      console.error('Error suggesting interventions:', error);
+      return {
+        success: false,
+        error: error.message || 'Failed to generate intervention suggestions'
+      };
     }
   }
 } 
