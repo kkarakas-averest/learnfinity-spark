@@ -60,13 +60,26 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ onViewDetails, 
         return;
       }
       
-      setEmployees(result.employees);
-      setFilteredEmployees(result.employees);
+      // Log the employee data for debugging
+      console.log("Employee data received:", JSON.stringify(result.employees[0], null, 2));
+      
+      // Additional transformation to ensure department and position are properly extracted
+      const transformedEmployees = result.employees.map(emp => ({
+        ...emp,
+        // Explicitly overwrite department and position to ensure they're set correctly
+        department: typeof emp.department === 'string' ? emp.department : 
+                   (emp.hr_departments?.name || 'Unknown Department'),
+        position: typeof emp.position === 'string' ? emp.position : 
+                 (emp.hr_positions?.title || 'Unknown Position')
+      }));
+      
+      setEmployees(transformedEmployees);
+      setFilteredEmployees(transformedEmployees);
       
       // Fetch status histories for all employees
       const histories: Record<string, StatusHistoryEntry[]> = {};
       
-      for (const employee of result.employees) {
+      for (const employee of transformedEmployees) {
         try {
           const history = await ragStatusService.getEmployeeRAGHistory(employee.id);
           histories[employee.id] = history.entries.map(entry => ({
