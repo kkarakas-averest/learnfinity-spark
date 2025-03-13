@@ -261,6 +261,60 @@ export const hrEmployeeService = {
         // Try to load mock data from JSON file
         try {
           console.log('Loading mock employee data from file...');
+          
+          // First try to load from the override file
+          let overrideResponse;
+          try {
+            overrideResponse = await fetch('/data/hr_employees_override.json');
+          } catch (overrideError) {
+            console.log('No override file found, using standard mock data');
+          }
+          
+          // If override exists and is enabled, use it
+          if (overrideResponse && overrideResponse.ok) {
+            const overrideData = await overrideResponse.json();
+            if (overrideData.overrideEnabled) {
+              console.log('Using employee data override file');
+              
+              let filteredEmployees = overrideData.employees;
+              
+              // Apply search filter if provided
+              if (searchTerm) {
+                filteredEmployees = filteredEmployees.filter(emp => 
+                  emp.name.toLowerCase().includes(searchTerm.toLowerCase())
+                );
+              }
+              
+              // Apply department filter if provided
+              if (departmentId) {
+                filteredEmployees = filteredEmployees.filter(emp => 
+                  emp.department_id === departmentId
+                );
+              }
+              
+              // Apply status filter if provided
+              if (status) {
+                filteredEmployees = filteredEmployees.filter(emp => 
+                  emp.status === status
+                );
+              }
+              
+              // Calculate total and paginate
+              const total = filteredEmployees.length;
+              const paginatedEmployees = filteredEmployees.slice(from, from + pageSize);
+              
+              console.log('Override data contains ' + filteredEmployees.length + ' employees');
+              
+              return {
+                success: true,
+                employees: paginatedEmployees,
+                total: total,
+                error: null
+              };
+            }
+          }
+          
+          // Fall back to standard mock data
           const response = await fetch('/data/employees_list.json');
           if (response.ok) {
             const mockData = await response.json();
@@ -288,48 +342,45 @@ export const hrEmployeeService = {
               );
             }
             
-            // Transform the data to ensure position is correctly exposed
+            console.log("Mock data before transformation:", filteredEmployees[0]);
+            
+            // Force consistent format to handle all employee formats
             const transformedEmployees = filteredEmployees.map(emp => {
-              // Handle data structures where position and department are nested or direct
-              const departmentRaw = emp.department;
-              const positionRaw = emp.position;
+              // Special case fix for Kubilay Karakas or any custom added employees
+              if (emp.name && emp.name.includes('Kubilay')) {
+                console.log('Found Kubilay employee', emp);
+              }
+              
+              // Explicitly extract department and position from various potential formats
+              const departmentRaw = typeof emp.department === 'string' ? emp.department : null;
               const hrDeptName = emp.hr_departments?.name;
+              
+              const positionRaw = typeof emp.position === 'string' ? emp.position : null;
               const hrPosTitle = emp.hr_positions?.title;
               
-              // Debug log for special case of Kubilay
-              if (emp.name && emp.name.includes('Kubilay')) {
-                console.log('Special employee found:', {
-                  name: emp.name,
-                  departmentRaw,
-                  hrDeptName,
-                  finalDepartment: departmentRaw || hrDeptName || 'Unknown Department',
-                  positionRaw,
-                  hrPosTitle,
-                  finalPosition: positionRaw || hrPosTitle || 'Unknown Position'
-                });
-              }
-              
-              // Debug random sample of employees for comparison
-              if (Math.random() < 0.2) { // Log ~20% of employees
-                console.log(`Sample employee ${emp.name}:`, {
-                  departmentRaw,
-                  hrDeptName,
-                  positionRaw,
-                  hrPosTitle
-                });
-              }
-              
-              const department = departmentRaw || hrDeptName || 'Unknown Department';
-              const position = positionRaw || hrPosTitle || 'Unknown Position';
-              
+              // Clean copy of the employee with consistent data format
               return {
-                ...emp,
-                department: department,
-                position: position,
-                // Ensure ragStatus is explicitly present and properly mapped 
-                ragStatus: emp.ragStatus || emp.rag_status || 'green'
+                id: emp.id || `emp-${Math.random().toString(36).substr(2, 9)}`,
+                name: emp.name || 'Unknown Employee',
+                email: emp.email || 'unknown@example.com',
+                department: departmentRaw || hrDeptName || 'Unknown Department', 
+                position: positionRaw || hrPosTitle || 'Unknown Position',
+                status: emp.status || 'active',
+                ragStatus: emp.ragStatus || emp.rag_status || 'green',
+                lastActivity: emp.lastActivity || emp.last_activity || new Date().toISOString().split('T')[0],
+                // Make sure we preserve the original nested objects for debugging
+                hr_departments: emp.hr_departments,
+                hr_positions: emp.hr_positions,
+                // Additional properties if needed
+                courses: emp.courses || 0,
+                coursesCompleted: emp.coursesCompleted || 0,
+                progress: emp.progress || 0,
+                created_at: emp.created_at || new Date().toISOString(),
+                updated_at: emp.updated_at || new Date().toISOString()
               };
             });
+            
+            console.log("Mock data after transformation:", transformedEmployees[0]);
             
             // Calculate total and paginate
             const total = transformedEmployees.length;
@@ -349,34 +400,40 @@ export const hrEmployeeService = {
         throw new Error(error.message);
       }
       
+      console.log("DB data before transformation:", data?.[0]);
+      
       // Transform the database results to ensure consistent structure
       const transformedData = data.map(emp => {
-        // Handle data structures where position and department are nested or direct
-        const departmentRaw = emp.department;
-        const positionRaw = emp.position;
+        // Explicitly extract department and position from various potential formats
+        const departmentRaw = typeof emp.department === 'string' ? emp.department : null;
         const hrDeptName = emp.hr_departments?.name;
+        
+        const positionRaw = typeof emp.position === 'string' ? emp.position : null;
         const hrPosTitle = emp.hr_positions?.title;
         
-        // Debug log for any department/position issues
-        if (!departmentRaw && !hrDeptName) {
-          console.log(`DB employee ${emp.name || emp.id} missing department:`, emp);
-        }
-        
-        if (!positionRaw && !hrPosTitle) {
-          console.log(`DB employee ${emp.name || emp.id} missing position:`, emp);
-        }
-        
-        const department = departmentRaw || hrDeptName || 'Unknown Department';
-        const position = positionRaw || hrPosTitle || 'Unknown Position';
-        
+        // Clean copy of the employee with consistent data format
         return {
-          ...emp,
-          department: department,
-          position: position,
-          // Ensure ragStatus is explicitly present and properly mapped 
-          ragStatus: emp.ragStatus || emp.rag_status || 'green'
+          id: emp.id || `emp-${Math.random().toString(36).substr(2, 9)}`,
+          name: emp.name || 'Unknown Employee',
+          email: emp.email || 'unknown@example.com',
+          department: departmentRaw || hrDeptName || 'Unknown Department', 
+          position: positionRaw || hrPosTitle || 'Unknown Position',
+          status: emp.status || 'active',
+          ragStatus: emp.ragStatus || emp.rag_status || 'green',
+          lastActivity: emp.lastActivity || emp.last_activity || new Date().toISOString().split('T')[0],
+          // Make sure we preserve the original nested objects for debugging
+          hr_departments: emp.hr_departments,
+          hr_positions: emp.hr_positions,
+          // Additional properties if needed
+          courses: emp.courses || 0,
+          coursesCompleted: emp.coursesCompleted || 0,
+          progress: emp.progress || 0,
+          created_at: emp.created_at || new Date().toISOString(),
+          updated_at: emp.updated_at || new Date().toISOString()
         };
       });
+      
+      console.log("DB data after transformation:", transformedData?.[0]);
       
       return {
         success: true,
