@@ -26,30 +26,44 @@
   },
   "activities": [
     {
+      "id": "1",
       "type": "enrollment",
-      "user": "Jordan Lee",
-      "course": "Advanced TypeScript",
-      "time": "2 hours ago"
-    },
-    {
-      "type": "completion",
       "user": "Alex Morgan",
-      "course": "React State Management",
-      "time": "Yesterday"
+      "description": "enrolled in Advanced TypeScript",
+      "timestamp": "2024-03-13T10:00:00Z",
+      "status": "success"
     },
     {
-      "type": "feedback",
+      "id": "2",
+      "type": "completion",
+      "user": "Jordan Lee",
+      "description": "completed React State Management",
+      "timestamp": "2024-03-12T15:30:00Z",
+      "status": "success"
+    },
+    {
+      "id": "3",
+      "type": "assessment",
       "user": "Taylor Swift",
-      "course": "Building APIs with Node.js",
-      "rating": 4.5,
-      "comment": "Excellent course with practical examples",
-      "time": "2 days ago"
+      "description": "scored 92% on Node.js Assessment",
+      "timestamp": "2024-03-11T08:45:00Z",
+      "status": "success"
     },
     {
-      "type": "alert",
+      "id": "4",
+      "type": "intervention",
       "user": "Chris Walker",
-      "issue": "Has not completed mandatory compliance training",
-      "time": "3 days ago"
+      "description": "moved to amber status - incomplete compliance training",
+      "timestamp": "2024-03-10T14:20:00Z",
+      "status": "warning"
+    },
+    {
+      "id": "5",
+      "type": "assignment",
+      "user": "HR Admin",
+      "description": "assigned Leadership Training to 12 employees",
+      "timestamp": "2024-03-09T09:15:00Z",
+      "status": "info"
     }
   ]
 } 

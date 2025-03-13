@@ -289,15 +289,19 @@ export const hrEmployeeService = {
             }
             
             // Transform the data to ensure position is correctly exposed
-            const transformedEmployees = filteredEmployees.map(emp => ({
-              ...emp,
-              // Use the title from hr_positions if available, else fall back to position field
-              position: emp.hr_positions?.title || emp.position || 'Unknown Position',
-              // Ensure department is taken from hr_departments if available
-              department: emp.hr_departments?.name || emp.department || 'Unknown Department',
-              // Ensure rag status is present
-              ragStatus: emp.ragStatus || 'green'
-            }));
+            const transformedEmployees = filteredEmployees.map(emp => {
+              // Handle data structures where position and department are nested or direct
+              const position = emp.hr_positions?.title || emp.position || 'Unknown Position';
+              const department = emp.hr_departments?.name || emp.department || 'Unknown Department';
+              
+              return {
+                ...emp,
+                position: position,
+                department: department,
+                // Ensure ragStatus is explicitly present and properly mapped 
+                ragStatus: emp.ragStatus || emp.rag_status || 'green'
+              };
+            });
             
             // Calculate total and paginate
             const total = transformedEmployees.length;
@@ -318,15 +322,19 @@ export const hrEmployeeService = {
       }
       
       // Transform the database results to ensure consistent structure
-      const transformedData = data.map(emp => ({
-        ...emp,
-        // Use the title from hr_positions if available, else fall back to position field
-        position: emp.hr_positions?.title || emp.position || 'Unknown Position',
-        // Ensure department is taken from hr_departments if available
-        department: emp.hr_departments?.name || emp.department || 'Unknown Department',
-        // Ensure rag status is present
-        ragStatus: emp.rag_status || 'green'
-      }));
+      const transformedData = data.map(emp => {
+        // Handle data structures where position and department are nested or direct
+        const position = emp.hr_positions?.title || emp.position || 'Unknown Position';
+        const department = emp.hr_departments?.name || emp.department || 'Unknown Department';
+        
+        return {
+          ...emp,
+          position: position,
+          department: department,
+          // Ensure ragStatus is explicitly present and properly mapped 
+          ragStatus: emp.ragStatus || emp.rag_status || 'green'
+        };
+      });
       
       return {
         success: true,
