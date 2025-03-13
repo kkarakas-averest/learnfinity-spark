@@ -21,13 +21,24 @@ const getEnvVariable = (name: string, vitePrefix = 'VITE_'): string => {
 
 // Get Supabase URL and API key from environment variables
 const supabaseUrl = getEnvVariable('SUPABASE_URL');
-const supabaseKey = 
-  getEnvVariable('SUPABASE_SERVICE_KEY') || // Try service key first (for admin operations)
-  getEnvVariable('SUPABASE_ANON_KEY');      // Fall back to anon key
+const supabaseServiceKey = getEnvVariable('SUPABASE_SERVICE_KEY'); // Service key for admin operations
+const supabaseAnonKey = getEnvVariable('SUPABASE_ANON_KEY'); // Anon key for public operations
+
+// Use the service key if available, otherwise fall back to anon key
+const supabaseKey = supabaseServiceKey || supabaseAnonKey;
+
+// Log which key we're using (without exposing the actual key)
+if (supabaseServiceKey) {
+  console.log('✅ Using Supabase service key for admin operations');
+} else if (supabaseAnonKey) {
+  console.log('⚠️ Using Supabase anon key - some admin operations may fail');
+} else {
+  console.error('❌ No Supabase API key found');
+}
 
 // Validate that we have the required values
 if (!supabaseUrl || !supabaseKey) {
-  console.error('Supabase configuration missing. Please check your environment variables.');
+  console.error('❌ Supabase configuration missing. Please check your environment variables.');
   console.error('See SUPABASE-CONFIG-README.md for setup instructions.');
   
   // Additional guidance for common issues
@@ -41,6 +52,14 @@ if (!supabaseUrl || !supabaseKey) {
 
 // Create and export a Supabase client
 export const supabase = createClient(supabaseUrl, supabaseKey);
+
+// Export admin-specific client (will be the same as supabase if service key was used)
+export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey || supabaseAnonKey);
+
+// Helper to check if we're using the service key
+export const isUsingServiceKey = (): boolean => {
+  return !!supabaseServiceKey;
+};
 
 // Export types
 export type { SupabaseClient } from '@supabase/supabase-js';

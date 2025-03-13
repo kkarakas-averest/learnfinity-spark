@@ -60,10 +60,14 @@ const handleError = (error: any, defaultMessage: string) => {
 export const hrLearnerService = {
   /**
    * Check if all required tables exist for the HR-Learner connection
-   * @returns {Promise<boolean>} True if all required tables exist
+   * @returns {Promise<{success: boolean, missingTables?: string[]}>} Result with success status and any missing tables
    */
-  async checkRequiredTablesExist(): Promise<boolean> {
-    return await checkRequiredTables(REQUIRED_TABLES);
+  async checkRequiredTablesExist(): Promise<{success: boolean, missingTables?: string[]}> {
+    const result = await checkRequiredTables(REQUIRED_TABLES);
+    return {
+      success: result.success,
+      missingTables: result.missingTables
+    };
   },
 
   /**
@@ -255,21 +259,37 @@ export const hrLearnerService = {
       
       // Enroll in each course if they aren't already enrolled
       for (const { course_id } of pathCourses) {
-        const { error: enrollError } = await supabase
-          .from('course_enrollments')
-          .insert({
-            user_id: assignment.user_id,
-            course_id,
-            progress: 0,
-            rag_status: 'amber',
-            sections: 0,  // This will be updated when they first open the course
-            completed_sections: 0
-          })
-          .onConflict(['user_id', 'course_id'])
-          .ignore();
-          
-        if (enrollError && enrollError.code !== '23505') { // Ignore duplicate error
-          console.error(`Error enrolling user in course ${course_id}:`, enrollError);
+        try {
+          // First check if the enrollment already exists
+          const { data: existingEnrollment } = await supabase
+            .from('course_enrollments')
+            .select('id')
+            .eq('user_id', assignment.user_id)
+            .eq('course_id', course_id)
+            .maybeSingle();
+            
+          // If enrollment doesn't exist, create it
+          if (!existingEnrollment) {
+            const { error: enrollError } = await supabase
+              .from('course_enrollments')
+              .insert({
+                user_id: assignment.user_id,
+                course_id,
+                progress: 0,
+                rag_status: 'amber',
+                sections: 0,  // This will be updated when they first open the course
+                completed_sections: 0
+              });
+              
+            if (enrollError) {
+              // Still ignore duplicates which might happen due to race conditions
+              if (enrollError.code !== '23505') { 
+                console.error(`Error enrolling user in course ${course_id}:`, enrollError);
+              }
+            }
+          }
+        } catch (error) {
+          console.error(`Error handling enrollment for course ${course_id}:`, error);
         }
       }
       
@@ -442,17 +462,23 @@ export const hrLearnerService = {
   },
   
   /**
-   * Get a summary of learner progress for all employees
+   * Get a summary of learner progress for HR dashboard
    */
-  async getLearnerProgressSummary(): Promise<{ success: boolean; data?: any; error?: string }> {
+  async getLearnerProgressSummary(): Promise<{ 
+    success: boolean; 
+    data?: any; 
+    error?: string;
+    missingTables?: string[];
+  }> {
     try {
       // First check if required tables exist
-      const tablesExist = await this.checkRequiredTablesExist();
+      const { success: tablesExist, missingTables } = await this.checkRequiredTablesExist();
       
       if (!tablesExist) {
-        return {
-          success: false,
-          error: 'Required database tables do not exist. Please set up the database schema first.'
+        return { 
+          success: false, 
+          error: `Required database tables do not exist. Please set up the database schema first.`,
+          missingTables 
         };
       }
       
@@ -523,13 +549,12 @@ export const hrLearnerService = {
         : 0;
       
       // Now fetch detailed employee progress data
-      const { data: employees, error: employeesError } = await supabase
+      const { data: employees, error: empError } = await supabase
         .from('hr_employees')
-        .select('id, name, email, department:hr_departments(name)')
-        .eq('status', 'active')
+        .select('id, name, email, department_id, rag_status')
         .order('name');
         
-      if (employeesError) throw employeesError;
+      if (empError) throw empError;
       
       // For each employee, fetch their progress data
       const employeeProgress = await Promise.all(employees.map(async (employee) => {
@@ -594,7 +619,10 @@ export const hrLearnerService = {
           user_id: employee.id,
           name: employee.name,
           email: employee.email,
-          department: employee.department?.name || 'Unknown',
+          department: 
+            typeof employee.department_id === 'object' && employee.department_id && 'name' in employee.department_id 
+              ? employee.department_id.name 
+              : 'Unknown',
           active_paths: activePathCount || 0,
           avg_progress: employeeAvgProgress,
           rag_status: overallRagStatus,
@@ -621,7 +649,7 @@ export const hrLearnerService = {
         }
       };
     } catch (error) {
-      return handleError(error, 'Failed to fetch learner progress summary');
+      return handleError(error, 'Failed to get learner progress summary');
     }
   }
 }; 

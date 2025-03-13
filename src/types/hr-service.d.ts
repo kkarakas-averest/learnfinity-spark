@@ -1,4 +1,3 @@
-
 // Type definitions for HR service
 declare module '@/services/hrEmployeeService' {
   export interface Employee {
@@ -50,4 +49,18 @@ declare module '@/lib/services/hrServices' {
     getDashboardMetrics(): Promise<any>;
     getRecentActivities(): Promise<any>;
   };
+}
+
+declare module '@/services/hrLearnerService' {
+  export interface HRLearnerService {
+    // Add missingTables to the return type for getLearnerProgressSummary
+    getLearnerProgressSummary(): Promise<{ 
+      success: boolean; 
+      data?: any; 
+      error?: string;
+      missingTables?: string[];
+    }>;
+    
+    // Other methods...
+  }
 }

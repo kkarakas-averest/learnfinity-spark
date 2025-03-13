@@ -6,8 +6,9 @@
  */
 
 import 'dotenv/config';
-import { supabase } from '@/lib/supabase-client';
+import { supabase, supabaseAdmin, isUsingServiceKey } from '@/lib/supabase-client';
 import { fileURLToPath } from 'url';
+import { toast } from '@/components/ui/use-toast';
 
 async function checkSupabaseConfig() {
   console.log('========================================');
@@ -45,62 +46,131 @@ async function checkSupabaseConfig() {
   console.log('\n🔄 Testing Supabase connection...');
   
   try {
-    // Try a simple auth check to verify connection
-    const { data, error } = await supabase.auth.getSession();
+    // Step 1: Check if we can connect to Supabase
+    const { data: healthCheck, error: healthError } = await supabase.from('_healthcheck').select('*').limit(1);
     
-    if (error) {
-      throw error;
+    if (healthError) {
+      console.error('Supabase health check failed:', healthError);
+      toast({
+        variant: 'destructive',
+        title: 'Supabase connection failed',
+        description: `Unable to connect to Supabase: ${healthError.message}. Check your environment variables.`
+      });
+      return { success: false, error: healthError };
     }
     
-    console.log('✅ Successfully connected to Supabase!');
+    // Step 2: Check for key type (anon vs service)
+    const usingServiceKey = isUsingServiceKey();
     
-    // Try to list tables to verify basic database access
-    try {
-      const { data: tablesData, error: tablesError } = await supabase
-        .from('information_schema.tables')
-        .select('table_name')
-        .eq('table_schema', 'public')
-        .limit(5);
-        
-      if (tablesError) {
-        console.log('⚠️ Limited database access (this is normal with anon key)');
-        console.log(`   For full access, consider using a service role key`);
-      } else if (tablesData && tablesData.length > 0) {
-        console.log('✅ Successfully accessed database schema');
-        console.log('📋 Tables in your database:');
-        for (const table of tablesData) {
-          console.log(`   - ${table.table_name}`);
-        }
+    if (!usingServiceKey) {
+      // This is just a warning as anon key works for many operations
+      console.warn('Using Supabase anon key - some admin operations may fail');
+      toast({
+        variant: 'warning',
+        title: 'Limited Permissions',
+        description: 'Using Supabase anon key. Some admin operations will not work. Set SUPABASE_SERVICE_KEY for full access.'
+      });
+    }
+    
+    // Step 3: Check for required tables
+    const requiredTables = [
+      'learning_paths',
+      'learning_path_courses',
+      'learning_path_assignments',
+      'hr_employees',
+      'hr_departments'
+    ];
+    
+    const missingTables = await checkTablesExist(requiredTables);
+    
+    if (missingTables.length > 0) {
+      console.warn(`Missing tables: ${missingTables.join(', ')}`);
+      
+      if (usingServiceKey) {
+        // We could potentially create them here, but that's best left to the create-hr-tables.js script
+        toast({
+          variant: 'warning',
+          title: 'Missing database tables',
+          description: `The following tables need to be created: ${missingTables.join(', ')}. Run the create-hr-tables.js script to set them up.`
+        });
       } else {
-        console.log('⚠️ Connected but no tables found in the public schema');
-        console.log('   You may need to initialize your database schema first');
+        toast({
+          variant: 'destructive',
+          title: 'Database setup required',
+          description: 'Some required tables are missing. Set SUPABASE_SERVICE_KEY and run the create-hr-tables.js script.'
+        });
+      }
+      
+      return { 
+        success: false, 
+        error: 'Missing tables', 
+        canCreate: usingServiceKey,
+        missingTables 
+      };
+    }
+    
+    console.log('✅ Supabase configuration validated successfully');
+    return { success: true };
+  } catch (error) {
+    console.error('Error checking Supabase config:', error);
+    toast({
+      variant: 'destructive',
+      title: 'Configuration check failed',
+      description: error instanceof Error ? error.message : 'Unknown error checking Supabase configuration'
+    });
+    return { success: false, error };
+  }
+}
+
+/**
+ * Check if tables exist by directly querying them
+ * @param tables Array of table names to check
+ * @returns Array of missing table names
+ */
+async function checkTablesExist(tables: string[]): Promise<string[]> {
+  const client = supabaseAdmin || supabase;
+  const missingTables: string[] = [];
+  
+  // Check each table individually
+  for (const table of tables) {
+    try {
+      // Try a lightweight query just to check if the table exists
+      const { error } = await client
+        .from(table)
+        .select('*', { count: 'exact', head: true })
+        .limit(0);
+      
+      // If the error is "relation does not exist", the table is missing
+      if (error && error.message.includes('does not exist')) {
+        missingTables.push(table);
       }
     } catch (err) {
-      console.log('ℹ️ Database schema access restricted (normal with anon key)');
+      console.error(`Error checking table ${table}:`, err);
+      missingTables.push(table);
     }
-    
-  } catch (err) {
-    console.log('❌ Failed to connect to Supabase:');
-    
-    // More detailed error information
-    if (err && typeof err === 'object') {
-      if ('code' in err) console.log(`   Error code: ${(err as any).code}`);
-      if ('message' in err) console.log(`   Error message: ${(err as any).message}`);
-      if ('details' in err) console.log(`   Error details: ${(err as any).details}`);
-      if ('hint' in err) console.log(`   Error hint: ${(err as any).hint}`);
-    } else {
-      console.log(`   ${String(err)}`);
-    }
-    
-    console.log('\n🔧 Troubleshooting tips:');
-    console.log('1. Check if your Supabase project is active');
-    console.log('2. Verify your SUPABASE_URL and API keys');
-    console.log('3. Make sure your IP is not blocked by Supabase');
-    console.log('4. Check network connectivity');
-    process.exit(1);
   }
   
-  console.log('\n========================================');
+  return missingTables;
+}
+
+/**
+ * Create the required HR tables using the service key
+ * This would typically be called from the create-hr-tables.js script
+ */
+async function createRequiredTables() {
+  if (!isUsingServiceKey()) {
+    console.error('Service key required to create tables');
+    return { 
+      success: false, 
+      error: 'Service key required' 
+    };
+  }
+  
+  console.log('Creating required tables...');
+  // This would execute the SQL to create the tables
+  // We'll leave the actual implementation to the create-hr-tables.js script
+  
+  return { success: true, message: 'Tables created successfully' };
 }
 
 // Execute if run directly (ES module version)

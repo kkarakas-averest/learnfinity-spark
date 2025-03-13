@@ -10,6 +10,35 @@ const requestSchema = z.object({
   offset: z.number().int().min(0).optional().default(0)
 });
 
+// Type definitions for Supabase data
+interface CourseData {
+  id: string;
+  title: string;
+  description: string;
+  estimated_duration: number;
+  skills: string[];
+  thumbnail_url: string;
+  featured: boolean;
+  category: string;
+}
+
+interface LearningPathData {
+  id: string;
+  name: string;
+}
+
+interface CourseItem {
+  id: string;
+  course_id: string;
+  learning_path_id: string;
+  progress: number;
+  rag_status: string;
+  completed_sections: number;
+  sections: number;
+  courses: CourseData;
+  learning_paths: LearningPathData;
+}
+
 /**
  * GET handler for fetching a learner's courses
  */
@@ -96,23 +125,29 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // Transform the data for the frontend
-    const formattedCourses = coursesData.map(item => ({
-      id: item.course_id,
-      title: item.courses.title,
-      description: item.courses.description,
-      duration: item.courses.estimated_duration,
-      progress: item.progress,
-      completedSections: item.completed_sections,
-      totalSections: item.sections,
-      thumbnailUrl: item.courses.thumbnail_url,
-      featured: item.courses.featured,
-      category: item.courses.category,
-      skills: item.courses.skills,
-      ragStatus: item.rag_status,
-      learningPathId: item.learning_path_id,
-      learningPathName: item.learning_paths.name
-    }));
+    // Transform the data for the frontend, ensuring proper type access
+    const formattedCourses = coursesData.map((item: any) => {
+      // Use type assertion to get proper typing for the Supabase nested objects
+      const course = item.courses as CourseData;
+      const learningPath = item.learning_paths as LearningPathData;
+      
+      return {
+        id: item.course_id,
+        title: course.title,
+        description: course.description,
+        duration: course.estimated_duration,
+        progress: item.progress,
+        completedSections: item.completed_sections,
+        totalSections: item.sections,
+        thumbnailUrl: course.thumbnail_url,
+        featured: course.featured,
+        category: course.category,
+        skills: course.skills,
+        ragStatus: item.rag_status,
+        learningPathId: item.learning_path_id,
+        learningPathName: learningPath.name
+      };
+    });
 
     // Get count of courses by status for summary stats
     const { data: countData, error: countError } = await supabase

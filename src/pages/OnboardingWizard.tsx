@@ -180,7 +180,7 @@ const OnboardingWizard: React.FC = () => {
       setIsSubmitting(false);
     }
   };
-  
+
   return (
     <div className="min-h-screen flex flex-col justify-center items-center p-4 bg-gray-50">
       <Card className="w-full max-w-2xl shadow-lg">
@@ -406,17 +406,17 @@ const OnboardingWizard: React.FC = () => {
         
         <CardFooter className="flex justify-between">
           {step > 1 ? (
-            <Button 
+          <Button 
               variant="outline" 
               onClick={handlePrevStep}
               disabled={isSubmitting}
-            >
+          >
               Back
-            </Button>
+          </Button>
           ) : (
-            <Button 
-              variant="outline" 
-              onClick={() => navigate('/')}
+          <Button 
+            variant="outline" 
+            onClick={() => navigate('/')}
               disabled={isSubmitting}
             >
               Cancel
@@ -444,7 +444,7 @@ const OnboardingWizard: React.FC = () => {
                   Complete Setup
                 </>
               )}
-            </Button>
+          </Button>
           )}
         </CardFooter>
       </Card>

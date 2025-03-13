@@ -291,13 +291,41 @@ export const hrEmployeeService = {
             // Transform the data to ensure position is correctly exposed
             const transformedEmployees = filteredEmployees.map(emp => {
               // Handle data structures where position and department are nested or direct
-              const position = emp.hr_positions?.title || emp.position || 'Unknown Position';
-              const department = emp.hr_departments?.name || emp.department || 'Unknown Department';
+              const departmentRaw = emp.department;
+              const positionRaw = emp.position;
+              const hrDeptName = emp.hr_departments?.name;
+              const hrPosTitle = emp.hr_positions?.title;
+              
+              // Debug log for special case of Kubilay
+              if (emp.name && emp.name.includes('Kubilay')) {
+                console.log('Special employee found:', {
+                  name: emp.name,
+                  departmentRaw,
+                  hrDeptName,
+                  finalDepartment: departmentRaw || hrDeptName || 'Unknown Department',
+                  positionRaw,
+                  hrPosTitle,
+                  finalPosition: positionRaw || hrPosTitle || 'Unknown Position'
+                });
+              }
+              
+              // Debug random sample of employees for comparison
+              if (Math.random() < 0.2) { // Log ~20% of employees
+                console.log(`Sample employee ${emp.name}:`, {
+                  departmentRaw,
+                  hrDeptName,
+                  positionRaw,
+                  hrPosTitle
+                });
+              }
+              
+              const department = departmentRaw || hrDeptName || 'Unknown Department';
+              const position = positionRaw || hrPosTitle || 'Unknown Position';
               
               return {
                 ...emp,
-                position: position,
                 department: department,
+                position: position,
                 // Ensure ragStatus is explicitly present and properly mapped 
                 ragStatus: emp.ragStatus || emp.rag_status || 'green'
               };
@@ -324,13 +352,27 @@ export const hrEmployeeService = {
       // Transform the database results to ensure consistent structure
       const transformedData = data.map(emp => {
         // Handle data structures where position and department are nested or direct
-        const position = emp.hr_positions?.title || emp.position || 'Unknown Position';
-        const department = emp.hr_departments?.name || emp.department || 'Unknown Department';
+        const departmentRaw = emp.department;
+        const positionRaw = emp.position;
+        const hrDeptName = emp.hr_departments?.name;
+        const hrPosTitle = emp.hr_positions?.title;
+        
+        // Debug log for any department/position issues
+        if (!departmentRaw && !hrDeptName) {
+          console.log(`DB employee ${emp.name || emp.id} missing department:`, emp);
+        }
+        
+        if (!positionRaw && !hrPosTitle) {
+          console.log(`DB employee ${emp.name || emp.id} missing position:`, emp);
+        }
+        
+        const department = departmentRaw || hrDeptName || 'Unknown Department';
+        const position = positionRaw || hrPosTitle || 'Unknown Position';
         
         return {
           ...emp,
-          position: position,
           department: department,
+          position: position,
           // Ensure ragStatus is explicitly present and properly mapped 
           ragStatus: emp.ragStatus || emp.rag_status || 'green'
         };

@@ -9,6 +9,37 @@ const requestSchema = z.object({
   offset: z.number().int().min(0).optional().default(0)
 });
 
+// Define interfaces for type safety
+interface Course {
+  title: string;
+}
+
+interface Skill {
+  name: string;
+}
+
+interface Badge {
+  id: string;
+  name: string;
+  description: string;
+  badge_type: string;
+  image_url: string | null;
+  awarded_at: string;
+  course_id: string | null;
+  skill_id: string | null;
+  courses: { title: string } | null;
+  skills: { name: string } | null;
+}
+
+interface Certificate {
+  id: string;
+  name: string;
+  description: string | null;
+  certification_name: string | null;
+  completion_date: string | null;
+  created_at: string;
+}
+
 /**
  * GET handler for fetching a learner's achievements
  */
@@ -72,8 +103,8 @@ export async function GET(req: NextRequest) {
         awarded_at,
         course_id,
         skill_id,
-        courses(title),
-        skills(name)
+        courses (title),
+        skills (name)
       `)
       .eq('user_id', validUserId)
       .order('awarded_at', { ascending: false });
@@ -87,7 +118,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Transform the certificates data
-    const certificates = certificatesData.map(cert => ({
+    const certificates = (certificatesData as Certificate[]).map(cert => ({
       id: cert.id,
       title: cert.certification_name || `${cert.name} Certificate`,
       description: cert.description || `Certification for completing the ${cert.name} learning path`,
@@ -97,16 +128,22 @@ export async function GET(req: NextRequest) {
     }));
 
     // Transform the badges data
-    const badges = badgesData.map(badge => ({
-      id: badge.id,
-      title: badge.name,
-      description: badge.description,
-      awardedAt: badge.awarded_at,
-      type: badge.badge_type,
-      imageUrl: badge.image_url || '/images/badge-default.png',
-      courseTitle: badge.courses?.title,
-      skillName: badge.skills?.name
-    }));
+    const badges = (badgesData as any[]).map(badge => {
+      // Handle nested objects safely
+      const courseTitle = badge.courses?.title || undefined;
+      const skillName = badge.skills?.name || undefined;
+      
+      return {
+        id: badge.id,
+        title: badge.name,
+        description: badge.description,
+        awardedAt: badge.awarded_at,
+        type: badge.badge_type,
+        imageUrl: badge.image_url || '/images/badge-default.png',
+        courseTitle,
+        skillName
+      };
+    });
 
     // Calculate summary counts
     const summary = {

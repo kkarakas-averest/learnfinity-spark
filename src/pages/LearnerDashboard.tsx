@@ -281,10 +281,10 @@ const LearnerDashboard: React.FC = () => {
       
       {/* Development User ID Display - Remove in production */}
       {process.env.NODE_ENV === 'development' && (
-        <div className="bg-blue-100 p-2 text-sm text-center">
+      <div className="bg-blue-100 p-2 text-sm text-center">
           <p>Your User ID: <strong>{user?.id}</strong> (Development mode)</p>
-          <TestNotificationButton />
-        </div>
+        <TestNotificationButton />
+      </div>
       )}
       
       <main className="container mx-auto px-4 py-8">
@@ -416,28 +416,28 @@ const LearnerDashboard: React.FC = () => {
                 </CardContent>
               </Card>
             </div>
-            
+
             <div className="grid gap-4 grid-cols-1 lg:grid-cols-7">
               {/* Personalized Learning Path - Takes 4/7 columns on larger screens */}
               <div className="lg:col-span-4">
                 <div className="mb-4">
                   <h2 className="text-xl font-semibold">Your Learning Path</h2>
-                  <p className="text-sm text-muted-foreground">
+                    <p className="text-sm text-muted-foreground">
                     Personalized courses curated by AI based on your preferences and goals
-                  </p>
-                </div>
+                    </p>
+                  </div>
                 <PersonalizedPathDisplay />
-              </div>
+                  </div>
               
               {/* AI Course Recommendations - Takes 3/7 columns on larger screens */}
               <div className="lg:col-span-3">
                 <div className="mb-4">
                   <h2 className="text-xl font-semibold">Recommended For You</h2>
-                  <p className="text-sm text-muted-foreground">
+                    <p className="text-sm text-muted-foreground">
                     Additional courses that match your interests
-                  </p>
+                    </p>
                 </div>
-                <AICourseRecommendations />
+              <AICourseRecommendations />
               </div>
             </div>
           </TabsContent>
@@ -597,7 +597,7 @@ const LearnerDashboard: React.FC = () => {
                                 className="object-cover h-full w-full"
                               />
                             ) : (
-                              <BookOpen className="h-8 w-8 text-slate-500" />
+                            <BookOpen className="h-8 w-8 text-slate-500" />
                             )}
                           </div>
                           <div className="flex-1">
@@ -729,7 +729,7 @@ const LearnerDashboard: React.FC = () => {
                             View All {badges.length} Badges
                           </Button>
                         )}
-                      </div>
+                </div>
                     )}
                   </>
                 )}
@@ -867,9 +867,9 @@ const LearnerDashboard: React.FC = () => {
                         
                         <div className="pt-4 border-t">
                           <Button className="w-full">Edit Profile</Button>
-                        </div>
-                      </div>
-                    </div>
+                  </div>
+                </div>
+                </div>
                   </>
                 )}
               </CardContent>

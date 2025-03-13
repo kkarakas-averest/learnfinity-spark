@@ -30,11 +30,10 @@
     
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"],
-      "react": ["./node_modules/react"]
+      "@/*": ["./src/*"]
     },
     "typeRoots": ["./node_modules/@types", "./src/types"],
-    "types": ["node", "react", "react-dom"]
+    "types": ["node", "react", "react-dom", "zod"]
   },
   "include": ["src"]
 }

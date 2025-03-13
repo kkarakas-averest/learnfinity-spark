@@ -45,10 +45,17 @@ export default function LearnerProgressSummary({ period = 'week' }: LearnerProgr
       setIsLoading(true);
       setError(null);
 
-      const { success, data, error: serviceError } = await hrLearnerService.getLearnerProgressSummary();
+      const { success, data, error: serviceError, missingTables } = await hrLearnerService.getLearnerProgressSummary();
 
       if (!success || serviceError) {
-        throw new Error(serviceError || 'Failed to load learner progress data');
+        let errorMessage = serviceError || 'Failed to load learner progress data';
+        
+        // If we have missing tables, provide instructions
+        if (missingTables && missingTables.length > 0) {
+          errorMessage = `Required database tables do not exist: ${missingTables.join(', ')}. Please run the database setup script.`;
+        }
+        
+        throw new Error(errorMessage);
       }
 
       setStatistics(data.statistics);
@@ -113,9 +120,21 @@ export default function LearnerProgressSummary({ period = 'week' }: LearnerProgr
       ) : error ? (
         <Card className="bg-red-50 border-red-200">
           <CardContent className="py-6">
-            <div className="flex items-center">
-              <AlertCircle className="h-5 w-5 text-red-500 mr-2" />
-              <p className="text-red-600">{error}</p>
+            <div className="flex items-center space-x-2">
+              <AlertCircle className="h-5 w-5 text-red-500" />
+              <div>
+                <p className="text-red-600 font-medium">{error}</p>
+                {error.includes('database tables do not exist') && (
+                  <div className="mt-2 space-y-2">
+                    <p className="text-sm text-red-600">To fix this issue:</p>
+                    <ol className="list-decimal list-inside text-sm text-red-600 pl-2">
+                      <li>Make sure you've set SUPABASE_SERVICE_KEY in your .env file</li>
+                      <li>Run database setup script: <code className="bg-red-100 px-1 rounded">node src/db/apply-hr-schema.js</code></li>
+                      <li>Populate test data: <code className="bg-red-100 px-1 rounded">node src/scripts/populate-hr-employees.js</code></li>
+                    </ol>
+                  </div>
+                )}
+              </div>
             </div>
             <Button variant="outline" size="sm" className="mt-4" onClick={fetchProgressData}>
               Retry

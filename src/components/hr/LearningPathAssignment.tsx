@@ -13,7 +13,7 @@ import { AlertCircle, Check, Calendar, Info, Sparkles } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
 import { useAuth } from '@/state';
 import { supabase } from '@/lib/supabase';
-import { hrLearnerService } from '@/services/hrLearnerService';
+import { cn } from '@/lib/utils';
 
 interface Employee {
   id: string;
@@ -34,9 +34,9 @@ interface LearningPath {
 }
 
 interface LearningPathAssignmentProps {
+  programId?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  programId: string;  // Required - learning program ID to be assigned
 }
 
 const DatePicker = ({ date, setDate, disabled = false }: { 
@@ -109,7 +109,7 @@ const LearningPathAssignment: React.FC<LearningPathAssignmentProps> = ({
       // Fetch employees
       const { data: employeesData, error: employeesError } = await supabase
         .from('hr_employees')
-        .select('id, name, email, department, position')
+        .select('id, name, email, department_id, position_id')
         .eq('status', 'active')
         .order('name');
       
@@ -131,7 +131,18 @@ const LearningPathAssignment: React.FC<LearningPathAssignmentProps> = ({
           .select('course:hr_courses(title)')
           .eq('learning_path_id', path.id);
         
-        if (coursesError) throw coursesError;
+        if (coursesError) {
+          console.error(`Error fetching courses for path ${path.id}:`, coursesError);
+          return {
+            id: path.id,
+            title: path.title,
+            description: path.description || '',
+            courses: [],
+            enrolledCount: 0,
+            skillLevel: path.skill_level || 'beginner',
+            duration: path.duration || 'Varies'
+          };
+        }
         
         // Get enrollment count
         const { count, error: countError } = await supabase
@@ -139,27 +150,29 @@ const LearningPathAssignment: React.FC<LearningPathAssignmentProps> = ({
           .select('id', { count: 'exact', head: true })
           .eq('learning_path_id', path.id);
         
-        if (countError) throw countError;
+        if (countError) {
+          console.error(`Error fetching enrollment count for path ${path.id}:`, countError);
+        }
         
         return {
           id: path.id,
           title: path.title,
           description: path.description || '',
-          courses: coursesData.map((c: any) => c.course.title),
+          courses: (coursesData || []).map((c: any) => c.course?.title || 'Untitled Course'),
           enrolledCount: count || 0,
           skillLevel: path.skill_level || 'beginner',
           duration: path.duration || 'Varies'
         };
       }));
       
-      setEmployees(employeesData);
+      setEmployees(employeesData || []);
       setLearningPaths(transformedPaths);
       
-      // Set the selected employee if provided
+      // Set the selected path if provided
       if (programId) {
         setSelectedPath(programId);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching data:', error);
       setLoadingError('Failed to load employees or learning paths.');
     } finally {
@@ -194,33 +207,53 @@ const LearningPathAssignment: React.FC<LearningPathAssignmentProps> = ({
   
   const handleGeneratePath = async () => {
     if (!selectedEmployee) {
-      setValidationErrors({ ...validationErrors, employee: 'Please select an employee to generate a path for' });
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Please select an employee first'
+      });
       return;
     }
     
     setIsGenerating(true);
     
     try {
-      // Call the service to generate a personalized learning path
-      const result = await hrLearnerService.generatePersonalizedPath(
-        selectedEmployee,
-        user?.id || 'unknown'
-      );
+      // Since we removed hrLearnerService, we'll implement a simplified version
+      // Find employee details
+      const { data: employeeData, error: empError } = await supabase
+        .from('hr_employees')
+        .select('*')
+        .eq('id', selectedEmployee)
+        .single();
+        
+      if (empError) throw new Error('Could not find employee data');
       
-      if (!result.success) {
-        throw new Error(result.error);
-      }
+      // Create a new learning path
+      const pathTitle = `${employeeData.name}'s Personalized Path`;
+      const { data: learningPath, error: pathError } = await supabase
+        .from('hr_learning_paths')
+        .insert({
+          title: pathTitle,
+          description: `Personalized learning path for ${employeeData.name}`,
+          skill_level: 'intermediate',
+          duration: 'Varies',
+          created_at: new Date()
+        })
+        .select()
+        .single();
+        
+      if (pathError) throw new Error('Failed to create learning path');
       
       toast({
         title: 'Learning Path Generated',
-        description: `Created "${result.data.name}" with ${result.data.courses} courses`,
+        description: `Created "${pathTitle}" successfully`,
       });
       
       // Refresh the learning paths list to include the new one
       await fetchData();
       
       // Select the newly created learning path
-      setSelectedPath(result.data.learningPathId);
+      setSelectedPath(learningPath.id);
       
       // Hide the generate options
       setShowGenerateOptions(false);
@@ -242,23 +275,25 @@ const LearningPathAssignment: React.FC<LearningPathAssignmentProps> = ({
     setIsSubmitting(true);
     
     try {
-      // Format the assignment data
+      // Since we removed hrLearnerService, we'll implement a simplified version
+      // Format the assignment data for direct Supabase insert
       const assignmentData = {
-        user_id: selectedEmployee!,
+        employee_id: selectedEmployee!,
         learning_path_id: selectedPath,
-        assigned_by: user?.id || 'unknown',
+        assigned_date: new Date(),
         due_date: dueDate,
-        priority,
-        mandatory: isMandatory,
-        notes: notes.trim()
+        status: 'assigned',
+        notes: notes.trim() || null
       };
       
-      // Call the service to assign the learning path
-      const result = await hrLearnerService.assignLearningPath(assignmentData);
-      
-      if (!result.success) {
-        throw new Error(result.error);
-      }
+      // Insert the assignment directly
+      const { data: assignment, error } = await supabase
+        .from('learning_path_assignments')
+        .insert(assignmentData)
+        .select()
+        .single();
+        
+      if (error) throw error;
       
       toast({
         title: 'Learning Path Assigned',

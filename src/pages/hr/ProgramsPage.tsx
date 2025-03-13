@@ -32,8 +32,7 @@ export default function ProgramsPage() {
       // Fetch learning paths from Supabase
       const { data: pathsData, error: pathsError } = await supabase
         .from('learning_paths')
-        .select('*')
-        .order('title');
+        .select('*');
       
       if (pathsError) {
         throw new Error(pathsError.message);
@@ -61,6 +60,9 @@ export default function ProgramsPage() {
           console.error(`Error fetching modules for path ${path.id}:`, modulesError);
         }
         
+        // Get title from either title or name field (depending on which exists)
+        const pathTitle = path.title || path.name || 'Untitled Program';
+        
         // Calculate weeks based on expected hours per week (assuming 5 hours/week)
         const durationWeeks = path.estimated_hours 
           ? Math.ceil(path.estimated_hours / 5) 
@@ -68,7 +70,7 @@ export default function ProgramsPage() {
           
         return {
           id: path.id,
-          title: path.title || 'Untitled Program',
+          title: pathTitle,
           description: path.description || 'No description available',
           enrolledCount: enrolledCount || 0,
           moduleCount: modulesData?.length || 0,

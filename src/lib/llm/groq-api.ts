@@ -36,6 +36,8 @@ export class GroqAPI {
     // Validate API key
     if (!this.apiKey) {
       console.warn('Groq API key not provided. LLM functionality will not work.');
+    } else if (this.debug) {
+      console.log('Groq API key configured successfully');
     }
   }
   

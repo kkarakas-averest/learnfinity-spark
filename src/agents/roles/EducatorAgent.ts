@@ -6,8 +6,11 @@
  */
 
 import { BaseAgent, AgentMessage } from '../core/BaseAgent';
-import { AgentConfig } from '../types';
+import { AgentConfig, ContentCreatorAgent, ContentGenerationRequest, GeneratedContent, GeneratedQuiz, LearnerProfile, PersonalizationParams } from '../types';
 import { RAGStatus } from '@/types/hr.types';
+import { ContentType, DifficultyLevel } from '@/types/course.types';
+import { LLMService } from '@/lib/llm/llm-service';
+import { v4 as uuidv4 } from 'uuid';
 
 export interface LearningResource {
   id: string;
@@ -27,8 +30,10 @@ export interface LearningPathAdjustment {
   reason: string;
 }
 
-export class EducatorAgent extends BaseAgent {
+export class EducatorAgent extends BaseAgent implements ContentCreatorAgent {
   private resourceLibrary: LearningResource[] = [];
+  private llmService: LLMService;
+  private useLLM: boolean;
   
   constructor(config?: Partial<AgentConfig>) {
     super({
@@ -38,6 +43,17 @@ export class EducatorAgent extends BaseAgent {
       backstory: "You specialize in educational science and curriculum design, with expertise in adapting content to individual needs.",
       ...config
     });
+    
+    // Initialize LLM service
+    this.llmService = LLMService.getInstance({
+      debugMode: process.env.NODE_ENV === 'development'
+    });
+
+    // Check if we have a configured LLM
+    this.useLLM = this.llmService.isConfigured();
+    if (!this.useLLM && process.env.NODE_ENV === 'development') {
+      console.warn('EducatorAgent: LLM not configured, using rule-based approach');
+    }
   }
   
   /**
@@ -80,7 +96,6 @@ export class EducatorAgent extends BaseAgent {
         
       case 'adapt_content':
         return this.adaptContent(
-          task.data.employeeId, 
           task.data.contentId, 
           task.data.learnerData
         );
@@ -257,35 +272,41 @@ export class EducatorAgent extends BaseAgent {
   }
   
   /**
-   * Adapt content for a specific learner
+   * Adapt existing content to meet a user's needs
+   * Implementation for ContentCreatorAgent interface
    */
   async adaptContent(
-    employeeId: string,
-    contentId: string,
+    contentId: string, 
     learnerData: any
   ): Promise<any> {
-    // Find the original content
-    const content = this.resourceLibrary.find(r => r.id === contentId);
-    
-    if (!content) {
-      throw new Error(`Content with ID ${contentId} not found`);
+    if (!contentId || !learnerData) {
+      throw new Error('Missing required parameters');
     }
     
-    // Basic adaptations based on learner preferences
-    const adaptations = {
-      original: content,
-      adapted: {
-        ...content,
-        title: content.title, // Keep the same title
-        difficulty: this.adaptDifficulty(content.difficulty, learnerData),
-        duration: this.adaptDuration(content.duration, learnerData),
-        supplementaryMaterials: this.getSupplementaryMaterials(content, learnerData),
-        format: this.adaptFormat(content.type, learnerData.learningStyle)
-      },
-      adaptationReason: `Content adapted to match ${learnerData.learningStyle} learning style and ${learnerData.currentLevel} proficiency level.`
+    // Convert learnerData to our LearnerProfile format
+    const learnerProfile: LearnerProfile = {
+      id: learnerData.id || 'unknown',
+      name: learnerData.name || 'Anonymous Learner',
+      role: learnerData.role || '',
+      department: learnerData.department || '',
+      skills: learnerData.skills || [],
+      interests: learnerData.interests || [],
+      learningStyle: this.mapLearningStyle(learnerData.preferredLearningStyle),
+      experienceLevel: this.mapExperienceLevel(learnerData.experienceLevel),
+      completedCourses: learnerData.completedCourses || [],
+      engagementMetrics: learnerData.metrics || {}
     };
     
-    return adaptations;
+    // Create personalization parameters
+    const params: PersonalizationParams = {
+      learnerProfile,
+      originalContentId: contentId,
+      adaptationType: this.determineAdaptationType(learnerProfile, contentId),
+      targetLevel: this.determineTargetLevel(learnerProfile, contentId),
+      focusAreas: learnerData.focusAreas || []
+    };
+    
+    return this.personalizeContent(params);
   }
   
   /**
@@ -422,79 +443,6 @@ export class EducatorAgent extends BaseAgent {
     });
     
     return modules;
-  }
-  
-  /**
-   * Adapt content difficulty based on learner data
-   */
-  private adaptDifficulty(originalDifficulty: string, learnerData: any): string {
-    const currentLevel = learnerData.currentLevel || 'beginner';
-    
-    // Adjust difficulty based on learner's level
-    if (currentLevel === 'beginner' && originalDifficulty !== 'beginner') {
-      return 'beginner'; // Simplify content for beginners
-    }
-    
-    if (currentLevel === 'advanced' && originalDifficulty === 'beginner') {
-      return 'intermediate'; // Make it more challenging for advanced learners
-    }
-    
-    return originalDifficulty; // Keep original difficulty in other cases
-  }
-  
-  /**
-   * Adapt content duration based on learner data
-   */
-  private adaptDuration(originalDuration: number, learnerData: any): number {
-    const attentionSpan = learnerData.attentionSpan || 'medium';
-    
-    // Adjust duration based on attention span
-    switch (attentionSpan) {
-      case 'short':
-        return Math.min(originalDuration, 15); // Cap at 15 minutes
-      case 'medium':
-        return Math.min(originalDuration, 30); // Cap at 30 minutes
-      case 'long':
-        return originalDuration; // Keep original duration
-      default:
-        return originalDuration;
-    }
-  }
-  
-  /**
-   * Get supplementary materials based on content and learner data
-   */
-  private getSupplementaryMaterials(content: LearningResource, learnerData: any): any[] {
-    // Find resources on the same topics
-    return this.resourceLibrary
-      .filter(r => 
-        r.id !== content.id && // Not the same resource
-        r.topics.some(topic => content.topics.includes(topic)) && // Related topics
-        r.type !== content.type // Different format
-      )
-      .slice(0, 2) // Limit to 2 supplementary resources
-      .map(r => ({
-        id: r.id,
-        title: r.title,
-        type: r.type,
-        duration: r.duration
-      }));
-  }
-  
-  /**
-   * Adapt content format based on learning style
-   */
-  private adaptFormat(originalType: string, learningStyle: string): string {
-    // Map learning styles to preferred content types
-    const styleToTypeMap: Record<string, string> = {
-      'visual': 'video',
-      'auditory': 'video', // Videos have audio
-      'reading': 'article',
-      'kinesthetic': 'exercise'
-    };
-    
-    // Return the preferred type for the learning style, or the original if not found
-    return styleToTypeMap[learningStyle] || originalType;
   }
   
   /**
@@ -659,5 +607,998 @@ export class EducatorAgent extends BaseAgent {
         description: "Best practices for cloud architecture design"
       }
     ];
+  }
+
+  /**
+   * Generate remediation content for a specific learning gap
+   */
+  async generateRemediationContent(
+    learningGap: string, 
+    learnerPreferences: any
+  ): Promise<any> {
+    if (!this.useLLM) {
+      return this.generateMockRemediationContent(learningGap, learnerPreferences);
+    }
+
+    const prompt = `
+      As an educational content creator, generate remediation content to address the following learning gap:
+      "${learningGap}"
+
+      Learner preferences and background:
+      ${JSON.stringify(learnerPreferences, null, 2)}
+
+      Create content that:
+      1. Addresses the specific gap identified
+      2. Is tailored to the learner's preferences and background
+      3. Includes practical examples and exercises
+      4. Provides clear explanations of concepts
+      5. Includes suggestions for further learning
+
+      Format the output as markdown.
+    `;
+
+    try {
+      const content = await this.llmService.complete(prompt, {
+        temperature: 0.7,
+        maxTokens: 2000
+      });
+
+      return {
+        id: uuidv4(),
+        title: `Remediation for ${learningGap}`,
+        content,
+        contentType: this.determineContentType(learnerPreferences),
+        format: 'markdown',
+        createdAt: new Date(),
+        metadata: {
+          targetGap: learningGap,
+          generationPrompt: prompt
+        }
+      };
+    } catch (error) {
+      console.error('Error generating remediation content:', error);
+      return this.generateMockRemediationContent(learningGap, learnerPreferences);
+    }
+  }
+
+  /**
+   * Generate content based on a specific request
+   */
+  async generateContentForRequest(request: ContentGenerationRequest): Promise<GeneratedContent> {
+    if (!this.useLLM) {
+      return this.generateMockContent(request);
+    }
+
+    const prompt = `
+      As an educational content creator, generate learning content with the following specifications:
+
+      Content Type: ${request.contentType}
+      Topic: ${request.topic}
+      Target Audience:
+        Roles: ${request.targetAudience.roles?.join(', ') || 'Any'}
+        Departments: ${request.targetAudience.departments?.join(', ') || 'Any'}
+        Skill Level: ${request.targetAudience.skillLevel}
+
+      Learning Objectives:
+      ${request.learningObjectives.map((obj, i) => `${i + 1}. ${obj}`).join('\n')}
+
+      ${request.keywords?.length ? `Keywords: ${request.keywords.join(', ')}` : ''}
+      ${request.tone ? `Tone: ${request.tone}` : ''}
+      ${request.contentLength ? `Content Length: ${request.contentLength}` : ''}
+      ${request.includeExamples ? 'Please include practical examples.' : ''}
+
+      ${request.includeQuizQuestions ? 'Include 3-5 quiz questions at the end with answers and explanations.' : ''}
+
+      Format the content using markdown, with appropriate headings, bullet points, code blocks, and other formatting as needed.
+      Include a title for the content at the top.
+    `;
+
+    try {
+      const generatedText = await this.llmService.complete(prompt, {
+        temperature: 0.7,
+        maxTokens: 4000
+      });
+
+      // Extract title from the generated content (first line)
+      const contentLines = generatedText.trim().split('\n');
+      const title = contentLines[0].replace(/^#\s*/, '').trim();
+      const content = contentLines.slice(1).join('\n').trim();
+
+      // Generate quiz if requested
+      let quiz: GeneratedQuiz | undefined;
+      if (request.includeQuizQuestions) {
+        quiz = await this.extractQuizFromContent(content) || 
+               await this.generateQuiz(request.topic, request.targetAudience.skillLevel, 3);
+      }
+
+      const response: GeneratedContent = {
+        id: uuidv4(),
+        originalRequest: request,
+        title,
+        content,
+        contentType: request.contentType,
+        format: 'markdown',
+        metadata: {
+          generatedAt: new Date(),
+          model: "llm-model", // Simplify to avoid getModel() error
+          version: '1.0',
+          tokensUsed: this.estimateTokenCount(prompt) + this.estimateTokenCount(generatedText),
+          generationParams: {
+            temperature: 0.7,
+            contentLength: request.contentLength || 'standard'
+          }
+        },
+        suggestedNextSteps: await this.generateNextSteps(request.topic, content),
+        relatedTopics: await this.identifyRelatedTopics(request.topic, content),
+        quiz,
+        summary: await this.generateSummary(content)
+      };
+
+      return response;
+    } catch (error) {
+      console.error('Error generating content:', error);
+      return this.generateMockContent(request);
+    }
+  }
+
+  /**
+   * Personalize content for a specific learner
+   */
+  async personalizeContent(params: PersonalizationParams): Promise<GeneratedContent> {
+    if (!this.useLLM) {
+      return this.generateMockPersonalizedContent(params);
+    }
+
+    // Fetch the original content first
+    const originalContent = await this.fetchContentById(params.originalContentId);
+    if (!originalContent) {
+      throw new Error(`Content with ID ${params.originalContentId} not found`);
+    }
+
+    const prompt = `
+      As an educational content personalizer, adapt the following content to suit the learner's profile and adaptation requirements.
+
+      Original Content:
+      ${originalContent.content}
+
+      Learner Profile:
+      ${JSON.stringify(params.learnerProfile, null, 2)}
+
+      Adaptation Type: ${params.adaptationType}
+      ${params.targetLevel ? `Target Difficulty Level: ${params.targetLevel}` : ''}
+      ${params.focusAreas?.length ? `Focus Areas: ${params.focusAreas.join(', ')}` : ''}
+      ${params.preserveStructure ? 'Preserve the original structure of the content.' : 'You may restructure the content as needed.'}
+
+      Adaptation Guidelines:
+      - For 'simplify', reduce complexity and use more basic language and concepts
+      - For 'elaborate', add more details, examples, and explanations
+      - For 'restyle', adapt to the learner's preferred learning style (${params.learnerProfile.learningStyle})
+      - For 'supplement', add additional information focused on the learner's interests and goals
+
+      Format the content using markdown, preserving appropriate headings, bullet points, code blocks, and other formatting.
+      Include a title for the adapted content at the top.
+    `;
+
+    try {
+      const generatedText = await this.llmService.complete(prompt, {
+        temperature: 0.7,
+        maxTokens: 4000
+      });
+
+      // Extract title from the generated content (first line)
+      const contentLines = generatedText.trim().split('\n');
+      const title = contentLines[0].replace(/^#\s*/, '').trim();
+      const content = contentLines.slice(1).join('\n').trim();
+
+      const response: GeneratedContent = {
+        id: uuidv4(),
+        originalRequest: originalContent.originalRequest,
+        title,
+        content,
+        contentType: originalContent.contentType,
+        format: 'markdown',
+        metadata: {
+          generatedAt: new Date(),
+          model: "llm-model", // Simplify to avoid getModel() error
+          version: '1.0',
+          tokensUsed: this.estimateTokenCount(prompt) + this.estimateTokenCount(generatedText),
+          generationParams: {
+            adaptationType: params.adaptationType,
+            targetLevel: params.targetLevel,
+            learnerProfile: params.learnerProfile.id
+          }
+        },
+        suggestedNextSteps: originalContent.suggestedNextSteps,
+        relatedTopics: originalContent.relatedTopics,
+        quiz: originalContent.quiz ? await this.personalizeQuiz(originalContent.quiz, params) : undefined,
+        summary: await this.generateSummary(content)
+      };
+
+      return response;
+    } catch (error) {
+      console.error('Error personalizing content:', error);
+      return this.generateMockPersonalizedContent(params);
+    }
+  }
+
+  /**
+   * Generate a quiz for a specific topic
+   */
+  async generateQuiz(
+    topic: string, 
+    difficultyLevel: DifficultyLevel, 
+    questionCount: number = 5
+  ): Promise<GeneratedQuiz> {
+    if (!this.useLLM) {
+      return this.generateMockQuiz(topic, difficultyLevel, questionCount);
+    }
+
+    const prompt = `
+      As an educational assessment designer, create a quiz on the topic of "${topic}" at a ${difficultyLevel} level.
+      
+      Generate ${questionCount} questions with the following specifications:
+      - Mix of multiple-choice, true-false, and short-answer questions
+      - For multiple-choice questions, provide 4 options (labeled A, B, C, D)
+      - Include the correct answer for each question
+      - Provide a brief explanation for why the answer is correct
+      - Ensure questions test different aspects of the topic
+      - Vary the difficulty of questions appropriately for the ${difficultyLevel} level
+
+      Format the output as valid JSON matching this structure:
+      {
+        "questions": [
+          {
+            "id": "unique-id",
+            "type": "multiple-choice",
+            "question": "Question text here?",
+            "options": ["Option A", "Option B", "Option C", "Option D"],
+            "correctAnswer": "Option B",
+            "explanation": "Explanation for why this is the correct answer",
+            "difficulty": "${difficultyLevel}"
+          },
+          ...
+        ]
+      }
+
+      IMPORTANT: Please provide ONLY valid JSON in your response, with no additional text.
+    `;
+
+    try {
+      const response = await this.llmService.complete(prompt, {
+        temperature: 0.7,
+        maxTokens: 2500,
+        system: "You are an educational quiz designer. You respond with valid JSON following the specified format."
+      });
+
+      // Extract JSON from the response
+      let jsonMatch = response.match(/```json\s*([\s\S]*?)\s*```/) || 
+                      response.match(/```\s*([\s\S]*?)\s*```/) ||
+                      [null, response];
+
+      let jsonString = jsonMatch[1] || response;
+      
+      // Clean up the string - remove potential text before or after JSON
+      jsonString = jsonString.trim();
+      
+      // Find the first '{' and the last '}'
+      const firstBrace = jsonString.indexOf('{');
+      const lastBrace = jsonString.lastIndexOf('}');
+      
+      if (firstBrace >= 0 && lastBrace > firstBrace) {
+        jsonString = jsonString.substring(firstBrace, lastBrace + 1);
+      }
+      
+      // Try to parse the JSON
+      try {
+        const parsedQuiz = JSON.parse(jsonString);
+        
+        // Validate and fix the quiz structure if needed
+        return this.validateAndFixQuiz(parsedQuiz, topic, difficultyLevel, questionCount);
+      } catch (parseError) {
+        console.error('Error parsing quiz JSON:', parseError);
+        // If JSON parsing fails, generate a quiz from scratch
+        return this.generateMockQuiz(topic, difficultyLevel, questionCount);
+      }
+    } catch (error) {
+      console.error('Error generating quiz:', error);
+      return this.generateMockQuiz(topic, difficultyLevel, questionCount);
+    }
+  }
+
+  /**
+   * Estimate the number of tokens in a string
+   */
+  private estimateTokenCount(text: string): number {
+    // Simple approximation: about 4 characters per token
+    return Math.ceil(text.length / 4);
+  }
+
+  /**
+   * Retrieve content by ID
+   */
+  private async fetchContentById(contentId: string): Promise<GeneratedContent> {
+    try {
+      // Import the database client (imported here to avoid circular dependencies)
+      const { db } = await import('@/db');
+      const { eq } = await import('drizzle-orm');
+      const { generatedContents } = await import('@/db/schema');
+      
+      // Query the database
+      const content = await db.query.generatedContents.findFirst({
+        where: eq(generatedContents.id, contentId),
+      });
+      
+      if (!content) {
+        // Fall back to mock content if not found
+        console.warn(`Content with ID ${contentId} not found, returning mock content`);
+        return this.createMockContent(contentId);
+      }
+      
+      // Convert database record to GeneratedContent
+      return {
+        id: content.id,
+        originalRequest: content.originalRequest as any,
+        title: content.title,
+        content: content.content,
+        contentType: content.contentType as any,
+        format: content.format as 'html' | 'markdown' | 'json' | 'plain',
+        metadata: content.metadata as any,
+        suggestedNextSteps: content.suggestedNextSteps as string[] || [],
+        relatedTopics: content.relatedTopics as string[] || [],
+        quiz: content.quiz as any,
+        summary: content.summary || undefined
+      };
+    } catch (error) {
+      console.error('Error fetching content from database:', error);
+      return this.createMockContent(contentId);
+    }
+  }
+  
+  /**
+   * Create mock content for fallback
+   */
+  private createMockContent(contentId: string): GeneratedContent {
+    return {
+      id: contentId,
+      originalRequest: {
+        contentType: ContentType.TEXT,
+        topic: "Introduction to Learning Frameworks",
+        targetAudience: {
+          skillLevel: DifficultyLevel.INTERMEDIATE
+        },
+        learningObjectives: [
+          "Understand basic learning frameworks",
+          "Apply frameworks to practical situations"
+        ]
+      },
+      title: "Introduction to Learning Frameworks",
+      content: "# Introduction to Learning Frameworks\n\nLearning frameworks provide structure to the educational process...",
+      contentType: ContentType.TEXT,
+      format: 'markdown',
+      metadata: {
+        generatedAt: new Date(),
+        model: "mock-model",
+        version: "1.0",
+        tokensUsed: 500
+      },
+      suggestedNextSteps: [],
+      relatedTopics: []
+    };
+  }
+
+  /**
+   * Generate a summary of content
+   */
+  private async generateSummary(content: string): Promise<string> {
+    if (!this.useLLM) {
+      return "This is a summary of the content.";
+    }
+
+    const prompt = `
+      Summarize the following educational content in 2-3 sentences:
+      
+      ${content.substring(0, 2000)}${content.length > 2000 ? '...' : ''}
+    `;
+
+    try {
+      return await this.llmService.complete(prompt, {
+        temperature: 0.3,
+        maxTokens: 200
+      });
+    } catch (error) {
+      console.error('Error generating summary:', error);
+      return "This is a summary of the content.";
+    }
+  }
+
+  /**
+   * Extract quiz questions from content
+   */
+  private async extractQuizFromContent(content: string): Promise<GeneratedQuiz | null> {
+    // Look for a quiz section in the content
+    const quizSectionMatch = content.match(/#+\s*Quiz[\s\S]*$/i);
+    
+    if (!quizSectionMatch) {
+      return null;
+    }
+
+    if (!this.useLLM) {
+      return null; // Fall back to generating a new quiz
+    }
+
+    const quizSection = quizSectionMatch[0];
+    
+    const prompt = `
+      Extract the quiz questions from the following section and format them as JSON:
+      
+      ${quizSection}
+      
+      Format the output as valid JSON matching this structure:
+      {
+        "questions": [
+          {
+            "id": "unique-id",
+            "type": "multiple-choice",
+            "question": "Question text here?",
+            "options": ["Option A", "Option B", "Option C", "Option D"],
+            "correctAnswer": "Option B",
+            "explanation": "Explanation for why this is the correct answer",
+            "difficulty": "intermediate"
+          },
+          ...
+        ]
+      }
+    `;
+
+    try {
+      const response = await this.llmService.complete(prompt, {
+        temperature: 0.3,
+        maxTokens: 1500
+      });
+
+      // Extract and parse JSON
+      const jsonMatch = response.match(/```json\s*([\s\S]*?)\s*```/) || 
+                        response.match(/```\s*([\s\S]*?)\s*```/) ||
+                        [null, response];
+      
+      const jsonString = jsonMatch[1] || response;
+      
+      try {
+        const parsedQuiz = JSON.parse(jsonString);
+        if (parsedQuiz.questions && Array.isArray(parsedQuiz.questions)) {
+          return parsedQuiz;
+        }
+      } catch (e) {
+        console.error('Error parsing extracted quiz:', e);
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Error extracting quiz:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Generate next steps based on content
+   */
+  private async generateNextSteps(topic: string, content: string): Promise<string[]> {
+    if (!this.useLLM) {
+      return [
+        "Review related materials",
+        "Practice with exercises",
+        "Apply concepts to real-world scenarios"
+      ];
+    }
+
+    const prompt = `
+      Based on the following educational content about "${topic}", suggest 3-5 next steps or follow-up activities for the learner:
+      
+      ${content.substring(0, 1500)}${content.length > 1500 ? '...' : ''}
+      
+      Provide each next step as a brief action item, one per line.
+    `;
+
+    try {
+      const response = await this.llmService.complete(prompt, {
+        temperature: 0.7,
+        maxTokens: 300
+      });
+      
+      return response
+        .split('\n')
+        .map(line => line.trim())
+        .filter(line => line && !line.startsWith('#'))
+        .map(line => line.replace(/^\d+\.\s*/, '').replace(/^-\s*/, ''));
+    } catch (error) {
+      console.error('Error generating next steps:', error);
+      return [
+        "Review related materials",
+        "Practice with exercises",
+        "Apply concepts to real-world scenarios"
+      ];
+    }
+  }
+
+  /**
+   * Identify related topics
+   */
+  private async identifyRelatedTopics(topic: string, content: string): Promise<string[]> {
+    if (!this.useLLM) {
+      return [
+        `${topic} fundamentals`,
+        `Advanced ${topic}`,
+        `${topic} in practice`
+      ];
+    }
+
+    const prompt = `
+      Based on the following educational content about "${topic}", identify 3-5 related topics that would be worth exploring next:
+      
+      ${content.substring(0, 1500)}${content.length > 1500 ? '...' : ''}
+      
+      Provide each related topic as a brief phrase, one per line.
+    `;
+
+    try {
+      const response = await this.llmService.complete(prompt, {
+        temperature: 0.7,
+        maxTokens: 300
+      });
+      
+      return response
+        .split('\n')
+        .map(line => line.trim())
+        .filter(line => line && !line.startsWith('#'))
+        .map(line => line.replace(/^\d+\.\s*/, '').replace(/^-\s*/, ''));
+    } catch (error) {
+      console.error('Error identifying related topics:', error);
+      return [
+        `${topic} fundamentals`,
+        `Advanced ${topic}`,
+        `${topic} in practice`
+      ];
+    }
+  }
+
+  /**
+   * Personalize a quiz based on learner profile
+   */
+  private async personalizeQuiz(quiz: GeneratedQuiz, params: PersonalizationParams): Promise<GeneratedQuiz> {
+    if (!this.useLLM) {
+      return quiz; // Return the original quiz if LLM not available
+    }
+
+    // Only adapt quiz if necessary based on adaptation type
+    if (params.adaptationType === 'simplify' || params.adaptationType === 'elaborate' || params.targetLevel) {
+      const prompt = `
+        Adapt the following quiz to make it ${params.adaptationType === 'simplify' ? 'simpler' : 'more detailed'} 
+        for a learner with the following profile:
+        
+        Learning Style: ${params.learnerProfile.learningStyle}
+        Experience Level: ${params.learnerProfile.experienceLevel}
+        ${params.targetLevel ? `Target Difficulty Level: ${params.targetLevel}` : ''}
+        
+        Original Quiz:
+        ${JSON.stringify(quiz, null, 2)}
+        
+        Modify the questions while keeping the same structure. You can:
+        - Adjust the difficulty
+        - Clarify or elaborate on questions
+        - Simplify language if needed
+        - Add more context to explanations
+        - Keep the same number of questions
+        
+        Return only the valid JSON with the updated quiz.
+      `;
+
+      try {
+        const response = await this.llmService.complete(prompt, {
+          temperature: 0.5,
+          maxTokens: 2000
+        });
+        
+        // Extract and parse JSON
+        const jsonMatch = response.match(/```json\s*([\s\S]*?)\s*```/) || 
+                          response.match(/```\s*([\s\S]*?)\s*```/) ||
+                          [null, response];
+        
+        const jsonString = jsonMatch[1] || response;
+        
+        try {
+          const parsedQuiz = JSON.parse(jsonString);
+          if (parsedQuiz.questions && Array.isArray(parsedQuiz.questions)) {
+            return parsedQuiz;
+          }
+        } catch (e) {
+          console.error('Error parsing personalized quiz:', e);
+        }
+      } catch (error) {
+        console.error('Error personalizing quiz:', error);
+      }
+    }
+    
+    return quiz; // Return the original quiz if adaptation failed
+  }
+
+  /**
+   * Validate and fix a generated quiz
+   */
+  private validateAndFixQuiz(
+    quiz: any, 
+    topic: string, 
+    difficultyLevel: DifficultyLevel, 
+    questionCount: number
+  ): GeneratedQuiz {
+    // Ensure the quiz has a questions array
+    if (!quiz || !quiz.questions || !Array.isArray(quiz.questions)) {
+      return this.generateMockQuiz(topic, difficultyLevel, questionCount);
+    }
+    
+    // Fix each question
+    const fixedQuestions = quiz.questions.map((q: any, index: number) => {
+      return {
+        id: q.id || uuidv4(),
+        type: this.validateQuestionType(q.type),
+        question: q.question || `Question about ${topic}?`,
+        options: q.type === 'multiple-choice' ? this.validateOptions(q.options) : undefined,
+        correctAnswer: q.correctAnswer || (q.type === 'multiple-choice' ? 0 : 'True'),
+        explanation: q.explanation || `Explanation for question ${index + 1}`,
+        difficulty: this.validateDifficulty(q.difficulty, difficultyLevel)
+      };
+    });
+    
+    // Limit to requested number of questions
+    const limitedQuestions = fixedQuestions.slice(0, questionCount);
+    
+    // Pad with mock questions if needed
+    while (limitedQuestions.length < questionCount) {
+      limitedQuestions.push(this.generateMockQuestion(topic, difficultyLevel, limitedQuestions.length));
+    }
+    
+    return { questions: limitedQuestions };
+  }
+
+  /**
+   * Validate question type
+   */
+  private validateQuestionType(type: string): 'multiple-choice' | 'true-false' | 'short-answer' {
+    const validTypes = ['multiple-choice', 'true-false', 'short-answer'];
+    return validTypes.includes(type) ? 
+      type as 'multiple-choice' | 'true-false' | 'short-answer' : 
+      'multiple-choice';
+  }
+
+  /**
+   * Validate options for multiple-choice questions
+   */
+  private validateOptions(options: any): string[] {
+    if (Array.isArray(options) && options.length >= 2) {
+      return options.map(o => String(o));
+    }
+    return ['Option A', 'Option B', 'Option C', 'Option D'];
+  }
+
+  /**
+   * Validate difficulty level
+   */
+  private validateDifficulty(difficulty: string, defaultLevel: DifficultyLevel): DifficultyLevel {
+    switch (difficulty?.toLowerCase()) {
+      case 'beginner':
+        return DifficultyLevel.BEGINNER;
+      case 'intermediate':
+        return DifficultyLevel.INTERMEDIATE;
+      case 'advanced':
+        return DifficultyLevel.ADVANCED;
+      case 'expert':
+        return DifficultyLevel.EXPERT;
+      default:
+        return defaultLevel;
+    }
+  }
+
+  /**
+   * Generate a mock question
+   */
+  private generateMockQuestion(
+    topic: string, 
+    difficultyLevel: DifficultyLevel, 
+    index: number
+  ): GeneratedQuiz['questions'][0] {
+    const types: Array<'multiple-choice' | 'true-false' | 'short-answer'> = [
+      'multiple-choice', 'true-false', 'short-answer'
+    ];
+    
+    const type = types[index % types.length];
+    
+    return {
+      id: uuidv4(),
+      type,
+      question: `Mock question ${index + 1} about ${topic}?`,
+      options: type === 'multiple-choice' ? [
+        'Option A', 'Option B', 'Option C', 'Option D'
+      ] : undefined,
+      correctAnswer: type === 'multiple-choice' ? 0 : (type === 'true-false' ? 'True' : 'Answer'),
+      explanation: `This is an explanation for question ${index + 1}`,
+      difficulty: difficultyLevel
+    };
+  }
+
+  /**
+   * Generate mock remediation content
+   */
+  private generateMockRemediationContent(learningGap: string, learnerPreferences: any): any {
+    return {
+      id: uuidv4(),
+      title: `Remediation for ${learningGap}`,
+      content: `# Remediation Content for ${learningGap}
+
+This is mock remediation content generated for the identified learning gap.
+
+## Key Concepts
+
+1. First concept related to ${learningGap}
+2. Second concept related to ${learningGap}
+3. Third concept related to ${learningGap}
+
+## Examples
+
+Here are some examples that illustrate the concepts...
+
+## Practice Exercises
+
+Try these exercises to reinforce your understanding...`,
+      contentType: this.determineContentType(learnerPreferences),
+      format: 'markdown',
+      createdAt: new Date(),
+      metadata: {
+        targetGap: learningGap,
+        mockGenerated: true
+      }
+    };
+  }
+
+  /**
+   * Generate mock content for a request
+   */
+  private generateMockContent(request: ContentGenerationRequest): GeneratedContent {
+    return {
+      id: uuidv4(),
+      originalRequest: request,
+      title: `Content about ${request.topic}`,
+      content: `# ${request.topic}
+
+## Introduction
+
+This is mock content about ${request.topic} generated for ${request.targetAudience.skillLevel} level learners.
+
+## Key Concepts
+
+1. First concept related to ${request.topic}
+2. Second concept related to ${request.topic}
+3. Third concept related to ${request.topic}
+
+## Examples
+
+Here are some examples that illustrate the concepts...
+
+## Summary
+
+In conclusion, ${request.topic} involves several important principles...`,
+      contentType: request.contentType,
+      format: 'markdown',
+      metadata: {
+        generatedAt: new Date(),
+        model: 'mock-model',
+        version: '1.0',
+        tokensUsed: 500,
+        generationParams: {
+          mockGenerated: true
+        }
+      },
+      suggestedNextSteps: [
+        "Review related materials",
+        "Practice with exercises",
+        "Apply concepts to real-world scenarios"
+      ],
+      relatedTopics: [
+        `${request.topic} fundamentals`,
+        `Advanced ${request.topic}`,
+        `${request.topic} in practice`
+      ],
+      quiz: this.generateMockQuiz(request.topic, request.targetAudience.skillLevel, 3),
+      summary: `This is a summary of the content about ${request.topic}.`
+    };
+  }
+
+  /**
+   * Generate mock personalized content
+   */
+  private generateMockPersonalizedContent(params: PersonalizationParams): GeneratedContent {
+    // Create a mock original content directly instead of trying to fetch it
+    const mockOriginalContent = {
+      id: params.originalContentId,
+      originalRequest: {
+        contentType: ContentType.TEXT,
+        topic: "Mock Topic",
+        targetAudience: {
+          skillLevel: DifficultyLevel.INTERMEDIATE
+        },
+        learningObjectives: ["Mock objective"]
+      },
+      title: "Original Content",
+      content: "Original content goes here",
+      contentType: ContentType.TEXT,
+      format: 'markdown',
+      metadata: {
+        generatedAt: new Date(),
+        model: 'mock-model',
+        version: '1.0',
+        tokensUsed: 300
+      },
+      suggestedNextSteps: [],
+      relatedTopics: []
+    };
+    
+    return {
+      id: uuidv4(),
+      originalRequest: mockOriginalContent.originalRequest,
+      title: `Personalized content for ${params.learnerProfile.name}`,
+      content: `# Personalized Content
+
+This content has been adapted to match your learning style (${params.learnerProfile.learningStyle}) 
+and experience level (${params.learnerProfile.experienceLevel}).
+
+## Key Concepts
+
+The content has been ${params.adaptationType}d to better match your needs.
+
+## Examples
+
+Here are some examples that are relevant to your interests in ${params.learnerProfile.interests.join(', ')}...`,
+      contentType: mockOriginalContent.contentType,
+      format: 'markdown',
+      metadata: {
+        generatedAt: new Date(),
+        model: 'mock-model',
+        version: '1.0',
+        tokensUsed: 500,
+        generationParams: {
+          adaptationType: params.adaptationType,
+          mockGenerated: true
+        }
+      },
+      suggestedNextSteps: [
+        "Review this personalized content",
+        "Apply concepts to your specific role",
+        "Explore related topics"
+      ],
+      relatedTopics: params.learnerProfile.interests.slice(0, 3),
+      quiz: this.generateMockQuiz("Personalized topic", 
+                                 params.targetLevel || DifficultyLevel.INTERMEDIATE, 
+                                 3),
+      summary: "This is a personalized summary of the content."
+    };
+  }
+
+  /**
+   * Generate a mock quiz
+   */
+  private generateMockQuiz(
+    topic: string, 
+    difficultyLevel: DifficultyLevel, 
+    questionCount: number
+  ): GeneratedQuiz {
+    const questions: GeneratedQuiz['questions'] = [];
+    
+    for (let i = 0; i < questionCount; i++) {
+      questions.push(this.generateMockQuestion(topic, difficultyLevel, i));
+    }
+    
+    return { questions };
+  }
+
+  /**
+   * Determine content type based on learner preferences
+   */
+  private determineContentType(learnerPreferences: any): ContentType {
+    // Map learning style to content type
+    const learningStyle = learnerPreferences.learningStyle || 'visual';
+    
+    switch (learningStyle?.toLowerCase()) {
+      case 'visual':
+        return ContentType.VIDEO;
+      case 'auditory':
+        return ContentType.AUDIO;
+      case 'reading':
+        return ContentType.TEXT;
+      case 'kinesthetic':
+        return ContentType.INTERACTIVE;
+      default:
+        return ContentType.TEXT;
+    }
+  }
+
+  /**
+   * Map learning style string to our format
+   */
+  private mapLearningStyle(style: string): 'visual' | 'auditory' | 'reading' | 'kinesthetic' {
+    if (!style) return 'visual';
+    
+    const styleMap: Record<string, 'visual' | 'auditory' | 'reading' | 'kinesthetic'> = {
+      visual: 'visual',
+      auditory: 'auditory',
+      audio: 'auditory',
+      reading: 'reading',
+      text: 'reading',
+      kinesthetic: 'kinesthetic',
+      interactive: 'kinesthetic',
+      hands: 'kinesthetic',
+      'hands-on': 'kinesthetic'
+    };
+    
+    return styleMap[style.toLowerCase()] || 'visual';
+  }
+
+  /**
+   * Map experience level string to our format
+   */
+  private mapExperienceLevel(level: string): 'beginner' | 'intermediate' | 'advanced' | 'expert' {
+    if (!level) return 'beginner';
+    
+    const levelMap: Record<string, 'beginner' | 'intermediate' | 'advanced' | 'expert'> = {
+      beginner: 'beginner',
+      novice: 'beginner',
+      basic: 'beginner',
+      intermediate: 'intermediate',
+      medium: 'intermediate',
+      mid: 'intermediate',
+      moderate: 'intermediate',
+      advanced: 'advanced',
+      expert: 'expert',
+      master: 'expert',
+      proficient: 'expert'
+    };
+    
+    return levelMap[level.toLowerCase()] || 'beginner';
+  }
+
+  /**
+   * Determine the appropriate adaptation type based on learner profile
+   */
+  private determineAdaptationType(
+    profile: LearnerProfile, 
+    contentId: string
+  ): 'simplify' | 'elaborate' | 'restyle' | 'supplement' {
+    // This would normally have more sophisticated logic
+    // based on the content and the learner's profile
+    
+    if (profile.experienceLevel === 'beginner') {
+      return 'simplify';
+    } else if (profile.experienceLevel === 'expert') {
+      return 'elaborate';
+    } else if (profile.learningStyle === 'visual' || profile.learningStyle === 'auditory') {
+      return 'restyle';
+    } else {
+      return 'supplement';
+    }
+  }
+
+  /**
+   * Determine target difficulty level based on learner profile
+   */
+  private determineTargetLevel(
+    profile: LearnerProfile, 
+    contentId: string
+  ): DifficultyLevel | undefined {
+    // Map experience level to difficulty level
+    const levelMap: Record<string, DifficultyLevel> = {
+      beginner: DifficultyLevel.BEGINNER,
+      intermediate: DifficultyLevel.INTERMEDIATE,
+      advanced: DifficultyLevel.ADVANCED,
+      expert: DifficultyLevel.EXPERT
+    };
+    
+    return levelMap[profile.experienceLevel];
   }
 } 

@@ -392,4 +392,11 @@ export class LLMService {
   public getConfig(): LLMConfig {
     return { ...this.config };
   }
+  
+  /**
+   * Get the currently active model name
+   */
+  public getModel(): string {
+    return this.provider.getModel();
+  }
 } 

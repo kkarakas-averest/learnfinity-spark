@@ -9,6 +9,26 @@ const LearningPathRequestSchema = z.object({
   userId: z.string().uuid()
 });
 
+// Type definitions
+interface CourseData {
+  id: string;
+  title: string;
+  description: string;
+  estimated_duration: number;
+  skills: string[] | null;
+}
+
+interface PathCourseData {
+  id: string;
+  course_id: string;
+  match_score: number;
+  rag_status: string;
+  progress: number;
+  sections: number;
+  completed_sections: number;
+  courses: CourseData;
+}
+
 /**
  * GET /api/learner/learning-path
  * Get a learner's personalized learning path
@@ -89,18 +109,23 @@ export async function GET(req: NextRequest) {
     }
     
     // Transform courses data to match our client interface
-    const transformedCourses = coursesData?.map(course => ({
-      id: course.course_id,
-      title: course.courses.title,
-      description: course.courses.description,
-      duration: course.courses.estimated_duration,
-      matchScore: course.match_score,
-      ragStatus: course.rag_status,
-      progress: course.progress,
-      sections: course.sections,
-      completedSections: course.completed_sections,
-      skills: course.courses.skills || []
-    })) || [];
+    const transformedCourses = coursesData?.map((course: any) => {
+      // Use type assertion to get proper typing
+      const courseDetails = course.courses as CourseData;
+      
+      return {
+        id: course.course_id,
+        title: courseDetails.title,
+        description: courseDetails.description,
+        duration: courseDetails.estimated_duration,
+        matchScore: course.match_score,
+        ragStatus: course.rag_status,
+        progress: course.progress,
+        sections: course.sections,
+        completedSections: course.completed_sections,
+        skills: courseDetails.skills || []
+      };
+    }) || [];
     
     // Build the learning path object
     const learningPath = {

@@ -20,7 +20,7 @@ export interface LLMConfig {
 export const defaultLLMConfig: LLMConfig = {
   provider: 'groq',
   apiKey: import.meta.env.VITE_GROQ_API_KEY || '',
-  model: 'llama-3.1-70b-versatile',
+  model: import.meta.env.VITE_LLM_MODEL || 'llama-3.1-70b-versatile',
   debugMode: import.meta.env.MODE === 'development',
   maxTokens: 1024,
   temperature: 0.7,

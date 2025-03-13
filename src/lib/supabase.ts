@@ -1,104 +1,92 @@
 import { createClient } from '@supabase/supabase-js';
-import { Database } from './database.types';
+import type { Database } from './database.types';
 
-// Get Supabase URL and key from environment variables
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://ujlqzkkkfatehxeqtbdl.supabase.co';
+// Check if Supabase environment variables are configured
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-// Create a Supabase client with improved error handling
-let supabase;
-
-try {
-  if (!supabaseUrl || !supabaseAnonKey) {
-    console.error('❌ Missing Supabase configuration. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env.local file.');
-    
-    // Create client with a placeholder key to prevent app from crashing
-    supabase = createClient<Database>(supabaseUrl || 'https://placeholder.supabase.co', 'MISSING_CONFIG_PLACEHOLDER');
-  } else {
-    console.info('✅ Initializing Supabase client');
-    supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
-  }
-} catch (error) {
-  console.error('❌ Error initializing Supabase client:', error);
-  // Fallback client that will fail gracefully
-  supabase = createClient<Database>(supabaseUrl || 'https://placeholder.supabase.co', 'ERROR_PLACEHOLDER');
+// Debug output for config variables in development mode
+if (import.meta.env.MODE === 'development') {
+  console.log('[Supabase Client] Configuration check');
+  if (!supabaseUrl) console.error('Missing VITE_SUPABASE_URL');
+  if (!supabaseAnonKey) console.error('Missing VITE_SUPABASE_ANON_KEY');
 }
 
-// Export a function to check if Supabase is properly configured
+// Create a supabase client
+export const supabase = createClient<Database>(
+  supabaseUrl || 'https://placeholder.supabase.co',
+  supabaseAnonKey || 'placeholder-key',
+  {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true
+    }
+  }
+);
+
+// Utility to check if Supabase is properly configured
 export const isSupabaseConfigured = () => {
-  return !!supabaseUrl && 
-    !!supabaseAnonKey && 
-    typeof supabaseAnonKey === 'string' && 
-    supabaseAnonKey.length >= 20 && 
-    supabaseAnonKey !== 'MISSING_CONFIG_PLACEHOLDER' && 
-    supabaseAnonKey !== 'ERROR_PLACEHOLDER';
+  return !!(supabaseUrl && supabaseAnonKey);
 };
 
-// Add a test function to verify connection
+// Test the connection to Supabase
 export const testSupabaseConnection = async () => {
   try {
-    console.log('Testing Supabase connection...');
-    
-    // First check if Supabase is properly configured
     if (!isSupabaseConfigured()) {
-      return { 
-        success: false, 
-        error: new Error('Supabase is not properly configured. Check your environment variables.'),
-        details: 'Check that VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set in .env.local'
+      return {
+        success: false,
+        message: 'Supabase client not configured. Missing environment variables.',
+        details: { 
+          hasUrl: !!supabaseUrl, 
+          hasAnonKey: !!supabaseAnonKey 
+        }
       };
     }
     
-    // Try to access a public table
-    const { data, error } = await supabase
-      .from('users')
-      .select('id')
-      .limit(1);
+    // Test a simple query
+    const { data, error } = await supabase.from('courses').select('id').limit(1);
     
     if (error) {
-      console.error('❌ Supabase connection test failed:', error);
-      
-      // Provide helpful error messages for common issues
-      if (error.message?.includes('relation') && error.message?.includes('does not exist')) {
-        return { 
-          success: false, 
-          error,
-          details: 'Database table does not exist. You may need to initialize your Supabase tables.'
+      if (error.message.includes('does not exist')) {
+        return {
+          success: false,
+          message: 'Connection successful but table not found. Database may need initialization.',
+          details: { error: error.message }
         };
       }
       
-      if (error.message?.includes('JWT')) {
-        return { 
-          success: false, 
-          error,
-          details: 'Authentication error. Your Supabase key may be invalid.'
+      if (error.message.includes('auth')) {
+        return {
+          success: false,
+          message: 'Authentication error. Check your Supabase anonymous key.',
+          details: { error: error.message }
         };
       }
       
-      return { success: false, error };
+      return {
+        success: false,
+        message: 'Error connecting to Supabase.',
+        details: { error: error.message }
+      };
     }
     
-    console.log('✅ Supabase connection test successful');
-    return { success: true, data };
-  } catch (error) {
-    console.error('❌ Supabase connection test failed with exception:', error);
-    return { 
-      success: false, 
-      error, 
-      details: 'An unexpected error occurred when connecting to Supabase.'
+    return {
+      success: true,
+      message: 'Successfully connected to Supabase.',
+      details: { rowCount: data?.length || 0 }
+    };
+  } catch (e) {
+    return {
+      success: false,
+      message: 'Exception while testing Supabase connection.',
+      details: { error: e instanceof Error ? e.message : String(e) }
     };
   }
 };
 
-// Make the test function available globally in development
-if (import.meta.env.DEV) {
-  (window as Window & typeof globalThis & { testSupabaseConnection: typeof testSupabaseConnection }) 
-    .testSupabaseConnection = testSupabaseConnection;
-  console.log('🔧 Global function window.testSupabaseConnection() is now available for testing');
-  
-  // Remove the old test function if it exists to avoid confusion
-  if ((window as Window & typeof globalThis & { runSupabaseTest?: Function }).runSupabaseTest) {
-    delete (window as Window & typeof globalThis & { runSupabaseTest?: Function }).runSupabaseTest;
-  }
+// Export testSupabaseConnection for global access in development
+if (import.meta.env.MODE === 'development') {
+  // @ts-ignore - This is fine for development purposes
+  window.testSupabaseConnection = testSupabaseConnection;
 }
-
-export { supabase };
