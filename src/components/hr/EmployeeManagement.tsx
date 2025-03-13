@@ -423,7 +423,14 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ onViewDetails, 
                 <div>
                   <h3 className="text-lg font-medium">{employee.name}</h3>
                   <div className="text-sm text-gray-500">
-                    {employee.department} · {employee.position || 'No position'}
+                    {/* Use a more robust approach for displaying department and position */}
+                    {typeof employee.department === 'string' && employee.department ? 
+                      employee.department : 
+                      (employee.hr_departments?.name || 'Unknown Department')}
+                    {' · '}
+                    {typeof employee.position === 'string' && employee.position ? 
+                      employee.position : 
+                      (employee.hr_positions?.title || 'Unknown Position')}
                   </div>
                   <div className="text-xs text-gray-400 italic">
                     Raw: {JSON.stringify({
@@ -432,6 +439,12 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ onViewDetails, 
                       hr_dept: employee.hr_departments?.name,
                       hr_pos: employee.hr_positions?.title
                     })}
+                  </div>
+                  <div className="text-xs text-blue-400">
+                    Object types: dept({typeof employee.department}), pos({typeof employee.position})
+                  </div>
+                  <div className="text-xs text-red-400">
+                    Source: {employee.id.includes('custom') ? 'Override' : 'Standard mock'}
                   </div>
                   <div className="mt-2 flex items-center space-x-3">
                     <RAGStatusBadge 
