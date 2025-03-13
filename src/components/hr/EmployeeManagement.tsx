@@ -454,22 +454,11 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ onViewDetails, 
                 <div>
                   <h3 className="text-lg font-medium">{employee.name}</h3>
                   <div className="text-sm text-gray-500">
-                    {/* Use a more robust approach for displaying department and position */}
-                    {typeof employee.department === 'string' && employee.department ? 
-                      employee.department : 
-                      (employee.hr_departments?.name || 'Unknown Department')}
-                    {' · '}
-                    {typeof employee.position === 'string' && employee.position ? 
-                      employee.position : 
-                      (employee.hr_positions?.title || 'Unknown Position')}
+                    {/* Use the display value from renderDepartmentPosition */}
+                    {renderDepartmentPosition(employee).display}
                   </div>
                   <div className="text-xs text-gray-400 italic">
-                    Raw: {JSON.stringify({
-                      dept: employee.department, 
-                      pos: employee.position,
-                      hr_dept: employee.hr_departments?.name,
-                      hr_pos: employee.hr_positions?.title
-                    })}
+                    Raw: {JSON.stringify(renderDepartmentPosition(employee).rawData)}
                   </div>
                   <div className="text-xs text-blue-400">
                     Object types: dept({typeof employee.department}), pos({typeof employee.position})
@@ -561,6 +550,34 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ onViewDetails, 
         </ul>
       </div>
     );
+  };
+
+  const renderDepartmentPosition = (employee: any) => {
+    // Extract department and position with fallbacks to default values
+    const departmentName = employee.department && employee.department !== "Unknown Department" 
+      ? employee.department 
+      : (employee.hr_departments?.name && employee.hr_departments.name !== "Unknown Department"
+        ? employee.hr_departments.name
+        : "Not Assigned"); // Change 'Unknown Department' to 'Not Assigned'
+
+    const positionTitle = employee.position && employee.position !== "Unknown Position"
+      ? employee.position
+      : (employee.hr_positions?.title && employee.hr_positions.title !== "Unknown Position" 
+        ? employee.hr_positions.title
+        : "Not Assigned"); // Change 'Unknown Position' to 'Not Assigned'
+
+    // Return just the display values, not the entire component
+    return {
+      display: `${departmentName} · ${positionTitle}`,
+      rawData: {
+        dept: employee.department || "Unknown Department", 
+        pos: employee.position || "Unknown Position",
+        hr_dept: employee.hr_departments?.name || "Unknown Department",
+        hr_pos: employee.hr_positions?.title || "Unknown Position"
+      },
+      departmentName,
+      positionTitle
+    };
   };
 
   return (
