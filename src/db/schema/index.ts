@@ -28,13 +28,13 @@ export {
 // Import and re-export courses schema
 import {
   courses,
-  modules,
-  sections,
+  courseModules as modules,
+  courseQuizzes as sections,
   enrollments,
   courseReviews,
   coursesRelations,
-  modulesRelations,
-  sectionsRelations,
+  courseModulesRelations as modulesRelations,
+  courseQuizzesRelations as sectionsRelations,
   enrollmentsRelations,
   courseReviewsRelations,
 } from './courses';
