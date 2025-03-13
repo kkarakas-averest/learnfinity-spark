@@ -90,6 +90,26 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ onViewDetails, 
         const hrDeptName = emp.hr_departments?.name;
         const hrPosTitle = emp.hr_positions?.title;
         
+        // More detailed debug logging
+        console.log(`Transforming employee ${emp.name} (${emp.id})`, {
+          original: {
+            department: {
+              raw: departmentRaw,
+              type: typeof departmentRaw,
+              exists: !!departmentRaw,
+              isEmpty: departmentRaw === ''
+            },
+            position: {
+              raw: positionRaw,
+              type: typeof positionRaw,
+              exists: !!positionRaw,
+              isEmpty: positionRaw === ''
+            },
+            hr_departments: emp.hr_departments,
+            hr_positions: emp.hr_positions
+          }
+        });
+        
         // Explicitly extract department and position with better logging
         const finalDepartment = typeof departmentRaw === 'string' && departmentRaw ? 
                                departmentRaw : (hrDeptName || 'Unknown Department');
@@ -109,13 +129,24 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ onViewDetails, 
           });
         }
         
-        return {
+        // Ensure required properties are set with debugging information 
+        const improvedEmployee = {
           ...emp,
           department: finalDepartment,
           position: finalPosition,
+          // Add extra debug fields to help diagnose issues
+          _debug: {
+            hasValidDepartment: finalDepartment !== 'Unknown Department',
+            hasValidPosition: finalPosition !== 'Unknown Position',
+            originalDepartmentType: typeof departmentRaw,
+            originalPositionType: typeof positionRaw,
+            source: emp.id.includes('custom') ? 'override' : 'standard'
+          },
           // Ensure ragStatus is explicitly present and properly mapped 
           ragStatus: emp.ragStatus || emp.rag_status || 'green'
         };
+        
+        return improvedEmployee;
       });
       
       console.log("Transformation complete. First employee transformed:", 
@@ -445,6 +476,14 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ onViewDetails, 
                   </div>
                   <div className="text-xs text-red-400">
                     Source: {employee.id.includes('custom') ? 'Override' : 'Standard mock'}
+                  </div>
+                  {/* Enhanced debugging section */}
+                  <div className="text-xs text-purple-400 bg-gray-100 p-1 mt-1 rounded">
+                    ID: {employee.id}<br/>
+                    Valid Data: {employee._debug?.hasValidDepartment ? '✅' : '❌'} dept, 
+                                {employee._debug?.hasValidPosition ? '✅' : '❌'} pos<br/>
+                    HR Objects: {!!employee.hr_departments ? '✅' : '❌'} dept, 
+                               {!!employee.hr_positions ? '✅' : '❌'} pos
                   </div>
                   <div className="mt-2 flex items-center space-x-3">
                     <RAGStatusBadge 
