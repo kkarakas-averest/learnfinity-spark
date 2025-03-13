@@ -60,105 +60,20 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ onViewDetails, 
         return;
       }
       
-      // Extended debugging for employee data
-      console.log("Total employees received:", result.employees.length);
+      // Apply simple data normalization to ensure consistent employee objects
+      const normalizedEmployees = result.employees.map(emp => ({
+        ...emp,
+        // Ensure ragStatus is explicitly present and properly mapped 
+        ragStatus: emp.ragStatus || emp.rag_status || 'green'
+      }));
       
-      // Log the first and a few other employees for comparison
-      console.log("First employee data:", JSON.stringify(result.employees[0], null, 2));
-      
-      // Check for Kubilay Karakas specifically
-      const kubilayEmployee = result.employees.find(emp => emp.name.includes('Kubilay'));
-      if (kubilayEmployee) {
-        console.log("Kubilay's employee data:", JSON.stringify(kubilayEmployee, null, 2));
-      }
-      
-      // Log raw department and position properties for the first few employees
-      console.log("First 3 employees department/position properties:");
-      result.employees.slice(0, 3).forEach((emp, index) => {
-        console.log(`Employee ${index + 1} - ${emp.name}:`);
-        console.log(`  department: ${emp.department} (type: ${typeof emp.department})`);
-        console.log(`  hr_departments: ${JSON.stringify(emp.hr_departments)}`);
-        console.log(`  position: ${emp.position} (type: ${typeof emp.position})`);
-        console.log(`  hr_positions: ${JSON.stringify(emp.hr_positions)}`);
-      });
-      
-      // Additional transformation to ensure department and position are properly extracted
-      const transformedEmployees = result.employees.map(emp => {
-        // Log transformation process for debugging employees with issues
-        const departmentRaw = emp.department;
-        const positionRaw = emp.position;
-        const hrDeptName = emp.hr_departments?.name;
-        const hrPosTitle = emp.hr_positions?.title;
-        
-        // More detailed debug logging
-        console.log(`Transforming employee ${emp.name} (${emp.id})`, {
-          original: {
-            department: {
-              raw: departmentRaw,
-              type: typeof departmentRaw,
-              exists: !!departmentRaw,
-              isEmpty: departmentRaw === ''
-            },
-            position: {
-              raw: positionRaw,
-              type: typeof positionRaw,
-              exists: !!positionRaw,
-              isEmpty: positionRaw === ''
-            },
-            hr_departments: emp.hr_departments,
-            hr_positions: emp.hr_positions
-          }
-        });
-        
-        // Explicitly extract department and position with better logging
-        const finalDepartment = typeof departmentRaw === 'string' && departmentRaw ? 
-                               departmentRaw : (hrDeptName || 'Unknown Department');
-                               
-        const finalPosition = typeof positionRaw === 'string' && positionRaw ? 
-                             positionRaw : (hrPosTitle || 'Unknown Position');
-        
-        // Log any suspicious transformations
-        if (finalDepartment === 'Unknown Department' || finalPosition === 'Unknown Position') {
-          console.log(`Transformation issue for ${emp.name}:`, {
-            departmentRaw,
-            hrDeptName,
-            positionRaw, 
-            hrPosTitle,
-            finalDepartment,
-            finalPosition
-          });
-        }
-        
-        // Ensure required properties are set with debugging information 
-        const improvedEmployee = {
-          ...emp,
-          department: finalDepartment,
-          position: finalPosition,
-          // Add extra debug fields to help diagnose issues
-          _debug: {
-            hasValidDepartment: finalDepartment !== 'Unknown Department',
-            hasValidPosition: finalPosition !== 'Unknown Position',
-            originalDepartmentType: typeof departmentRaw,
-            originalPositionType: typeof positionRaw,
-            source: emp.id.includes('custom') ? 'override' : 'standard'
-          },
-          // Ensure ragStatus is explicitly present and properly mapped 
-          ragStatus: emp.ragStatus || emp.rag_status || 'green'
-        };
-        
-        return improvedEmployee;
-      });
-      
-      console.log("Transformation complete. First employee transformed:", 
-        JSON.stringify(transformedEmployees[0], null, 2));
-      
-      setEmployees(transformedEmployees);
-      setFilteredEmployees(transformedEmployees);
+      setEmployees(normalizedEmployees);
+      setFilteredEmployees(normalizedEmployees);
       
       // Fetch status histories for all employees
       const histories: Record<string, StatusHistoryEntry[]> = {};
       
-      for (const employee of transformedEmployees) {
+      for (const employee of normalizedEmployees) {
         try {
           const history = await ragStatusService.getEmployeeRAGHistory(employee.id);
           histories[employee.id] = history.entries.map(entry => ({
@@ -456,23 +371,6 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ onViewDetails, 
                   <div className="text-sm text-gray-500">
                     {/* Use the display value from renderDepartmentPosition */}
                     {renderDepartmentPosition(employee).display}
-                  </div>
-                  <div className="text-xs text-gray-400 italic">
-                    Raw: {JSON.stringify(renderDepartmentPosition(employee).rawData)}
-                  </div>
-                  <div className="text-xs text-blue-400">
-                    Object types: dept({typeof employee.department}), pos({typeof employee.position})
-                  </div>
-                  <div className="text-xs text-red-400">
-                    Source: {employee.id.includes('custom') ? 'Override' : 'Standard mock'}
-                  </div>
-                  {/* Enhanced debugging section */}
-                  <div className="text-xs text-purple-400 bg-gray-100 p-1 mt-1 rounded">
-                    ID: {employee.id}<br/>
-                    Valid Data: {employee._debug?.hasValidDepartment ? '✅' : '❌'} dept, 
-                                {employee._debug?.hasValidPosition ? '✅' : '❌'} pos<br/>
-                    HR Objects: {!!employee.hr_departments ? '✅' : '❌'} dept, 
-                               {!!employee.hr_positions ? '✅' : '❌'} pos
                   </div>
                   <div className="mt-2 flex items-center space-x-3">
                     <RAGStatusBadge 
