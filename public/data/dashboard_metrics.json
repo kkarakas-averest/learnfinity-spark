@@ -12,7 +12,17 @@
     "skillGaps": 23,
     "skillGapsChange": -5,
     "learningHours": 1452,
-    "learningHoursChange": 123
+    "learningHoursChange": 123,
+    "averageEngagement": 78,
+    "engagementChange": 3.5,
+    "coursesAssigned": 289,
+    "newCoursesAssigned": 42,
+    "ragStatusCounts": {
+      "green": 98,
+      "amber": 36,
+      "red": 22,
+      "total": 156
+    }
   },
   "activities": [
     {
@@ -41,11 +51,5 @@
       "issue": "Has not completed mandatory compliance training",
       "time": "3 days ago"
     }
-  ],
-  "ragSummary": {
-    "green": 98,
-    "amber": 36,
-    "red": 22,
-    "total": 156
-  }
+  ]
 } 

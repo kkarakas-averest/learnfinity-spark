@@ -288,9 +288,20 @@ export const hrEmployeeService = {
               );
             }
             
+            // Transform the data to ensure position is correctly exposed
+            const transformedEmployees = filteredEmployees.map(emp => ({
+              ...emp,
+              // Use the title from hr_positions if available, else fall back to position field
+              position: emp.hr_positions?.title || emp.position || 'Unknown Position',
+              // Ensure department is taken from hr_departments if available
+              department: emp.hr_departments?.name || emp.department || 'Unknown Department',
+              // Ensure rag status is present
+              ragStatus: emp.ragStatus || 'green'
+            }));
+            
             // Calculate total and paginate
-            const total = filteredEmployees.length;
-            const paginatedEmployees = filteredEmployees.slice(from, from + pageSize);
+            const total = transformedEmployees.length;
+            const paginatedEmployees = transformedEmployees.slice(from, from + pageSize);
             
             return {
               success: true,
@@ -306,9 +317,20 @@ export const hrEmployeeService = {
         throw new Error(error.message);
       }
       
+      // Transform the database results to ensure consistent structure
+      const transformedData = data.map(emp => ({
+        ...emp,
+        // Use the title from hr_positions if available, else fall back to position field
+        position: emp.hr_positions?.title || emp.position || 'Unknown Position',
+        // Ensure department is taken from hr_departments if available
+        department: emp.hr_departments?.name || emp.department || 'Unknown Department',
+        // Ensure rag status is present
+        ragStatus: emp.rag_status || 'green'
+      }));
+      
       return {
         success: true,
-        employees: data,
+        employees: transformedData,
         total: count,
         error: null
       };
