@@ -87,8 +87,24 @@ export const hrServices = {
   // Dashboard metrics
   getDashboardMetrics: async () => {
     try {
-      // In a real app, this would call hrEmployeeService.getDashboardMetrics()
-      // For demo purposes, return mock data
+      // Try to fetch from real database first
+      // (In a real implementation, this would query your database)
+      
+      // If that fails, try to load from the mock JSON file
+      try {
+        console.log('Loading dashboard metrics from JSON file...');
+        const response = await fetch('/data/dashboard_metrics.json');
+        
+        if (response.ok) {
+          const data = await response.json();
+          return data;
+        }
+      } catch (jsonError) {
+        console.error('Error loading dashboard metrics from JSON:', jsonError);
+      }
+      
+      // Fall back to hardcoded mock data if JSON fails
+      console.log('Using hardcoded mock dashboard metrics');
       return {
         success: true,
         metrics: mockDashboardMetrics

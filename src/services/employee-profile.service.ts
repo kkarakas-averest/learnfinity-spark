@@ -178,12 +178,28 @@ export const getEmployeeProfile = async (employeeId: string): Promise<EnhancedEm
     
     try {
       // For demo purposes, look for a JSON file with this employee's data
-      const response = await fetch(`/data/employee_profile_${employeeId}.json`);
+      let response = await fetch(`/data/employee_profile_${employeeId}.json`);
+      
+      // If that fails, try the sample profile
       if (!response.ok) {
-        throw new Error(`Failed to fetch profile for employee ${employeeId}`);
+        console.log(`Profile not found for employee ${employeeId}, trying sample profile...`);
+        response = await fetch('/data/employee_profile_sample.json');
       }
       
+      if (!response.ok) {
+        console.log('Sample profile not found either, falling back to generated mock data');
+        throw new Error(`Failed to fetch profile data`);
+      }
+      
+      // Parse the profile data
       const profileData = await response.json();
+      
+      // If using the sample, update the ID to match the requested employee
+      if (profileData.id === 'sample-employee-id') {
+        profileData.id = employeeId;
+        profileData.name = `Employee ${employeeId.substring(0, 6)}`;
+        profileData.email = `employee-${employeeId.substring(0, 6)}@example.com`;
+      }
       
       // Cache the profile data for later use
       DUMMY_PROFILES[employeeId] = profileData;
@@ -191,13 +207,13 @@ export const getEmployeeProfile = async (employeeId: string): Promise<EnhancedEm
       return profileData;
     } catch (error) {
       console.error('Error fetching employee profile JSON:', error);
-      console.log('Using mock employee data instead of API response');
+      console.log('Using generated mock employee data');
       
       // Generate basic employee for mock data
       const basicEmployee: Employee = {
         id: employeeId,
-        name: `Employee ${employeeId}`,
-        email: `employee-${employeeId}@example.com`,
+        name: `Employee ${employeeId.substring(0, 6)}`,
+        email: `employee-${employeeId.substring(0, 6)}@example.com`,
         department: 'Engineering',
         position: 'Software Developer',
         courses: 5,

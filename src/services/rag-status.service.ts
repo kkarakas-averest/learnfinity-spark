@@ -83,69 +83,90 @@ export class RAGStatusService {
   }
   
   /**
-   * Get an employee's RAG status history
-   * 
-   * @param employeeId The employee ID to get history for
-   * @returns The employee's RAG status history
+   * Get the RAG status history for an employee
+   * @param employeeId ID of the employee
+   * @returns Promise<RAGStatusHistory>
    */
   async getEmployeeRAGHistory(employeeId: string): Promise<RAGStatusHistory> {
-    // Check cache first
-    if (this.cache.has(employeeId)) {
-      return this.cache.get(employeeId)!;
-    }
-    
     try {
-      // Try to get real data from Supabase
+      // Try to fetch real data from the database
       const { data, error } = await supabase
         .from('employee_rag_history')
         .select('*')
         .eq('employee_id', employeeId)
         .order('created_at', { ascending: false });
-        
+      
       if (error) {
-        console.error('Error fetching RAG history:', error);
-        // Fall back to mock data on error
-        const mockData = this.generateMockRAGHistory(employeeId);
-        this.cache.set(employeeId, mockData);
-        return mockData;
+        console.error('Error fetching RAG history from database:', error);
+        
+        // Try to load from mock JSON file
+        try {
+          console.log('Trying to load RAG history from JSON file...');
+          const response = await fetch('/data/employee_rag_history.json');
+          if (response.ok) {
+            const mockData = await response.json();
+            // Filter entries for this employee
+            const employeeEntries = mockData.entries.filter(
+              (entry: any) => entry.employeeId === employeeId
+            );
+            
+            if (employeeEntries.length > 0) {
+              // Transform the data to match our expected format
+              const entries: RAGStatusEntry[] = employeeEntries.map((entry: any) => ({
+                id: entry.id,
+                employeeId: entry.employeeId,
+                status: entry.status as RAGStatus,
+                previousStatus: entry.previousStatus as RAGStatus | undefined,
+                reason: entry.reason,
+                createdBy: entry.createdBy,
+                createdAt: entry.createdAt, // Keep as string to match type
+                relatedInterventionId: entry.relatedInterventionId
+              }));
+              
+              return {
+                employeeId,
+                currentStatus: entries[0].status,
+                lastUpdate: entries[0].createdAt,
+                entries
+              };
+            }
+          }
+        } catch (jsonError) {
+          console.error('Error loading RAG history from JSON:', jsonError);
+        }
+        
+        // Fall back to generating mock data
+        console.log('Generating mock RAG history data');
+        return this.generateMockRAGHistory(employeeId);
       }
       
-      if (data && data.length > 0) {
-        // Format real data
-        const currentStatus = data[0].status;
-        const lastUpdate = data[0].created_at;
-        
-        const history: RAGStatusHistory = {
-          employeeId,
-          currentStatus,
-          lastUpdate,
-          entries: data.map(entry => ({
-            id: entry.id,
-            employeeId: entry.employee_id,
-            status: entry.status,
-            previousStatus: entry.previous_status,
-            reason: entry.reason,
-            createdBy: entry.created_by,
-            createdAt: entry.created_at,
-            relatedInterventionId: entry.related_intervention_id
-          }))
-        };
-        
-        // Update cache and return
-        this.cache.set(employeeId, history);
-        return history;
-      } else {
-        // No data, use mock
-        const mockData = this.generateMockRAGHistory(employeeId);
-        this.cache.set(employeeId, mockData);
-        return mockData;
+      if (!data || data.length === 0) {
+        // No history found, generate mock data
+        return this.generateMockRAGHistory(employeeId);
       }
+      
+      // Transform the data to match our expected format
+      const entries: RAGStatusEntry[] = data.map(entry => ({
+        id: entry.id,
+        employeeId: entry.employee_id,
+        status: entry.status as RAGStatus,
+        previousStatus: entry.previous_status as RAGStatus | undefined,
+        reason: entry.reason,
+        createdBy: entry.created_by,
+        createdAt: entry.created_at, // Already a string from the database
+        relatedInterventionId: entry.related_intervention_id
+      }));
+      
+      return {
+        employeeId,
+        currentStatus: entries[0].status,
+        lastUpdate: entries[0].createdAt,
+        entries
+      };
     } catch (error) {
-      console.error('Exception fetching RAG history:', error);
-      // Fall back to mock data on exception
-      const mockData = this.generateMockRAGHistory(employeeId);
-      this.cache.set(employeeId, mockData);
-      return mockData;
+      console.error('Error in getEmployeeRAGHistory:', error);
+      // Generate mock data as fallback
+      return this.generateMockRAGHistory(employeeId);
     }
   }
   

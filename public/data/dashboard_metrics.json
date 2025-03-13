@@ -1,0 +1,51 @@
+{
+  "success": true,
+  "metrics": {
+    "totalEmployees": 156,
+    "activeEmployees": 134,
+    "inactiveEmployees": 22,
+    "totalDepartments": 8,
+    "recentHires": 12,
+    "newEmployees": 5,
+    "completionRate": 67,
+    "completionRateChange": 4.2,
+    "skillGaps": 23,
+    "skillGapsChange": -5,
+    "learningHours": 1452,
+    "learningHoursChange": 123
+  },
+  "activities": [
+    {
+      "type": "enrollment",
+      "user": "Jordan Lee",
+      "course": "Advanced TypeScript",
+      "time": "2 hours ago"
+    },
+    {
+      "type": "completion",
+      "user": "Alex Morgan",
+      "course": "React State Management",
+      "time": "Yesterday"
+    },
+    {
+      "type": "feedback",
+      "user": "Taylor Swift",
+      "course": "Building APIs with Node.js",
+      "rating": 4.5,
+      "comment": "Excellent course with practical examples",
+      "time": "2 days ago"
+    },
+    {
+      "type": "alert",
+      "user": "Chris Walker",
+      "issue": "Has not completed mandatory compliance training",
+      "time": "3 days ago"
+    }
+  ],
+  "ragSummary": {
+    "green": 98,
+    "amber": 36,
+    "red": 22,
+    "total": 156
+  }
+} 

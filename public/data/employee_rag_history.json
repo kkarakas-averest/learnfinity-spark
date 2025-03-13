@@ -1,0 +1,54 @@
+{
+  "entries": [
+    {
+      "id": "hist-001",
+      "employeeId": "emp-000001",
+      "status": "green",
+      "previousStatus": "amber",
+      "reason": "Completed required compliance training",
+      "createdBy": "11111111-1111-4111-a111-111111111111",
+      "createdAt": "2024-03-10T15:30:00Z",
+      "relatedInterventionId": null
+    },
+    {
+      "id": "hist-002",
+      "employeeId": "emp-000001",
+      "status": "amber",
+      "previousStatus": "red",
+      "reason": "Improved performance on assessment",
+      "createdBy": "11111111-1111-4111-a111-111111111111",
+      "createdAt": "2024-02-15T09:45:00Z",
+      "relatedInterventionId": "int-001"
+    },
+    {
+      "id": "hist-003",
+      "employeeId": "emp-000001",
+      "status": "red",
+      "previousStatus": "amber",
+      "reason": "Missed deadline for compliance training",
+      "createdBy": "11111111-1111-4111-a111-111111111111",
+      "createdAt": "2024-01-20T11:20:00Z",
+      "relatedInterventionId": null
+    },
+    {
+      "id": "hist-004",
+      "employeeId": "emp-000002",
+      "status": "amber", 
+      "previousStatus": "green",
+      "reason": "Declining performance on recent assessments",
+      "createdBy": "11111111-1111-4111-a111-111111111111",
+      "createdAt": "2024-03-05T16:15:00Z",
+      "relatedInterventionId": null
+    },
+    {
+      "id": "hist-005",
+      "employeeId": "emp-000003",
+      "status": "red",
+      "previousStatus": "amber",
+      "reason": "No progress on assigned learning paths",
+      "createdBy": "11111111-1111-4111-a111-111111111111", 
+      "createdAt": "2024-03-01T10:30:00Z",
+      "relatedInterventionId": "int-002"
+    }
+  ]
+} 

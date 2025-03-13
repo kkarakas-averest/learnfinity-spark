@@ -1,0 +1,146 @@
+{
+  "id": "sample-employee-id",
+  "name": "Jane Example",
+  "email": "jane.example@learnfinity.com",
+  "department": "Engineering",
+  "position": "Senior Developer",
+  "courses": 8,
+  "coursesCompleted": 6,
+  "progress": 75,
+  "lastActivity": "2024-03-13",
+  "status": "active",
+  "ragStatus": "green",
+  "profilePictureUrl": "https://ui-avatars.com/api/?name=Jane+Example&size=256&background=random",
+  "phoneNumber": "+1 555-123-4567",
+  "startDate": "2022-05-15",
+  "manager": "John Manager",
+  "bio": "Experienced developer with a passion for learning and teaching.",
+
+  "learningPreferences": {
+    "learningStyle": "visual",
+    "preferredTimes": ["morning", "evening"],
+    "preferredDevice": "laptop",
+    "preferredContentFormats": ["video", "interactive"],
+    "preferredLanguages": ["English"],
+    "averageSessionDuration": 45,
+    "prefersDifficulty": "moderate",
+    "prefersCollaboration": true,
+    "prefersDeadlines": true
+  },
+
+  "skills": [
+    {
+      "id": "skill-1",
+      "name": "JavaScript Programming",
+      "category": "Technical",
+      "proficiency": "advanced",
+      "isRequired": true,
+      "lastAssessed": "2024-02-15"
+    },
+    {
+      "id": "skill-2",
+      "name": "Project Management",
+      "category": "Soft Skills",
+      "proficiency": "intermediate",
+      "isRequired": true
+    },
+    {
+      "id": "skill-3",
+      "name": "Data Analysis",
+      "category": "Technical",
+      "proficiency": "beginner",
+      "isRequired": false,
+      "lastAssessed": "2024-01-20"
+    }
+  ],
+
+  "careerGoals": [
+    {
+      "id": "goal-1",
+      "title": "Become Team Lead",
+      "description": "Develop leadership skills and technical expertise to lead a development team",
+      "targetDate": "2025-12-31",
+      "status": "in_progress",
+      "requiredSkills": ["skill-1", "skill-2"]
+    }
+  ],
+
+  "completedCourses": [
+    {
+      "courseId": "course-101",
+      "courseName": "JavaScript Fundamentals",
+      "completionDate": "2023-11-15",
+      "score": 92,
+      "feedbackProvided": true,
+      "certificateUrl": "https://example.com/cert/js-101"
+    },
+    {
+      "courseId": "course-102",
+      "courseName": "Intro to React",
+      "completionDate": "2024-01-10",
+      "score": 88,
+      "feedbackProvided": true
+    }
+  ],
+
+  "learningActivities": [
+    {
+      "id": "activity-1",
+      "type": "course_progress",
+      "timestamp": "2024-02-28T14:30:00Z",
+      "details": {
+        "resourceId": "course-103",
+        "resourceName": "Advanced React Patterns",
+        "duration": 45,
+        "progress": 65
+      }
+    },
+    {
+      "id": "activity-2",
+      "type": "assessment",
+      "timestamp": "2024-02-25T10:15:00Z",
+      "details": {
+        "resourceId": "quiz-201",
+        "resourceName": "TypeScript Basics Quiz",
+        "duration": 25,
+        "score": 78
+      }
+    }
+  ],
+
+  "interventions": [
+    {
+      "id": "int-1",
+      "date": "2024-01-20",
+      "type": "remedial_assignment",
+      "initiatedBy": "hr-user-1",
+      "status": "completed",
+      "notes": "Additional JavaScript practice modules assigned due to lower assessment scores",
+      "outcome": "Improved proficiency confirmed in follow-up assessment",
+      "ragStatusBefore": "amber",
+      "ragStatusAfter": "green"
+    }
+  ],
+
+  "contentFeedback": {
+    "preferredTopics": ["React", "TypeScript", "UI Design"],
+    "dislikedTopics": ["Legacy Systems"],
+    "averageRating": 4.2,
+    "feedbackHistory": [
+      {
+        "contentId": "course-101",
+        "contentType": "course",
+        "rating": 4,
+        "comments": "Good introduction but could use more practical examples",
+        "date": "2023-11-16"
+      },
+      {
+        "contentId": "resource-301",
+        "contentType": "article",
+        "rating": 5,
+        "comments": "Excellent explanation of concepts",
+        "date": "2024-02-10"
+      }
+    ]
+  }
+} 

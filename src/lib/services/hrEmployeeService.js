@@ -205,29 +205,29 @@ export const hrEmployeeService = {
   },
 
   /**
-   * Get all employees
+   * Get employees with pagination and filtering
    * @param {Object} options - Query options
    * @param {number} options.page - Page number
    * @param {number} options.pageSize - Page size
    * @param {string} options.searchTerm - Search term
    * @param {string} options.departmentId - Filter by department ID
-   * @returns {Promise<{data: Array, error: Object, count: number}>}
+   * @returns {Promise<{success: boolean, employees: Array, error: string}>}
    */
   async getEmployees({ 
     page = 1, 
-    pageSize = 10, 
+    pageSize = 50, 
     searchTerm = '', 
     departmentId = null,
     status = null
   } = {}) {
     try {
-      // Calculate range
+      // Calculate range for pagination
       const from = (page - 1) * pageSize;
       const to = from + pageSize - 1;
 
       // Build query
       let query = supabase
-        .from(TABLE_NAME)
+        .from('hr_employees')
         .select(`
           *,
           hr_departments(id, name),
@@ -254,11 +254,73 @@ export const hrEmployeeService = {
 
       // Execute query
       const { data, error, count } = await query;
-
-      return { data, error, count };
+      
+      if (error) {
+        console.error('Error fetching employees from database:', error);
+        
+        // Try to load mock data from JSON file
+        try {
+          console.log('Loading mock employee data from file...');
+          const response = await fetch('/data/employees_list.json');
+          if (response.ok) {
+            const mockData = await response.json();
+            
+            let filteredEmployees = mockData.employees;
+            
+            // Apply search filter if provided
+            if (searchTerm) {
+              filteredEmployees = filteredEmployees.filter(emp => 
+                emp.name.toLowerCase().includes(searchTerm.toLowerCase())
+              );
+            }
+            
+            // Apply department filter if provided
+            if (departmentId) {
+              filteredEmployees = filteredEmployees.filter(emp => 
+                emp.department_id === departmentId
+              );
+            }
+            
+            // Apply status filter if provided
+            if (status) {
+              filteredEmployees = filteredEmployees.filter(emp => 
+                emp.status === status
+              );
+            }
+            
+            // Calculate total and paginate
+            const total = filteredEmployees.length;
+            const paginatedEmployees = filteredEmployees.slice(from, from + pageSize);
+            
+            return {
+              success: true,
+              employees: paginatedEmployees,
+              total: total,
+              error: null
+            };
+          }
+        } catch (mockError) {
+          console.error('Error loading mock employee data:', mockError);
+        }
+        
+        throw new Error(error.message);
+      }
+      
+      return {
+        success: true,
+        employees: data,
+        total: count,
+        error: null
+      };
     } catch (error) {
       console.error('Error in getEmployees:', error);
-      return { data: null, error, count: 0 };
+      
+      return {
+        success: false,
+        employees: [],
+        total: 0,
+        error: error.message
+      };
     }
   },
 
