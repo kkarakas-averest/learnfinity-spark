@@ -74,8 +74,8 @@ const EmployeesPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [departmentFilter, setDepartmentFilter] = useState<string | undefined>(undefined);
-  const [statusFilter, setStatusFilter] = useState<string | undefined>(undefined);
+  const [departmentFilter, setDepartmentFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [activeTab, setActiveTab] = useState('all');
   const [metrics, setMetrics] = useState<EmployeeMetrics>({
     active: 0,
@@ -95,8 +95,8 @@ const EmployeesPage: React.FC = () => {
       setError(null);
       const result = await hrEmployeeService.getEmployees({
         searchTerm,
-        departmentId: departmentFilter || null,
-        status: statusFilter || null
+        departmentId: departmentFilter === 'all' ? null : departmentFilter,
+        status: statusFilter === 'all' ? null : statusFilter
       });
       
       if (result.success) {
@@ -290,7 +290,7 @@ const EmployeesPage: React.FC = () => {
                 <SelectValue placeholder="Department" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Departments</SelectItem>
+                <SelectItem value="all">All Departments</SelectItem>
                 <SelectItem value="engineering">Engineering</SelectItem>
                 <SelectItem value="marketing">Marketing</SelectItem>
                 <SelectItem value="sales">Sales</SelectItem>
@@ -301,7 +301,7 @@ const EmployeesPage: React.FC = () => {
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Statuses</SelectItem>
+                <SelectItem value="all">All Statuses</SelectItem>
                 <SelectItem value="active">Active</SelectItem>
                 <SelectItem value="on_leave">On Leave</SelectItem>
                 <SelectItem value="inactive">Inactive</SelectItem>
