@@ -21,9 +21,9 @@ export interface RAGStatusEntry {
   employeeId: string;
   status: RAGStatus;
   previousStatus?: RAGStatus;
-  reason: string;
-  createdBy: string;
-  createdAt: string;
+  rag_status_reason: string;
+  rag_status_updated_by: string;
+  rag_status_updated_at: string;
   relatedInterventionId?: string;
 }
 
@@ -117,16 +117,16 @@ export class RAGStatusService {
                 employeeId: entry.employeeId,
                 status: entry.status as RAGStatus,
                 previousStatus: entry.previousStatus as RAGStatus | undefined,
-                reason: entry.reason,
-                createdBy: entry.createdBy,
-                createdAt: entry.createdAt, // Keep as string to match type
+                rag_status_reason: entry.reason,
+                rag_status_updated_by: entry.createdBy,
+                rag_status_updated_at: entry.createdAt, // Keep as string to match type
                 relatedInterventionId: entry.relatedInterventionId
               }));
               
               return {
                 employeeId,
                 currentStatus: entries[0].status,
-                lastUpdate: entries[0].createdAt,
+                lastUpdate: entries[0].rag_status_updated_at,
                 entries
               };
             }
@@ -151,16 +151,16 @@ export class RAGStatusService {
         employeeId: entry.employee_id,
         status: entry.status as RAGStatus,
         previousStatus: entry.previous_status as RAGStatus | undefined,
-        reason: entry.reason,
-        createdBy: entry.created_by,
-        createdAt: entry.created_at, // Already a string from the database
+        rag_status_reason: entry.reason,
+        rag_status_updated_by: entry.created_by,
+        rag_status_updated_at: entry.created_at, // Already a string from the database
         relatedInterventionId: entry.related_intervention_id
       }));
       
       return {
         employeeId,
         currentStatus: entries[0].status,
-        lastUpdate: entries[0].createdAt,
+        lastUpdate: entries[0].rag_status_updated_at,
         entries
       };
     } catch (error) {
@@ -209,8 +209,9 @@ export class RAGStatusService {
           employee_id: employeeId,
           status,
           previous_status: previousStatus,
-          reason,
-          created_by: createdByUUID,
+          rag_status_reason: reason,
+          rag_status_updated_by: createdByUUID,
+          rag_status_updated_at: new Date().toISOString(),
           related_intervention_id: relatedInterventionId
         })
         .select()
@@ -227,9 +228,9 @@ export class RAGStatusService {
         employeeId: data.employee_id,
         status: data.status,
         previousStatus: data.previous_status,
-        reason: data.reason,
-        createdBy: data.created_by,
-        createdAt: data.created_at,
+        rag_status_reason: data.rag_status_reason,
+        rag_status_updated_by: data.rag_status_updated_by,
+        rag_status_updated_at: data.rag_status_updated_at,
         relatedInterventionId: data.related_intervention_id
       };
       
@@ -237,7 +238,7 @@ export class RAGStatusService {
       if (this.cache.has(employeeId)) {
         const cached = this.cache.get(employeeId)!;
         cached.currentStatus = status;
-        cached.lastUpdate = newEntry.createdAt;
+        cached.lastUpdate = newEntry.rag_status_updated_at;
         cached.entries.unshift(newEntry);
         this.cache.set(employeeId, cached);
       }
@@ -364,9 +365,9 @@ export class RAGStatusService {
         employeeId,
         status: previousStatus,
         previousStatus: i > 0 ? entries[i-1].status : undefined,
-        reason,
-        createdBy: generateUUID(),
-        createdAt: date,
+        rag_status_reason: reason,
+        rag_status_updated_by: generateUUID(),
+        rag_status_updated_at: date,
         relatedInterventionId: Math.random() > 0.7 ? `int-${employeeId}-${i}` : undefined
       });
       
@@ -374,13 +375,13 @@ export class RAGStatusService {
     }
     
     // Sort entries by date, newest first
-    entries.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    entries.sort((a, b) => new Date(b.rag_status_updated_at).getTime() - new Date(a.rag_status_updated_at).getTime());
     
     return {
       employeeId,
       currentStatus: entries[0].status,
       entries,
-      lastUpdate: entries[0].createdAt
+      lastUpdate: entries[0].rag_status_updated_at
     };
   }
 }

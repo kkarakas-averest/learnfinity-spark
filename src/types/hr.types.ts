@@ -1,4 +1,3 @@
-
 /**
  * HR and employee management related types
  */
@@ -8,9 +7,9 @@ export type RAGStatus = 'red' | 'amber' | 'green';
 
 export interface RAGStatusDetails {
   status: RAGStatus;
-  justification: string;
-  updatedBy: string;
-  lastUpdated: string;
+  rag_status_reason: string;
+  rag_status_updated_by: string;
+  rag_status_updated_at: string;
   recommendedActions?: string[];
 }
 

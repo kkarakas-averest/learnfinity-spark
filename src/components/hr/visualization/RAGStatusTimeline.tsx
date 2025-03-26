@@ -31,7 +31,7 @@ const RAGStatusTimeline: React.FC<RAGStatusTimelineProps> = ({
 }) => {
   // Sort status history by date (most recent first)
   const sortedHistory = [...statusHistory].sort(
-    (a, b) => new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime()
+    (a, b) => new Date(b.rag_status_updated_at).getTime() - new Date(a.rag_status_updated_at).getTime()
   );
   
   // Limit the number of items to display
@@ -96,42 +96,15 @@ const RAGStatusTimeline: React.FC<RAGStatusTimelineProps> = ({
     );
   };
   
-  // Render a trend indicator
+  // Render trend indicator
   const renderTrendIndicator = (trend: 'improving' | 'worsening' | 'stable'): JSX.Element => {
     switch (trend) {
       case 'improving':
-        return (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger>
-                <TrendUpIcon className="h-4 w-4 text-green-500" />
-              </TooltipTrigger>
-              <TooltipContent>Improving</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        );
+        return <TrendUpIcon className="h-4 w-4 text-green-500 ml-1" />;
       case 'worsening':
-        return (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger>
-                <TrendDownIcon className="h-4 w-4 text-destructive" />
-              </TooltipTrigger>
-              <TooltipContent>Worsening</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        );
+        return <TrendDownIcon className="h-4 w-4 text-red-500 ml-1" />;
       case 'stable':
-        return (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger>
-                <MinusIcon className="h-4 w-4 text-gray-500" />
-              </TooltipTrigger>
-              <TooltipContent>Stable</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        );
+        return <MinusIcon className="h-4 w-4 text-gray-500 ml-1" />;
     }
   };
   
@@ -160,14 +133,7 @@ const RAGStatusTimeline: React.FC<RAGStatusTimelineProps> = ({
         <div className="space-y-4">
           {displayedHistory.map((statusDetail, index) => {
             const { status, trend } = getStatusWithTrend(index);
-            const date = new Date(statusDetail.lastUpdated);
-            const formattedDate = new Intl.DateTimeFormat('en-US', { 
-              year: 'numeric', 
-              month: 'short', 
-              day: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit'
-            }).format(date);
+            const formattedDate = new Date(statusDetail.rag_status_updated_at).toLocaleDateString();
             
             return (
               <div key={index} className="flex items-start space-x-3">
@@ -189,7 +155,7 @@ const RAGStatusTimeline: React.FC<RAGStatusTimelineProps> = ({
                   
                   {showDetailedView && (
                     <>
-                      <p className="text-sm my-2">{statusDetail.justification}</p>
+                      <p className="text-sm my-2">{statusDetail.rag_status_reason}</p>
                       
                       {statusDetail.recommendedActions && statusDetail.recommendedActions.length > 0 && (
                         <div className="mt-2">
@@ -203,7 +169,7 @@ const RAGStatusTimeline: React.FC<RAGStatusTimelineProps> = ({
                       )}
                       
                       <div className="text-xs text-muted-foreground mt-2">
-                        Updated by: {statusDetail.updatedBy}
+                        Updated by: {statusDetail.rag_status_updated_by}
                       </div>
                     </>
                   )}
