@@ -39,6 +39,14 @@ interface Employee {
   lastActivity: string;
 }
 
+interface EmployeeResponse {
+  success: boolean;
+  data?: Employee[];
+  error?: {
+    message: string;
+  };
+}
+
 const EmployeesPage: React.FC = () => {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
@@ -63,12 +71,26 @@ const EmployeesPage: React.FC = () => {
       });
       
       if (result.success) {
-        setEmployees(result.data);
+        // Transform the employee data to match our interface
+        const transformedEmployees = result.employees.map(emp => ({
+          id: emp.id,
+          name: emp.name,
+          email: emp.email,
+          department: emp.hr_departments?.name || 'Unknown Department',
+          position: emp.hr_positions?.title || 'Unknown Position',
+          status: emp.status,
+          ragStatus: emp.rag_status || 'green',
+          progress: emp.progress || 0,
+          lastActivity: emp.last_activity || 'Never'
+        }));
+        setEmployees(transformedEmployees);
       } else {
-        setError(result.error?.message || 'Failed to fetch employees');
+        setEmployees([]);
+        setError(result.error || 'Failed to fetch employees');
         console.error('Failed to fetch employees:', result.error);
       }
     } catch (error) {
+      setEmployees([]);
       setError('An error occurred while fetching employees');
       console.error('Error fetching employees:', error);
     } finally {
