@@ -276,7 +276,7 @@ export const hrEmployeeService = {
             console.log('✅ [DEBUG] Loaded positions from database:', positions.length);
           } else {
             // Fallback positions
-            const fallbackPos = [
+            const fallbackPositions = [
               { id: 'pos-001', title: 'Senior Developer', department_id: 'dept-001' },
               { id: 'pos-002', title: 'Marketing Specialist', department_id: 'dept-002' },
               { id: 'pos-003', title: 'Sales Manager', department_id: 'dept-003' },
@@ -285,17 +285,16 @@ export const hrEmployeeService = {
               { id: 'pos-006', title: 'Financial Analyst', department_id: 'dept-005' }
             ];
             
-            fallbackPos.forEach(pos => {
+            fallbackPositions.forEach(pos => {
               posLookup[pos.id] = pos;
             });
-            console.log('📁 [DEBUG] Using fallback positions:', fallbackPos.length);
+            console.log('📁 [DEBUG] Using fallback positions:', fallbackPositions.length);
           }
           
           return { departments: deptLookup, positions: posLookup };
         } catch (error) {
-          console.error('❌ [DEBUG] Error getting lookup data:', error);
-          // Return empty lookup in case of error
-          return { departments: {}, positions: {} };
+          console.error('❌ [DEBUG] Error getting lookup tables:', error);
+          throw error;
         }
       };
       
@@ -338,6 +337,9 @@ export const hrEmployeeService = {
         // Try to load mock data from JSON file
         try {
           console.log('📁 [DEBUG] Attempting to load mock employee data...');
+          
+          // Get lookup tables first
+          const lookupData = await getDepartmentsAndPositionsLookup();
           
           // Use a try-catch block to properly handle file loading
           let employeesList = [];
