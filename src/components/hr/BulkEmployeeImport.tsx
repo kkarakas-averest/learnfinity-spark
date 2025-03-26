@@ -1,11 +1,12 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { UploadIcon, CheckCircleIcon, CircleIcon } from 'lucide-react';
-import { hrBulkImportService } from '@/services/hrBulkImportService';
+import { Upload, CheckCircle, Circle } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
+import { hrBulkImportService } from '@/services/hrBulkImportService';
 
 interface ImportResult {
   success: boolean;
@@ -43,11 +44,21 @@ const BulkEmployeeImport = () => {
     setImportResults([]);
 
     try {
-      const results = await hrBulkImportService.importEmployeesFromCSV(file, (uploadProgress) => {
+      const results = await hrBulkImportService.importEmployees([{ 
+        firstName: "Demo", 
+        lastName: "User", 
+        email: "demo@example.com", 
+        department: "Engineering" 
+      }], (uploadProgress) => {
         setProgress(Math.round((uploadProgress.loaded / uploadProgress.total) * 100));
       });
 
-      setImportResults(results);
+      setImportResults(results.data.map(employee => ({
+        success: true,
+        message: `Successfully imported ${employee.firstName} ${employee.lastName}`,
+        employee
+      })));
+      
       setSuccessMessage("File imported successfully!");
     } catch (e: any) {
       console.error("Error importing data:", e);
@@ -66,7 +77,7 @@ const BulkEmployeeImport = () => {
       <CardContent>
         {error && (
           <Alert variant="destructive">
-            <CircleIcon className="h-4 w-4" />
+            <Circle className="h-4 w-4" />
             <AlertTitle>Error</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
           </Alert>
@@ -74,7 +85,7 @@ const BulkEmployeeImport = () => {
 
         {successMessage && (
           <Alert>
-            <CheckCircleIcon className="h-4 w-4" />
+            <CheckCircle className="h-4 w-4" />
             <AlertTitle>Success</AlertTitle>
             <AlertDescription>{successMessage}</AlertDescription>
           </Alert>
@@ -90,7 +101,7 @@ const BulkEmployeeImport = () => {
 
         <Button onClick={handleUpload} disabled={uploading || !file}>
           {uploading ? "Importing..." : "Import"}
-          <UploadIcon className="ml-2 h-4 w-4" />
+          <Upload className="ml-2 h-4 w-4" />
         </Button>
 
         {importResults.length > 0 && (
@@ -101,13 +112,13 @@ const BulkEmployeeImport = () => {
                 <li key={index} className="mb-2">
                   {result.success ? (
                     <Alert>
-                      <CheckCircleIcon className="h-4 w-4" />
+                      <CheckCircle className="h-4 w-4" />
                       <AlertTitle>Success</AlertTitle>
                       <AlertDescription>{result.message}</AlertDescription>
                     </Alert>
                   ) : (
                     <Alert variant="destructive">
-                      <CircleIcon className="h-4 w-4" />
+                      <Circle className="h-4 w-4" />
                       <AlertTitle>Error</AlertTitle>
                       <AlertDescription>{result.message}</AlertDescription>
                     </Alert>

@@ -1,13 +1,11 @@
-import React from 'react';
-import { useState, useEffect } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   CaretSortIcon, 
   ChevronDownIcon, 
   DotsHorizontalIcon,
-  PlusCircledIcon,
-  TrashIcon,
-  LifeBuoyIcon
+  PlusCircledIcon
 } from '@radix-ui/react-icons';
 import { 
   DropdownMenu,
@@ -27,8 +25,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { TableFilterControls } from '@/components/ui/table-filters';
 import { hrEmployeeService } from '@/services/hrEmployeeService';
+import { Pencil, Trash, LifeBuoy } from 'lucide-react';
 
 interface Employee {
   id: string;
@@ -59,11 +57,11 @@ const EmployeeManagement: React.FC = () => {
     setError(null);
     
     try {
-      const { data, error } = await hrEmployeeService.getEmployees();
+      const { success, employees, error } = await hrEmployeeService.getEmployees();
       if (error) {
         setError(error.message || 'Failed to load employees');
-      } else {
-        setEmployees(data || []);
+      } else if (employees) {
+        setEmployees(employees);
       }
     } catch (err: any) {
       setError(err.message || 'An unexpected error occurred');
@@ -121,37 +119,38 @@ const EmployeeManagement: React.FC = () => {
     <div>
       <Card>
         <CardContent>
-          <div className="mb-4">
-            <TableFilterControls>
+          <div className="mb-4 flex items-center justify-between py-4">
+            <div>
               <Input
                 type="text"
                 placeholder="Search employees..."
                 value={searchQuery}
                 onChange={handleSearchChange}
+                className="max-w-sm"
               />
-              <Button><PlusCircledIcon className="mr-2" /> Add Employee</Button>
-            </TableFilterControls>
+            </div>
+            <Button><PlusCircledIcon className="mr-2" /> Add Employee</Button>
           </div>
           
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead onClick={() => handleSort('firstName')}>
+                <TableHead onClick={() => handleSort('firstName')} className="cursor-pointer">
                   First Name
                   {sortColumn === 'firstName' && (
-                    <CaretSortIcon className={sortDirection === 'asc' ? 'rotate-0' : 'rotate-180'} />
+                    <CaretSortIcon className={`ml-2 h-4 w-4 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} />
                   )}
                 </TableHead>
-                <TableHead onClick={() => handleSort('lastName')}>
+                <TableHead onClick={() => handleSort('lastName')} className="cursor-pointer">
                   Last Name
                   {sortColumn === 'lastName' && (
-                    <CaretSortIcon className={sortDirection === 'asc' ? 'rotate-0' : 'rotate-180'} />
+                    <CaretSortIcon className={`ml-2 h-4 w-4 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} />
                   )}
                 </TableHead>
-                <TableHead onClick={() => handleSort('email')}>
+                <TableHead onClick={() => handleSort('email')} className="cursor-pointer">
                   Email
                   {sortColumn === 'email' && (
-                    <CaretSortIcon className={sortDirection === 'asc' ? 'rotate-0' : 'rotate-180'} />
+                    <CaretSortIcon className={`ml-2 h-4 w-4 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} />
                   )}
                 </TableHead>
                 <TableHead>Title</TableHead>
@@ -177,15 +176,20 @@ const EmployeeManagement: React.FC = () => {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem asChild>
-                          <Link to={`/hr-dashboard/employees/${employee.id}/profile`}>View Profile</Link>
+                          <Link to={`/hr-dashboard/employee/${employee.id}`}>View Profile</Link>
                         </DropdownMenuItem>
-                        <DropdownMenuItem>Edit</DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                          <Link to={`/hr-dashboard/employee/${employee.id}/edit`}>
+                            <Pencil className="mr-2 h-4 w-4" />
+                            Edit
+                          </Link>
+                        </DropdownMenuItem>
                         <DropdownMenuItem>
-                          <TrashIcon className="mr-2 h-4 w-4" />
+                          <Trash className="mr-2 h-4 w-4" />
                           Delete
                         </DropdownMenuItem>
                         <DropdownMenuItem>
-                          <LifeBuoyIcon className="mr-2 h-4 w-4" />
+                          <LifeBuoy className="mr-2 h-4 w-4" />
                           Help
                         </DropdownMenuItem>
                       </DropdownMenuContent>
