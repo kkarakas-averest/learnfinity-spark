@@ -88,3 +88,50 @@ export interface RAGStatusSummary {
   amberPercentage: number;
   greenPercentage: number;
 }
+
+export type HRDashboardTab = 'overview' | 'employees' | 'courses' | 'reports' | 'analytics' | 'agents';
+
+export interface Employee {
+  id: string;
+  name: string;
+  email: string;
+  department: string;
+  position: string;
+  hireDate?: string;
+  status: 'active' | 'inactive' | 'onboarding' | 'terminated';
+  manager?: string;
+  skills?: string[];
+  certifications?: string[];
+  ragStatus?: RAGStatus;
+  progress?: number;
+  lastActivity?: string;
+  department_id?: string;
+  position_id?: string;
+}
+
+export interface User {
+  id: string;
+  username: string;
+  email: string;
+  role: string;
+}
+
+export interface Course {
+  id: string;
+  title: string;
+  description: string;
+  duration: number;
+  targetAudience: string;
+  skillLevel: string;
+  topics: string[];
+  status: 'draft' | 'published' | 'archived';
+}
+
+export interface LearningPath {
+  id: string;
+  title: string;
+  description: string;
+  courses: string[];
+  duration: number;
+  skillLevel: string;
+}
