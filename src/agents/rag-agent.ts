@@ -1,3 +1,4 @@
+
 /**
  * RAG System Agent Implementation
  * 
@@ -5,13 +6,16 @@
  * of employees based on their progress and engagement data.
  */
 
-import { AgentConfig, RAGSystemAgent } from "./types";
+import { AgentConfig } from "./interfaces/Agent";
 import { RAGStatus, RAGStatusDetails } from "@/types/hr.types";
-import { AgentMessage } from "./types";
+import { AgentMessage } from "./interfaces/AgentMessage";
 import { v4 as uuidv4 } from 'uuid';
+import { RAGSystemAgent } from "./types";
 
 export class RAGSystemAgentImpl implements RAGSystemAgent {
   id: string;
+  name: string;
+  role: string;
   config: AgentConfig;
   private initialized: boolean = false;
   private debug: boolean = false;
@@ -25,6 +29,8 @@ export class RAGSystemAgentImpl implements RAGSystemAgent {
       backstory: "You analyze learning patterns to identify when intervention is needed.",
       ...(config || {})
     };
+    this.name = this.config.name;
+    this.role = this.config.role;
   }
 
   /**
@@ -210,6 +216,20 @@ export class RAGSystemAgentImpl implements RAGSystemAgent {
     }
   }
 
+  /**
+   * Get agent status
+   */
+  async getStatus(): Promise<{
+    status: 'idle' | 'busy' | 'error';
+    currentTask?: string;
+    lastActivity?: Date;
+  }> {
+    return {
+      status: 'idle',
+      lastActivity: new Date()
+    };
+  }
+
   private ensureInitialized(): void {
     if (!this.initialized) {
       throw new Error(`${this.config.name} must be initialized before use. Call initialize() first.`);
@@ -228,4 +248,4 @@ export class RAGSystemAgentImpl implements RAGSystemAgent {
     // Convert to days
     return Math.floor(differenceMs / (1000 * 60 * 60 * 24));
   }
-} 
+}

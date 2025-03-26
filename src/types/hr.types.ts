@@ -1,196 +1,88 @@
-import { UserRole } from '@/lib/database.types';
 
 /**
- * HR Module Types
- * 
- * This file contains all type definitions related to the HR module
+ * HR and employee management related types
  */
 
-// Basic user type for HR authentication
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: UserRole;
-}
-
 // RAG Status types
-export type RAGStatus = 'green' | 'amber' | 'red';
-
-// RAG Status enum for use as values
-export enum RAGStatusEnum {
-  GREEN = 'green',
-  AMBER = 'amber',
-  RED = 'red'
-}
+export type RAGStatus = 'red' | 'amber' | 'green';
 
 export interface RAGStatusDetails {
   status: RAGStatus;
   justification: string;
+  updatedBy: string;
   lastUpdated: string;
-  updatedBy: string | 'system';
   recommendedActions?: string[];
-  // Additional properties needed by RAGSystemAgent
-  learnerId?: string;
-  confidence?: number;
-  timestamp?: Date;
-  reasons?: string[];
-  metrics?: {
-    completionRate: number;
-    lastActivityDate?: Date;
-    deadlinesMet?: number;
-    deadlinesMissed?: number;
-    [key: string]: any;
-  };
 }
 
-// HR Dashboard types
-export interface KeyMetric {
-  title: string;
-  value: string | number;
-  change?: string;
-  trend?: 'up' | 'down' | 'neutral';
-  icon?: React.ComponentType<{ className?: string }>;
-}
-
-export interface QuickAction {
-  title: string;
-  description: string;
-  icon?: React.ComponentType<{ className?: string }>;
-  onClick: () => void;
-}
-
-export interface ActivityItem {
-  id: string;
-  type: 'enrollment' | 'completion' | 'achievement' | 'warning';
-  user: string;
-  course?: string;
-  timestamp: string;
-  description: string;
-}
-
-// Employee types
-export interface Employee {
+export interface EmployeeDetail {
   id: string;
   name: string;
   email: string;
   department: string;
-  position?: string;
-  courses: number;
-  coursesCompleted: number;
-  progress: number;
-  lastActivity: string;
-  status: 'active' | 'inactive' | 'onboarding' | 'offboarding';
-  
-  // RAG status properties
-  ragStatus: RAGStatus;
-  ragDetails?: RAGStatusDetails;
-  statusHistory?: RAGStatusDetails[];
+  position: string;
+  hireDate: string;
+  status: 'active' | 'inactive' | 'onboarding' | 'terminated';
+  manager?: string;
+  skills?: string[];
+  certifications?: string[];
+  ragStatus?: RAGStatus;
+  learningPathId?: string;
+  progress?: number; // 0-100%
+  lastActivity?: string; // ISO date string
 }
 
-// Intervention types
-export interface Intervention {
-  id: string;
-  employeeId: string;
-  type: 'content_modification' | 'remedial_assignment' | 'notification' | 'other';
-  createdAt: string;
-  createdBy: string;
-  notes?: string;
-  content?: string;
-  status: 'pending' | 'delivered' | 'completed';
-}
-
-// Course types
-export interface Course {
-  id: string;
-  title: string;
-  description: string;
-  department: string;
-  enrollments: number;
-  completionRate: number;
-  averageScore?: number;
-  duration: string;
-  status: 'active' | 'draft' | 'archived';
-  createdAt: string;
-  updatedAt: string;
-}
-
-// Department type
 export interface Department {
   id: string;
   name: string;
-  employeeCount: number;
-  courseCount: number;
-  averageCompletion: number;
+  description?: string;
+  headCount: number;
+  manager?: string;
 }
 
-// HRDashboard tab type
-export type HRDashboardTab = 'overview' | 'employees' | 'courses' | 'reports' | 'analytics' | 'agents';
-
-// Legacy types kept for backward compatibility
-export interface HRUser {
-  id: string;
-  name: string;
-  email: string;
-  role: string;
-}
-
-export interface HRAuthContext {
-  currentUser: HRUser | null;
-  isLoading: boolean;
-  isAuthenticated: boolean;
-  login: (username: string, password: string) => Promise<HRUser>;
-  logout: () => void;
-}
-
-// Learning Path Type
-export interface LearningPath {
+export interface Position {
   id: string;
   title: string;
-  description: string;
-  courses: string[];
-  enrolledCount: number;
-  skillLevel: string;
-  duration: string;
+  departmentId: string;
+  level: string;
+  minSalary?: number;
+  maxSalary?: number;
+  responsibilities?: string[];
+  requiredSkills?: string[];
 }
 
-// Activity Type for Recent Activities
-export interface Activity {
-  type: 'enrollment' | 'completion' | 'feedback' | 'alert';
-  user: string;
-  course?: string;
-  comment?: string;
-  rating?: number;
-  issue?: string;
-  time: string;
-  icon: React.ComponentType<{ className?: string }>;
-}
-
-// Notification type
-export interface Notification {
+export interface LearningPathAssignment {
   id: string;
-  recipientId: string | null;
-  title: string;
-  message: string;
-  isRead: boolean;
-  createdAt: string;
-  actionLink?: string;
-}
-
-// Employee Progress tracking type for detailed monitoring
-export interface EmployeeProgress {
   employeeId: string;
-  employeeName: string;
-  department: string;
-  role: string;
-  programName: string;
-  currentStatus: RAGStatus;
-  progress: number;
-  lastActivityDate: string;
-  upcomingDeadlines?: {
-    title: string;
-    date: string;
-    completed: boolean;
-  }[];
-  notes?: string;
-} 
+  learningPathId: string;
+  assignedBy: string;
+  assignedDate: string;
+  dueDate?: string;
+  priority: 'low' | 'medium' | 'high';
+  status: 'assigned' | 'in_progress' | 'completed' | 'overdue';
+  progress: number; // 0-100%
+}
+
+export interface EmployeeIntervention {
+  id: string;
+  employeeId: string;
+  createdBy: string;
+  createdDate: string;
+  reason: string;
+  interventionType: 'course_reassignment' | 'mentor_assignment' | 'additional_resources' | 'meeting' | 'other';
+  status: 'planned' | 'in_progress' | 'completed' | 'cancelled';
+  dueDate?: string;
+  outcome?: string;
+  followUpRequired: boolean;
+}
+
+export interface RAGStatusSummary {
+  departmentId: string;
+  departmentName: string;
+  totalEmployees: number;
+  redCount: number;
+  amberCount: number;
+  greenCount: number;
+  redPercentage: number;
+  amberPercentage: number;
+  greenPercentage: number;
+}
