@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { ROUTES } from '@/lib/routes';
@@ -22,7 +21,8 @@ import CourseListPage from './pages/course/CourseListPage';
 import CreateCoursePage from './pages/course/CreateCoursePage';
 import EmployeesPage from './pages/hr/EmployeesPage';
 import EmployeeProfilePage from './pages/hr/EmployeeProfilePage';
-import EditEmployeePage from './pages/hr/EditEmployeePage';
+import EditEmployeePage from './components/hr/EditEmployeePage';
+import CreateEmployeePage from './components/hr/CreateEmployeePage';
 
 // Protected Routes
 import HRProtectedRoute from './components/auth/HRProtectedRoute';
@@ -51,6 +51,7 @@ const AppRouter: React.FC = () => {
         >
           <Route index element={<HRDashboardRoot />} />
           <Route path="employees" element={<EmployeesPage />} />
+          <Route path="employee/new" element={<CreateEmployeePage />} />
           <Route path="employee/:id" element={<EmployeeProfilePage />} />
           <Route path="employee/:id/edit" element={<EditEmployeePage />} />
           {/* Add other HR routes as needed */}
