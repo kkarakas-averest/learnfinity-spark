@@ -1,48 +1,69 @@
 import React from "@/lib/react-helpers";
 import { toast } from "@/components/ui/use-toast";
 import { hrEmployeeService } from '@/lib/services/hrEmployeeService';
+import { hrDepartmentService } from '@/lib/services/hrDepartmentService';
 import { Badge } from "@/components/ui/badge";
-import { Employee, RAGStatus } from "@/types/hr.types";
-// Import the agent system hook
+import { EmployeeDetail, RAGStatus } from "@/types/hr.types";
 import { useAgentSystem } from '@/hooks/useAgentSystem';
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { SparklesIcon } from '@heroicons/react/24/outline';
 import { Link } from "react-router-dom";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Activity, Edit, MessageSquare, User, MoreHorizontal } from "lucide-react";
+import { Activity, Edit, MessageSquare, User, MoreHorizontal, Filter } from "lucide-react";
 import { RAGStatusBadge } from './RAGStatusBadge';
 import RAGStatusHistory, { StatusHistoryEntry } from './RAGStatusHistory';
 import { ragStatusService } from '@/services/rag-status.service';
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface EmployeeManagementProps {
-  onViewDetails: (employee: Employee) => void;
-  onIntervene: (employee: Employee) => void;
+  onViewDetails: (employee: EmployeeDetail) => void;
+  onIntervene: (employee: EmployeeDetail) => void;
 }
 
-// Complete component with RAG status filtering
 const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ onViewDetails, onIntervene }) => {
-  const [employees, setEmployees] = React.useState<Employee[]>([]);
-  const [filteredEmployees, setFilteredEmployees] = React.useState<Employee[]>([]);
+  const [employees, setEmployees] = React.useState<EmployeeDetail[]>([]);
+  const [filteredEmployees, setFilteredEmployees] = React.useState<EmployeeDetail[]>([]);
   const [isLoading, setIsLoading] = React.useState(false);
   const [statusFilter, setStatusFilter] = React.useState<RAGStatus | 'all'>('all');
-  // State for agent analysis
+  const [employmentStatusFilter, setEmploymentStatusFilter] = React.useState<string>('all');
+  const [departmentFilter, setDepartmentFilter] = React.useState<string>('all');
+  const [departments, setDepartments] = React.useState<{id: string, name: string}[]>([]);
+  
   const [isAnalyzing, setIsAnalyzing] = React.useState(false);
   const [employeesBeingAnalyzed, setEmployeesBeingAnalyzed] = React.useState<Record<string, boolean>>({});
-  // State for status history
   const [statusHistories, setStatusHistories] = React.useState<Record<string, StatusHistoryEntry[]>>({});
   
-  // Get the agent system hooks
   const { 
     isInitialized: isAgentSystemInitialized,
     isProcessing: isAgentProcessing,
     determineRAGStatus
   } = useAgentSystem();
 
+  const fetchDepartments = async () => {
+    try {
+      const { data, error } = await hrDepartmentService.getDepartments();
+      if (error) {
+        console.error("Error fetching departments:", error);
+        return;
+      }
+      if (data) {
+        setDepartments(data);
+      }
+    } catch (err) {
+      console.error("Exception fetching departments:", err);
+    }
+  };
+
   const fetchEmployees = async () => {
     setIsLoading(true);
     try {
-      // Get employees from the HR service
       const result = await hrEmployeeService.getEmployees();
       
       if (!result || !result.success) {
@@ -60,17 +81,15 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ onViewDetails, 
         return;
       }
       
-      // Apply simple data normalization to ensure consistent employee objects
       const normalizedEmployees = result.employees.map(emp => ({
         ...emp,
-        // Ensure ragStatus is explicitly present and properly mapped 
         ragStatus: emp.ragStatus || emp.rag_status || 'green'
       }));
       
       setEmployees(normalizedEmployees);
-      setFilteredEmployees(normalizedEmployees);
       
-      // Fetch status histories for all employees
+      applyFilters(normalizedEmployees, statusFilter, departmentFilter, employmentStatusFilter);
+      
       const histories: Record<string, StatusHistoryEntry[]> = {};
       
       for (const employee of normalizedEmployees) {
@@ -103,8 +122,33 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ onViewDetails, 
     }
   };
 
-  // Function to analyze a specific employee using the agent system
-  const analyzeEmployee = async (employee: Employee) => {
+  const applyFilters = (employeeList: EmployeeDetail[], ragFilter: RAGStatus | 'all', deptFilter: string, empStatusFilter: string) => {
+    let filtered = [...employeeList];
+    
+    if (ragFilter !== 'all') {
+      filtered = filtered.filter(employee => employee.ragStatus === ragFilter);
+    }
+    
+    if (deptFilter !== 'all') {
+      filtered = filtered.filter(employee => {
+        if (employee.department_id) {
+          return employee.department_id === deptFilter;
+        } else if (typeof employee.department === 'string') {
+          const dept = departments.find(d => d.name === employee.department);
+          return dept?.id === deptFilter;
+        }
+        return false;
+      });
+    }
+    
+    if (empStatusFilter !== 'all') {
+      filtered = filtered.filter(employee => employee.status === empStatusFilter);
+    }
+    
+    setFilteredEmployees(filtered);
+  };
+
+  const analyzeEmployee = async (employee: EmployeeDetail) => {
     if (!isAgentSystemInitialized) {
       toast({
         title: 'Agent System Not Available',
@@ -115,14 +159,11 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ onViewDetails, 
     }
     
     try {
-      // Mark this employee as being analyzed
       setEmployeesBeingAnalyzed(prev => ({ ...prev, [employee.id]: true }));
       
-      // Use the agent system to determine RAG status
       const analysisResult = await determineRAGStatus(employee);
       
       if (analysisResult && analysisResult.status) {
-        // Update the employee with the new RAG status and details
         const updatedEmployee = {
           ...employee,
           ragStatus: analysisResult.status,
@@ -135,20 +176,17 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ onViewDetails, 
           }
         };
         
-        // Update the employee in the list
         const updatedEmployees = employees.map(emp => 
           emp.id === employee.id ? updatedEmployee : emp
         );
         
         setEmployees(updatedEmployees);
         
-        // Update filtered employees too if needed
         if (statusFilter === 'all' || statusFilter === updatedEmployee.ragStatus) {
           setFilteredEmployees(prevFiltered => 
             prevFiltered.map(emp => emp.id === employee.id ? updatedEmployee : emp)
           );
         } else {
-          // Remove from filtered list if it no longer matches the filter
           setFilteredEmployees(prevFiltered => 
             prevFiltered.filter(emp => emp.id !== employee.id)
           );
@@ -170,12 +208,10 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ onViewDetails, 
         variant: 'destructive',
       });
     } finally {
-      // Mark this employee as no longer being analyzed
       setEmployeesBeingAnalyzed(prev => ({ ...prev, [employee.id]: false }));
     }
   };
-  
-  // Function to analyze all employees using the agent system
+
   const analyzeAllEmployees = async () => {
     if (!isAgentSystemInitialized) {
       toast({
@@ -194,26 +230,21 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ onViewDetails, 
         variant: 'default',
       });
       
-      // Process employees in batches to avoid overwhelming the system
       const batchSize = 5;
       const totalEmployees = employees.length;
       let processedCount = 0;
       let updatedCount = 0;
       
-      // Create a copy of the employees array to avoid direct mutations
       let updatedEmployees = [...employees];
       
-      // Create batches of employees
       for (let i = 0; i < totalEmployees; i += batchSize) {
         const batch = employees.slice(i, i + batchSize);
         
-        // Process each employee in the batch in parallel
         const batchResults = await Promise.all(batch.map(async (employee) => {
           try {
             const analysisResult = await determineRAGStatus(employee);
             
             if (analysisResult && analysisResult.status) {
-              // Create updated employee object
               const updatedEmployee = {
                 ...employee,
                 ragStatus: analysisResult.status,
@@ -226,7 +257,6 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ onViewDetails, 
                 }
               };
               
-              // Return the updated employee and success status
               return { 
                 success: true, 
                 employee: updatedEmployee,
@@ -243,7 +273,6 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ onViewDetails, 
           }
         }));
         
-        // Update our employees array with the successful results
         batchResults.forEach(result => {
           if (result.success && result.employee) {
             updatedCount++;
@@ -254,10 +283,8 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ onViewDetails, 
           }
         });
         
-        // Update the state every batch to show progress
         setEmployees(updatedEmployees);
         
-        // Apply the filter to the updated employees
         if (statusFilter !== 'all') {
           setFilteredEmployees(updatedEmployees.filter(emp => emp.ragStatus === statusFilter));
         } else {
@@ -282,35 +309,27 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ onViewDetails, 
     }
   };
 
-  // Filter employees when status filter changes
   React.useEffect(() => {
-    if (statusFilter === 'all') {
-      setFilteredEmployees(employees);
-    } else {
-      setFilteredEmployees(employees.filter(employee => employee.ragStatus === statusFilter));
+    if (employees.length > 0) {
+      applyFilters(employees, statusFilter, departmentFilter, employmentStatusFilter);
     }
-  }, [statusFilter, employees]);
+  }, [statusFilter, departmentFilter, employmentStatusFilter, employees]);
 
-  // Fetch employees on mount
   React.useEffect(() => {
+    fetchDepartments();
     fetchEmployees();
   }, []);
 
-  // Add this JSX where appropriate in your component's render method
-  // For example, after the filter buttons:
-
   const renderEmployeeList = () => {
-    // ... existing employee list rendering code ...
-    
     return (
       <div className="overflow-hidden bg-white shadow sm:rounded-md mt-4">
-        <div className="flex justify-between items-center p-4 bg-gray-50">
+        <div className="flex flex-col space-y-4 p-4 bg-gray-50">
           <div className="flex space-x-2">
             <button
               className={`px-3 py-1 text-sm rounded ${statusFilter === 'all' ? 'bg-gray-800 text-white' : 'bg-gray-200'}`}
               onClick={() => setStatusFilter('all')}
             >
-              All
+              All RAG
             </button>
             <button
               className={`px-3 py-1 text-sm rounded ${statusFilter === 'green' ? 'bg-green-500 text-white' : 'bg-green-100'}`}
@@ -332,7 +351,51 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ onViewDetails, 
             </button>
           </div>
           
-          {/* Add Agent Analysis buttons */}
+          <div className="flex flex-wrap gap-4">
+            <div className="w-64">
+              <Select
+                value={departmentFilter}
+                onValueChange={(value) => setDepartmentFilter(value)}
+              >
+                <SelectTrigger className="w-full">
+                  <div className="flex items-center">
+                    <Filter className="mr-2 h-4 w-4" />
+                    <SelectValue placeholder="Department" />
+                  </div>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Departments</SelectItem>
+                  {departments.map((dept) => (
+                    <SelectItem key={dept.id} value={dept.id}>
+                      {dept.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="w-64">
+              <Select
+                value={employmentStatusFilter}
+                onValueChange={(value) => setEmploymentStatusFilter(value)}
+              >
+                <SelectTrigger className="w-full">
+                  <div className="flex items-center">
+                    <Filter className="mr-2 h-4 w-4" />
+                    <SelectValue placeholder="Status" />
+                  </div>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                  <SelectItem value="onboarding">Onboarding</SelectItem>
+                  <SelectItem value="terminated">Terminated</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          
           {isAgentSystemInitialized && (
             <div className="flex items-center">
               <TooltipProvider>
@@ -361,7 +424,7 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ onViewDetails, 
         <ul className="divide-y divide-gray-200">
           {filteredEmployees.length === 0 ? (
             <li className="px-6 py-4 text-center text-gray-500">
-              No employees found with the selected status.
+              No employees found with the selected filters.
             </li>
           ) : (
             filteredEmployees.map(employee => (
@@ -369,7 +432,6 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ onViewDetails, 
                 <div>
                   <h3 className="text-lg font-medium">{employee.name}</h3>
                   <div className="text-sm text-gray-500">
-                    {/* Use the display value from renderDepartmentPosition */}
                     {renderDepartmentPosition(employee).display}
                   </div>
                   <div className="mt-2 flex items-center space-x-3">
@@ -385,8 +447,17 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ onViewDetails, 
                         size="sm"
                       />
                     )}
+                    <Badge className={
+                      employee.status === 'active' ? 'bg-green-100 text-green-800' :
+                      employee.status === 'inactive' ? 'bg-gray-100 text-gray-800' :
+                      employee.status === 'onboarding' ? 'bg-blue-100 text-blue-800' :
+                      employee.status === 'terminated' ? 'bg-red-100 text-red-800' :
+                      'bg-gray-100 text-gray-800'
+                    }>
+                      {employee.status?.charAt(0).toUpperCase() + employee.status?.slice(1) || 'Unknown'}
+                    </Badge>
                     <span className="text-xs text-gray-500">
-                      Last activity: {new Date(employee.lastActivity).toLocaleDateString()}
+                      Last activity: {employee.lastActivity ? new Date(employee.lastActivity).toLocaleDateString() : 'N/A'}
                     </span>
                   </div>
                 </div>
@@ -451,20 +522,18 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ onViewDetails, 
   };
 
   const renderDepartmentPosition = (employee: any) => {
-    // Extract department and position with fallbacks to default values
     const departmentName = employee.department && employee.department !== "Unknown Department" 
       ? employee.department 
       : (employee.hr_departments?.name && employee.hr_departments.name !== "Unknown Department"
         ? employee.hr_departments.name
-        : "Not Assigned"); // Change 'Unknown Department' to 'Not Assigned'
-
+        : "Not Assigned");
+    
     const positionTitle = employee.position && employee.position !== "Unknown Position"
       ? employee.position
       : (employee.hr_positions?.title && employee.hr_positions.title !== "Unknown Position" 
         ? employee.hr_positions.title
-        : "Not Assigned"); // Change 'Unknown Position' to 'Not Assigned'
-
-    // Return just the display values, not the entire component
+        : "Not Assigned");
+    
     return {
       display: `${departmentName} · ${positionTitle}`,
       rawData: {

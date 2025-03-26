@@ -29,6 +29,8 @@ export interface EmployeeDetail {
   learningPathId?: string;
   progress?: number; // 0-100%
   lastActivity?: string; // ISO date string
+  department_id?: string;
+  position_id?: string;
 }
 
 export interface Department {
