@@ -1,6 +1,6 @@
 
 import React from '@/lib/react-helpers';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Outlet } from 'react-router-dom';
 import { ROUTES } from '@/lib/routes';
 
 // Layouts

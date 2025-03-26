@@ -1,13 +1,10 @@
-import React from 'react';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { AlertCircle, Award, BookOpen, CheckCircle, Clock, Users } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { hrLearnerService } from '@/services/hrLearnerService';
-import { toast } from '@/components/ui/use-toast';
-import { Skeleton } from '@/components/ui/skeleton';
+import { HRLearnerService } from '@/services/hrLearnerService';
+import { RAGStatusBadge } from './RAGStatusBadge';
 
 interface LearningStatistics {
   total_employees: number;
@@ -35,22 +32,21 @@ interface LearnerProgressSummaryProps {
 }
 
 export default function LearnerProgressSummary({ period = 'week' }: LearnerProgressSummaryProps) {
-  const [statistics, setStatistics] = React.useState<LearningStatistics | null>(null);
-  const [employeeProgress, setEmployeeProgress] = React.useState<EmployeeProgress[]>([]);
-  const [isLoading, setIsLoading] = React.useState(true);
-  const [error, setError] = React.useState<string | null>(null);
+  const [statistics, setStatistics] = useState<LearningStatistics | null>(null);
+  const [employeeProgress, setEmployeeProgress] = useState<EmployeeProgress[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchProgressData = async () => {
     try {
       setIsLoading(true);
       setError(null);
 
-      const { success, data, error: serviceError, missingTables } = await hrLearnerService.getLearnerProgressSummary();
+      const { success, data, error: serviceError, missingTables } = await HRLearnerService.getLearnerProgressSummary();
 
       if (!success || serviceError) {
         let errorMessage = serviceError || 'Failed to load learner progress data';
         
-        // If we have missing tables, provide instructions
         if (missingTables && missingTables.length > 0) {
           errorMessage = `Required database tables do not exist: ${missingTables.join(', ')}. Please run the database setup script.`;
         }
@@ -73,7 +69,7 @@ export default function LearnerProgressSummary({ period = 'week' }: LearnerProgr
     }
   };
 
-  React.useEffect(() => {
+  useEffect(() => {
     fetchProgressData();
   }, [period]);
 
@@ -248,10 +244,7 @@ export default function LearnerProgressSummary({ period = 'week' }: LearnerProgr
                           </div>
                         </td>
                         <td className="py-3 px-2">
-                          <Badge className={`${getRAGStatusColor(employee.rag_status)}`}>
-                            {employee.rag_status === 'green' ? 'On Track' : 
-                             employee.rag_status === 'amber' ? 'Needs Attention' : 'At Risk'}
-                          </Badge>
+                          <RAGStatusBadge status={employee.rag_status} />
                         </td>
                         <td className="py-3 px-2">
                           <div>
@@ -284,4 +277,4 @@ export default function LearnerProgressSummary({ period = 'week' }: LearnerProgr
       )}
     </div>
   );
-} 
+}
