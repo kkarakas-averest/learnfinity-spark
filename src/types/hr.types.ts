@@ -133,4 +133,82 @@ export interface LearningPath {
   courses: string[];
   duration: number;
   skillLevel: string;
+  modules: Array<{
+    id: string;
+    title: string;
+    description: string;
+    duration: number;
+    prerequisites?: string[];
+    objectives: string[];
+    content: {
+      type: 'video' | 'text' | 'interactive' | 'assessment';
+      data: any;
+    }[];
+  }>;
+}
+
+export interface EmployeeProfile {
+  id: string;
+  name: string;
+  role: string;
+  department: string;
+  skills: string[];
+  experience?: string;
+  learningPreferences?: {
+    preferredLearningStyle?: 'visual' | 'auditory' | 'reading' | 'kinesthetic';
+    preferredTimeOfDay?: 'morning' | 'afternoon' | 'evening';
+    preferredContentTypes?: string[];
+    preferredSessionDuration?: number;
+  };
+  skillLevel: 'beginner' | 'intermediate' | 'advanced' | 'expert';
+  careerGoals?: string[];
+  timeAvailability?: {
+    weeklyHours?: number;
+    preferredDays?: string[];
+    preferredTimes?: string[];
+  };
+  learningHistory?: {
+    completedCourses?: string[];
+    currentCourses?: string[];
+    certifications?: string[];
+    achievements?: string[];
+  };
+}
+
+export interface EmployeeOnboardingData {
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: string;
+  department: string;
+  skills?: string[];
+  experience?: string;
+  learningPreferences?: {
+    preferredLearningStyle?: 'visual' | 'auditory' | 'reading' | 'kinesthetic';
+    preferredTimeOfDay?: 'morning' | 'afternoon' | 'evening';
+    preferredContentTypes?: string[];
+    preferredSessionDuration?: number;
+  };
+  temporaryPassword: string;
+}
+
+export interface LearningStatistics {
+  total_employees: number;
+  active_paths: number;
+  completion_rate: number;
+  at_risk_count: number;
+  avg_progress: number;
+  recent_completions: number;
+}
+
+export interface EmployeeProgress {
+  user_id: string;
+  name: string;
+  email: string;
+  department: string;
+  active_paths: number;
+  avg_progress: number;
+  rag_status: 'red' | 'amber' | 'green';
+  recent_activity: string;
+  last_active: string;
 }

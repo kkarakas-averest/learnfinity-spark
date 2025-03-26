@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabase';
 import { toast } from '@/components/ui/use-toast';
 import { AgentService } from '@/services/agent.service';
 import { checkRequiredTables } from '@/utils/database/tableExists';
+import type { EmployeeProgress, LearningStatistics } from '@/types/hr.types';
 
 // Type for learner profile
 interface LearnerProfile {
@@ -57,7 +58,7 @@ const handleError = (error: any, defaultMessage: string) => {
  * HR Learner Service
  * Bridges the gap between HR employee management and learner profiles
  */
-class HRLearnerService {
+export class HRLearnerService {
   /**
    * Check if all required tables exist for the HR-Learner connection
    * @returns {Promise<{success: boolean, missingTables?: string[]}>} Result with success status and any missing tables
@@ -258,156 +259,122 @@ class HRLearnerService {
   /**
    * Get a summary of learner progress for HR dashboard
    */
-  async getLearnerProgressSummary(): Promise<{ success: boolean; data?: any; error?: string; missingTables?: string[] }> {
+  public async getLearnerProgressSummary(): Promise<{
+    success: boolean;
+    data?: {
+      statistics: LearningStatistics;
+      employees: EmployeeProgress[];
+    };
+    error?: string;
+    missingTables?: string[];
+  }> {
     try {
-      // First check if required tables exist
-      const { success: tablesExist, missingTables } = await this.checkRequiredTablesExist();
-      
-      if (!tablesExist) {
+      // Check if required tables exist
+      const { data: tables, error: tablesError } = await supabase
+        .from('information_schema.tables')
+        .select('table_name')
+        .in('table_name', ['employees', 'learning_paths', 'progress_tracking']);
+
+      if (tablesError) {
+        return {
+          success: false,
+          error: 'Failed to check database tables',
+          missingTables: ['employees', 'learning_paths', 'progress_tracking']
+        };
+      }
+
+      const existingTables = tables.map(t => t.table_name);
+      const missingTables = ['employees', 'learning_paths', 'progress_tracking']
+        .filter(table => !existingTables.includes(table));
+
+      if (missingTables.length > 0) {
         return {
           success: false,
           error: 'Required database tables do not exist',
           missingTables
         };
       }
-      
-      // Get all employees with their department info
-      const { data: employees, error: employeeError } = await supabase
-        .from('hr_employees')
+
+      // Fetch statistics
+      const { data: stats, error: statsError } = await supabase
+        .from('progress_tracking')
+        .select('*')
+        .single();
+
+      if (statsError) {
+        return {
+          success: false,
+          error: 'Failed to fetch learning statistics'
+        };
+      }
+
+      // Fetch employee progress
+      const { data: employees, error: employeesError } = await supabase
+        .from('employees')
         .select(`
           id,
           name,
           email,
-          department_id (
-            id,
-            name
-          )
+          department,
+          learning_paths (
+            progress,
+            status
+          ),
+          last_activity
         `);
-        
-      if (employeeError) throw employeeError;
-      
-      // Get all learning path assignments
-      const { data: assignments, error: assignmentError } = await supabase
-        .from('learning_path_assignments')
-        .select('*');
-        
-      if (assignmentError) throw assignmentError;
-      
-      // Get all course enrollments
-      const { data: enrollments, error: enrollmentError } = await supabase
-        .from('course_enrollments')
-        .select('*');
-        
-      if (enrollmentError) throw enrollmentError;
-      
-      // Get recent completions
-      const { data: recentCompletions, error: completionError } = await supabase
-        .from('course_enrollments')
-        .select('*')
-        .eq('status', 'completed')
-        .gte('completed_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
-        
-      if (completionError) throw completionError;
-      
-      // Calculate statistics
-      const totalEmployees = employees?.length || 0;
-      const activePathsCount = assignments?.length || 0;
-      const completedCourses = enrollments?.filter(e => e.status === 'completed').length || 0;
-      const totalCourses = enrollments?.length || 0;
-      const completionRate = totalCourses > 0 ? (completedCourses / totalCourses) * 100 : 0;
-      
-      // Count at-risk employees based on their progress and overdue assignments
-      const atRiskCount = employees?.filter(emp => {
-        const empEnrollments = enrollments?.filter(e => e.user_id === emp.id) || [];
-        const avgProgress = empEnrollments.length > 0
-          ? empEnrollments.reduce((sum, enr) => sum + (enr.progress || 0), 0) / empEnrollments.length
-          : 0;
-        return avgProgress < 30 || empEnrollments.some(e => e.status === 'overdue');
-      }).length || 0;
-      
-      // Calculate average progress across all employees
-      const avgProgress = employees?.reduce((acc, emp) => {
-        const empEnrollments = enrollments?.filter(e => e.user_id === emp.id) || [];
-        const empProgress = empEnrollments.reduce((sum, enr) => sum + (enr.progress || 0), 0);
-        return acc + (empProgress / (empEnrollments.length || 1));
-      }, 0) / (employees?.length || 1);
-      
-      // Process employee progress data
-      const employeeProgress = await Promise.all(employees?.map(async (employee) => {
-        // Get active learning paths for this employee
-        const activePathCount = assignments?.filter(a => a.user_id === employee.id).length || 0;
-        
-        // Calculate average progress for this employee
-        const employeeEnrollments = enrollments?.filter(e => e.user_id === employee.id) || [];
-        const employeeAvgProgress = employeeEnrollments.length > 0
-          ? employeeEnrollments.reduce((sum, enr) => sum + (enr.progress || 0), 0) / employeeEnrollments.length
-          : 0;
-        
-        // Determine RAG status based on progress and completion
-        let overallRagStatus: 'red' | 'amber' | 'green' = 'green';
-        
-        if (employeeAvgProgress < 30 || employeeEnrollments.some(e => e.status === 'overdue')) {
-          overallRagStatus = 'red';
-        } else if (employeeAvgProgress < 70) {
-          overallRagStatus = 'amber';
-        }
-        
-        // Get most recent activity
-        const { data: recentActivity, error: activityError } = await supabase
-          .from('agent_activities')
-          .select('description, created_at')
-          .eq('user_id', employee.id)
-          .order('created_at', { ascending: false })
-          .limit(1);
-          
-        if (activityError) {
-          console.error(`Error fetching recent activity for employee ${employee.id}:`, activityError);
-        }
-        
-        // Format the last active date
-        const lastActive = recentActivity?.length > 0
-          ? new Date(recentActivity[0].created_at).toLocaleDateString()
-          : 'Never';
-          
+
+      if (employeesError) {
         return {
-          user_id: employee.id,
-          name: employee.name,
-          email: employee.email,
-          department: 
-            typeof employee.department_id === 'object' && employee.department_id && 'name' in employee.department_id 
-              ? employee.department_id.name 
-              : 'Unknown',
-          active_paths: activePathCount || 0,
-          avg_progress: employeeAvgProgress,
-          rag_status: overallRagStatus,
-          recent_activity: recentActivity?.length > 0
-            ? recentActivity[0].description
-            : 'No recent activity',
-          last_active: lastActive
+          success: false,
+          error: 'Failed to fetch employee progress'
         };
-      }));
-      
-      // Return the complete data
+      }
+
+      // Map the raw employee data to the expected EmployeeProgress format
+      const mappedEmployees: EmployeeProgress[] = employees.map(emp => {
+        // Calculate average progress across learning paths
+        const paths = emp.learning_paths || [];
+        const avgProgress = paths.length > 0
+          ? paths.reduce((sum, path) => sum + (path.progress || 0), 0) / paths.length
+          : 0;
+        
+        // Determine RAG status based on progress
+        let ragStatus: 'red' | 'amber' | 'green' = 'green';
+        if (avgProgress < 30) {
+          ragStatus = 'red';
+        } else if (avgProgress < 70) {
+          ragStatus = 'amber';
+        }
+
+        return {
+          user_id: emp.id,
+          name: emp.name,
+          email: emp.email,
+          department: emp.department,
+          active_paths: paths.length,
+          avg_progress: Math.round(avgProgress),
+          rag_status: ragStatus,
+          recent_activity: 'Course progress updated', // Default value
+          last_active: emp.last_activity || 'Never'
+        };
+      });
+
       return {
         success: true,
         data: {
-          statistics: {
-            total_employees: totalEmployees || 0,
-            active_paths: activePathsCount,
-            completion_rate: completionRate,
-            at_risk_count: atRiskCount,
-            avg_progress: avgProgress,
-            recent_completions: recentCompletions?.length || 0
-          },
-          employees: employeeProgress
+          statistics: stats as LearningStatistics,
+          employees: mappedEmployees
         }
       };
     } catch (error) {
-      return handleError(error, 'Failed to get learner progress summary');
+      console.error('Error in getLearnerProgressSummary:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
+      };
     }
   }
 }
 
 // Create and export the singleton instance
-const hrLearnerService = new HRLearnerService();
-export { hrLearnerService }; 
+export const hrLearnerService = new HRLearnerService(); 
