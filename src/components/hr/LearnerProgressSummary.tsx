@@ -9,27 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { AlertCircle, Users, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
-
-interface LearningStatistics {
-  total_employees: number;
-  active_paths: number;
-  completion_rate: number;
-  at_risk_count: number;
-  avg_progress: number;
-  recent_completions: number;
-}
-
-interface EmployeeProgress {
-  user_id: string;
-  name: string;
-  email: string;
-  department: string;
-  active_paths: number;
-  avg_progress: number;
-  rag_status: 'red' | 'amber' | 'green';
-  recent_activity: string;
-  last_active: string;
-}
+import type { LearningStatistics, EmployeeProgress } from '@/types/hr.types';
 
 interface LearnerProgressSummaryProps {
   period?: 'week' | 'month' | 'quarter';

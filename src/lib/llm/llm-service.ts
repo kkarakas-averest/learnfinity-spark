@@ -2,6 +2,8 @@ import { GroqAPI } from './groq-api';
 import { MockLLMProvider } from './mock-provider';
 import { defaultLLMConfig, fallbackLLMConfig, LLMConfig, systemPrompts } from './config';
 import envConfig, { isApiConfigured, isFeatureEnabled } from '../env-config';
+import { Groq } from 'groq-sdk';
+import type { SystemPromptType } from './types';
 
 // Define a common interface that all LLM providers will implement
 export interface LLMProvider {
@@ -31,6 +33,7 @@ export class LLMService {
     completion_tokens: 0,
     requests: 0
   };
+  private groq: Groq;
   
   /**
    * Initialize the LLM service with a specific provider
@@ -90,6 +93,10 @@ export class LLMService {
       this.provider = new MockLLMProvider();
       this.config.provider = 'mock';
     }
+
+    this.groq = new Groq({
+      apiKey: process.env.GROQ_API_KEY
+    });
   }
   
   /**
@@ -257,15 +264,15 @@ export class LLMService {
     employeeData: any,
     preferences: any,
     options: {
-      temperature?: number,
-      maxTokens?: number
+      temperature?: number;
+      maxTokens?: number;
     } = {}
-  ): Promise<string> {
+  ): Promise<any> {
     const employeeDataString = JSON.stringify(employeeData, null, 2);
     const preferencesString = JSON.stringify(preferences, null, 2);
     
     const prompt = `
-      I need to create a personalized learning path for the following employee based on their data and preferences:
+      Create a personalized learning path for the following employee based on their data and preferences:
       
       Employee Data:
       ${employeeDataString}
@@ -273,20 +280,46 @@ export class LLMService {
       Learning Preferences:
       ${preferencesString}
       
-      Please generate a comprehensive learning path that includes:
+      The learning path should include:
       1. Core focus areas based on skills gaps and career goals
       2. Specific recommended courses or modules with estimated time commitments
       3. A suggested schedule or timeline for completion
       4. Additional resources that would complement the formal learning
       
-      The learning path should be tailored to their current skill level, learning style preferences, and career objectives.
+      Return the learning path as a JSON object with the following structure:
+      {
+        "id": "unique-id",
+        "title": "Learning Path Title",
+        "description": "Path Description",
+        "courses": ["course-ids"],
+        "duration": number,
+        "skillLevel": "beginner|intermediate|advanced|expert",
+        "modules": [
+          {
+            "id": "module-id",
+            "title": "Module Title",
+            "description": "Module Description",
+            "duration": number,
+            "prerequisites": ["module-ids"],
+            "objectives": ["objective1", "objective2"],
+            "content": [
+              {
+                "type": "video|text|interactive|assessment",
+                "data": {}
+              }
+            ]
+          }
+        ]
+      }
     `.trim();
     
-    return this.complete(prompt, {
+    const response = await this.complete(prompt, {
       system: systemPrompts.learningPath,
       temperature: options.temperature ?? 0.7,
       maxTokens: options.maxTokens ?? 2048
     });
+
+    return JSON.parse(response);
   }
   
   /**
@@ -398,5 +431,138 @@ export class LLMService {
    */
   public getModel(): string {
     return this.provider.getModel();
+  }
+
+  public async generateEmployeeProfile(data: {
+    id: string;
+    name: string;
+    role: string;
+    department: string;
+    skills: string[];
+    experience?: string;
+    learningPreferences?: Record<string, any>;
+  }): Promise<any> {
+    const prompt = `
+      Create a comprehensive employee profile based on the following information:
+      
+      Employee ID: ${data.id}
+      Name: ${data.name}
+      Role: ${data.role}
+      Department: ${data.department}
+      Experience: ${data.experience || 'Not specified'}
+      Skills: ${data.skills.join(', ')}
+      Learning Preferences: ${JSON.stringify(data.learningPreferences || {})}
+      
+      The profile should include:
+      1. A summary of the employee's professional background
+      2. An assessment of their likely skill level based on their role and experience
+      3. Recommended learning areas based on their role and department
+      4. Preferred learning styles (if information is available)
+      5. Estimated time availability for learning (if information is available)
+      
+      Return the profile as a JSON object.
+    `.trim();
+
+    const response = await this.complete(prompt, {
+      system: systemPrompts.employeeProfile,
+      temperature: 0.7
+    });
+
+    return JSON.parse(response);
+  }
+
+  public async generateContent(options: {
+    module: any;
+    profile: any;
+    learningPath: any;
+  }): Promise<any> {
+    const prompt = `
+      Generate learning content for the following module:
+      
+      Module: ${JSON.stringify(options.module, null, 2)}
+      
+      Employee Profile: ${JSON.stringify(options.profile, null, 2)}
+      
+      Learning Path: ${JSON.stringify(options.learningPath, null, 2)}
+      
+      The content should include:
+      1. Clear learning objectives
+      2. Engaging explanations and examples
+      3. Interactive elements and exercises
+      4. Assessment questions
+      5. Additional resources
+      
+      Return the content as a JSON object.
+    `.trim();
+
+    const response = await this.complete(prompt, {
+      system: systemPrompts.contentCreation,
+      temperature: 0.7
+    });
+
+    return JSON.parse(response);
+  }
+
+  public async adaptContent(options: {
+    currentContent: any;
+    progress: any;
+    ragStatus: 'green' | 'amber' | 'red';
+  }): Promise<any> {
+    const prompt = `
+      Adapt the following learning content based on the student's progress and RAG status:
+      
+      Current Content: ${JSON.stringify(options.currentContent, null, 2)}
+      
+      Progress: ${JSON.stringify(options.progress, null, 2)}
+      
+      RAG Status: ${options.ragStatus}
+      
+      The adapted content should:
+      1. Address any learning gaps
+      2. Provide additional support if needed
+      3. Include more challenging content if the student is excelling
+      4. Maintain engagement and motivation
+      
+      Return the adapted content as a JSON object.
+    `.trim();
+
+    const response = await this.complete(prompt, {
+      system: systemPrompts.contentAdaptation,
+      temperature: 0.7
+    });
+
+    return JSON.parse(response);
+  }
+
+  public async generateIntervention(options: {
+    employeeId: string;
+    ragStatus: 'green' | 'amber' | 'red';
+    learningHistory: any;
+  }): Promise<any> {
+    const prompt = `
+      Suggest interventions for the following situation:
+      
+      Employee ID: ${options.employeeId}
+      RAG Status: ${options.ragStatus}
+      Learning History: ${JSON.stringify(options.learningHistory, null, 2)}
+      
+      Provide specific actions and recommendations based on the RAG status.
+      
+      Return the intervention plan as a JSON object.
+    `.trim();
+
+    const response = await this.complete(prompt, {
+      system: systemPrompts.intervention,
+      temperature: 0.7
+    });
+
+    return JSON.parse(response);
+  }
+
+  /**
+   * Get the appropriate system prompt based on the type
+   */
+  public getSystemPrompt(type: SystemPromptType): string {
+    return systemPrompts[type] || '';
   }
 } 

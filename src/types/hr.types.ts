@@ -130,21 +130,24 @@ export interface LearningPath {
   id: string;
   title: string;
   description: string;
-  courses: string[];
-  duration: number;
-  skillLevel: string;
+  duration: string;
+  objectives: string[];
+  prerequisites?: string[];
   modules: Array<{
     id: string;
     title: string;
     description: string;
-    duration: number;
-    prerequisites?: string[];
-    objectives: string[];
-    content: {
-      type: 'video' | 'text' | 'interactive' | 'assessment';
-      data: any;
-    }[];
+    duration: string;
+    content: any[];
+    assessments: any[];
   }>;
+  createdAt: Date;
+  updatedAt: Date;
+  status: 'draft' | 'published' | 'archived';
+  tags?: string[];
+  difficulty: 'beginner' | 'intermediate' | 'advanced';
+  category: string;
+  author: string;
 }
 
 export interface EmployeeProfile {
@@ -153,25 +156,15 @@ export interface EmployeeProfile {
   role: string;
   department: string;
   skills: string[];
-  experience?: string;
-  learningPreferences?: {
-    preferredLearningStyle?: 'visual' | 'auditory' | 'reading' | 'kinesthetic';
-    preferredTimeOfDay?: 'morning' | 'afternoon' | 'evening';
+  experience: {
+    years: number;
+    level: string;
+    previousRoles?: string[];
+  };
+  learningPreferences: {
+    preferredLearningStyle?: string;
     preferredContentTypes?: string[];
-    preferredSessionDuration?: number;
-  };
-  skillLevel: 'beginner' | 'intermediate' | 'advanced' | 'expert';
-  careerGoals?: string[];
-  timeAvailability?: {
-    weeklyHours?: number;
-    preferredDays?: string[];
-    preferredTimes?: string[];
-  };
-  learningHistory?: {
-    completedCourses?: string[];
-    currentCourses?: string[];
-    certifications?: string[];
-    achievements?: string[];
+    learningGoals?: string[];
   };
 }
 
@@ -181,24 +174,28 @@ export interface EmployeeOnboardingData {
   email: string;
   role: string;
   department: string;
-  skills?: string[];
-  experience?: string;
-  learningPreferences?: {
-    preferredLearningStyle?: 'visual' | 'auditory' | 'reading' | 'kinesthetic';
-    preferredTimeOfDay?: 'morning' | 'afternoon' | 'evening';
-    preferredContentTypes?: string[];
-    preferredSessionDuration?: number;
-  };
   temporaryPassword: string;
+  skills?: string[];
+  experience?: {
+    years: number;
+    level: 'junior' | 'mid' | 'senior';
+    previousRoles?: string[];
+  };
+  learningPreferences?: {
+    preferredLearningStyle?: string;
+    preferredContentTypes?: string[];
+    learningGoals?: string[];
+  };
 }
 
 export interface LearningStatistics {
   total_employees: number;
   active_paths: number;
-  completion_rate: number;
-  at_risk_count: number;
   avg_progress: number;
+  at_risk_count: number;
   recent_completions: number;
+  completion_rate: number;
+  engagement_rate: number;
 }
 
 export interface EmployeeProgress {

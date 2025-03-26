@@ -19,9 +19,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { hrEmployeeService } from '@/services/hrEmployeeService';
-import { CaretSortIcon, ChevronDownIcon, DotsHorizontalIcon } from '@radix-ui/react-icons';
-import { Pencil, Trash2, LifeBuoy } from 'lucide-react';
-import { PlusCircledIcon } from '@/components/ui/icons';
+import { ChevronUpDown, MoreHorizontal, Pencil, Trash2, LifeBuoy, PlusCircle } from 'lucide-react';
 
 interface Employee {
   id: string;
@@ -132,7 +130,7 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
                 className="max-w-sm"
               />
             </div>
-            <Button><PlusCircledIcon className="mr-2" /> Add Employee</Button>
+            <Button><PlusCircle className="mr-2" /> Add Employee</Button>
           </div>
           
           <Table>
@@ -141,13 +139,13 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
                 <TableHead onClick={() => handleSort('firstName')} className="cursor-pointer">
                   First Name
                   {sortColumn === 'firstName' && (
-                    <CaretSortIcon className={`ml-2 h-4 w-4 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} />
+                    <ChevronUpDown className={`ml-2 h-4 w-4 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} />
                   )}
                 </TableHead>
                 <TableHead onClick={() => handleSort('lastName')} className="cursor-pointer">
                   Last Name
                   {sortColumn === 'lastName' && (
-                    <CaretSortIcon className={`ml-2 h-4 w-4 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} />
+                    <ChevronUpDown className={`ml-2 h-4 w-4 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} />
                   )}
                 </TableHead>
                 <TableHead onClick={() => handleSort('email')} className="cursor-pointer">

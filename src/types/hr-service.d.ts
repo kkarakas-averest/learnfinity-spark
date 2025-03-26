@@ -17,7 +17,7 @@ declare module '@/services/hrEmployeeService' {
     createMissingTables(missingTables: string[]): Promise<{ success: boolean; error?: any }>;
     getEmployees(): Promise<{ success: boolean; employees?: any[]; error?: any }>;
     getEmployee(id: string): Promise<{ data: Employee; error: any }>;
-    createEmployee(employeeData: any): Promise<{ id: string, success: boolean }>;
+    createEmployee(employeeData: any): Promise<{ id: string; error?: { message: string } }>;
     updateEmployee(id: string, employeeData: any): Promise<{ success: boolean; error?: any }>;
     deleteEmployee(id: string): Promise<{ success: boolean; error?: any }>;
     uploadEmployeeResume(id: string, file: File): Promise<{ error: any }>;
@@ -52,15 +52,43 @@ declare module '@/lib/services/hrServices' {
 }
 
 declare module '@/services/hrLearnerService' {
+  import type { EmployeeProgress, LearningStatistics } from '@/types/hr.types';
+
   export interface HRLearnerService {
-    // Add missingTables to the return type for getLearnerProgressSummary
-    getLearnerProgressSummary(): Promise<{ 
+    checkRequiredTablesExist(): Promise<{ success: boolean; missingTables?: string[] }>;
+    
+    createOrUpdateLearnerProfile(employeeData: any): Promise<{ 
       success: boolean; 
       data?: any; 
       error?: string;
-      missingTables?: string[];
+      action?: 'created' | 'updated';
     }>;
     
-    // Other methods...
+    assignLearningPath(assignment: {
+      user_id: string;
+      learning_path_id: string;
+      assigned_by: string;
+      due_date?: Date;
+      priority?: 'high' | 'medium' | 'low';
+      mandatory?: boolean;
+      notes?: string;
+    }): Promise<{ 
+      success: boolean; 
+      data?: any; 
+      error?: string;
+      action?: 'created' | 'updated';
+    }>;
+    
+    getLearnerProgressSummary(): Promise<{
+      success: boolean;
+      data?: {
+        statistics: LearningStatistics;
+        employees: EmployeeProgress[];
+      };
+      error?: string;
+      missingTables?: string[];
+    }>;
   }
+
+  export const hrLearnerService: HRLearnerService;
 }

@@ -58,7 +58,7 @@ const handleError = (error: any, defaultMessage: string) => {
  * HR Learner Service
  * Bridges the gap between HR employee management and learner profiles
  */
-export class HRLearnerService {
+class HRLearnerService {
   /**
    * Check if all required tables exist for the HR-Learner connection
    * @returns {Promise<{success: boolean, missingTables?: string[]}>} Result with success status and any missing tables
@@ -377,4 +377,6 @@ export class HRLearnerService {
 }
 
 // Create and export the singleton instance
-export const hrLearnerService = new HRLearnerService(); 
+const hrLearnerService = new HRLearnerService();
+
+export { HRLearnerService, hrLearnerService }; 
