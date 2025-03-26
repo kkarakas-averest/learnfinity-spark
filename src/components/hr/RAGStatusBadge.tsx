@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from '@/lib/react-helpers';
+import React, { useState, useEffect, useRef, forwardRef } from '@/lib/react-helpers';
 import { RAGStatus } from '@/types/hr.types';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -22,7 +22,7 @@ export interface RAGStatusBadgeProps {
  * Displays a color-coded badge representing the Red-Amber-Green status
  * with optional tooltip and animation effects
  */
-export const RAGStatusBadge: React.FC<RAGStatusBadgeProps> = ({
+export const RAGStatusBadge = forwardRef<HTMLDivElement, RAGStatusBadgeProps>(({
   status,
   label,
   showTooltip = true,
@@ -33,7 +33,7 @@ export const RAGStatusBadge: React.FC<RAGStatusBadgeProps> = ({
   showTransition = false,
   previousStatus = null,
   transitionDuration = 1500,
-}) => {
+}, ref) => {
   const [isAnimating, setIsAnimating] = useState(false);
   const [displayedStatus, setDisplayedStatus] = useState<RAGStatus>(status);
   const [transitioning, setTransitioning] = useState(false);
@@ -113,6 +113,7 @@ export const RAGStatusBadge: React.FC<RAGStatusBadgeProps> = ({
   
   const badgeContent = (
     <Badge 
+      ref={ref}
       className={`
         ${variants[displayedStatus]} 
         ${sizeClasses[size]}
@@ -143,6 +144,8 @@ export const RAGStatusBadge: React.FC<RAGStatusBadgeProps> = ({
       </Tooltip>
     </TooltipProvider>
   );
-};
+});
+
+RAGStatusBadge.displayName = "RAGStatusBadge";
 
 export default RAGStatusBadge; 
