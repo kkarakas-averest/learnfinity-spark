@@ -308,7 +308,7 @@ export class LLMService {
     `.trim();
     
     const response = await this.complete(prompt, {
-      system: systemPrompts.learningPath,
+      system: systemPrompts.learningPathCreation,
       temperature: options.temperature ?? 0.7,
       maxTokens: options.maxTokens ?? 2048
     });
@@ -458,7 +458,7 @@ export class LLMService {
     `.trim();
 
     const response = await this.complete(prompt, {
-      system: systemPrompts.employeeProfile,
+      system: systemPrompts.employeeProfileCreation,
       temperature: 0.7
     });
 
@@ -546,7 +546,7 @@ export class LLMService {
     `.trim();
 
     const response = await this.complete(prompt, {
-      system: systemPrompts.intervention,
+      system: systemPrompts.learningIntervention,
       temperature: 0.7
     });
 
