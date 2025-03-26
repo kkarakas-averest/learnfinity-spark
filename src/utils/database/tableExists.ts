@@ -30,6 +30,39 @@ export async function tableExists(tableName: string): Promise<boolean> {
 }
 
 /**
+ * Check if multiple required tables exist in the database
+ * @param requiredTables - Array of table names to check
+ * @returns Promise that resolves to an object with success status and any missing tables
+ */
+export async function checkRequiredTables(requiredTables: string[]): Promise<{ 
+  success: boolean; 
+  missingTables: string[] 
+}> {
+  try {
+    const missingTables: string[] = [];
+    
+    // Check each required table
+    for (const tableName of requiredTables) {
+      const exists = await tableExists(tableName);
+      if (!exists) {
+        missingTables.push(tableName);
+      }
+    }
+    
+    return {
+      success: missingTables.length === 0,
+      missingTables
+    };
+  } catch (error) {
+    console.error('Error checking required tables:', error);
+    return {
+      success: false,
+      missingTables: requiredTables // Assume all are missing if there's an error
+    };
+  }
+}
+
+/**
  * Get count of rows in a specific table
  * @param tableName - The name of the table to check
  * @returns Promise that resolves to a number representing row count or -1 if error
