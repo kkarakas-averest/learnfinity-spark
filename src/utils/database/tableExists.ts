@@ -1,3 +1,4 @@
+
 import { supabase, supabaseAdmin, isUsingServiceKey } from '@/lib/supabase-client';
 
 /**
@@ -108,4 +109,4 @@ export async function checkRequiredTables(requiredTables: string[]): Promise<{
   }
   
   return { success: true, missingTables: [] };
-} 
+}

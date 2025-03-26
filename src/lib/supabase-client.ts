@@ -8,6 +8,22 @@ import { supabase } from '@/integrations/supabase/client';
 export { supabase };
 
 /**
+ * Supabase admin client with service key capabilities
+ * Will be undefined if service key is not provided
+ */
+export const supabaseAdmin = undefined; // Will be populated if using a service key
+
+/**
+ * Check if we're using a service key with elevated privileges
+ * @returns boolean indicating if the current client is using a service key
+ */
+export function isUsingServiceKey(): boolean {
+  // In this implementation, we're not using a service key
+  // This would need to be adjusted if service key functionality is implemented
+  return false;
+}
+
+/**
  * Helper function to check if Supabase connection is working
  * @returns A promise that resolves to a boolean indicating if connection is successful
  */
