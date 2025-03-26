@@ -6,6 +6,15 @@ declare module 'react' {
   import * as React from 'react';
   export = React;
   export as namespace React;
+  
+  // Export specific hooks that are commonly used
+  export const useState: typeof React.useState;
+  export const useEffect: typeof React.useEffect;
+  export const useContext: typeof React.useContext;
+  export const useRef: typeof React.useRef;
+  export const useCallback: typeof React.useCallback;
+  export const useMemo: typeof React.useMemo;
+  export const useReducer: typeof React.useReducer;
 }
 
 // Fix Lucide-React icon imports
@@ -46,6 +55,15 @@ declare module 'lucide-react' {
   export const GripVertical: React.FC<React.SVGProps<SVGSVGElement>>;
   export const ArrowRight: React.FC<React.SVGProps<SVGSVGElement>>;
   export const ArrowUpRight: React.FC<React.SVGProps<SVGSVGElement>>;
+  export const Upload: React.FC<React.SVGProps<SVGSVGElement>>;
+  export const CheckCircle: React.FC<React.SVGProps<SVGSVGElement>>;
+  export const AlertCircle: React.FC<React.SVGProps<SVGSVGElement>>;
+  export const Trash2: React.FC<React.SVGProps<SVGSVGElement>>;
+  export const LifeBuoy: React.FC<React.SVGProps<SVGSVGElement>>;
+  export const LogOut: React.FC<React.SVGProps<SVGSVGElement>>;
+  export const Users: React.FC<React.SVGProps<SVGSVGElement>>;
+  export const BookOpen: React.FC<React.SVGProps<SVGSVGElement>>;
+  export const Activity: React.FC<React.SVGProps<SVGSVGElement>>;
 }
 
 // Fix react-hook-form module

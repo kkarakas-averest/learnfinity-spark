@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Upload, CheckCircle, Circle } from 'lucide-react';
+import { Upload, CheckCircle, AlertCircle } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { hrBulkImportService } from '@/services/hrBulkImportService';
 
@@ -77,7 +77,7 @@ const BulkEmployeeImport = () => {
       <CardContent>
         {error && (
           <Alert variant="destructive">
-            <Circle className="h-4 w-4" />
+            <AlertCircle className="h-4 w-4" />
             <AlertTitle>Error</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
           </Alert>
@@ -118,7 +118,7 @@ const BulkEmployeeImport = () => {
                     </Alert>
                   ) : (
                     <Alert variant="destructive">
-                      <Circle className="h-4 w-4" />
+                      <AlertCircle className="h-4 w-4" />
                       <AlertTitle>Error</AlertTitle>
                       <AlertDescription>{result.message}</AlertDescription>
                     </Alert>

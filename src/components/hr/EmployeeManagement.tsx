@@ -1,12 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { 
-  CaretSortIcon, 
-  ChevronDownIcon, 
-  DotsHorizontalIcon,
-  PlusCircledIcon
-} from '@radix-ui/react-icons';
 import { 
   DropdownMenu,
   DropdownMenuContent,
@@ -26,7 +19,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { hrEmployeeService } from '@/services/hrEmployeeService';
-import { Pencil, Trash, LifeBuoy } from 'lucide-react';
+import { CaretSortIcon, ChevronDownIcon, DotsHorizontalIcon } from '@radix-ui/react-icons';
+import { Pencil, Trash2, LifeBuoy } from 'lucide-react';
+import { PlusCircledIcon } from '@/components/ui/icons';
 
 interface Employee {
   id: string;
@@ -40,7 +35,15 @@ interface Employee {
   ragStatusLastUpdated: Date;
 }
 
-const EmployeeManagement: React.FC = () => {
+interface EmployeeManagementProps {
+  onViewDetails?: (employee: Employee) => void;
+  onIntervene?: (employee: Employee) => void;
+}
+
+const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ 
+  onViewDetails, 
+  onIntervene 
+}) => {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -185,7 +188,7 @@ const EmployeeManagement: React.FC = () => {
                           </Link>
                         </DropdownMenuItem>
                         <DropdownMenuItem>
-                          <Trash className="mr-2 h-4 w-4" />
+                          <Trash2 className="mr-2 h-4 w-4" />
                           Delete
                         </DropdownMenuItem>
                         <DropdownMenuItem>
