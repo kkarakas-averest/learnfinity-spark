@@ -1,10 +1,14 @@
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import React from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { HRLearnerService } from '@/services/hrLearnerService';
+import { hrLearnerService } from '@/services/hrLearnerService';
 import { RAGStatusBadge } from './RAGStatusBadge';
+import { Skeleton } from '@/components/ui/skeleton';
+import { AlertCircle, Users, BookOpen } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { useToast } from '@/components/ui/use-toast';
 
 interface LearningStatistics {
   total_employees: number;
@@ -31,18 +35,21 @@ interface LearnerProgressSummaryProps {
   period?: 'week' | 'month' | 'quarter';
 }
 
-export default function LearnerProgressSummary({ period = 'week' }: LearnerProgressSummaryProps) {
-  const [statistics, setStatistics] = useState<LearningStatistics | null>(null);
-  const [employeeProgress, setEmployeeProgress] = useState<EmployeeProgress[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+const LearnerProgressSummary = ({ period = 'week' }: LearnerProgressSummaryProps) => {
+  const { toast } = useToast();
+  const [statistics, setStatistics] = React.useState<LearningStatistics | null>(null);
+  const [employeeProgress, setEmployeeProgress] = React.useState<EmployeeProgress[]>([]);
+  const [isLoading, setIsLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    fetchProgressData();
+  }, [period]);
 
   const fetchProgressData = async () => {
+    setIsLoading(true);
     try {
-      setIsLoading(true);
-      setError(null);
-
-      const { success, data, error: serviceError, missingTables } = await HRLearnerService.getLearnerProgressSummary();
+      const { success, data, error: serviceError, missingTables } = await hrLearnerService.getLearnerProgressSummary();
 
       if (!success || serviceError) {
         let errorMessage = serviceError || 'Failed to load learner progress data';
@@ -68,10 +75,6 @@ export default function LearnerProgressSummary({ period = 'week' }: LearnerProgr
       setIsLoading(false);
     }
   };
-
-  useEffect(() => {
-    fetchProgressData();
-  }, [period]);
 
   const getRAGStatusColor = (status: 'red' | 'amber' | 'green') => {
     switch (status) {
@@ -277,4 +280,6 @@ export default function LearnerProgressSummary({ period = 'week' }: LearnerProgr
       )}
     </div>
   );
-}
+};
+
+export default LearnerProgressSummary;
