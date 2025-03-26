@@ -260,7 +260,7 @@ class HRLearnerService {
    * Get a summary of learner progress for HR dashboard
    */
   public async getLearnerProgressSummary(): Promise<{
-    success: boolean;
+    success: boolean; 
     data?: {
       statistics: LearningStatistics;
       employees: EmployeeProgress[];
@@ -288,13 +288,13 @@ class HRLearnerService {
         .filter(table => !existingTables.includes(table));
 
       if (missingTables.length > 0) {
-        return {
-          success: false,
+        return { 
+          success: false, 
           error: 'Required database tables do not exist',
-          missingTables
+          missingTables 
         };
       }
-
+      
       // Fetch statistics
       const { data: stats, error: statsError } = await supabase
         .from('progress_tracking')
@@ -345,7 +345,7 @@ class HRLearnerService {
         } else if (avgProgress < 70) {
           ragStatus = 'amber';
         }
-
+          
         return {
           user_id: emp.id,
           name: emp.name,

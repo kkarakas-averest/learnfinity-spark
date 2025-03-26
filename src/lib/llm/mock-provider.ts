@@ -13,310 +13,292 @@ const TOKENS_PER_CHAR = 0.25;
 const MIN_COMPLETION_TOKENS = 20;
 
 /**
- * MockLLMProvider class for testing without API calls
+ * MockLLMProvider for development and testing purposes
+ * 
+ * This provides a mock implementation of the LLM provider interface
+ * that returns predefined responses for testing without API calls.
  */
 export class MockLLMProvider implements LLMProvider {
-  private debug: boolean;
   private model: string;
+  private debug: boolean;
   
-  constructor(model: string = 'mock-model', debug: boolean = false) {
+  constructor(model: string = 'mock-llm', debug: boolean = false) {
     this.model = model;
     this.debug = debug;
-    
     if (debug) {
-      console.log('MockLLMProvider initialized. This is for testing only!');
+      console.log('Using MockLLMProvider for testing');
     }
   }
   
-  /**
-   * Generate a mock completion response
-   */
-  async complete(
+  public isConfigured(): boolean {
+    return true; // Mock provider is always configured
+  }
+  
+  public getModel(): string {
+    return this.model;
+  }
+  
+  public setModel(model: string): void {
+    this.model = model;
+    if (this.debug) {
+      console.log(`Mock model set to: ${model}`);
+    }
+  }
+  
+  public async complete(
     prompt: string,
     options: {
-      temperature?: number,
-      maxTokens?: number,
-      system?: string,
-      topP?: number,
-      stopSequences?: string[]
+      temperature?: number;
+      maxTokens?: number;
+      system?: string;
+      topP?: number;
+      stopSequences?: string[];
     } = {}
-  ): Promise<{ text: string, usage: { prompt_tokens: number, completion_tokens: number, total_tokens: number } }> {
-    // Log the request if debug is enabled
+  ): Promise<{
+    text: string;
+    usage: {
+      prompt_tokens: number;
+      completion_tokens: number;
+      total_tokens: number;
+    };
+  }> {
+    // Log prompt and options if debug is enabled
     if (this.debug) {
-      console.log('MockLLMProvider received prompt:', {
-        promptLength: prompt.length,
-        system: options.system?.substring(0, 50) + '...',
+      console.log('Mock LLM request:', {
+        prompt: prompt.substring(0, 100) + (prompt.length > 100 ? '...' : ''),
         options
       });
     }
     
-    // Simulate a slight delay to mimic API call
-    await new Promise(resolve => setTimeout(resolve, 300 + Math.random() * 700));
+    // Calculate mock token counts
+    const promptTokens = Math.ceil(prompt.length / 4);
+    const responseTokens = 150 + Math.floor(Math.random() * 100);
     
-    // Calculate simulated token usage
-    const promptTokens = Math.ceil(prompt.length * TOKENS_PER_CHAR);
+    // Generate a deterministic but context-aware mock response
+    let response: string;
     
-    // Determine the most appropriate mock response based on the prompt content
-    const response = this.determineResponse(prompt, options.system || '');
-    const completionTokens = Math.max(
-      Math.ceil(response.length * TOKENS_PER_CHAR),
-      MIN_COMPLETION_TOKENS
-    );
-    
-    // Track usage
-    const usage = {
-      prompt_tokens: promptTokens,
-      completion_tokens: completionTokens,
-      total_tokens: promptTokens + completionTokens
-    };
-    
-    if (this.debug) {
-      console.log('MockLLMProvider returning response:', {
-        responseLength: response.length,
-        usage
-      });
+    // Basic keyword matching for different types of prompts
+    if (prompt.includes('learning path')) {
+      response = this.getMockLearningPath();
+    } else if (prompt.includes('RAG') || prompt.includes('status analysis')) {
+      response = this.getMockRAGAnalysis();
+    } else if (prompt.includes('profile')) {
+      response = this.getMockProfile();
+    } else if (prompt.includes('intervention') || prompt.includes('recommendation')) {
+      response = this.getMockIntervention();
+    } else if (prompt.includes('content')) {
+      response = this.getMockContent();
+    } else {
+      response = this.getGenericResponse();
     }
+    
+    // Simulate processing time (100ms-300ms)
+    const delay = 100 + Math.floor(Math.random() * 200);
+    await new Promise(resolve => setTimeout(resolve, delay));
     
     return {
       text: response,
-      usage
+      usage: {
+        prompt_tokens: promptTokens,
+        completion_tokens: responseTokens,
+        total_tokens: promptTokens + responseTokens
+      }
     };
   }
   
-  /**
-   * Return an appropriate mock response based on the prompt content
-   */
-  private determineResponse(prompt: string, system: string): string {
-    // Normalize the prompt and system message for easier matching
-    const normalizedPrompt = prompt.toLowerCase();
-    const normalizedSystem = system.toLowerCase();
+  private getMockLearningPath(): string {
+    return JSON.stringify({
+      "id": "lp-mock-" + Date.now(),
+      "title": "Professional Development Learning Path",
+      "description": "A comprehensive learning path designed to build core skills and expertise.",
+      "duration": "12 weeks",
+      "objectives": ["Master key concepts", "Develop practical skills", "Build portfolio projects"],
+      "modules": [
+        {
+          "id": "module-1",
+          "title": "Core Fundamentals",
+          "description": "Essential concepts and foundation knowledge",
+          "duration": "3 weeks",
+          "content": [],
+          "assessments": []
+        },
+        {
+          "id": "module-2",
+          "title": "Practical Applications",
+          "description": "Applying concepts to real-world scenarios",
+          "duration": "5 weeks",
+          "content": [],
+          "assessments": []
+        },
+        {
+          "id": "module-3",
+          "title": "Advanced Techniques",
+          "description": "Mastering advanced methods and approaches",
+          "duration": "4 weeks",
+          "content": [],
+          "assessments": []
+        }
+      ],
+      "createdAt": new Date().toISOString(),
+      "updatedAt": new Date().toISOString(),
+      "status": "published",
+      "difficulty": "intermediate",
+      "category": "Professional Development",
+      "author": "Learnfinity AI"
+    }, null, 2);
+  }
+  
+  private getMockRAGAnalysis(): string {
+    const statuses = ['RED', 'AMBER', 'GREEN'];
+    const randomStatus = statuses[Math.floor(Math.random() * statuses.length)];
     
-    // Check for RAG status determination
-    if (
-      normalizedPrompt.includes('rag status') || 
-      normalizedPrompt.includes('determine status') ||
-      normalizedSystem.includes('rag') || 
-      normalizedSystem.includes('red/amber/green')
-    ) {
-      return this.mockRAGStatusResponse(normalizedPrompt);
-    }
-    
-    // Check for learning path generation
-    if (
-      normalizedPrompt.includes('learning path') || 
-      normalizedPrompt.includes('course recommendation') ||
-      normalizedSystem.includes('personalized learning')
-    ) {
-      return this.mockLearningPathResponse(normalizedPrompt);
-    }
-    
-    // Check for content creation
-    if (
-      normalizedPrompt.includes('create content') || 
-      normalizedPrompt.includes('remedial material') ||
-      normalizedSystem.includes('content creation')
-    ) {
-      return this.mockContentCreationResponse(normalizedPrompt);
-    }
-    
-    // Default response for unrecognized prompts
     return `
-      This is a mock response from the testing provider.
-      Your prompt didn't match any specialized categories, so I'm providing this generic response.
-      In a real implementation, I would generate a thoughtful response based on your specific query:
-      "${prompt.substring(0, 100)}${prompt.length > 100 ? '...' : ''}"
-    `.trim();
+## RAG STATUS: ${randomStatus}
+
+### Justification
+${randomStatus === 'RED' 
+  ? 'The employee has shown low engagement and completion rates, with extended periods of inactivity.'
+  : randomStatus === 'AMBER'
+    ? 'The employee is making moderate progress but has inconsistent engagement patterns.' 
+    : 'The employee is making excellent progress with consistent engagement and high completion rates.'}
+
+### Key Metrics Analysis
+- Progress Rate: ${randomStatus === 'RED' ? '25%' : randomStatus === 'AMBER' ? '55%' : '85%'} completion
+- Engagement: ${randomStatus === 'RED' ? 'Low' : randomStatus === 'AMBER' ? 'Moderate' : 'High'} with ${randomStatus === 'RED' ? '30+' : randomStatus === 'AMBER' ? '15-20' : '< 7'} days since last activity
+- Performance: ${randomStatus === 'RED' ? 'Below expectations' : randomStatus === 'AMBER' ? 'Meeting basic requirements' : 'Exceeding expectations'}
+- Comparative Standing: ${randomStatus === 'RED' ? 'Bottom 25%' : randomStatus === 'AMBER' ? 'Middle 50%' : 'Top 25%'} of department
+
+### Recommended Actions
+1. ${randomStatus === 'RED' 
+    ? 'Schedule an immediate check-in meeting to address barriers' 
+    : randomStatus === 'AMBER' 
+      ? 'Provide additional resources for challenging topics'
+      : 'Recognize achievements and offer advanced learning opportunities'}
+2. ${randomStatus === 'RED'
+    ? 'Adjust learning path complexity or timeline'
+    : randomStatus === 'AMBER'
+      ? 'Set up regular progress check-ins'
+      : 'Consider for mentorship opportunities'}
+3. ${randomStatus === 'RED'
+    ? 'Consider assigning a peer mentor'
+    : randomStatus === 'AMBER'
+      ? 'Highlight upcoming deadlines and milestones'
+      : 'Explore new skill development areas of interest'}
+
+### Follow-up Timeline
+${randomStatus === 'RED'
+  ? 'Immediate follow-up within 48 hours, with weekly check-ins thereafter'
+  : randomStatus === 'AMBER'
+    ? 'Follow up within one week, with bi-weekly check-ins'
+    : 'Regular monthly check-ins to maintain momentum'}
+`;
   }
   
-  /**
-   * Generate a mock RAG status response
-   */
-  private mockRAGStatusResponse(prompt: string): string {
-    // Check the prompt to decide which status to return
-    let status: 'RED' | 'AMBER' | 'GREEN';
-    
-    if (
-      prompt.includes('poor performance') || 
-      prompt.includes('missed deadline') || 
-      prompt.includes('inactive') ||
-      prompt.includes('low completion')
-    ) {
-      status = 'RED';
-    } else if (
-      prompt.includes('moderate') || 
-      prompt.includes('some delay') || 
-      prompt.includes('average') ||
-      prompt.includes('partially')
-    ) {
-      status = 'AMBER';
-    } else {
-      status = 'GREEN';
-    }
-    
-    // Return appropriate response
-    switch (status) {
-      case 'RED':
-        return `
-          Status: RED
-
-          This employee requires immediate intervention. Their progress metrics show significant issues:
-          - Low completion rate (below 30%)
-          - Extended inactivity period (more than 30 days)
-          - Multiple missed deadlines
-
-          Recommended actions:
-          1. Schedule a direct one-on-one meeting to discuss blockers
-          2. Consider adjusting the learning plan to be more manageable
-          3. Provide additional support resources
-          4. Set up more frequent check-ins to monitor progress
-        `.trim();
-      case 'AMBER':
-        return `
-          Status: AMBER
-
-          This employee needs attention. Their progress metrics show moderate concerns:
-          - Completion rate between 30-60%
-          - Some inactivity (10-20 days)
-          - Occasional missed deadlines
-
-          Recommended actions:
-          1. Send a check-in message to offer assistance
-          2. Highlight upcoming deadlines and important modules
-          3. Consider providing supplementary resources for difficult topics
-          4. Monitor progress more closely over the next two weeks
-        `.trim();
-      case 'GREEN':
-        return `
-          Status: GREEN
-
-          This employee is progressing well. Their metrics show positive engagement:
-          - Good completion rate (above 70%)
-          - Regular activity (active within the past week)
-          - Meeting deadlines consistently
-
-          Recommended actions:
-          1. Provide positive reinforcement
-          2. Continue regular monitoring
-          3. Consider offering advanced or bonus material if they're interested
-        `.trim();
-    }
+  private getMockProfile(): string {
+    return JSON.stringify({
+      "professionalSummary": "Experienced professional with a strong background in their field and a track record of success in similar roles.",
+      "skillLevel": "intermediate",
+      "skillGaps": ["advanced communication", "leadership", "strategic planning"],
+      "strengths": ["technical knowledge", "problem-solving", "attention to detail"],
+      "learningStyle": "visual",
+      "recommendedLearningAreas": [
+        "leadership development",
+        "strategic thinking",
+        "communication skills"
+      ],
+      "estimatedTimeAvailability": {
+        "weeklyHours": 5,
+        "preferredTimes": ["mornings", "weekends"]
+      },
+      "careerGoals": [
+        "advance to senior position",
+        "develop management skills",
+        "expand technical expertise"
+      ]
+    }, null, 2);
   }
   
-  /**
-   * Generate a mock learning path response
-   */
-  private mockLearningPathResponse(prompt: string): string {
-    return `
-      # Personalized Learning Path Recommendation
-
-      Based on the employee's profile and learning history, here's a recommended learning path:
-
-      ## Core Focus Areas
-      1. **Data Analysis Fundamentals** - 4 weeks
-         - Introduction to SQL (2 days)
-         - Data Visualization Principles (3 days)
-         - Statistical Analysis Basics (1 week)
-         - Practical Data Interpretation (1 week)
-
-      2. **Project Management Skills** - 3 weeks
-         - Agile Methodology Overview (1 week)
-         - Time Management and Prioritization (3 days)
-         - Collaborative Tools Workshop (2 days)
-         - Problem-Solving Techniques (1 week)
-
-      ## Recommended Schedule
-      - Complete 1-2 modules per week
-      - Allocate 3-5 hours weekly for learning activities
-      - Schedule practice sessions every Friday
-
-      ## Additional Resources
-      - Recommended mentorship with Sarah from Data Team
-      - Suggested participation in the monthly Analytics Workshop
-      - Access to the premium Learning Library for practical examples
-
-      This path is designed to address the identified knowledge gaps while building on existing strengths. The pace is set to accommodate current workload while ensuring steady progress.
-    `.trim();
+  private getMockIntervention(): string {
+    return JSON.stringify({
+      "type": "medium_priority",
+      "actions": [
+        {
+          "type": "schedule_meeting",
+          "description": "Schedule a check-in meeting with the employee",
+          "details": "Discuss current progress and identify any challenges"
+        },
+        {
+          "type": "provide_resources",
+          "description": "Provide additional learning resources",
+          "resources": [
+            { "id": "res-1", "name": "Video tutorial", "url": "https://example.com/tutorial" },
+            { "id": "res-2", "name": "Practice exercises", "url": "https://example.com/exercises" }
+          ]
+        },
+        {
+          "type": "adjust_timeline",
+          "description": "Consider adjusting the learning path timeline",
+          "details": "Extend deadline by 2 weeks to allow for more practice time"
+        }
+      ],
+      "message": "Based on the employee's learning history and current status, we recommend a medium priority intervention to address engagement gaps and provide additional support."
+    }, null, 2);
   }
   
-  /**
-   * Generate a mock content creation response
-   */
-  private mockContentCreationResponse(prompt: string): string {
-    return `
-      # Remedial Learning Module: Data Visualization Fundamentals
-
-      ## Module Overview
-      This learning module is designed to address knowledge gaps in data visualization principles and best practices, specifically focusing on chart selection and effective visualization design.
-
-      ## Learning Objectives
-      By the end of this module, you will be able to:
-      - Determine the appropriate chart type for different data scenarios
-      - Apply design principles to create clear and effective visualizations
-      - Avoid common data visualization pitfalls
-      - Interpret complex visualizations correctly
-
-      ## Module Content
-
-      ### Section 1: Chart Selection Framework
-      **Visual Exercise: Chart Matching**
-      Match each dataset scenario with the most appropriate visualization type:
-      - Time series data → Line charts
-      - Part-to-whole relationships → Pie or donut charts
-      - Ranking data → Bar charts
-      - Distribution analysis → Histograms or box plots
-
-      **Practice Activity:**
-      Review the following dataset descriptions and select the most appropriate visualization:
-      1. Monthly sales figures for the past year
-      2. Department budget allocation
-      3. Customer satisfaction scores by product
-      4. Age distribution of employees
-
-      ### Section 2: Design Principles for Clarity
-      **Key Concepts:**
-      - Data-ink ratio - Maximizing meaningful information
-      - Color usage - Strategic use of color for emphasis
-      - Labeling best practices - When and how to use annotations
-
-      **Interactive Example:**
-      Improve the provided visualization by applying these principles.
-
-      ### Section 3: Learning Check
-      Answer the following questions to assess your understanding:
-      1. What visualization would be best for showing the relationship between employee tenure and performance scores?
-      2. When is a stacked bar chart more appropriate than a grouped bar chart?
-      3. What design changes would you make to improve this example dashboard?
-
-      ## Additional Resources
-      - Quick Reference Guide: "Chart Selection Decision Tree"
-      - Video Tutorial: "Common Visualization Mistakes and How to Fix Them"
-      - Practice Dataset: "Sales Performance by Region"
-
-      This module is designed with your visual learning preference in mind, providing multiple examples and hands-on activities to reinforce concepts.
-    `.trim();
+  private getMockContent(): string {
+    return JSON.stringify({
+      "title": "Introduction to Key Concepts",
+      "description": "A foundational overview of essential concepts and principles",
+      "sections": [
+        {
+          "title": "Core Principles",
+          "content": "Here we explore the fundamental principles that underpin this subject area.",
+          "examples": [
+            "Example 1: A practical demonstration of the first principle in action",
+            "Example 2: How this concept applies in real-world scenarios"
+          ]
+        },
+        {
+          "title": "Practical Applications",
+          "content": "This section covers how to apply these concepts in practical situations.",
+          "activities": [
+            "Activity 1: Problem-solving exercise",
+            "Activity 2: Group discussion prompt"
+          ]
+        }
+      ],
+      "assessments": [
+        {
+          "type": "quiz",
+          "questions": [
+            {
+              "question": "What is the primary purpose of this concept?",
+              "options": ["Option A", "Option B", "Option C", "Option D"],
+              "answer": "Option B"
+            },
+            {
+              "question": "How would you apply this in a real-world scenario?",
+              "type": "open_ended"
+            }
+          ]
+        }
+      ],
+      "resources": [
+        {
+          "title": "Further Reading",
+          "type": "article",
+          "url": "https://example.com/article"
+        },
+        {
+          "title": "Video Tutorial",
+          "type": "video",
+          "url": "https://example.com/video"
+        }
+      ]
+    }, null, 2);
   }
   
-  /**
-   * Check if the provider is configured (always true for mock)
-   */
-  isConfigured(): boolean {
-    return true;
-  }
-  
-  /**
-   * Get the model being used
-   */
-  getModel(): string {
-    return this.model;
-  }
-  
-  /**
-   * Set the model to use
-   */
-  setModel(model: string): void {
-    this.model = model;
-    if (this.debug) {
-      console.log(`Mock model changed to: ${this.model}`);
-    }
+  private getGenericResponse(): string {
+    return "I've analyzed the information you provided and can offer the following insights and recommendations. Based on the context, it appears that a structured approach would be beneficial, focusing on key areas of development while leveraging existing strengths. Consider implementing a phased plan that addresses immediate needs while building toward long-term goals. Regular assessment and feedback loops will be essential to measure progress effectively.";
   }
 } 

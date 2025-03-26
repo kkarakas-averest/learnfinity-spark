@@ -1,205 +1,136 @@
-// Using dynamic import for groq-sdk to handle build-time issues
-// The actual import will happen at runtime
-let Groq: any = null;
+import { LLMProvider } from './llm-service';
 
 /**
- * GroqAPI class for interacting with Groq's LLM models
- * 
- * This wrapper provides a simple interface for interacting with 
- * Groq's large language models, handling authentication and API calls.
+ * Implementation of LLMProvider using Groq API
  */
-export class GroqAPI {
-  private client: any;
+export class GroqAPI implements LLMProvider {
   private apiKey: string;
   private model: string;
-  private maxRetries: number;
-  private debug: boolean;
-  private isInitialized: boolean = false;
+  private options: {
+    maxRetries: number;
+    debug: boolean;
+  };
 
-  /**
-   * Initialize the Groq API client
-   * 
-   * @param apiKey - Groq API key (defaults to environment variable)
-   * @param model - Model to use (defaults to Llama 3.1)
-   * @param options - Additional options
-   */
   constructor(
-    apiKey: string = process.env.GROQ_API_KEY || "",
-    model: string = "llama-3.1-70b-versatile",
-    options: { maxRetries?: number, debug?: boolean } = {}
+    apiKey: string,
+    model: string = 'llama3-8b-8192',
+    options: { maxRetries?: number; debug?: boolean } = {}
   ) {
     this.apiKey = apiKey;
     this.model = model;
-    this.maxRetries = options.maxRetries || 3;
-    this.debug = options.debug || false;
-    
-    // Validate API key
-    if (!this.apiKey) {
-      console.warn('Groq API key not provided. LLM functionality will not work.');
-    } else if (this.debug) {
-      console.log('Groq API key configured successfully');
-    }
+    this.options = {
+      maxRetries: options.maxRetries ?? 3,
+      debug: options.debug ?? false
+    };
   }
-  
+
   /**
-   * Lazy initialization of the Groq client
-   * This ensures the SDK is only loaded at runtime when needed
+   * Check if the API is properly configured
    */
-  private async initializeClient(): Promise<boolean> {
-    if (this.isInitialized) return true;
-    
-    try {
-      // Dynamically import the Groq SDK
-      const groqModule = await import('groq-sdk');
-      Groq = groqModule.Groq;
-      
-      // Initialize the Groq client
-      this.client = new Groq({
-        apiKey: this.apiKey
-      });
-      
-      if (this.debug) {
-        console.log(`GroqAPI initialized with model: ${this.model}`);
-      }
-      
-      this.isInitialized = true;
-      return true;
-    } catch (error) {
-      console.error('Failed to initialize Groq client:', error);
-      return false;
-    }
+  public isConfigured(): boolean {
+    return !!this.apiKey;
   }
-  
+
   /**
-   * Send a completion request to Groq API
-   * 
-   * @param prompt - The text prompt to send
-   * @param options - Additional options for the completion
-   * @returns The generated text
+   * Get the current model name
    */
-  async complete(
+  public getModel(): string {
+    return this.model;
+  }
+
+  /**
+   * Set a new model
+   */
+  public setModel(model: string): void {
+    this.model = model;
+  }
+
+  /**
+   * Call the Groq API to generate a completion
+   */
+  public async complete(
     prompt: string,
     options: {
-      temperature?: number,
-      maxTokens?: number,
-      system?: string,
-      topP?: number,
-      stopSequences?: string[]
+      temperature?: number;
+      maxTokens?: number;
+      system?: string;
+      topP?: number;
+      stopSequences?: string[];
     } = {}
-  ): Promise<{ text: string, usage: { prompt_tokens: number, completion_tokens: number, total_tokens: number } }> {
-    if (!this.apiKey) {
-      throw new Error('Groq API key not provided. Cannot generate completions.');
-    }
-    
-    // Initialize the client if not already done
-    const initialized = await this.initializeClient();
-    if (!initialized) {
-      throw new Error('Failed to initialize Groq client. Cannot generate completions.');
-    }
-    
-    // Set default options
-    const temperature = options.temperature ?? 0.7;
-    const maxTokens = options.maxTokens ?? 1024;
-    const system = options.system ?? "You are a helpful AI assistant.";
-    const topP = options.topP ?? 0.9;
-    const stopSequences = options.stopSequences ?? [];
-    
-    if (this.debug) {
-      console.log(`Sending prompt to Groq (${this.model}):`, { 
-        promptLength: prompt.length,
-        temperature,
-        maxTokens
+  ): Promise<{
+    text: string;
+    usage: {
+      prompt_tokens: number;
+      completion_tokens: number;
+      total_tokens: number;
+    };
+  }> {
+    // Log request details if debug is enabled
+    if (this.options.debug) {
+      console.log('Groq API request:', {
+        model: this.model,
+        prompt: prompt.length > 100 ? prompt.substring(0, 100) + '...' : prompt,
+        options
       });
     }
 
     try {
-      // Implement retry logic
-      let attempt = 0;
-      let lastError;
+      // Make the request to Groq API
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.apiKey}`
+        },
+        body: JSON.stringify({
+          model: this.model,
+          messages: [
+            { role: 'system', content: options.system || 'You are a helpful assistant.' },
+            { role: 'user', content: prompt }
+          ],
+          temperature: options.temperature ?? 0.7,
+          max_tokens: options.maxTokens ?? 1024,
+          top_p: options.topP ?? 1,
+          stop: options.stopSequences || null
+        })
+      });
+
+      // Parse the response
+      const data = await response.json();
       
-      while (attempt < this.maxRetries) {
-        try {
-          const completion = await this.client.chat.completions.create({
-            model: this.model,
-            messages: [
-              { role: 'system', content: system },
-              { role: 'user', content: prompt }
-            ],
-            temperature,
-            max_tokens: maxTokens,
-            top_p: topP,
-            stop: stopSequences.length > 0 ? stopSequences : undefined
-          });
-          
-          // Extract the response text
-          const responseText = completion.choices[0]?.message?.content || '';
-          
-          // Extract token usage
-          const usage = {
-            prompt_tokens: completion.usage?.prompt_tokens || 0,
-            completion_tokens: completion.usage?.completion_tokens || 0,
-            total_tokens: completion.usage?.total_tokens || 0
-          };
-          
-          if (this.debug) {
-            console.log(`Groq response received. Tokens used: ${usage.total_tokens}`);
-          }
-          
-          return { 
-            text: responseText,
-            usage
-          };
-        } catch (error) {
-          lastError = error;
-          attempt++;
-          
-          if (this.debug) {
-            console.error(`Groq API error (attempt ${attempt}/${this.maxRetries}):`, error);
-          }
-          
-          // Wait before retrying (with exponential backoff)
-          if (attempt < this.maxRetries) {
-            const delayMs = Math.pow(2, attempt) * 500; // 1s, 2s, 4s, ...
-            await new Promise(resolve => setTimeout(resolve, delayMs));
-          }
-        }
+      if (!response.ok) {
+        throw new Error(`Groq API error: ${data.error?.message || 'Unknown error'}`);
+      }
+
+      // Extract the completion text and token usage
+      const completionText = data.choices[0]?.message?.content || '';
+      const usage = {
+        prompt_tokens: data.usage?.prompt_tokens || 0,
+        completion_tokens: data.usage?.completion_tokens || 0,
+        total_tokens: data.usage?.total_tokens || 0
+      };
+
+      // Log response details if debug is enabled
+      if (this.options.debug) {
+        console.log('Groq API response:', {
+          text: completionText.length > 100 ? completionText.substring(0, 100) + '...' : completionText,
+          usage
+        });
+      }
+
+      return {
+        text: completionText,
+        usage
+      };
+    } catch (error) {
+      // Retry logic for transient errors
+      if (this.options.maxRetries > 0) {
+        console.warn(`Groq API request failed, retrying... (${this.options.maxRetries} attempts left)`);
+        return this.complete(prompt, options);
       }
       
-      // If we've exhausted all retries, throw the last error
-      throw lastError;
-    } catch (error) {
-      console.error('Error sending completion request to Groq:', error);
-      throw new Error(`Failed to get completion from Groq: ${error instanceof Error ? error.message : String(error)}`);
-    }
-  }
-  
-  /**
-   * Check if the API client is properly configured
-   * 
-   * @returns True if the client has a valid API key
-   */
-  isConfigured(): boolean {
-    return Boolean(this.apiKey);
-  }
-  
-  /**
-   * Get the currently configured model
-   * 
-   * @returns The model name
-   */
-  getModel(): string {
-    return this.model;
-  }
-  
-  /**
-   * Change the model being used
-   * 
-   * @param model - New model name
-   */
-  setModel(model: string): void {
-    this.model = model;
-    if (this.debug) {
-      console.log(`Groq model changed to: ${this.model}`);
+      console.error('Error calling Groq API:', error);
+      throw error;
     }
   }
 } 

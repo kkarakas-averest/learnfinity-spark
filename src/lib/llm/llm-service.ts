@@ -2,7 +2,6 @@ import { GroqAPI } from './groq-api';
 import { MockLLMProvider } from './mock-provider';
 import { defaultLLMConfig, fallbackLLMConfig, LLMConfig, systemPrompts } from './config';
 import envConfig, { isApiConfigured, isFeatureEnabled } from '../env-config';
-import { Groq } from 'groq-sdk';
 import type { SystemPromptType } from './types';
 
 // Define a common interface that all LLM providers will implement
@@ -33,7 +32,6 @@ export class LLMService {
     completion_tokens: 0,
     requests: 0
   };
-  private groq: Groq;
   
   /**
    * Initialize the LLM service with a specific provider
@@ -93,10 +91,6 @@ export class LLMService {
       this.provider = new MockLLMProvider();
       this.config.provider = 'mock';
     }
-
-    this.groq = new Groq({
-      apiKey: process.env.GROQ_API_KEY
-    });
   }
   
   /**
