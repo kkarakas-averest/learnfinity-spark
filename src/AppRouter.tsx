@@ -1,5 +1,6 @@
 
-import { createBrowserRouter, RouterProvider } from 'react-router-dom';
+import React from '@/lib/react-helpers';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ROUTES } from './lib/routes';
 
 // Layout components
@@ -30,64 +31,53 @@ import SystemHealthCheck from './pages/SystemHealthCheck';
 import HRProtectedRoute from './components/auth/HRProtectedRoute';
 import LearnerProtectedRoute from './components/auth/LearnerProtectedRoute';
 
-const router = createBrowserRouter([
-  {
-    path: ROUTES.HOME,
-    element: <MainLayout />,
-    errorElement: <NotFoundPage />,
-    children: [
-      { index: true, element: <HomePage /> },
-      { path: ROUTES.LOGIN, element: <LoginPage /> },
-      { path: ROUTES.HR_LOGIN, element: <HRLoginPage /> },
-      { path: ROUTES.SYSTEM_CHECK, element: <SystemHealthCheck /> },
-      
-      // HR routes
-      {
-        path: ROUTES.HR_DASHBOARD,
-        element: (
-          <HRProtectedRoute>
-            <HRLayout />
-          </HRProtectedRoute>
-        ),
-        children: [
-          { index: true, element: <HRDashboardPage /> },
-          // Employee routes
-          { path: 'employees', element: <EmployeesPage /> },
-          { path: 'employee/create', element: <CreateEmployeePage /> },
-          { path: 'employee/onboarding', element: <EmployeeOnboardingPage /> },
-          { path: 'employee/:id', element: <EmployeeProfilePage /> },
-          { path: 'employee/:id/edit', element: <EditEmployeePage /> },
-        ],
-      },
-      
-      // Learner routes
-      {
-        path: ROUTES.LEARNER_DASHBOARD,
-        element: (
-          <LearnerProtectedRoute>
-            <LearnerLayout />
-          </LearnerProtectedRoute>
-        ),
-        children: [
-          { index: true, element: <LearnerDashboardPage /> },
-          { path: 'courses', element: <LearnerCoursesPage /> },
-          { path: 'profile', element: <LearnerProfilePage /> },
-        ],
-      },
-      
-      // Course routes
-      { path: ROUTES.COURSE_LIST, element: <CourseListPage /> },
-      { path: 'course/:id', element: <CourseDetailsPage /> },
-      { path: ROUTES.COURSE_CREATE, element: <CreateCoursePage /> },
-      
-      // 404 route
-      { path: ROUTES.NOT_FOUND, element: <NotFoundPage /> },
-    ],
-  },
-]);
-
 function AppRouter() {
-  return <RouterProvider router={router} />;
+  return (
+    <Router>
+      <Routes>
+        <Route path="/" element={<MainLayout />}>
+          <Route index element={<HomePage />} />
+          <Route path={ROUTES.LOGIN} element={<LoginPage />} />
+          <Route path={ROUTES.HR_LOGIN} element={<HRLoginPage />} />
+          <Route path={ROUTES.SYSTEM_CHECK} element={<SystemHealthCheck />} />
+          
+          {/* HR routes */}
+          <Route path={ROUTES.HR_DASHBOARD} element={
+            <HRProtectedRoute>
+              <HRLayout />
+            </HRProtectedRoute>
+          }>
+            <Route index element={<HRDashboardPage />} />
+            <Route path="employees" element={<EmployeesPage />} />
+            <Route path="employee/create" element={<CreateEmployeePage />} />
+            <Route path="employee/onboarding" element={<EmployeeOnboardingPage />} />
+            <Route path="employee/:id" element={<EmployeeProfilePage />} />
+            <Route path="employee/:id/edit" element={<EditEmployeePage />} />
+          </Route>
+          
+          {/* Learner routes */}
+          <Route path={ROUTES.LEARNER_DASHBOARD} element={
+            <LearnerProtectedRoute>
+              <LearnerLayout />
+            </LearnerProtectedRoute>
+          }>
+            <Route index element={<LearnerDashboardPage />} />
+            <Route path="courses" element={<LearnerCoursesPage />} />
+            <Route path="profile" element={<LearnerProfilePage />} />
+          </Route>
+          
+          {/* Course routes */}
+          <Route path={ROUTES.COURSE_LIST} element={<CourseListPage />} />
+          <Route path="course/:id" element={<CourseDetailsPage />} />
+          <Route path={ROUTES.COURSE_CREATE} element={<CreateCoursePage />} />
+          
+          {/* 404 route */}
+          <Route path={ROUTES.NOT_FOUND} element={<NotFoundPage />} />
+          <Route path="*" element={<Navigate to={ROUTES.NOT_FOUND} replace />} />
+        </Route>
+      </Routes>
+    </Router>
+  );
 }
 
 export default AppRouter;
