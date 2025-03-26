@@ -41,12 +41,19 @@ interface Employee {
   name: string;
   email: string;
   department: string;
+  department_id?: string;
   position: string;
+  position_id?: string;
   status: string;
   ragStatus: 'red' | 'amber' | 'green';
   progress: number;
   lastActivity: string;
   created_at?: string;
+}
+
+interface Department {
+  id: string;
+  name: string;
 }
 
 interface EmployeeResponse {
@@ -71,6 +78,7 @@ interface BulkEmployeeImportProps {
 const EmployeesPage: React.FC = () => {
   const navigate = useNavigate();
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -86,13 +94,37 @@ const EmployeesPage: React.FC = () => {
   const [showImportDialog, setShowImportDialog] = useState(false);
   
   useEffect(() => {
+    fetchDepartments();
+  }, []);
+  
+  useEffect(() => {
     fetchEmployees();
   }, [departmentFilter, statusFilter]);
+
+  const fetchDepartments = async () => {
+    try {
+      const result = await hrEmployeeService.getDepartments();
+      if (result.success) {
+        console.log('Fetched departments:', result.departments);
+        setDepartments(result.departments);
+      } else {
+        console.error('Failed to fetch departments:', result.error);
+      }
+    } catch (error) {
+      console.error('Error fetching departments:', error);
+    }
+  };
 
   const fetchEmployees = async () => {
     try {
       setLoading(true);
       setError(null);
+      console.log('Fetching employees with filters:', {
+        searchTerm,
+        departmentId: departmentFilter === 'all' ? null : departmentFilter,
+        status: statusFilter === 'all' ? null : statusFilter
+      });
+      
       const result = await hrEmployeeService.getEmployees({
         searchTerm,
         departmentId: departmentFilter === 'all' ? null : departmentFilter,
@@ -101,18 +133,30 @@ const EmployeesPage: React.FC = () => {
       
       if (result.success) {
         // Transform the employee data to match our interface
-        const transformedEmployees = result.employees.map(emp => ({
-          id: emp.id,
-          name: emp.name,
-          email: emp.email,
-          department: emp.hr_departments?.name || 'Unknown Department',
-          position: emp.hr_positions?.title || 'Unknown Position',
-          status: emp.status,
-          ragStatus: emp.rag_status || 'green',
-          progress: emp.progress || 0,
-          lastActivity: emp.last_activity || 'Never',
-          created_at: emp.created_at
-        }));
+        const transformedEmployees = result.employees.map(emp => {
+          // Ensure ragStatus is normalized to one of the valid values
+          let normalizedRagStatus = (emp.ragStatus || emp.rag_status || 'green').toLowerCase();
+          if (!['red', 'amber', 'green'].includes(normalizedRagStatus)) {
+            normalizedRagStatus = 'green'; // Default to green if invalid value
+          }
+          
+          return {
+            id: emp.id,
+            name: emp.name,
+            email: emp.email,
+            department: emp.hr_departments?.name || emp.department || 'Unknown Department',
+            department_id: emp.hr_departments?.id || emp.department_id,
+            position: emp.hr_positions?.title || emp.position || 'Unknown Position',
+            position_id: emp.hr_positions?.id || emp.position_id,
+            status: emp.status,
+            ragStatus: normalizedRagStatus as 'red' | 'amber' | 'green',
+            progress: emp.progress || 0,
+            lastActivity: emp.last_activity || 'Never',
+            created_at: emp.created_at
+          };
+        });
+        
+        console.log('Transformed employees:', transformedEmployees.slice(0, 2));
         setEmployees(transformedEmployees);
         calculateMetrics(transformedEmployees);
       } else {
@@ -229,7 +273,7 @@ const EmployeesPage: React.FC = () => {
             <Download className="mr-2 h-4 w-4" />
             Export
           </Button>
-          <Button onClick={() => navigate(`${ROUTES.HR_DASHBOARD}/employee/new`)}>
+          <Button onClick={() => navigate(`${ROUTES.HR_DASHBOARD}/employees/new`)}>
             <UserPlus className="mr-2 h-4 w-4" />
             Add Employee
           </Button>
@@ -291,9 +335,11 @@ const EmployeesPage: React.FC = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Departments</SelectItem>
-                <SelectItem value="engineering">Engineering</SelectItem>
-                <SelectItem value="marketing">Marketing</SelectItem>
-                <SelectItem value="sales">Sales</SelectItem>
+                {departments.map((dept) => (
+                  <SelectItem key={dept.id} value={dept.id}>
+                    {dept.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -377,13 +423,13 @@ const EmployeesPage: React.FC = () => {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem>
-                            <Link to={`${ROUTES.HR_DASHBOARD}/employee/${employee.id}`} className="flex items-center w-full">
+                            <Link to={`${ROUTES.HR_DASHBOARD}/employees/${employee.id}`} className="flex items-center w-full">
                               <FileText className="mr-2 h-4 w-4" />
                               View Profile
                             </Link>
                           </DropdownMenuItem>
                           <DropdownMenuItem>
-                            <Link to={`${ROUTES.HR_DASHBOARD}/employee/${employee.id}/edit`} className="flex items-center w-full">
+                            <Link to={`${ROUTES.HR_DASHBOARD}/employees/${employee.id}/edit`} className="flex items-center w-full">
                               <Settings className="mr-2 h-4 w-4" />
                               Edit
                             </Link>

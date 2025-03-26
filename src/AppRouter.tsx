@@ -55,9 +55,9 @@ const AppRouter: React.FC = () => {
         >
           <TypeSafeRoute index element={<HRDashboardRoot />} />
           <TypeSafeRoute path="employees" element={<EmployeesPage />} />
-          <TypeSafeRoute path="employee/new" element={<CreateEmployeePage />} />
-          <TypeSafeRoute path="employee/:id" element={<EmployeeProfilePage />} />
-          <TypeSafeRoute path="employee/:id/edit" element={<EditEmployeePage />} />
+          <TypeSafeRoute path="employees/new" element={<CreateEmployeePage />} />
+          <TypeSafeRoute path="employees/:id" element={<EmployeeProfilePage />} />
+          <TypeSafeRoute path="employees/:id/edit" element={<EditEmployeePage />} />
           {/* Add other HR routes as needed */}
         </TypeSafeRoute>
 
