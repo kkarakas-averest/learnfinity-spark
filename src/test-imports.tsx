@@ -1,6 +1,6 @@
 
-import * as React from 'react';
-import { useState, useEffect } from '@/lib/react-helpers';
+import React from 'react';
+import { useState, useEffect } from 'react';
 
 // This is just a test file to confirm React imports are working correctly
 const TestImports = () => {

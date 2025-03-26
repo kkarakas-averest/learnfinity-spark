@@ -3,10 +3,10 @@ import React from '@/lib/react-helpers';
 
 const LearnerProfilePage: React.FC = () => {
   return (
-    <div className="container mx-auto p-6">
-      <h1 className="text-3xl font-bold mb-6">My Profile</h1>
+    <div>
+      <h1 className="text-2xl font-bold mb-4">My Profile</h1>
       <div className="bg-white rounded-lg shadow p-6">
-        <p>Learner profile will appear here</p>
+        <p>Your profile information will appear here</p>
       </div>
     </div>
   );

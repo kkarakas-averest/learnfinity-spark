@@ -1,6 +1,6 @@
 
 import React from '@/lib/react-helpers';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { ROUTES } from '@/lib/routes';
 
 const HRLoginPage: React.FC = () => {
@@ -8,42 +8,28 @@ const HRLoginPage: React.FC = () => {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    // For demo purposes, just navigate to HR dashboard
+    // Simulate login success
     navigate(ROUTES.HR_DASHBOARD);
   };
 
   return (
-    <div className="container mx-auto max-w-md mt-12 p-6">
+    <div className="container mx-auto p-6 max-w-md">
       <h1 className="text-3xl font-bold mb-6 text-center">HR Admin Login</h1>
       <div className="bg-white rounded-lg shadow p-6">
-        <form onSubmit={handleLogin} className="space-y-4">
-          <div>
-            <label htmlFor="email" className="block text-sm font-medium mb-1">Email</label>
-            <input 
-              type="email" 
-              id="email" 
-              className="w-full p-2 border rounded" 
-              placeholder="Enter your email"
-            />
+        <form onSubmit={handleLogin}>
+          <div className="mb-4">
+            <label className="block text-sm font-medium mb-1">Email</label>
+            <input type="email" className="w-full p-2 border rounded" defaultValue="hr@example.com" />
           </div>
-          
-          <div>
-            <label htmlFor="password" className="block text-sm font-medium mb-1">Password</label>
-            <input 
-              type="password" 
-              id="password" 
-              className="w-full p-2 border rounded" 
-              placeholder="Enter your password"
-            />
+          <div className="mb-6">
+            <label className="block text-sm font-medium mb-1">Password</label>
+            <input type="password" className="w-full p-2 border rounded" defaultValue="password" />
           </div>
-          
-          <button 
-            type="submit"
-            className="w-full bg-primary text-white p-2 rounded hover:bg-primary/90"
-          >
-            Login
-          </button>
+          <button type="submit" className="w-full bg-primary text-white p-2 rounded">Login</button>
         </form>
+        <div className="mt-4 text-center">
+          <p>Not an HR admin? <Link to={ROUTES.LOGIN} className="text-primary hover:underline">Login here</Link></p>
+        </div>
       </div>
     </div>
   );
