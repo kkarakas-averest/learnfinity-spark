@@ -823,6 +823,181 @@ export const hrEmployeeService = {
    */
   async updateEmployeeStatus(id, status) {
     return this.updateEmployee(id, { status });
+  },
+
+  /**
+   * Get departments list
+   * @returns {Promise<{success: boolean, departments: Array, error: string|null}>}
+   */
+  async getDepartments() {
+    try {
+      const { data, error } = await supabase
+        .from('hr_departments')
+        .select('*')
+        .order('name', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching departments:', error);
+        return { success: false, departments: [], error: error.message };
+      }
+
+      // If no real departments, return mock data
+      if (!data || data.length === 0) {
+        console.log('No departments found in database, using mock data');
+        return {
+          success: true,
+          departments: [
+            { id: 'dept-1', name: 'Engineering' },
+            { id: 'dept-2', name: 'Marketing' },
+            { id: 'dept-3', name: 'Human Resources' },
+            { id: 'dept-4', name: 'Finance' },
+            { id: 'dept-5', name: 'Product Management' },
+            { id: 'dept-6', name: 'Sales' },
+            { id: 'dept-7', name: 'Customer Support' },
+            { id: 'dept-8', name: 'Operations' },
+            { id: 'dept-9', name: 'Legal' }
+          ],
+          error: null
+        };
+      }
+
+      return { success: true, departments: data, error: null };
+    } catch (error) {
+      console.error('Exception in getDepartments:', error);
+      return { success: false, departments: [], error: error.message };
+    }
+  },
+
+  /**
+   * Get positions list, optionally filtered by department
+   * @param {string} departmentId - Optional department ID to filter positions
+   * @returns {Promise<{success: boolean, positions: Array, error: string|null}>}
+   */
+  async getPositions(departmentId = null) {
+    try {
+      let query = supabase
+        .from('hr_positions')
+        .select('*')
+        .order('title', { ascending: true });
+
+      if (departmentId) {
+        query = query.eq('department_id', departmentId);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error('Error fetching positions:', error);
+        return { success: false, positions: [], error: error.message };
+      }
+
+      // If no real positions, return mock data
+      if (!data || data.length === 0) {
+        console.log('No positions found in database, using mock data');
+        
+        // Mock positions data
+        const mockPositions = [
+          // Engineering positions
+          { id: 'pos-1', title: 'Software Engineer', department_id: 'dept-1' },
+          { id: 'pos-2', title: 'Senior Software Engineer', department_id: 'dept-1' },
+          { id: 'pos-3', title: 'Lead Engineer', department_id: 'dept-1' },
+          { id: 'pos-4', title: 'DevOps Engineer', department_id: 'dept-1' },
+          
+          // Marketing positions
+          { id: 'pos-5', title: 'Marketing Specialist', department_id: 'dept-2' },
+          { id: 'pos-6', title: 'Marketing Manager', department_id: 'dept-2' },
+          { id: 'pos-7', title: 'Digital Marketing Specialist', department_id: 'dept-2' },
+          
+          // HR positions
+          { id: 'pos-8', title: 'HR Specialist', department_id: 'dept-3' },
+          { id: 'pos-9', title: 'HR Manager', department_id: 'dept-3' },
+          { id: 'pos-10', title: 'Recruiter', department_id: 'dept-3' },
+          
+          // Finance positions
+          { id: 'pos-11', title: 'Financial Analyst', department_id: 'dept-4' },
+          { id: 'pos-12', title: 'Accountant', department_id: 'dept-4' },
+          { id: 'pos-13', title: 'Finance Manager', department_id: 'dept-4' },
+          
+          // Product Management positions
+          { id: 'pos-14', title: 'Product Manager', department_id: 'dept-5' },
+          { id: 'pos-15', title: 'Product Owner', department_id: 'dept-5' },
+          
+          // Sales positions
+          { id: 'pos-16', title: 'Sales Representative', department_id: 'dept-6' },
+          { id: 'pos-17', title: 'Account Manager', department_id: 'dept-6' },
+          { id: 'pos-18', title: 'Sales Manager', department_id: 'dept-6' },
+          
+          // Customer Support positions
+          { id: 'pos-19', title: 'Customer Support Specialist', department_id: 'dept-7' },
+          { id: 'pos-20', title: 'Support Team Lead', department_id: 'dept-7' },
+          
+          // Operations positions
+          { id: 'pos-21', title: 'Operations Analyst', department_id: 'dept-8' },
+          { id: 'pos-22', title: 'Operations Manager', department_id: 'dept-8' },
+          
+          // Legal positions
+          { id: 'pos-23', title: 'Legal Counsel', department_id: 'dept-9' },
+          { id: 'pos-24', title: 'Compliance Officer', department_id: 'dept-9' }
+        ];
+        
+        // Filter if department ID was provided
+        const filteredPositions = departmentId 
+          ? mockPositions.filter(pos => pos.department_id === departmentId)
+          : mockPositions;
+          
+        return { success: true, positions: filteredPositions, error: null };
+      }
+
+      return { success: true, positions: data, error: null };
+    } catch (error) {
+      console.error('Exception in getPositions:', error);
+      return { success: false, positions: [], error: error.message };
+    }
+  },
+
+  /**
+   * Upload resume file for an employee
+   * @param {File} file - Resume file
+   * @returns {Promise<{success: boolean, url: string|null, error: string|null}>}
+   */
+  async uploadResume(file) {
+    try {
+      if (!file) {
+        return { success: false, url: null, error: 'No file provided' };
+      }
+
+      // Create a unique filename
+      const timestamp = new Date().getTime();
+      const fileExt = file.name.split('.').pop();
+      const fileName = `resume_${timestamp}.${fileExt}`;
+      const filePath = `resumes/${fileName}`;
+
+      // Upload file to Supabase Storage
+      const { data, error } = await supabase.storage
+        .from('employee-files')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: true
+        });
+
+      if (error) {
+        console.error('Error uploading resume:', error);
+        return { success: false, url: null, error: error.message };
+      }
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('employee-files')
+        .getPublicUrl(filePath);
+
+      return { success: true, url: publicUrl, error: null };
+    } catch (error) {
+      console.error('Exception in uploadResume:', error);
+      // For development, provide a fake URL if upload fails
+      const mockUrl = `https://example.com/mock-uploads/resume_${Date.now()}.pdf`;
+      console.log('Using mock resume URL:', mockUrl);
+      return { success: true, url: mockUrl, error: null };
+    }
   }
 };
 

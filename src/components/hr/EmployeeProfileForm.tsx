@@ -1,4 +1,4 @@
-import * as React from "react";
+import React from '@/lib/react-helpers';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -10,8 +10,45 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useHRAuth } from '@/contexts/HRAuthContext';
 import { Checkbox } from '@/components/ui/checkbox';
 
+// Define interfaces for the component props and state
+interface Department {
+  id: string;
+  name: string;
+}
+
+interface Position {
+  id: string;
+  title: string;
+  department_id: string;
+}
+
+interface Course {
+  id: string;
+  title: string;
+  description: string;
+}
+
+interface FormData {
+  name: string;
+  email: string;
+  departmentId: string;
+  positionId: string;
+  status: string;
+  companyId: string;
+  courseIds: string[];
+  resumeFile: File | null;
+}
+
+interface EmployeeProfileFormProps {
+  onSubmit: (formData: FormData) => void;
+  isLoading?: boolean;
+  departments?: Department[];
+  positions?: Position[];
+  initialData?: Partial<FormData>;
+}
+
 // Define mock departments in case the API doesn't return any
-const mockDepartments = [
+const mockDepartments: Department[] = [
   { id: 'dept-1', name: 'Engineering' },
   { id: 'dept-2', name: 'Marketing' },
   { id: 'dept-3', name: 'Human Resources' },
@@ -24,7 +61,7 @@ const mockDepartments = [
 ];
 
 // Define mock positions in case the API doesn't return any
-const mockPositions = [
+const mockPositions: Position[] = [
   // Engineering positions
   { id: 'pos-1', title: 'Software Engineer', department_id: 'dept-1' },
   { id: 'pos-2', title: 'Senior Software Engineer', department_id: 'dept-1' },
@@ -69,33 +106,39 @@ const mockPositions = [
 ];
 
 // Define available courses
-const availableCourses = [
+const availableCourses: Course[] = [
   { id: 'course-1', title: 'Cybersecurity for Fintech', description: 'Essential security practices for fintech industry' },
   { id: 'course-2', title: 'New Employee Orientation', description: 'Introduction to company policies and procedures' },
   { id: 'course-3', title: 'Leadership Fundamentals', description: 'Core principles for effective leadership' }
 ];
 
-const EmployeeProfileForm = ({ onSubmit, isLoading, departments = [], positions = [] }) => {
+const EmployeeProfileForm: React.FC<EmployeeProfileFormProps> = ({ 
+  onSubmit, 
+  isLoading = false, 
+  departments = [], 
+  positions = [],
+  initialData = {} as Partial<FormData>
+}) => {
   const { hrUser } = useHRAuth() || {};
   
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    departmentId: '',
-    positionId: '',
-    status: 'active',
-    companyId: '',
-    courseIds: [],
-    resumeFile: null
+  const [formData, setFormData] = React.useState<FormData>({
+    name: initialData.name || '',
+    email: initialData.email || '',
+    departmentId: initialData.departmentId || '',
+    positionId: initialData.positionId || '',
+    status: initialData.status || 'active',
+    companyId: initialData.companyId || '',
+    courseIds: initialData.courseIds || [],
+    resumeFile: initialData.resumeFile || null
   });
   
-  const [error, setError] = useState(null);
-  const [displayDepartments, setDisplayDepartments] = useState([]);
-  const [displayPositions, setDisplayPositions] = useState([]);
-  const [resumeFileName, setResumeFileName] = useState('');
+  const [error, setError] = React.useState<string | null>(null);
+  const [displayDepartments, setDisplayDepartments] = React.useState<Department[]>([]);
+  const [displayPositions, setDisplayPositions] = React.useState<Position[]>([]);
+  const [resumeFileName, setResumeFileName] = React.useState<string>('');
   
   // Set the company ID from the HR user's context when component mounts
-  useEffect(() => {
+  React.useEffect(() => {
     if (hrUser?.company_id) {
       setFormData(prev => ({
         ...prev,
@@ -111,7 +154,7 @@ const EmployeeProfileForm = ({ onSubmit, isLoading, departments = [], positions 
   }, [hrUser]);
   
   // Set departments - use mock data if API returns empty array
-  useEffect(() => {
+  React.useEffect(() => {
     if (departments && departments.length > 0) {
       setDisplayDepartments(departments);
     } else {
@@ -120,7 +163,7 @@ const EmployeeProfileForm = ({ onSubmit, isLoading, departments = [], positions 
   }, [departments]);
   
   // Set positions - use mock data if API returns empty array
-  useEffect(() => {
+  React.useEffect(() => {
     if (positions && positions.length > 0) {
       setDisplayPositions(positions);
     } else {
@@ -128,7 +171,7 @@ const EmployeeProfileForm = ({ onSubmit, isLoading, departments = [], positions 
     }
   }, [positions]);
   
-  const handleChange = (e) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
@@ -136,14 +179,14 @@ const EmployeeProfileForm = ({ onSubmit, isLoading, departments = [], positions 
     }));
   };
   
-  const handleSelectChange = (name, value) => {
+  const handleSelectChange = (name: string, value: string) => {
     setFormData(prev => ({
       ...prev,
       [name]: value
     }));
   };
   
-  const handleCourseToggle = (courseId) => {
+  const handleCourseToggle = (courseId: string) => {
     setFormData(prev => {
       const currentCourses = [...prev.courseIds];
       
@@ -161,8 +204,8 @@ const EmployeeProfileForm = ({ onSubmit, isLoading, departments = [], positions 
     });
   };
   
-  const handleResumeUpload = (e) => {
-    const file = e.target.files[0];
+  const handleResumeUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
     if (file) {
       // Check file type
       const fileType = file.type;
@@ -192,7 +235,7 @@ const EmployeeProfileForm = ({ onSubmit, isLoading, departments = [], positions 
     }
   };
   
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     // Simple validation
@@ -238,172 +281,152 @@ const EmployeeProfileForm = ({ onSubmit, isLoading, departments = [], positions 
     : displayPositions;
   
   return (
-    <Card className="w-full max-w-3xl mx-auto">
-      <CardHeader>
-        <CardTitle>Employee Information</CardTitle>
-      </CardHeader>
+    <form onSubmit={handleSubmit} className="space-y-6">
+      {error && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
       
-      <form onSubmit={handleSubmit}>
-        <CardContent className="space-y-4">
-          {error && (
-            <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-          
-          <div className="space-y-2">
-            <Label htmlFor="name">Full Name *</Label>
-            <Input 
-              id="name" 
-              name="name" 
-              value={formData.name} 
-              onChange={handleChange} 
-              placeholder="John Doe"
-              required
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor="name">Full Name</Label>
+          <Input
+            id="name"
+            name="name"
+            value={formData.name}
+            onChange={handleChange}
+            required
+          />
+        </div>
+        
+        <div className="space-y-2">
+          <Label htmlFor="email">Email</Label>
+          <Input
+            id="email"
+            name="email"
+            type="email"
+            value={formData.email}
+            onChange={handleChange}
+            required
+          />
+        </div>
+        
+        <div className="space-y-2">
+          <Label htmlFor="department">Department</Label>
+          <Select
+            value={formData.departmentId}
+            onValueChange={(value) => handleSelectChange('departmentId', value)}
+          >
+            <SelectTrigger id="department">
+              <SelectValue placeholder="Select department" />
+            </SelectTrigger>
+            <SelectContent>
+              {displayDepartments.map((dept) => (
+                <SelectItem key={dept.id} value={dept.id}>
+                  {dept.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        
+        <div className="space-y-2">
+          <Label htmlFor="position">Position</Label>
+          <Select
+            value={formData.positionId}
+            onValueChange={(value) => handleSelectChange('positionId', value)}
+            disabled={!formData.departmentId}
+          >
+            <SelectTrigger id="position">
+              <SelectValue placeholder={!formData.departmentId ? "Select department first" : "Select position"} />
+            </SelectTrigger>
+            <SelectContent>
+              {filteredPositions.map((pos) => (
+                <SelectItem key={pos.id} value={pos.id}>
+                  {pos.title}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        
+        <div className="space-y-2">
+          <Label htmlFor="status">Status</Label>
+          <Select
+            value={formData.status}
+            onValueChange={(value) => handleSelectChange('status', value)}
+          >
+            <SelectTrigger id="status">
+              <SelectValue placeholder="Select status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="on_leave">On Leave</SelectItem>
+              <SelectItem value="inactive">Inactive</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        
+        <div className="space-y-2">
+          <Label htmlFor="resume">Upload Resume</Label>
+          <div className="flex items-center gap-4">
+            <Input
+              id="resume"
+              type="file"
+              accept=".pdf,.docx"
+              onChange={handleResumeUpload}
+              className="hidden"
             />
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="email">Email Address *</Label>
-            <Input 
-              id="email" 
-              name="email" 
-              type="email"
-              value={formData.email} 
-              onChange={handleChange} 
-              placeholder="john.doe@example.com"
-              required
-            />
-            <p className="text-sm text-muted-foreground">
-              Employee will be automatically registered with this email address
-            </p>
-          </div>
-          
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="departmentId">Department *</Label>
-              <Select 
-                value={formData.departmentId} 
-                onValueChange={(value) => handleSelectChange('departmentId', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select department" />
-                </SelectTrigger>
-                <SelectContent>
-                  {displayDepartments.map(dept => (
-                    <SelectItem key={dept.id} value={dept.id}>
-                      {dept.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="positionId">Position</Label>
-              <Select 
-                value={formData.positionId} 
-                onValueChange={(value) => handleSelectChange('positionId', value)}
-                disabled={!formData.departmentId}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select position" />
-                </SelectTrigger>
-                <SelectContent>
-                  {filteredPositions.map(pos => (
-                    <SelectItem key={pos.id} value={pos.id}>
-                      {pos.title}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="status">Status</Label>
-            <Select 
-              value={formData.status} 
-              onValueChange={(value) => handleSelectChange('status', value)}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => document.getElementById('resume')?.click()}
             >
-              <SelectTrigger>
-                <SelectValue placeholder="Select status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="inactive">Inactive</SelectItem>
-                <SelectItem value="onboarding">Onboarding</SelectItem>
-                <SelectItem value="on_leave">On Leave</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          
-          {/* Resume upload section */}
-          <div className="space-y-2">
-            <Label htmlFor="resume">Resume (PDF or DOCX, max 5MB)</Label>
-            <div className="flex items-center gap-2">
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={() => document.getElementById('resume').click()}
-                className="w-full flex gap-2 cursor-pointer"
-              >
-                <Upload className="h-4 w-4" />
-                {resumeFileName ? 'Change Resume' : 'Upload Resume'}
-              </Button>
-              <input
-                id="resume"
-                type="file"
-                accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                onChange={handleResumeUpload}
-                className="hidden"
-              />
-            </div>
+              <Upload className="mr-2 h-4 w-4" />
+              {resumeFileName ? 'Change File' : 'Upload File'}
+            </Button>
             {resumeFileName && (
-              <div className="flex items-center gap-2 text-sm">
-                <FileText className="h-4 w-4" />
-                <span>{resumeFileName}</span>
+              <div className="flex items-center text-sm text-gray-600">
+                <FileText className="mr-2 h-4 w-4" />
+                {resumeFileName}
               </div>
             )}
           </div>
-          
-          {/* Course selection section */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-medium">Course Enrollment</h3>
-            <div className="space-y-2">
-              {availableCourses.map(course => (
-                <div key={course.id} className="flex items-start space-x-3">
-                  <Checkbox 
-                    id={`course-${course.id}`}
-                    checked={formData.courseIds.includes(course.id)}
-                    onCheckedChange={() => handleCourseToggle(course.id)}
-                  />
-                  <div>
-                    <label 
-                      htmlFor={`course-${course.id}`}
-                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                    >
-                      {course.title}
-                    </label>
-                    <p className="text-sm text-muted-foreground">{course.description}</p>
-                  </div>
-                </div>
-              ))}
+        </div>
+      </div>
+      
+      <div className="space-y-4">
+        <Label>Assign Courses</Label>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {availableCourses.map((course) => (
+            <div key={course.id} className="flex items-start space-x-2 border p-3 rounded-md">
+              <Checkbox
+                id={`course-${course.id}`}
+                checked={formData.courseIds.includes(course.id)}
+                onCheckedChange={() => handleCourseToggle(course.id)}
+              />
+              <div className="grid gap-1">
+                <Label
+                  htmlFor={`course-${course.id}`}
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                >
+                  {course.title}
+                </Label>
+                <p className="text-xs text-gray-500">{course.description}</p>
+              </div>
             </div>
-          </div>
-          
-          {/* Hidden input for company ID - populated automatically from HR user context */}
-          <input type="hidden" name="companyId" value={formData.companyId} />
-        </CardContent>
-        
-        <CardFooter className="flex justify-end">
-          <Button type="submit" disabled={isLoading}>
-            {isLoading ? 'Creating Employee...' : 'Create Employee'}
-          </Button>
-        </CardFooter>
-      </form>
-    </Card>
+          ))}
+        </div>
+      </div>
+      
+      <div className="pt-4 border-t flex justify-end">
+        <Button type="submit" disabled={isLoading}>
+          {isLoading ? 'Submitting...' : 'Save Employee'}
+        </Button>
+      </div>
+    </form>
   );
 };
 

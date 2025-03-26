@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from '@/lib/react-helpers';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { ROUTES } from '@/lib/routes';
 import { hrEmployeeService } from '@/lib/services/hrEmployeeService';
 import { RAGStatusBadge } from '@/components/hr/RAGStatusBadge';
@@ -10,6 +10,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { 
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 import { 
   DropdownMenu,
   DropdownMenuContent,
@@ -26,6 +34,7 @@ import {
   FileText,
   Settings
 } from 'lucide-react';
+import BulkEmployeeImport from '@/components/hr/BulkEmployeeImport';
 
 interface Employee {
   id: string;
@@ -37,6 +46,7 @@ interface Employee {
   ragStatus: 'red' | 'amber' | 'green';
   progress: number;
   lastActivity: string;
+  created_at?: string;
 }
 
 interface EmployeeResponse {
@@ -47,7 +57,19 @@ interface EmployeeResponse {
   };
 }
 
+interface EmployeeMetrics {
+  active: number;
+  onLeave: number;
+  atRisk: number;
+  newThisMonth: number;
+}
+
+interface BulkEmployeeImportProps {
+  onComplete?: () => void;
+}
+
 const EmployeesPage: React.FC = () => {
+  const navigate = useNavigate();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -55,7 +77,14 @@ const EmployeesPage: React.FC = () => {
   const [departmentFilter, setDepartmentFilter] = useState<string | undefined>(undefined);
   const [statusFilter, setStatusFilter] = useState<string | undefined>(undefined);
   const [activeTab, setActiveTab] = useState('all');
-
+  const [metrics, setMetrics] = useState<EmployeeMetrics>({
+    active: 0,
+    onLeave: 0,
+    atRisk: 0,
+    newThisMonth: 0
+  });
+  const [showImportDialog, setShowImportDialog] = useState(false);
+  
   useEffect(() => {
     fetchEmployees();
   }, [departmentFilter, statusFilter]);
@@ -81,9 +110,11 @@ const EmployeesPage: React.FC = () => {
           status: emp.status,
           ragStatus: emp.rag_status || 'green',
           progress: emp.progress || 0,
-          lastActivity: emp.last_activity || 'Never'
+          lastActivity: emp.last_activity || 'Never',
+          created_at: emp.created_at
         }));
         setEmployees(transformedEmployees);
+        calculateMetrics(transformedEmployees);
       } else {
         setEmployees([]);
         setError(result.error || 'Failed to fetch employees');
@@ -98,13 +129,68 @@ const EmployeesPage: React.FC = () => {
     }
   };
 
+  const calculateMetrics = (employees: Employee[]) => {
+    const now = new Date();
+    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    
+    const metrics = {
+      active: employees.filter(e => e.status === 'active').length,
+      onLeave: employees.filter(e => e.status === 'on_leave').length,
+      atRisk: employees.filter(e => e.ragStatus === 'red').length,
+      newThisMonth: employees.filter(e => {
+        const createdAt = e.created_at ? new Date(e.created_at) : null;
+        return createdAt && createdAt >= firstDayOfMonth;
+      }).length
+    };
+    
+    setMetrics(metrics);
+  };
+
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);
   };
 
-  const handleBulkAction = (action: string) => {
-    // Implement bulk actions
-    console.log('Bulk action:', action);
+  const handleExportCSV = async () => {
+    try {
+      // Get all employees for export
+      const result = await hrEmployeeService.getEmployees({});
+      
+      if (!result.success || !result.employees) {
+        throw new Error('Failed to fetch employees for export');
+      }
+      
+      // Format data for CSV
+      const csvData = result.employees.map(emp => ({
+        Name: emp.name,
+        Email: emp.email,
+        Department: emp.hr_departments?.name || '',
+        Position: emp.hr_positions?.title || '',
+        Status: emp.status || '',
+        "Hire Date": emp.hire_date || '',
+        "Last Activity": emp.last_activity || ''
+      }));
+      
+      // Convert to CSV string
+      const headers = Object.keys(csvData[0]);
+      const csvContent = [
+        headers.join(','),
+        ...csvData.map(row => headers.map(header => JSON.stringify(row[header])).join(','))
+      ].join('\n');
+      
+      // Create download link
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `employees_export_${new Date().toISOString().slice(0, 10)}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error('Error exporting employees:', error);
+      alert('Failed to export employees. Please try again.');
+    }
   };
 
   return (
@@ -112,15 +198,38 @@ const EmployeesPage: React.FC = () => {
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Employee Management</h1>
         <div className="flex space-x-2">
-          <Button variant="outline" onClick={() => handleBulkAction('import')}>
-            <Upload className="mr-2 h-4 w-4" />
-            Import
-          </Button>
-          <Button variant="outline" onClick={() => handleBulkAction('export')}>
+          <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
+            <DialogTrigger asChild>
+              <Button variant="outline">
+                <Upload className="mr-2 h-4 w-4" />
+                Import
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[600px]">
+              <DialogHeader>
+                <DialogTitle>Import Employees</DialogTitle>
+                <DialogDescription>
+                  Import employees from a CSV file. The file should include name, email, department, and position.
+                </DialogDescription>
+              </DialogHeader>
+              <div>
+                <BulkEmployeeImport />
+                <div className="mt-4 flex justify-end">
+                  <Button onClick={() => {
+                    setShowImportDialog(false);
+                    fetchEmployees();
+                  }}>
+                    Done
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+          <Button variant="outline" onClick={handleExportCSV}>
             <Download className="mr-2 h-4 w-4" />
             Export
           </Button>
-          <Button>
+          <Button onClick={() => navigate(`${ROUTES.HR_DASHBOARD}/employee/new`)}>
             <UserPlus className="mr-2 h-4 w-4" />
             Add Employee
           </Button>
@@ -135,19 +244,19 @@ const EmployeesPage: React.FC = () => {
           <div className="grid grid-cols-4 gap-4">
             <div className="p-4 bg-green-50 rounded-lg">
               <h3 className="text-lg font-semibold text-green-700">Active Employees</h3>
-              <p className="text-2xl font-bold text-green-800">245</p>
+              <p className="text-2xl font-bold text-green-800">{metrics.active}</p>
             </div>
             <div className="p-4 bg-amber-50 rounded-lg">
               <h3 className="text-lg font-semibold text-amber-700">On Leave</h3>
-              <p className="text-2xl font-bold text-amber-800">12</p>
+              <p className="text-2xl font-bold text-amber-800">{metrics.onLeave}</p>
             </div>
             <div className="p-4 bg-red-50 rounded-lg">
               <h3 className="text-lg font-semibold text-red-700">At Risk</h3>
-              <p className="text-2xl font-bold text-red-800">8</p>
+              <p className="text-2xl font-bold text-red-800">{metrics.atRisk}</p>
             </div>
             <div className="p-4 bg-blue-50 rounded-lg">
               <h3 className="text-lg font-semibold text-blue-700">New This Month</h3>
-              <p className="text-2xl font-bold text-blue-800">15</p>
+              <p className="text-2xl font-bold text-blue-800">{metrics.newThisMonth}</p>
             </div>
           </div>
         </CardContent>
@@ -181,6 +290,7 @@ const EmployeesPage: React.FC = () => {
                 <SelectValue placeholder="Department" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="">All Departments</SelectItem>
                 <SelectItem value="engineering">Engineering</SelectItem>
                 <SelectItem value="marketing">Marketing</SelectItem>
                 <SelectItem value="sales">Sales</SelectItem>
@@ -191,6 +301,7 @@ const EmployeesPage: React.FC = () => {
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="">All Statuses</SelectItem>
                 <SelectItem value="active">Active</SelectItem>
                 <SelectItem value="on_leave">On Leave</SelectItem>
                 <SelectItem value="inactive">Inactive</SelectItem>
@@ -252,7 +363,7 @@ const EmployeesPage: React.FC = () => {
                             style={{ width: `${employee.progress}%` }}
                           ></div>
                         </div>
-                        <span className="ml-2 text-sm">{employee.progress}%</span>
+                        <span className="ml-2 text-xs">{employee.progress}%</span>
                       </div>
                     </TableCell>
                     <TableCell>{employee.lastActivity}</TableCell>
@@ -260,20 +371,22 @@ const EmployeesPage: React.FC = () => {
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" className="h-8 w-8 p-0">
+                            <span className="sr-only">Open menu</span>
                             <MoreHorizontal className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem>
-                            <FileText className="mr-2 h-4 w-4" />
-                            View Profile
+                            <Link to={`${ROUTES.HR_DASHBOARD}/employee/${employee.id}`} className="flex items-center w-full">
+                              <FileText className="mr-2 h-4 w-4" />
+                              View Profile
+                            </Link>
                           </DropdownMenuItem>
                           <DropdownMenuItem>
-                            <Settings className="mr-2 h-4 w-4" />
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="text-red-600">
-                            Delete
+                            <Link to={`${ROUTES.HR_DASHBOARD}/employee/${employee.id}/edit`} className="flex items-center w-full">
+                              <Settings className="mr-2 h-4 w-4" />
+                              Edit
+                            </Link>
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>

@@ -1,119 +1,152 @@
-
-import React from '@/lib/react-helpers';
+import React, { useState, useEffect } from '@/lib/react-helpers';
 import { useNavigate } from 'react-router-dom';
 import { ROUTES } from '@/lib/routes';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { AlertCircle } from 'lucide-react';
+import EmployeeProfileForm from './EmployeeProfileForm';
+import { hrEmployeeService } from '@/lib/services/hrEmployeeService';
+
+// Define interfaces
+interface FormData {
+  name: string;
+  email: string;
+  departmentId: string;
+  positionId: string;
+  status: string;
+  companyId: string;
+  courseIds: string[];
+  resumeFile: File | null;
+}
+
+interface EmployeeData {
+  name: string;
+  email: string;
+  department_id: string;
+  position_id: string;
+  status: string;
+  company_id: string;
+  hire_date: string;
+  course_ids: string[];
+  resume_url?: string; // Optional property for resume URL
+}
 
 const CreateEmployeePage: React.FC = () => {
   const navigate = useNavigate();
+  const [departments, setDepartments] = useState([]);
+  const [positions, setPositions] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    // For demo purposes, just navigate back to the employees list
-    navigate(`${ROUTES.HR_DASHBOARD}/employees`);
+  // Fetch departments and positions when component mounts
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        // Get departments
+        const deptResult = await hrEmployeeService.getDepartments();
+        if (deptResult.success) {
+          setDepartments(deptResult.departments);
+        } else {
+          console.error('Failed to fetch departments:', deptResult.error);
+        }
+        
+        // Get positions
+        const posResult = await hrEmployeeService.getPositions();
+        if (posResult.success) {
+          setPositions(posResult.positions);
+        } else {
+          console.error('Failed to fetch positions:', posResult.error);
+        }
+      } catch (err) {
+        console.error('Error fetching department/position data:', err);
+      }
+    };
+    
+    fetchData();
+  }, []);
+  
+  const handleSubmit = async (formData: FormData) => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Format the data as expected by the API
+      const employeeData: EmployeeData = {
+        name: formData.name,
+        email: formData.email,
+        department_id: formData.departmentId,
+        position_id: formData.positionId,
+        status: formData.status || 'active',
+        company_id: formData.companyId,
+        hire_date: new Date().toISOString().split('T')[0], // Today's date
+        course_ids: formData.courseIds || [] 
+      };
+      
+      // Upload resume if provided
+      if (formData.resumeFile) {
+        try {
+          const uploadResult = await hrEmployeeService.uploadResume(formData.resumeFile);
+          if (uploadResult.success && uploadResult.url) {
+            employeeData.resume_url = uploadResult.url;
+          } else {
+            console.warn('Resume upload failed:', uploadResult.error);
+          }
+        } catch (uploadErr) {
+          console.warn('Error uploading resume:', uploadErr);
+        }
+      }
+      
+      // Create the employee
+      const result = await hrEmployeeService.createEmployee(employeeData);
+      
+      if (result.success) {
+        // Navigate back to employee list on success
+        navigate(`${ROUTES.HR_DASHBOARD}/employees`);
+      } else {
+        setError(result.error || 'Failed to create employee');
+        console.error('Employee creation failed:', result.error);
+      }
+    } catch (err) {
+      setError('An error occurred while creating the employee');
+      console.error('Error in handleSubmit:', err);
+    } finally {
+      setLoading(false);
+    }
   };
   
   return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
+    <div className="container mx-auto py-6 space-y-6">
+      <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Add New Employee</h1>
-        <button 
+        <Button 
+          variant="outline"
           onClick={() => navigate(`${ROUTES.HR_DASHBOARD}/employees`)}
-          className="bg-secondary text-primary px-4 py-2 rounded hover:bg-secondary/90"
         >
           Cancel
-        </button>
+        </Button>
       </div>
       
-      <div className="bg-white rounded-lg shadow p-6">
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label htmlFor="firstName" className="block text-sm font-medium mb-2">First Name</label>
-              <input 
-                id="firstName"
-                type="text"
-                className="w-full p-2 border rounded" 
-                required
-              />
-            </div>
-            
-            <div>
-              <label htmlFor="lastName" className="block text-sm font-medium mb-2">Last Name</label>
-              <input 
-                id="lastName"
-                type="text"
-                className="w-full p-2 border rounded" 
-                required
-              />
-            </div>
-            
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium mb-2">Email</label>
-              <input 
-                id="email"
-                type="email"
-                className="w-full p-2 border rounded" 
-                required
-              />
-            </div>
-            
-            <div>
-              <label htmlFor="department" className="block text-sm font-medium mb-2">Department</label>
-              <select 
-                id="department"
-                className="w-full p-2 border rounded"
-                required
-              >
-                <option value="">Select department</option>
-                <option value="engineering">Engineering</option>
-                <option value="marketing">Marketing</option>
-                <option value="sales">Sales</option>
-                <option value="hr">HR</option>
-              </select>
-            </div>
-            
-            <div>
-              <label htmlFor="position" className="block text-sm font-medium mb-2">Position</label>
-              <input 
-                id="position"
-                type="text"
-                className="w-full p-2 border rounded" 
-                required
-              />
-            </div>
-            
-            <div>
-              <label htmlFor="hireDate" className="block text-sm font-medium mb-2">Hire Date</label>
-              <input 
-                id="hireDate"
-                type="date"
-                className="w-full p-2 border rounded" 
-                required
-              />
-            </div>
-          </div>
-          
-          <div>
-            <label htmlFor="skills" className="block text-sm font-medium mb-2">Skills</label>
-            <textarea 
-              id="skills"
-              className="w-full p-2 border rounded" 
-              rows={3}
-              placeholder="JavaScript, React, TypeScript"
-            />
-            <p className="text-sm text-gray-500 mt-1">Separate skills with commas</p>
-          </div>
-          
-          <div className="pt-4 border-t">
-            <button 
-              type="submit"
-              className="bg-primary text-white px-6 py-2 rounded hover:bg-primary/90"
-            >
-              Create Employee
-            </button>
-          </div>
-        </form>
-      </div>
+      {error && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+      
+      <Card>
+        <CardHeader>
+          <CardTitle>Employee Details</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <EmployeeProfileForm 
+            onSubmit={handleSubmit}
+            isLoading={loading}
+            departments={departments}
+            positions={positions}
+          />
+        </CardContent>
+      </Card>
     </div>
   );
 };
