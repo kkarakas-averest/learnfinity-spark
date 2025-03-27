@@ -64,6 +64,11 @@ const HRDashboardRoot: React.FC = () => {
       return <EmployeeProfilePage />;
     }
     
+    // Handle direct employee profile URLs (without /profile suffix)
+    if (path.match(/^\/hr-dashboard\/employees\/[a-zA-Z0-9-]+$/)) {
+      return <EmployeeProfilePage />;
+    }
+    
     if (path.startsWith('/hr-dashboard/course-builder/modules/')) {
       return <ModuleEditor />;
     }
