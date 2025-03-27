@@ -66,7 +66,10 @@ const HRDashboardRoot: React.FC = () => {
     
     // Handle direct employee profile URLs (without /profile suffix)
     if (path.match(/^\/hr-dashboard\/employees\/[a-zA-Z0-9-]+$/)) {
-      return <EmployeeProfilePage />;
+      // Extract the employee ID from the URL
+      const employeeId = path.split('/').filter(Boolean)[2];
+      console.log('Loading employee profile with ID:', employeeId);
+      return <EmployeeProfilePage key={employeeId} />;
     }
     
     if (path.startsWith('/hr-dashboard/course-builder/modules/')) {

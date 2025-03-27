@@ -1,5 +1,5 @@
 import React from '@/lib/react-helpers';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useLocation } from 'react-router-dom';
 import { useState, useEffect } from '@/lib/react-helpers';
 import { ROUTES } from '@/lib/routes';
 import { 
@@ -78,7 +78,15 @@ interface Activity {
 }
 
 const EmployeeProfilePage: React.FC = () => {
-  const { id } = useParams();
+  const params = useParams();
+  const location = useLocation();
+  // Fallback to extracting ID from URL if params doesn't provide it
+  const id = params.id || params.subpath || location.pathname.split('/').filter(Boolean)[2];
+  
+  console.log('EmployeeProfilePage - params:', params);
+  console.log('EmployeeProfilePage - location:', location.pathname);
+  console.log('EmployeeProfilePage - extracted ID:', id);
+  
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [employee, setEmployee] = useState<Employee | null>(null);
@@ -87,13 +95,21 @@ const EmployeeProfilePage: React.FC = () => {
   const [activities, setActivities] = useState<Activity[]>([]);
   
   useEffect(() => {
-    if (!id) return;
+    if (!id) {
+      console.error('No employee ID provided');
+      setError('No employee ID provided');
+      setLoading(false);
+      return;
+    }
     
     const loadEmployeeData = async () => {
       setLoading(true);
       try {
+        console.log('Fetching employee with ID:', id);
         // Fetch employee details
         const { data: employeeData, error: employeeError } = await hrEmployeeService.getEmployee(id);
+        
+        console.log('Employee data response:', { data: employeeData, error: employeeError });
         
         if (employeeError || !employeeData) {
           throw new Error(employeeError?.message || 'Failed to fetch employee details');
@@ -102,7 +118,9 @@ const EmployeeProfilePage: React.FC = () => {
         setEmployee(employeeData);
         
         // Fetch courses
+        console.log('Fetching courses for employee:', id);
         const { data: coursesData, error: coursesError } = await hrEmployeeService.getEmployeeCourses(id);
+        console.log('Courses data response:', { success: !coursesError, count: coursesData?.length });
         if (!coursesError && coursesData) {
           setCourses(coursesData);
         } else {
