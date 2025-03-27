@@ -161,21 +161,31 @@ const CourseDetailsPage: React.FC = () => {
         setCurrentModuleIndex(firstIncompleteIndex >= 0 ? firstIncompleteIndex : 0);
         
         // Format the course details
+        const courseData = (enrollmentData.course as unknown) as {
+          id: string;
+          title: string;
+          description: string;
+          estimated_duration: number;
+          module_count: number;
+          instructor: string;
+          category: string;
+        };
+        
         setCourseDetails({
-          id: enrollmentData.course.id,
-          title: enrollmentData.course.title,
-          description: enrollmentData.course.description || '',
+          id: courseData.id,
+          title: courseData.title,
+          description: courseData.description || '',
           enrollmentId: enrollmentData.id,
           progress: enrollmentData.progress || 0,
           ragStatus: (enrollmentData.rag_status || 'green').toLowerCase() as 'red' | 'amber' | 'green',
           dueDate: enrollmentData.due_date,
-          moduleCount: enrollmentData.course.module_count || formattedModules.length,
+          moduleCount: courseData.module_count || formattedModules.length,
           completedModules: enrollmentData.completed_modules || 0,
-          estimatedTimeToComplete: `${enrollmentData.course.estimated_duration || 1}h`,
+          estimatedTimeToComplete: `${courseData.estimated_duration || 1}h`,
           lastAccessed: enrollmentData.last_accessed,
           modules: formattedModules,
-          instructor: enrollmentData.course.instructor,
-          category: enrollmentData.course.category
+          instructor: courseData.instructor,
+          category: courseData.category
         });
       } catch (error) {
         console.error('Error fetching course details:', error);

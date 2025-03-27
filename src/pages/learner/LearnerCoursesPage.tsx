@@ -73,19 +73,29 @@ const LearnerCoursesPage: React.FC = () => {
         
         if (enrollmentsData) {
           // Map the enrollments data to the Course interface
-          const coursesData = enrollmentsData.map(enrollment => ({
-            id: enrollment.course.id,
-            title: enrollment.course.title,
-            description: enrollment.course.description,
-            progress: enrollment.progress || 0,
-            ragStatus: (enrollment.rag_status || 'green').toLowerCase() as 'red' | 'amber' | 'green',
-            dueDate: enrollment.due_date,
-            moduleCount: enrollment.course.module_count || 0,
-            completedModules: enrollment.completed_modules || 0,
-            estimatedTimeToComplete: `${enrollment.course.estimated_duration || 1}h`,
-            lastAccessed: enrollment.last_accessed,
-            status: enrollment.status
-          }));
+          const coursesData = enrollmentsData.map(enrollment => {
+            const courseData = (enrollment.course as unknown) as {
+              id: string;
+              title: string;
+              description: string;
+              estimated_duration: number;
+              module_count: number;
+            };
+            
+            return {
+              id: courseData.id,
+              title: courseData.title,
+              description: courseData.description,
+              progress: enrollment.progress || 0,
+              ragStatus: (enrollment.rag_status || 'green').toLowerCase() as 'red' | 'amber' | 'green',
+              dueDate: enrollment.due_date,
+              moduleCount: courseData.module_count || 0,
+              completedModules: enrollment.completed_modules || 0,
+              estimatedTimeToComplete: `${courseData.estimated_duration || 1}h`,
+              lastAccessed: enrollment.last_accessed,
+              status: enrollment.status
+            };
+          });
           
           setCourses(coursesData);
         }
