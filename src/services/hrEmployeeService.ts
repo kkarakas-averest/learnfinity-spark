@@ -363,16 +363,80 @@ export const hrEmployeeService = {
    */
   async createEmployee(employee: EmployeeUpdate): Promise<SupabaseResponse<Employee>> {
     try {
+      // Ensure all required fields are present
+      if (!employee.name || !employee.email) {
+        return {
+          data: null,
+          error: {
+            message: 'Name and email are required fields',
+            code: 'VALIDATION_ERROR'
+          }
+        };
+      }
+
       const { data, error } = await supabase
         .from(TABLE_NAME)
         .insert([employee])
-        .select()
+        .select(`
+          *,
+          hr_departments (
+            id,
+            name
+          ),
+          hr_positions (
+            id,
+            title
+          )
+        `)
         .single();
 
-      return { data, error };
-    } catch (error) {
+      if (error) {
+        return { data: null, error };
+      }
+
+      if (!data) {
+        return { 
+          data: null, 
+          error: { message: 'No data returned from the database' } 
+        };
+      }
+
+      // Map the joined data to the employee object
+      const employeeData: Employee = {
+        ...data,
+        department: data.hr_departments?.name || null,
+        position: data.hr_positions?.title || null,
+        id: data.id,
+        name: data.name,
+        email: data.email,
+        department_id: data.department_id,
+        position_id: data.position_id || null,
+        status: data.status,
+        phone: data.phone || null,
+        resume_url: data.resume_url || null,
+        company_id: data.company_id || null,
+        created_at: data.created_at,
+        updated_at: data.updated_at,
+        hr_departments: data.hr_departments || null,
+        hr_positions: data.hr_positions || null,
+        rag_status: data.rag_status || null,
+        ragStatus: data.ragStatus || null,
+        progress: data.progress || null,
+        last_activity: data.last_activity || null,
+        lastActivity: data.lastActivity || null,
+        hire_date: data.hire_date || null
+      };
+
+      return { data: employeeData, error: null };
+    } catch (error: any) {
       console.error('Error in createEmployee:', error);
-      return { data: null, error };
+      return { 
+        data: null, 
+        error: {
+          message: error?.message || 'Unknown error occurred',
+          code: error?.code || 'UNKNOWN_ERROR'
+        }
+      };
     }
   },
 
