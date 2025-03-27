@@ -1,5 +1,5 @@
-
-import React, { useState } from 'react';
+import React from 'react';
+import { useState, useEffect } from '@/lib/react-helpers';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -14,7 +14,11 @@ interface ImportResult {
   employee?: any;
 }
 
-const BulkEmployeeImport = () => {
+interface BulkEmployeeImportProps {
+  onComplete?: () => void;
+}
+
+const BulkEmployeeImport: React.FC<BulkEmployeeImportProps> = ({ onComplete }) => {
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [importResults, setImportResults] = useState<ImportResult[]>([]);
@@ -44,22 +48,57 @@ const BulkEmployeeImport = () => {
     setImportResults([]);
 
     try {
-      const results = await hrBulkImportService.importEmployees([{ 
-        firstName: "Demo", 
-        lastName: "User", 
-        email: "demo@example.com", 
-        department: "Engineering" 
-      }], (uploadProgress) => {
-        setProgress(Math.round((uploadProgress.loaded / uploadProgress.total) * 100));
-      });
-
-      setImportResults(results.data.map(employee => ({
-        success: true,
-        message: `Successfully imported ${employee.firstName} ${employee.lastName}`,
-        employee
-      })));
+      // Read and parse the CSV file
+      const text = await file.text();
       
-      setSuccessMessage("File imported successfully!");
+      // Basic CSV parsing - this should be replaced with a more robust CSV parser
+      // for production use
+      const rows = text.split('\n').filter(row => row.trim());
+      const headers = rows[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+      
+      const employeeData = [];
+      
+      // Skip header row
+      for (let i = 1; i < rows.length; i++) {
+        const values = rows[i].split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+        
+        if (values.length === headers.length) {
+          const employee: Record<string, string> = {};
+          
+          headers.forEach((header, index) => {
+            employee[header.toLowerCase()] = values[index];
+          });
+          
+          // Make sure required fields exist
+          if (employee.name && employee.email) {
+            employeeData.push(employee);
+          }
+        }
+      }
+      
+      // Show progress for file parsing
+      setProgress(50);
+      
+      // Import the employees
+      const results = await hrBulkImportService.importEmployees(employeeData);
+
+      if (results.success) {
+        setProgress(100);
+        setImportResults(results.data.map(employee => ({
+          success: true,
+          message: `Successfully imported ${employee.name || employee.firstName + ' ' + employee.lastName}`,
+          employee
+        })));
+        
+        setSuccessMessage(`Successfully imported ${results.data.length} employees.`);
+        
+        // Call onComplete if provided
+        if (onComplete) {
+          setTimeout(onComplete, 1500);
+        }
+      } else {
+        throw new Error(results.message || 'Import failed');
+      }
     } catch (e: any) {
       console.error("Error importing data:", e);
       setError(e.message || "Failed to import data");

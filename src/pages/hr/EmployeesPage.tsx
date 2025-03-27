@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from '@/lib/react-helpers';
 import { Link, useNavigate } from 'react-router-dom';
 import { ROUTES, buildRoute } from '@/lib/routes';
-import { hrEmployeeService } from '@/lib/services/hrEmployeeService';
+import { hrEmployeeService } from '@/services/hrEmployeeService';
 import { RAGStatusBadge } from '@/components/hr/RAGStatusBadge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -249,24 +249,17 @@ const EmployeesPage: React.FC = () => {
                 Import
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[600px]">
+            <DialogContent className="max-w-3xl">
               <DialogHeader>
                 <DialogTitle>Import Employees</DialogTitle>
                 <DialogDescription>
-                  Import employees from a CSV file. The file should include name, email, department, and position.
+                  Upload a CSV file to import multiple employees at once.
                 </DialogDescription>
               </DialogHeader>
-              <div>
-                <BulkEmployeeImport />
-                <div className="mt-4 flex justify-end">
-                  <Button onClick={() => {
-                    setShowImportDialog(false);
-                    fetchEmployees();
-                  }}>
-                    Done
-                  </Button>
-                </div>
-              </div>
+              <BulkEmployeeImport onComplete={() => {
+                setShowImportDialog(false);
+                fetchEmployees();
+              }} />
             </DialogContent>
           </Dialog>
           <Button variant="outline" onClick={handleExportCSV}>

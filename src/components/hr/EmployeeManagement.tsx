@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import React from 'react';
+import { useState, useEffect } from '@/lib/react-helpers';
+import { Link, useNavigate } from 'react-router-dom';
 import { 
   DropdownMenu,
   DropdownMenuContent,
@@ -19,18 +20,30 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { hrEmployeeService } from '@/services/hrEmployeeService';
-import { ChevronUpDown, MoreHorizontal, Pencil, Trash2, LifeBuoy, PlusCircle } from 'lucide-react';
+import { 
+  ChevronsUpDown, 
+  MoreHorizontal, 
+  Pencil, 
+  Trash2, 
+  LifeBuoy 
+} from 'lucide-react';
 
 interface Employee {
   id: string;
-  firstName: string;
-  lastName: string;
+  name: string;  
   email: string;
-  title: string;
-  department: string;
-  profileImageUrl: string;
-  ragStatus: string;
-  ragStatusLastUpdated: Date;
+  title?: string;
+  department?: string;
+  department_id?: string;
+  position?: string;
+  position_id?: string;
+  status?: string;
+  profileImageUrl?: string;
+  ragStatus?: string;
+  ragStatusLastUpdated?: Date;
+  progress?: number;
+  lastActivity?: string;
+  created_at?: string;
 }
 
 interface EmployeeManagementProps {
@@ -46,8 +59,9 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortColumn, setSortColumn] = useState<'firstName' | 'lastName' | 'email' | null>(null);
+  const [sortColumn, setSortColumn] = useState<'name' | 'email' | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const navigate = useNavigate();
   
   useEffect(() => {
     loadEmployees();
@@ -58,11 +72,26 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
     setError(null);
     
     try {
-      const { success, employees, error } = await hrEmployeeService.getEmployees();
-      if (error) {
-        setError(error.message || 'Failed to load employees');
-      } else if (employees) {
-        setEmployees(employees);
+      const result = await hrEmployeeService.getEmployees();
+      
+      if (result.success && result.employees) {
+        // Transform data to match our component interface
+        const transformedEmployees = result.employees.map(emp => ({
+          id: emp.id,
+          name: emp.name || 'No Name',
+          email: emp.email || '',
+          title: emp.position || emp.hr_positions?.title || '',
+          department: emp.department || emp.hr_departments?.name || '',
+          department_id: emp.department_id || emp.hr_departments?.id,
+          position_id: emp.position_id || emp.hr_positions?.id,
+          status: emp.status || 'active',
+          ragStatus: (emp.rag_status || emp.ragStatus || 'green').toLowerCase(),
+          progress: emp.progress || 0,
+          lastActivity: emp.last_activity || emp.lastActivity || 'Never'
+        }));
+        setEmployees(transformedEmployees);
+      } else {
+        setError(result.error?.message || 'Failed to load employees');
       }
     } catch (err: any) {
       setError(err.message || 'An unexpected error occurred');
@@ -75,7 +104,7 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
     setSearchQuery(e.target.value);
   };
   
-  const handleSort = (column: 'firstName' | 'lastName' | 'email') => {
+  const handleSort = (column: 'name' | 'email') => {
     if (sortColumn === column) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
     } else {
@@ -102,11 +131,61 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
   const filteredEmployees = sortedEmployees.filter(employee => {
     const searchStr = searchQuery.toLowerCase();
     return (
-      employee.firstName.toLowerCase().includes(searchStr) ||
-      employee.lastName.toLowerCase().includes(searchStr) ||
+      employee.name.toLowerCase().includes(searchStr) ||
       employee.email.toLowerCase().includes(searchStr)
     );
   });
+  
+  const handleAddEmployee = () => {
+    navigate('/hr-dashboard/employees/new');
+  };
+  
+  const handleExportCSV = async () => {
+    try {
+      setLoading(true);
+      // Get all employees for export
+      const result = await hrEmployeeService.getEmployees();
+      
+      if (!result.success || !result.employees) {
+        throw new Error('Failed to fetch employees for export');
+      }
+      
+      // Format data for CSV
+      const csvData = result.employees.map(emp => ({
+        Name: emp.name,
+        Email: emp.email,
+        Department: emp.department || emp.hr_departments?.name || '',
+        Position: emp.position || emp.hr_positions?.title || '',
+        Status: emp.status || '',
+        HireDate: emp.hire_date || '',
+        LastActivity: emp.last_activity || ''
+      }));
+      
+      // Convert to CSV string
+      const headers = Object.keys(csvData[0]);
+      const csvContent = [
+        headers.join(','),
+        ...csvData.map(row => headers.map(header => JSON.stringify(row[header] || '')).join(','))
+      ].join('\n');
+      
+      // Create download link
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `employees_export_${new Date().toISOString().slice(0, 10)}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      setLoading(false);
+    } catch (error: any) {
+      console.error('Error exporting employees:', error);
+      setError('Failed to export employees: ' + (error.message || 'Unknown error'));
+      setLoading(false);
+    }
+  };
   
   if (loading) {
     return <Card><CardContent>Loading employees...</CardContent></Card>;
@@ -130,30 +209,24 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
                 className="max-w-sm"
               />
             </div>
-            <Button><PlusCircle className="mr-2" /> Add Employee</Button>
+            <div className="flex space-x-2">
+              <Button variant="outline" onClick={handleExportCSV} disabled={loading}>
+                Export CSV
+              </Button>
+              <Button onClick={handleAddEmployee}>Add Employee</Button>
+            </div>
           </div>
           
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead onClick={() => handleSort('firstName')} className="cursor-pointer">
-                  First Name
-                  {sortColumn === 'firstName' && (
-                    <ChevronUpDown className={`ml-2 h-4 w-4 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} />
+                <TableHead onClick={() => handleSort('name')} className="cursor-pointer">
+                  Name
+                  {sortColumn === 'name' && (
+                    <ChevronsUpDown className={`ml-2 h-4 w-4 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} />
                   )}
                 </TableHead>
-                <TableHead onClick={() => handleSort('lastName')} className="cursor-pointer">
-                  Last Name
-                  {sortColumn === 'lastName' && (
-                    <ChevronUpDown className={`ml-2 h-4 w-4 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} />
-                  )}
-                </TableHead>
-                <TableHead onClick={() => handleSort('email')} className="cursor-pointer">
-                  Email
-                  {sortColumn === 'email' && (
-                    <CaretSortIcon className={`ml-2 h-4 w-4 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} />
-                  )}
-                </TableHead>
+                <TableHead>Email</TableHead>
                 <TableHead>Title</TableHead>
                 <TableHead>Department</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
@@ -162,8 +235,7 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
             <TableBody>
               {filteredEmployees.map(employee => (
                 <TableRow key={employee.id}>
-                  <TableCell>{employee.firstName}</TableCell>
-                  <TableCell>{employee.lastName}</TableCell>
+                  <TableCell>{employee.name}</TableCell>
                   <TableCell>{employee.email}</TableCell>
                   <TableCell>{employee.title}</TableCell>
                   <TableCell>{employee.department}</TableCell>
@@ -172,7 +244,7 @@ const EmployeeManagement: React.FC<EmployeeManagementProps> = ({
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" className="h-8 w-8 p-0">
                           <span className="sr-only">Open menu</span>
-                          <DotsHorizontalIcon className="h-4 w-4" />
+                          <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">

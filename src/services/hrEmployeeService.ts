@@ -14,6 +14,22 @@ export interface Employee {
   company_id?: string;
   created_at?: string;
   updated_at?: string;
+  department?: string;
+  position?: string;
+  hr_departments?: {
+    id: string;
+    name: string;
+  };
+  hr_positions?: {
+    id: string;
+    title: string;
+  };
+  rag_status?: string;
+  ragStatus?: string;
+  progress?: number;
+  last_activity?: string;
+  lastActivity?: string;
+  hire_date?: string;
 }
 
 // Define EmployeeUpdate type for update operations
@@ -35,6 +51,20 @@ const HR_TABLES = [
   'hr_learning_path_courses',
   'hr_learning_path_enrollments'
 ];
+
+export interface Department {
+  id: string;
+  name: string;
+  description?: string;
+}
+
+interface GetEmployeesOptions {
+  searchTerm?: string;
+  departmentId?: string | null;
+  status?: string | null;
+  page?: number;
+  pageSize?: number;
+}
 
 export const hrEmployeeService = {
   /**
@@ -223,60 +253,71 @@ export const hrEmployeeService = {
   },
 
   /**
-   * Get all employees
-   * @param {Object} options - Query options
-   * @param {number} options.page - Page number
-   * @param {number} options.pageSize - Page size
-   * @param {string} options.searchTerm - Search term
-   * @param {string} options.departmentId - Filter by department ID
-   * @returns {Promise<SupabaseResponse<Employee[]> & { count?: number }>}
+   * Get all employees with optional filtering
    */
-  async getEmployees({ 
-    page = 1, 
-    pageSize = 10, 
-    searchTerm = '', 
-    departmentId = null,
-    status = null
-  } = {}): Promise<SupabaseResponse<Employee[]> & { count?: number }> {
+  async getEmployees(options: GetEmployeesOptions = {}) {
     try {
-      // Calculate range
-      const from = (page - 1) * pageSize;
-      const to = from + pageSize - 1;
+      const {
+        searchTerm = '',
+        departmentId = null,
+        status = null,
+        page = 1,
+        pageSize = 50
+      } = options;
 
-      // Build query
       let query = supabase
-        .from(TABLE_NAME)
+        .from('hr_employees')
         .select(`
           *,
-          hr_departments(id, name),
-          hr_positions(id, title)
-        `, { count: 'exact' });
+          hr_departments (
+            id,
+            name
+          ),
+          hr_positions (
+            id,
+            title
+          )
+        `);
 
-      // Apply search filter if provided
+      // Apply filters
       if (searchTerm) {
-        query = query.ilike('name', `%${searchTerm}%`);
+        query = query.or(`name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`);
       }
 
-      // Apply department filter if provided
       if (departmentId) {
         query = query.eq('department_id', departmentId);
       }
 
-      // Apply status filter if provided
       if (status) {
         query = query.eq('status', status);
       }
 
-      // Paginate results
-      query = query.range(from, to).order('created_at', { ascending: false });
+      // Add pagination
+      const from = (page - 1) * pageSize;
+      query = query.range(from, from + pageSize - 1);
 
-      // Execute query
-      const { data, error, count } = await query;
+      const { data: employees, error } = await query;
 
-      return { data, error, count };
+      if (error) {
+        console.error('Error fetching employees:', error);
+        return {
+          success: false,
+          error: error.message,
+          employees: []
+        };
+      }
+
+      return {
+        success: true,
+        employees: employees as Employee[]
+      };
     } catch (error) {
       console.error('Error in getEmployees:', error);
-      return { data: null, error, count: 0 };
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        employees: []
+      };
     }
   },
 
@@ -754,6 +795,39 @@ export const hrEmployeeService = {
     } catch (error) {
       console.error('Error in createEmployeeFromJSON:', error);
       return { data: null, error, userAccount: null };
+    }
+  },
+
+  /**
+   * Get all departments
+   */
+  async getDepartments() {
+    try {
+      const { data: departments, error } = await supabase
+        .from('hr_departments')
+        .select('*')
+        .order('name');
+
+      if (error) {
+        console.error('Error fetching departments:', error);
+        return {
+          success: false,
+          error: error.message,
+          departments: []
+        };
+      }
+
+      return {
+        success: true,
+        departments: departments as Department[]
+      };
+    } catch (error) {
+      console.error('Error in getDepartments:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        departments: []
+      };
     }
   }
 };
