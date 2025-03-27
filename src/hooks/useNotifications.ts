@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "@/lib/react-helpers";
-import { notificationService } from '@/services/notificationService';
-import { Notification } from '@/types/notifications';
+import notificationService, { Notification } from '@/services/notificationService';
+import { supabase } from '@/lib/supabase';
 
 export function useNotifications(autoRefresh = true) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -13,21 +13,37 @@ export function useNotifications(autoRefresh = true) {
     setError(null);
     
     try {
-      const result = await notificationService.getNotifications();
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
       
-      if (result.success && result.notifications) {
-        setNotifications(result.notifications);
-      } else {
-        setError(result.error || 'Failed to fetch notifications');
+      if (!user) {
+        setNotifications([]);
+        setUnreadCount(0);
+        setIsLoading(false);
+        return;
       }
+      
+      // Get notifications using the updated interface
+      const { data, error: notificationError } = 
+        await notificationService.getUserNotifications(user.id);
+      
+      if (notificationError) {
+        throw notificationError;
+      }
+      
+      setNotifications(data || []);
       
       // Get unread count
-      const countResult = await notificationService.getUnreadCount();
-      if (countResult.success) {
-        setUnreadCount(countResult.count);
+      const { count, error: countError } = 
+        await notificationService.getUnreadCount(user.id);
+      
+      if (countError) {
+        throw countError;
       }
+      
+      setUnreadCount(count);
     } catch (err) {
-      setError('An unexpected error occurred');
+      setError('Failed to fetch notifications');
       console.error('Error in useNotifications:', err);
     } finally {
       setIsLoading(false);
@@ -36,9 +52,9 @@ export function useNotifications(autoRefresh = true) {
   
   const markAsRead = useCallback(async (notificationId: string) => {
     try {
-      const result = await notificationService.markAsRead(notificationId);
+      const { success, error } = await notificationService.markAsRead(notificationId);
       
-      if (result.success) {
+      if (success) {
         // Update local state
         setNotifications(prev => 
           prev.map(notification => 
@@ -48,9 +64,10 @@ export function useNotifications(autoRefresh = true) {
           )
         );
         setUnreadCount(prev => Math.max(0, prev - 1));
+        return { success: true };
       }
       
-      return result;
+      throw error;
     } catch (err) {
       console.error('Error marking notification as read:', err);
       return { success: false };
@@ -59,17 +76,24 @@ export function useNotifications(autoRefresh = true) {
   
   const markAllAsRead = useCallback(async () => {
     try {
-      const result = await notificationService.markAllAsRead();
+      const { data: { user } } = await supabase.auth.getUser();
       
-      if (result.success) {
+      if (!user) {
+        return { success: false };
+      }
+      
+      const { success, error } = await notificationService.markAllAsRead(user.id);
+      
+      if (success) {
         // Update local state
         setNotifications(prev => 
           prev.map(notification => ({ ...notification, is_read: true }))
         );
         setUnreadCount(0);
+        return { success: true };
       }
       
-      return result;
+      throw error;
     } catch (err) {
       console.error('Error marking all notifications as read:', err);
       return { success: false };

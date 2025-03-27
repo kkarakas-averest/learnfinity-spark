@@ -1,156 +1,124 @@
 import { supabase } from '@/lib/supabase';
-import { Notification } from '@/types/notifications';
 
-export const notificationService = {
+export interface Notification {
+  id: string;
+  title: string;
+  message: string;
+  type: string;
+  priority: 'normal' | 'high' | 'urgent';
+  is_read: boolean;
+  created_at: string;
+  metadata?: any;
+}
+
+const notificationService = {
   /**
-   * Get notifications for the current user
+   * Get all notifications for a user
+   * @param userId User ID to fetch notifications for
+   * @returns Array of notifications
    */
-  async getNotifications(limit = 20): Promise<{
-    success: boolean;
-    notifications?: Notification[];
-    error?: string;
-  }> {
+  async getUserNotifications(userId: string): Promise<{ data: Notification[], error: Error | null }> {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        console.log('User not authenticated, returning empty notifications array');
-        return {
-          success: true,
-          notifications: []
-        };
-      }
-      
       const { data, error } = await supabase
-        .from('notifications')
+        .from('user_notifications')
         .select('*')
-        .eq('recipient_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(limit);
-      
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+
       if (error) throw error;
-      
-      // Map the data to ensure compatibility with our interface
-      const notifications = data.map(notification => ({
-        ...notification,
-        // Ensure consistency with our frontend model regardless of DB structure
-        id: notification.id,
-        recipient_id: notification.recipient_id,
-        title: notification.title || 'Notification',
-        message: notification.message || '',
-        is_read: !!notification.is_read,
-        created_at: notification.created_at,
-        actionLink: notification.action_link || notification.actionLink,
-      }));
-      
-      return { 
-        success: true, 
-        notifications 
-      };
+
+      return { data: data || [], error: null };
     } catch (error) {
-      console.error('Error fetching notifications:', error);
-      return { 
-        success: false, 
-        error: error.message 
-      };
+      console.error('Error fetching user notifications:', error);
+      return { data: [], error: error as Error };
     }
   },
-  
+
+  /**
+   * Get unread notifications count for a user
+   * @param userId User ID to fetch notifications for
+   * @returns Number of unread notifications
+   */
+  async getUnreadCount(userId: string): Promise<{ count: number, error: Error | null }> {
+    try {
+      const { count, error } = await supabase
+        .from('user_notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .eq('is_read', false);
+
+      if (error) throw error;
+
+      return { count: count || 0, error: null };
+    } catch (error) {
+      console.error('Error fetching unread notifications count:', error);
+      return { count: 0, error: error as Error };
+    }
+  },
+
   /**
    * Mark a notification as read
+   * @param notificationId ID of the notification to mark as read
+   * @returns Success status
    */
-  async markAsRead(notificationId: string): Promise<{
-    success: boolean;
-    error?: string;
-  }> {
+  async markAsRead(notificationId: string): Promise<{ success: boolean, error: Error | null }> {
     try {
       const { error } = await supabase
-        .from('notifications')
+        .from('user_notifications')
         .update({ is_read: true })
         .eq('id', notificationId);
-      
+
       if (error) throw error;
-      
-      return { success: true };
+
+      return { success: true, error: null };
     } catch (error) {
       console.error('Error marking notification as read:', error);
-      return { 
-        success: false, 
-        error: error.message 
-      };
+      return { success: false, error: error as Error };
     }
   },
-  
+
   /**
-   * Mark all notifications as read for the current user
+   * Mark all notifications as read for a user
+   * @param userId User ID to mark all notifications as read
+   * @returns Success status
    */
-  async markAllAsRead(): Promise<{
-    success: boolean;
-    error?: string;
-  }> {
+  async markAllAsRead(userId: string): Promise<{ success: boolean, error: Error | null }> {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        throw new Error('User not authenticated');
-      }
-      
       const { error } = await supabase
-        .from('notifications')
+        .from('user_notifications')
         .update({ is_read: true })
-        .eq('recipient_id', user.id)
+        .eq('user_id', userId)
         .eq('is_read', false);
-      
+
       if (error) throw error;
-      
-      return { success: true };
+
+      return { success: true, error: null };
     } catch (error) {
       console.error('Error marking all notifications as read:', error);
-      return { 
-        success: false, 
-        error: error.message 
-      };
+      return { success: false, error: error as Error };
     }
   },
-  
+
   /**
-   * Get count of unread notifications
+   * Delete a notification
+   * @param notificationId ID of the notification to delete
+   * @returns Success status
    */
-  async getUnreadCount(): Promise<{
-    success: boolean;
-    count: number;
-    error?: string;
-  }> {
+  async deleteNotification(notificationId: string): Promise<{ success: boolean, error: Error | null }> {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        console.log('User not authenticated, returning 0 unread count');
-        return {
-          success: true,
-          count: 0
-        };
-      }
-      
-      const { count, error } = await supabase
-        .from('notifications')
-        .select('*', { count: 'exact', head: true })
-        .eq('recipient_id', user.id)
-        .eq('is_read', false);
-      
+      const { error } = await supabase
+        .from('user_notifications')
+        .delete()
+        .eq('id', notificationId);
+
       if (error) throw error;
-      
-      return { 
-        success: true, 
-        count: count || 0 
-      };
+
+      return { success: true, error: null };
     } catch (error) {
-      console.error('Error getting unread notification count:', error);
-      return { 
-        success: false, 
-        error: error.message, 
-        count: 0 
-      };
+      console.error('Error deleting notification:', error);
+      return { success: false, error: error as Error };
     }
   }
-}; 
+};
+
+export default notificationService; 

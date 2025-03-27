@@ -1,4 +1,3 @@
-
 export type Json =
   | string
   | number
@@ -14,6 +13,64 @@ export type ContentStatus = 'draft' | 'published' | 'archived'
 export interface Database {
   public: {
     Tables: {
+      hr_employees: {
+        Row: {
+          id: string
+          name: string
+          email: string
+          phone: string | null
+          hire_date: string | null
+          department_id: string | null
+          position_id: string | null
+          manager_id: string | null
+          status: string
+          profile_image_url: string | null
+          resume_url: string | null
+          last_active_at: string | null
+          created_at: string
+          updated_at: string
+          hr_departments?: {
+            id: string
+            name: string
+          } | null
+          hr_positions?: {
+            id: string
+            title: string
+          } | null
+        }
+        Insert: {
+          id?: string
+          name: string
+          email: string
+          phone?: string | null
+          hire_date?: string | null
+          department_id?: string | null
+          position_id?: string | null
+          manager_id?: string | null
+          status?: string
+          profile_image_url?: string | null
+          resume_url?: string | null
+          last_active_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          email?: string
+          phone?: string | null
+          hire_date?: string | null
+          department_id?: string | null
+          position_id?: string | null
+          manager_id?: string | null
+          status?: string
+          profile_image_url?: string | null
+          resume_url?: string | null
+          last_active_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
       users: {
         Row: {
           id: string
@@ -203,173 +260,6 @@ export interface Database {
           created_at?: string
         }
       }
-      learning_paths: {
-        Row: {
-          id: string
-          learner_id: string
-          course_id: string
-          ai_adaptation: Json
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          learner_id: string
-          course_id: string
-          ai_adaptation?: Json
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          learner_id?: string
-          course_id?: string
-          ai_adaptation?: Json
-          created_at?: string
-        }
-      }
-      ai_agents: {
-        Row: {
-          id: string
-          name: string
-          description: string | null
-          last_active: string
-        }
-        Insert: {
-          id?: string
-          name: string
-          description?: string | null
-          last_active?: string
-        }
-        Update: {
-          id?: string
-          name?: string
-          description?: string | null
-          last_active?: string
-        }
-      }
-      ai_generated_content: {
-        Row: {
-          id: string
-          ai_agent_id: string | null
-          module_id: string
-          content: Json
-          status: ContentStatus
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          ai_agent_id?: string | null
-          module_id: string
-          content: Json
-          status?: ContentStatus
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          ai_agent_id?: string | null
-          module_id?: string
-          content?: Json
-          status?: ContentStatus
-          created_at?: string
-          updated_at?: string
-        }
-      }
-      progress_tracking: {
-        Row: {
-          id: string
-          learner_id: string
-          module_id: string
-          rag_status: RagStatus
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          learner_id: string
-          module_id: string
-          rag_status?: RagStatus
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          learner_id?: string
-          module_id?: string
-          rag_status?: RagStatus
-          updated_at?: string
-        }
-      }
-      feedback: {
-        Row: {
-          id: string
-          learner_id: string
-          course_id: string
-          rating: number
-          comments: string | null
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          learner_id: string
-          course_id: string
-          rating: number
-          comments?: string | null
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          learner_id?: string
-          course_id?: string
-          rating?: number
-          comments?: string | null
-          created_at?: string
-        }
-      }
-      audit_logs: {
-        Row: {
-          id: string
-          user_id: string | null
-          action: string
-          timestamp: string
-          metadata: Json | null
-        }
-        Insert: {
-          id?: string
-          user_id?: string | null
-          action: string
-          timestamp?: string
-          metadata?: Json | null
-        }
-        Update: {
-          id?: string
-          user_id?: string | null
-          action?: string
-          timestamp?: string
-          metadata?: Json | null
-        }
-      }
-      hr_uploads: {
-        Row: {
-          id: string
-          company_id: string
-          file_path: string
-          processed: boolean
-          uploaded_at: string
-        }
-        Insert: {
-          id?: string
-          company_id: string
-          file_path: string
-          processed?: boolean
-          uploaded_at?: string
-        }
-        Update: {
-          id?: string
-          company_id?: string
-          file_path?: string
-          processed?: boolean
-          uploaded_at?: string
-        }
-      }
     }
     Views: {
       [_ in never]: never
@@ -390,4 +280,4 @@ export interface Database {
       content_status: ContentStatus
     }
   }
-}
+} 

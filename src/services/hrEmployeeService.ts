@@ -1,8 +1,8 @@
 import { supabase } from '@/lib/supabase';
 import { SupabaseResponse, SupabaseUser } from '@/types/service-responses';
 
-// Define Employee interface directly in this file instead of importing it
-export interface Employee {
+// Define interfaces
+interface Employee {
   id: string;
   name: string;
   email: string;
@@ -32,10 +32,44 @@ export interface Employee {
   hire_date?: string;
 }
 
-// Define EmployeeUpdate type for update operations
-export type EmployeeUpdate = Partial<Employee>;
+interface Department {
+  id: string;
+  name: string;
+  description?: string;
+}
 
-// Import from env variables or use a fallback with a valid UUID
+// Define response types
+interface EmployeeResponse {
+  success: boolean;
+  data?: Employee;
+  error?: string;
+  id?: string;
+}
+
+interface SkillResponse {
+  success: boolean;
+  data?: any;
+  error?: string;
+}
+
+interface CourseResponse {
+  success: boolean;
+  data?: any;
+  error?: string;
+}
+
+// Define update type
+type EmployeeUpdate = Partial<Employee>;
+
+// Export types
+export type { Employee };
+export type { Department };
+export type { EmployeeUpdate };
+export type { EmployeeResponse };
+export type { SkillResponse };
+export type { CourseResponse };
+
+// Constants
 const DEFAULT_COMPANY_ID = import.meta.env.VITE_DEFAULT_COMPANY_ID || '4fb1a692-3995-40ee-8aa5-292fd8ebf029';
 const TABLE_NAME = 'hr_employees';
 
@@ -49,14 +83,9 @@ const HR_TABLES = [
   'hr_employee_activities',
   'hr_learning_paths',
   'hr_learning_path_courses',
-  'hr_learning_path_enrollments'
+  'hr_learning_path_enrollments',
+  'user_notifications'
 ];
-
-export interface Department {
-  id: string;
-  name: string;
-  description?: string;
-}
 
 interface GetEmployeesOptions {
   searchTerm?: string;
@@ -66,7 +95,35 @@ interface GetEmployeesOptions {
   pageSize?: number;
 }
 
-export const hrEmployeeService = {
+/**
+ * Define the type for the EmployeeService
+ */
+export interface EmployeeService {
+  initialize: () => Promise<{success: boolean, error?: Error}>;
+  createMissingTables: (missingTables: string[]) => Promise<{success: boolean, error?: Error}>;
+  checkHRTablesExist: () => Promise<{exists: boolean, missingTables: string[]}>;
+  createEmployee: (employee: EmployeeUpdate) => Promise<EmployeeResponse>;
+  getDepartments: () => Promise<{success: boolean, departments?: Department[], error?: string}>;
+  getEmployees: (options?: any) => Promise<{success: boolean, employees?: Employee[], error?: string}>;
+  getEmployee: (id: string) => Promise<SupabaseResponse<Employee>>;
+  updateEmployee: (id: string, updates: EmployeeUpdate) => Promise<SupabaseResponse<Employee>>;
+  deleteEmployee: (id: string) => Promise<SupabaseResponse<null>>;
+  updateEmployeeStatus: (id: string, status: string) => Promise<SupabaseResponse<Employee>>;
+  updateEmployeePassword: (email: string, newPassword: string) => Promise<SupabaseResponse<{ user: SupabaseUser }>>;
+  resetEmployeePassword: (email: string) => Promise<SupabaseResponse<{success: boolean}>>;
+  testMinimalApiRequest: () => Promise<{success: boolean, responseText: string, error?: any}>;
+  uploadEmployeeResume: (employeeId: string, file: File) => Promise<SupabaseResponse<{ resumeUrl: string }>>;
+  createEmployeeFromJSON: (employeeJSON: any) => Promise<{data: any, error: any, userAccount: any}>;
+  createEmployeeWithUserAccount: (employee: any) => Promise<{data: any, error: any, userAccount: any}>;
+  getEmployeeCourses: (employeeId: string) => Promise<{data: any, error: any}>;
+  getEmployeeSkills: (employeeId: string) => Promise<{data: any, error: any}>;
+  getEmployeeActivities: (employeeId: string, limit?: number) => Promise<{data: any, error: any}>;
+  addEmployeeSkill: (employeeId: string, skill: any) => Promise<SkillResponse>;
+  assignCourseToEmployee: (employeeId: string, courseId: string) => Promise<CourseResponse>;
+}
+
+// Create the service object
+const hrEmployeeService: EmployeeService = {
   /**
    * Initialize the HR system
    * @returns {Promise<{success: boolean, error?: Error}>}
@@ -147,6 +204,22 @@ export const hrEmployeeService = {
                 status VARCHAR(20) DEFAULT 'active',
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+              );
+            `;
+            break;
+            
+          case 'user_notifications':
+            sql = `
+              CREATE TABLE IF NOT EXISTS user_notifications (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                user_id UUID NOT NULL,
+                title VARCHAR(255) NOT NULL,
+                message TEXT NOT NULL,
+                type VARCHAR(50) NOT NULL,
+                priority VARCHAR(20) DEFAULT 'normal',
+                is_read BOOLEAN DEFAULT false,
+                metadata JSONB,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
               );
             `;
             break;
@@ -363,17 +436,46 @@ export const hrEmployeeService = {
    */
   async createEmployee(employee: EmployeeUpdate): Promise<{success: boolean, data?: Employee, error?: string, id?: string}> {
     try {
-      // Ensure all required fields are present
-      if (!employee.name || !employee.email) {
+      // Create a clean employee object with only the fields we want to insert
+      const cleanEmployee: Record<string, any> = {
+        name: employee.name?.trim(),
+        email: employee.email?.trim(),
+        status: employee.status || 'active',
+        phone: employee.phone || null,
+        hire_date: new Date().toISOString(), // Add current date as hire_date
+      };
+      
+      // Only add department_id if it's a valid non-empty value
+      if (employee.department_id && typeof employee.department_id === 'string' && employee.department_id.trim() !== '') {
+        cleanEmployee.department_id = employee.department_id;
+      }
+      
+      // Only add position_id if it's a valid non-empty value
+      if (employee.position_id && typeof employee.position_id === 'string' && employee.position_id.trim() !== '') {
+        cleanEmployee.position_id = employee.position_id;
+      }
+
+      // Validate required fields
+      if (!cleanEmployee.name) {
         return {
           success: false,
-          error: 'Name and email are required fields'
+          error: 'Name is required'
+        };
+      }
+      
+      if (!cleanEmployee.email) {
+        return {
+          success: false,
+          error: 'Email is required'
         };
       }
 
+      // Log what we're actually sending to Supabase
+      console.log('Sending employee data to Supabase:', cleanEmployee);
+
       const { data, error } = await supabase
         .from(TABLE_NAME)
-        .insert([employee])
+        .insert([cleanEmployee])
         .select(`
           *,
           hr_departments (
@@ -410,7 +512,7 @@ export const hrEmployeeService = {
         id: data.id,
         name: data.name,
         email: data.email,
-        department_id: data.department_id,
+        department_id: data.department_id || null,
         position_id: data.position_id || null,
         status: data.status,
         phone: data.phone || null,
@@ -1021,7 +1123,160 @@ export const hrEmployeeService = {
       console.error('Error fetching employee activities:', error);
       return { data: null, error };
     }
+  },
+
+  /**
+   * Add a skill to an employee
+   * @param {string} employeeId - Employee ID
+   * @param {Object} skill - Skill data
+   * @returns {Promise<{success: boolean, data?: any, error?: string}>}
+   */
+  async addEmployeeSkill(employeeId: string, skill: any): Promise<{success: boolean, data?: any, error?: string}> {
+    try {
+      // Validate required fields
+      if (!employeeId) {
+        return {
+          success: false,
+          error: 'Employee ID is required'
+        };
+      }
+
+      if (!skill.name) {
+        return {
+          success: false,
+          error: 'Skill name is required'
+        };
+      }
+
+      // Prepare the skill data for insertion
+      const skillData = {
+        employee_id: employeeId,
+        skill_name: skill.name,
+        category: skill.category || 'Uncategorized',
+        proficiency_level: skill.proficiency || 'beginner',
+        is_required: skill.isRequired || false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      console.log('Adding skill to employee:', { employeeId, skillData });
+
+      // Insert the skill
+      const { data, error } = await supabase
+        .from('hr_employee_skills')
+        .insert([skillData])
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error adding employee skill:', error);
+        return {
+          success: false,
+          error: error.message
+        };
+      }
+
+      return {
+        success: true,
+        data
+      };
+    } catch (error: any) {
+      console.error('Exception in addEmployeeSkill:', error);
+      return {
+        success: false,
+        error: error?.message || 'Unknown error occurred'
+      };
+    }
+  },
+
+  /**
+   * Assign a course to an employee
+   * @param {string} employeeId - Employee ID
+   * @param {string} courseId - Course ID
+   * @returns {Promise<{success: boolean, data?: any, error?: string}>}
+   */
+  async assignCourseToEmployee(employeeId: string, courseId: string): Promise<{success: boolean, data?: any, error?: string}> {
+    try {
+      // Validate required fields
+      if (!employeeId) {
+        return {
+          success: false,
+          error: 'Employee ID is required'
+        };
+      }
+
+      if (!courseId) {
+        return {
+          success: false,
+          error: 'Course ID is required'
+        };
+      }
+
+      // Prepare the enrollment data
+      const enrollmentData = {
+        employee_id: employeeId,
+        course_id: courseId,
+        enrollment_date: new Date().toISOString(),
+        progress: 0,
+        status: 'assigned'
+      };
+
+      console.log('Assigning course to employee:', { employeeId, courseId, enrollmentData });
+
+      // Check if enrollment already exists
+      const { data: existingEnrollment, error: checkError } = await supabase
+        .from('hr_course_enrollments')
+        .select('id')
+        .eq('employee_id', employeeId)
+        .eq('course_id', courseId)
+        .maybeSingle();
+
+      if (checkError) {
+        console.error('Error checking existing enrollment:', checkError);
+        return {
+          success: false,
+          error: checkError.message
+        };
+      }
+
+      // If enrollment already exists, return success
+      if (existingEnrollment) {
+        console.log('Enrollment already exists:', existingEnrollment);
+        return {
+          success: true,
+          data: existingEnrollment
+        };
+      }
+
+      // Insert the enrollment
+      const { data, error } = await supabase
+        .from('hr_course_enrollments')
+        .insert([enrollmentData])
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error assigning course to employee:', error);
+        return {
+          success: false,
+          error: error.message
+        };
+      }
+
+      return {
+        success: true,
+        data
+      };
+    } catch (error: any) {
+      console.error('Exception in assignCourseToEmployee:', error);
+      return {
+        success: false,
+        error: error?.message || 'Unknown error occurred'
+      };
+    }
   }
 };
 
+// Export the service
+export { hrEmployeeService };
 export default hrEmployeeService;

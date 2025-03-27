@@ -20,12 +20,13 @@ import ProtectedRouteMigrated from "./components/ProtectedRouteMigrated";
 import DiagnosticTool from "./components/DiagnosticTool";
 import ExampleErrorHandling from "./components/ExampleErrorHandling";
 import FunctionalErrorBoundary from "./components/FunctionalErrorBoundary";
-import { UserRole } from "./lib/database.types";
 import { Toaster } from "./components/ui/toaster";
 import { useAuth, useHRAuth } from "./state";
 import { Button } from "./components/ui/button";
 import SystemHealthCheck from "./pages/SystemHealthCheck";
-import React from "@/lib/react-helpers";
+import React, { useEffect } from "@/lib/react-helpers";
+import { toast } from './components/ui/use-toast';
+import databaseInitService from "./services/databaseInitService";
 
 // Import HR dashboard pages
 import EmployeesPage from "./pages/hr/EmployeesPage";
@@ -87,6 +88,26 @@ const AuthDiagnostic = () => {
 };
 
 function App() {
+  useEffect(() => {
+    const initDb = async () => {
+      try {
+        const result = await databaseInitService.initialize();
+        if (!result.success) {
+          console.error('Database initialization error:', result.error);
+          toast({
+            title: 'System Notice',
+            description: 'Some features may not be available. Please contact the administrator.',
+            variant: 'destructive'
+          });
+        }
+      } catch (error) {
+        console.error('Failed to initialize database:', error);
+      }
+    };
+    
+    initDb();
+  }, []);
+
   return (
     <FunctionalErrorBoundary>
       <main>

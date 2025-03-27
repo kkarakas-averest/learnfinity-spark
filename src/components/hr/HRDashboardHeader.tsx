@@ -1,7 +1,5 @@
 import React from "@/lib/react-helpers";
-import { useNotifications } from '@/hooks/useNotifications';
-import NotificationBadge from '../learner/NotificationBadge';
-import NotificationPanel from '../learner/NotificationPanel';
+import UserNotifications from '@/components/navigation/UserNotifications';
 import { Button } from '@/components/ui/button';
 import { useHRAuth } from '@/state';
 import { useNavigate } from 'react-router-dom';
@@ -25,18 +23,7 @@ const HRDashboardHeader: React.FC<HRDashboardHeaderProps> = ({
   onLogout
 }) => {
   const navigate = useNavigate();
-  const [showNotifications, setShowNotifications] = React.useState(false);
-  const { 
-    notifications, 
-    unreadCount, 
-    markAsRead, 
-    markAllAsRead 
-  } = useNotifications();
   
-  const toggleNotifications = () => {
-    setShowNotifications(prev => !prev);
-  };
-
   const navigateToSettings = () => {
     navigate('/hr-dashboard/settings');
   };
@@ -90,21 +77,7 @@ const HRDashboardHeader: React.FC<HRDashboardHeaderProps> = ({
         </div>
         
         <div className="flex items-center space-x-2">
-          <div className="relative">
-            <NotificationBadge 
-              count={unreadCount} 
-              onClick={toggleNotifications} 
-            />
-            
-            {showNotifications && (
-              <NotificationPanel 
-                notifications={notifications} 
-                onClose={() => setShowNotifications(false)} 
-                onReadNotification={markAsRead}
-                onClearAll={markAllAsRead}
-              />
-            )}
-          </div>
+          <UserNotifications />
           
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
