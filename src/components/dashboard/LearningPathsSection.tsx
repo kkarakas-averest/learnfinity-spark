@@ -1,4 +1,3 @@
-
 import { ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import LearningPathCard from "@/components/LearningPathCard";

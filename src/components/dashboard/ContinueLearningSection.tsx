@@ -1,11 +1,9 @@
-
 import React from "@/lib/react-helpers";
 import CourseCard from "@/components/CourseCard";
 import { useLearningData } from "@/hooks/useLearningData";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const ContinueLearningSection = () => {
-  // Use React.useState instead of destructuring useState
   const { getActiveCourses, coursesLoading, coursesError } = useLearningData();
   const activeCourses = getActiveCourses();
 
