@@ -228,7 +228,7 @@ export const hrEmployeeService = {
           if (error.code === '42P01') {
             console.warn(`Table ${table} does not exist`);
             missingSampleTables.push(table);
-          } else if (error.status === 400) {
+          } else if (error.code === 'PGRST116') {
             console.warn(`API error checking table ${table}:`, error.message);
             // Don't consider 400 errors as missing tables for essential functionality
           }
@@ -828,6 +828,120 @@ export const hrEmployeeService = {
         error: error instanceof Error ? error.message : 'Unknown error',
         departments: []
       };
+    }
+  },
+
+  /**
+   * Get employee courses
+   * @param employeeId - The ID of the employee
+   * @returns A promise with the courses data and any error
+   */
+  async getEmployeeCourses(employeeId: string) {
+    try {
+      const { data, error } = await supabase
+        .from('hr_course_enrollments')
+        .select(`
+          id,
+          course_id,
+          enrollment_date,
+          completion_date,
+          progress,
+          courses:course_id (
+            id,
+            title,
+            description
+          )
+        `)
+        .eq('employee_id', employeeId);
+
+      if (error) throw error;
+
+      // Format the data to match our Course interface
+      const formattedCourses = data.map(enrollment => ({
+        id: enrollment.course_id,
+        title: enrollment.courses ? (enrollment.courses as any).title : '',
+        description: enrollment.courses ? (enrollment.courses as any).description : '',
+        progress: enrollment.progress,
+        enrollment_date: enrollment.enrollment_date,
+        completion_date: enrollment.completion_date
+      }));
+
+      return { data: formattedCourses, error: null };
+    } catch (error) {
+      console.error('Error fetching employee courses:', error);
+      return { data: null, error };
+    }
+  },
+
+  /**
+   * Get employee skills
+   * @param employeeId - The ID of the employee
+   * @returns A promise with the skills data and any error
+   */
+  async getEmployeeSkills(employeeId: string) {
+    try {
+      const { data, error } = await supabase
+        .from('hr_employee_skills')
+        .select(`
+          id,
+          skill_name,
+          proficiency_level,
+          is_in_progress
+        `)
+        .eq('employee_id', employeeId);
+
+      if (error) throw error;
+
+      // Format the data to match our Skill interface
+      const formattedSkills = data.map(skill => ({
+        name: skill.skill_name,
+        level: skill.proficiency_level,
+        inProgress: skill.is_in_progress
+      }));
+
+      return { data: formattedSkills, error: null };
+    } catch (error) {
+      console.error('Error fetching employee skills:', error);
+      return { data: null, error };
+    }
+  },
+
+  /**
+   * Get employee activities
+   * @param employeeId - The ID of the employee
+   * @param limit - Optional limit for the number of activities to return
+   * @returns A promise with the activities data and any error
+   */
+  async getEmployeeActivities(employeeId: string, limit = 10) {
+    try {
+      const { data, error } = await supabase
+        .from('hr_employee_activities')
+        .select(`
+          id,
+          activity_type,
+          description,
+          created_at,
+          metadata
+        `)
+        .eq('employee_id', employeeId)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+      if (error) throw error;
+
+      // Format the data to match our Activity interface
+      const formattedActivities = data.map(activity => ({
+        id: activity.id,
+        activity_type: activity.activity_type,
+        description: activity.description,
+        timestamp: activity.created_at,
+        course_title: activity.metadata?.course_title || undefined
+      }));
+
+      return { data: formattedActivities, error: null };
+    } catch (error) {
+      console.error('Error fetching employee activities:', error);
+      return { data: null, error };
     }
   }
 };

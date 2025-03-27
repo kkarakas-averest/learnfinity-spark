@@ -12,11 +12,38 @@ declare module '@/services/hrEmployeeService' {
     resume_url?: string;
   }
 
+  export interface Course {
+    id: string;
+    title: string;
+    description?: string;
+    progress: number;
+    enrollment_date?: string;
+    completion_date?: string;
+  }
+
+  export interface Skill {
+    name: string;
+    level: 'beginner' | 'intermediate' | 'advanced' | 'expert';
+    inProgress: boolean;
+  }
+
+  export interface Activity {
+    id: string;
+    activity_type: string;
+    description: string;
+    timestamp: string;
+    course_title?: string;
+  }
+
   export interface EmployeeService {
     initialize(): Promise<{ success: boolean; error?: any }>;
     createMissingTables(missingTables: string[]): Promise<{ success: boolean; error?: any }>;
     getEmployees(): Promise<{ success: boolean; employees?: any[]; error?: any }>;
     getEmployee(id: string): Promise<{ data: Employee; error: any }>;
+    getEmployeeCourses(employeeId: string): Promise<{ data: Course[] | null; error: any }>;
+    getEmployeeSkills(employeeId: string): Promise<{ data: Skill[] | null; error: any }>;
+    getEmployeeActivities(employeeId: string, limit?: number): Promise<{ data: Activity[] | null; error: any }>;
+    getDepartments(): Promise<{ success: boolean; departments?: any[]; error?: any }>;
     createEmployee(employeeData: any): Promise<{ id: string; error?: { message: string } }>;
     updateEmployee(id: string, employeeData: any): Promise<{ success: boolean; error?: any }>;
     deleteEmployee(id: string): Promise<{ success: boolean; error?: any }>;
