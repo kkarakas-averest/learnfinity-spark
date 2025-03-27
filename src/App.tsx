@@ -9,7 +9,6 @@ import LearnerDashboard from "./pages/LearnerDashboard";
 import NotFound from "./pages/NotFound";
 import ProfilePage from "./pages/ProfilePage";
 import ProfileSettings from "./pages/ProfileSettings";
-import SuperAdminDashboard from "./pages/SuperAdminDashboard";
 import HRDashboard from "./pages/HRDashboard";
 import HRLogin from "./pages/HRLogin";
 import HRLoginMigrated from "./pages/HRLoginMigrated";
@@ -142,24 +141,6 @@ function App() {
             } 
           />
           
-          <Route 
-            path="/admin" 
-            element={
-              <ProtectedRouteMigrated allowedRoles={["superadmin"]}>
-                <SuperAdminDashboard />
-              </ProtectedRouteMigrated>
-            } 
-          />
-          
-          <Route 
-            path="/admin/*" 
-            element={
-              <ProtectedRouteMigrated allowedRoles={["superadmin"]}>
-                <SuperAdminDashboard />
-              </ProtectedRouteMigrated>
-            } 
-          />
-          
           {/* HR Dashboard routes */}
           <Route 
             path="/hr-dashboard" 
@@ -249,8 +230,8 @@ function App() {
           
           <Route path="*" element={<NotFound />} />
         </Routes>
+        <Toaster />
       </main>
-      <Toaster />
     </FunctionalErrorBoundary>
   );
 }
