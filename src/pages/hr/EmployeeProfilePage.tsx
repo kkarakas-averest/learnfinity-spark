@@ -322,7 +322,7 @@ const EmployeeProfilePage: React.FC = () => {
       </div>
     );
   };
-  
+
   return (
     <div className="container mx-auto">
       <div className="flex justify-between items-center mb-6">
@@ -330,8 +330,8 @@ const EmployeeProfilePage: React.FC = () => {
         <div className="space-x-2">
           <Button variant="outline" asChild>
             <Link to={`${ROUTES.HR_DASHBOARD}/employees`}>
-              Back to List
-            </Link>
+            Back to List
+          </Link>
           </Button>
         </div>
       </div>
@@ -368,10 +368,10 @@ const EmployeeProfilePage: React.FC = () => {
                         <span>{employee.department}</span>
                       </div>
                     )}
-                  </div>
-                </div>
-              </div>
-              
+            </div>
+            </div>
+          </div>
+
               <div className="flex flex-col sm:flex-row gap-2">
                 <Button variant="outline" asChild>
                   <Link to={`${ROUTES.HR_DASHBOARD_EMPLOYEES_EDIT.replace(':id', employee.id)}`}>
@@ -388,22 +388,22 @@ const EmployeeProfilePage: React.FC = () => {
                 </Button>
               </div>
             </div>
-
+            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
               <div>
                 <div className="space-y-3">
-                  <div className="flex items-center">
+              <div className="flex items-center">
                     <Mail className="h-4 w-4 mr-2 text-gray-500" />
                     <span className="text-sm text-gray-500">Email:</span>
                     <span className="ml-2">{employee.email}</span>
-                  </div>
+              </div>
                   
                   <div className="flex items-center">
                     <PhoneCall className="h-4 w-4 mr-2 text-gray-500" />
                     <span className="text-sm text-gray-500">Phone:</span>
                     <span className="ml-2">{employee.phone || 'N/A'}</span>
-                  </div>
-                  
+          </div>
+
                   <div className="flex items-center">
                     <Calendar className="h-4 w-4 mr-2 text-gray-500" />
                     <span className="text-sm text-gray-500">Joined:</span>
@@ -560,9 +560,9 @@ const EmployeeProfilePage: React.FC = () => {
                             </div>
                             <div className="text-xs text-gray-400">
                               {formatDate(activity.timestamp)}
-                            </div>
-                          </div>
-                        </div>
+          </div>
+        </div>
+      </div>
                       </div>
                     ))}
                   </div>

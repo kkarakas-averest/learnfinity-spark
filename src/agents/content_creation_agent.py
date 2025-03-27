@@ -8,6 +8,7 @@ import sys
 import json
 from datetime import datetime
 import uuid
+import requests
 
 # Add parent directory to path to import correctly
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -22,8 +23,21 @@ from agents.db_utils import (
 from dotenv import load_dotenv
 load_dotenv()
 
+# Import our custom Groq API integration
+try:
+    from lib.llm.llm_service import LLMService
+    from lib.llm.groq_api import GroqAPI
+    groq_api_available = True
+except ImportError:
+    print("WARNING: Custom Groq API integration not available")
+    groq_api_available = False
+
 # Get API key
-GROQ_API_KEY = os.getenv('GROQ_API_KEY')
+GROQ_API_KEY = os.getenv('VITE_GROQ_API_KEY')
+if not GROQ_API_KEY:
+    GROQ_API_KEY = os.getenv('GROQ_API_KEY')
+    if not GROQ_API_KEY:
+        print("WARNING: No Groq API key found in environment variables")
 
 class ContentCreationAgent:
     """
@@ -33,12 +47,87 @@ class ContentCreationAgent:
     
     def __init__(self):
         """Initialize the Content Creation Agent"""
-        # In a real implementation, this would initialize the LLM client
-        # For this example, we'll just print the API key availability
-        if GROQ_API_KEY:
-            print("Content Creation Agent initialized with Groq API key")
+        # Initialize our Groq API
+        self.llm_service = None
+        self.groq_api = None
+        
+        # Available models (in preference order)
+        self.available_models = [
+            'llama3-8b-8192',
+            'llama3-70b-8192',
+            'gemma-7b-it'
+        ]
+        self.default_model = 'llama3-8b-8192'
+        
+        if GROQ_API_KEY and groq_api_available:
+            try:
+                # Initialize our custom Groq LLM service
+                self.llm_service = LLMService.getInstance({
+                    'provider': 'groq',
+                    'apiKey': GROQ_API_KEY, 
+                    'model': self.default_model,
+                    'debugMode': True
+                })
+                # For direct API access
+                self.groq_api = GroqAPI(
+                    GROQ_API_KEY,
+                    self.default_model,
+                    {'debug': True}
+                )
+                print("Content Creation Agent initialized with custom Groq API integration")
+                
+                # Verify model availability
+                self._check_model_availability()
+            except Exception as e:
+                print(f"Error initializing custom Groq API: {str(e)}")
+                self.llm_service = None
+                self.groq_api = None
         else:
-            print("Warning: GROQ_API_KEY not set")
+            print("Warning: Falling back to mock content generation")
+    
+    def _check_model_availability(self):
+        """Check if the configured model is available and update if needed"""
+        if not self.groq_api:
+            return
+            
+        try:
+            # Request available models from Groq API
+            headers = {
+                "Authorization": f"Bearer {GROQ_API_KEY}"
+            }
+            
+            response = requests.get("https://api.groq.com/openai/v1/models", headers=headers)
+            
+            if response.status_code != 200:
+                print(f"Warning: Failed to check model availability. Status code: {response.status_code}")
+                return
+                
+            models_data = response.json()
+            available_models = [model["id"] for model in models_data.get("data", [])]
+            
+            # Check if current model is available
+            current_model = self.groq_api.getModel()
+            
+            if current_model not in available_models:
+                print(f"Warning: Current model '{current_model}' is not available in Groq API")
+                
+                # Try to find an available model from our preference list
+                for model in self.available_models:
+                    if model in available_models:
+                        print(f"Switching to available model: {model}")
+                        self.groq_api.setModel(model)
+                        if self.llm_service:
+                            self.llm_service.setModel(model)
+                        return
+                        
+                print("Warning: No preferred models are available. Falling back to mock content generation")
+                self.groq_api = None
+                self.llm_service = None
+            else:
+                print(f"Model '{current_model}' is available and will be used for content generation")
+                
+        except Exception as e:
+            print(f"Error checking model availability: {str(e)}")
     
     def create_course_content(self, employee_id, course_id, course_info):
         """
@@ -57,9 +146,159 @@ class ContentCreationAgent:
         if not profile:
             raise ValueError(f"No profile found for employee {employee_id}")
         
-        # In a real implementation, this would use the LLM to generate content
-        # For this example, we'll create mock content
-        
+        # Generate course content using Groq API if available
+        if self.groq_api and self.groq_api.isConfigured():
+            print(f"Using Groq API to generate content for course: {course_info.get('title', 'Untitled')}")
+            return self._generate_course_content_with_groq(course_id, course_info, profile)
+        else:
+            # Fallback to mock content generation
+            print(f"Using mock generator for course: {course_info.get('title', 'Untitled')}")
+            return self._generate_mock_course_content(course_id, course_info, profile)
+    
+    def _generate_course_content_with_groq(self, course_id, course_info, profile):
+        """Generate course content using Groq API"""
+        try:
+            # Build the prompt for the course overview
+            overview_prompt = f"""
+            Create a comprehensive course overview for a course titled "{course_info.get('title', 'Untitled Course')}".
+            
+            The course is for an employee with the following profile:
+            {json.dumps(profile, indent=2)}
+            
+            Course information:
+            {json.dumps(course_info, indent=2)}
+            
+            Please generate a detailed course overview in JSON format with the following structure:
+            {{
+                "summary": "A concise but informative summary of the course",
+                "key_concepts": ["List of 3-5 key concepts covered"],
+                "prerequisites": ["Any prerequisite knowledge or skills"],
+                "target_audience": ["The intended audience"],
+                "difficulty_level": "Beginner/Intermediate/Advanced",
+                "estimated_completion_time": "Estimated time to complete the course"
+            }}
+            """
+            
+            # Get the course overview
+            overview_response = self.groq_api.complete(overview_prompt, {
+                'temperature': 0.3,
+                'maxTokens': 1000,
+                'system': 'You are an expert course content creator who produces high-quality educational materials.'
+            })
+            
+            # Parse the overview
+            try:
+                course_overview = json.loads(overview_response.text)
+            except json.JSONDecodeError:
+                # Fallback if the response isn't valid JSON
+                course_overview = self._generate_course_overview(course_info, profile)
+                
+            # Build prompt for module generation
+            modules_prompt = f"""
+            Create {min(5, int(course_info.get('estimated_duration', '10 hours').split()[0]) // 2)} educational modules for a course titled "{course_info.get('title', 'Untitled Course')}".
+            
+            Course overview:
+            {json.dumps(course_overview, indent=2)}
+            
+            Employee profile:
+            {json.dumps(profile, indent=2)}
+            
+            For each module, include:
+            1. A title and sequence number
+            2. Introduction text explaining the module
+            3. 3-4 sections, each with a title and content
+            4. A summary of the module
+            5. A quiz with 5 questions to test understanding
+            
+            Return the modules as a JSON array following this structure:
+            [
+                {{
+                    "id": "unique_id",
+                    "title": "Module Title",
+                    "sequence_order": 1,
+                    "content": {{
+                        "introduction": "Introduction text",
+                        "sections": [
+                            {{
+                                "title": "Section Title",
+                                "content": [
+                                    {{"type": "text", "value": "Text content"}},
+                                    {{"type": "code_example", "value": "Sample code"}}
+                                ]
+                            }}
+                        ],
+                        "summary": "Module summary"
+                    }},
+                    "estimated_duration": "30 minutes",
+                    "quiz": {{
+                        "title": "Module Quiz",
+                        "description": "Test your understanding",
+                        "questions": [
+                            {{
+                                "id": "q1",
+                                "text": "Question text",
+                                "type": "multiple_choice",
+                                "options": [
+                                    {{"id": "a", "text": "Option A"}},
+                                    {{"id": "b", "text": "Option B"}},
+                                    {{"id": "c", "text": "Option C"}},
+                                    {{"id": "d", "text": "Option D"}}
+                                ],
+                                "correct_answer": "a",
+                                "explanation": "Explanation of the correct answer"
+                            }}
+                        ],
+                        "passing_score": 80
+                    }}
+                }}
+            ]
+            """
+            
+            # Get the modules
+            modules_response = self.groq_api.complete(modules_prompt, {
+                'temperature': 0.5,
+                'maxTokens': 4000,
+                'system': 'You are an expert course content creator. Produce detailed educational modules in JSON format.'
+            })
+            
+            # Parse the modules
+            try:
+                modules = json.loads(modules_response.text)
+            except json.JSONDecodeError:
+                # Fallback if the response isn't valid JSON
+                modules = self._generate_modules(course_info, profile)
+            
+            # Assemble the course content
+            course_content = {
+                "id": course_id,
+                "title": course_info.get("title", "Untitled Course"),
+                "description": course_info.get("description", ""),
+                "overview": course_overview,
+                "modules": modules,
+                "employee_id": profile.get("employee_id"),
+                "learning_objectives": course_info.get("learning_objectives", []),
+                "metadata": {
+                    "course_id": course_id,
+                    "created_at": datetime.now().isoformat(),
+                    "updated_at": datetime.now().isoformat(),
+                    "generated_for": profile.get("employee_id"),
+                    "generated_with": "Groq API"
+                }
+            }
+            
+            # Save the course content
+            save_path = save_course_content(course_id, course_content)
+            print(f"Course content saved to: {save_path}")
+            
+            return course_content
+            
+        except Exception as e:
+            print(f"Error generating course content with Groq API: {str(e)}")
+            # Fallback to mock content generation
+            return self._generate_mock_course_content(course_id, course_info, profile)
+    
+    def _generate_mock_course_content(self, course_id, course_info, profile):
+        """Generate mock course content as a fallback"""
         # Generate course overview
         course_overview = self._generate_course_overview(course_info, profile)
         
@@ -73,19 +312,20 @@ class ContentCreationAgent:
             "description": course_info.get("description", ""),
             "overview": course_overview,
             "modules": modules,
-            "employee_id": employee_id,
+            "employee_id": profile.get("employee_id"),
             "learning_objectives": course_info.get("learning_objectives", []),
             "metadata": {
                 "course_id": course_id,
                 "created_at": datetime.now().isoformat(),
                 "updated_at": datetime.now().isoformat(),
-                "generated_for": employee_id
+                "generated_for": profile.get("employee_id"),
+                "generated_with": "mock generator"
             }
         }
         
         # Save the course content
         save_path = save_course_content(course_id, course_content)
-        print(f"Course content saved to: {save_path}")
+        print(f"Mock course content saved to: {save_path}")
         
         return course_content
     
@@ -116,8 +356,6 @@ class ContentCreationAgent:
     
     def _generate_modules(self, course_info, profile):
         """Generate course modules based on course info and profile"""
-        # In a real implementation, this would use the LLM
-        
         # Define module count based on course duration
         duration_str = course_info.get("estimated_duration", "10 hours")
         try:
@@ -249,48 +487,45 @@ class ContentCreationAgent:
     
     def create_courses_for_learning_path(self, employee_id):
         """
-        Create all courses for a learning path
+        Create course content for all courses in a learning path
         
         Args:
             employee_id: The ID of the employee
             
         Returns:
-            List of created course IDs
+            List of created courses with status
         """
         # Load the learning path
         learning_path = load_learning_path(employee_id)
         if not learning_path:
             raise ValueError(f"No learning path found for employee {employee_id}")
         
-        # Extract courses from the learning path
-        courses = learning_path.get("recommended_courses", [])
+        # Extract courses from learning path
+        courses = learning_path.get("courses", [])
         if not courses:
-            print(f"No courses found in learning path for employee {employee_id}")
-            return []
+            raise ValueError(f"No courses found in learning path for employee {employee_id}")
         
-        # Create content for each course
         created_courses = []
         
+        # Create content for each course
         for course in courses:
-            course_id = course.get("course_id", str(uuid.uuid4()))
-            print(f"Creating content for course: {course.get('title', 'Untitled Course')}")
-            
+            course_id = course.get("id", f"course_{str(uuid.uuid4())[:8]}")
             try:
-                course_content = self.create_course_content(employee_id, course_id, course)
+                self.create_course_content(employee_id, course_id, course)
                 created_courses.append({
                     "course_id": course_id,
                     "title": course.get("title", "Untitled Course"),
                     "success": True
                 })
             except Exception as e:
-                print(f"Error creating content for course {course_id}: {e}")
+                print(f"Error creating content for course {course_id}: {str(e)}")
                 created_courses.append({
                     "course_id": course_id,
                     "title": course.get("title", "Untitled Course"),
                     "success": False,
                     "error": str(e)
                 })
-        
+                
         return created_courses
 
 # Simple test function

@@ -1,7 +1,5 @@
 import React from "@/lib/react-helpers";
-import { useNotifications } from '@/hooks/useNotifications';
-import NotificationBadge from './NotificationBadge';
-import NotificationPanel from './NotificationPanel';
+import UserNotifications from '@/components/navigation/UserNotifications';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/state';
 import { useNavigate } from 'react-router-dom';
@@ -9,17 +7,6 @@ import { useNavigate } from 'react-router-dom';
 const DashboardHeader: React.FC = () => {
   const { user, userDetails, signOut } = useAuth();
   const navigate = useNavigate();
-  const [showNotifications, setShowNotifications] = React.useState(false);
-  const { 
-    notifications, 
-    unreadCount, 
-    markAsRead, 
-    markAllAsRead 
-  } = useNotifications();
-  
-  const toggleNotifications = () => {
-    setShowNotifications(prev => !prev);
-  };
   
   const handleLogout = async () => {
     try {
@@ -43,21 +30,7 @@ const DashboardHeader: React.FC = () => {
         </div>
         
         <div className="flex items-center space-x-2">
-          <div className="relative">
-            <NotificationBadge 
-              count={unreadCount} 
-              onClick={toggleNotifications} 
-            />
-            
-            {showNotifications && (
-              <NotificationPanel 
-                notifications={notifications} 
-                onClose={() => setShowNotifications(false)} 
-                onReadNotification={markAsRead}
-                onClearAll={markAllAsRead}
-              />
-            )}
-          </div>
+          <UserNotifications />
           
           <div className="flex items-center ml-4">
             <div className="mr-3 hidden md:block text-right">

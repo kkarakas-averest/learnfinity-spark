@@ -1,0 +1,55 @@
+{
+  "learning_path": {
+    "courses": [
+      {
+        "title": "Deep Learning with TensorFlow",
+        "description": "Master the fundamentals of deep learning using TensorFlow, including neural networks, convolutional networks, and recurrent networks.",
+        "learning_objectives": [
+          "Understand the basics of deep learning",
+          "Implement neural networks using TensorFlow",
+          "Apply deep learning to real-world problems"
+        ],
+        "estimated_duration": 8,
+        "relevance_to_role_and_career": "Deep learning is a key area of focus in data science, and this course will help Alex develop skills that are highly relevant to his role.",
+        "content_type": "video"
+      },
+      {
+        "title": "MLOps with Kubeflow",
+        "description": "Learn how to deploy, manage, and monitor machine learning models using Kubeflow, a popular open-source platform for MLOps.",
+        "learning_objectives": [
+          "Understand the importance of MLOps",
+          "Deploy and manage machine learning models using Kubeflow",
+          "Monitor and optimize model performance"
+        ],
+        "estimated_duration": 6,
+        "relevance_to_role_and_career": "MLOps is a critical area of focus in data science, and this course will help Alex develop skills that are highly relevant to his role.",
+        "content_type": "interactive"
+      },
+      {
+        "title": "Advanced Machine Learning with Python",
+        "description": "Take your machine learning skills to the next level with this advanced course, covering topics such as natural language processing, computer vision, and recommender systems.",
+        "learning_objectives": [
+          "Understand advanced machine learning concepts",
+          "Apply machine learning to real-world problems",
+          "Develop skills in natural language processing and computer vision"
+        ],
+        "estimated_duration": 10,
+        "relevance_to_role_and_career": "This course will help Alex develop advanced machine learning skills that are highly relevant to his role and career.",
+        "content_type": "reading"
+      }
+    ],
+    "sequence": [
+      "Deep Learning with TensorFlow",
+      "MLOps with Kubeflow",
+      "Advanced Machine Learning with Python"
+    ]
+  },
+  "metadata": {
+    "employee_id": "test_d1f4209e",
+    "generated_at": "2025-03-27T10:11:25.135310",
+    "model": "llama3-8b-8192",
+    "prompt_tokens": 370,
+    "completion_tokens": 468,
+    "total_tokens": 838
+  }
+}

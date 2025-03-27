@@ -37,7 +37,8 @@ export class OnboardingService {
         company_id: '1', // Default company ID
       });
       
-      const employeeId = createResult.id;
+      // Access employeeId from the data object in the response
+      const employeeId = createResult.data?.id;
       
       if (!employeeId || createResult.error) {
         throw new Error(createResult.error?.message || 'Failed to create employee in HR system');

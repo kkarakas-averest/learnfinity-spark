@@ -1,0 +1,187 @@
+{
+  "course_content": {
+    "course_overview": {
+      "title": "Deep Learning with TensorFlow",
+      "description": "Master the fundamentals of deep learning using TensorFlow, including neural networks, convolutional networks, and recurrent networks.",
+      "learning_objectives": [
+        "Understand the basics of deep learning",
+        "Implement neural networks using TensorFlow",
+        "Apply deep learning to real-world problems"
+      ]
+    },
+    "modules": [
+      {
+        "title": "Module 1: Introduction to Deep Learning",
+        "description": "In this module, we will introduce the basics of deep learning, including neural networks, activation functions, and optimization techniques.",
+        "learning_objectives": [
+          "Understand the basics of deep learning",
+          "Identify the key components of a neural network"
+        ],
+        "sections": [
+          {
+            "title": "Introduction to Neural Networks",
+            "content": "This section will introduce the concept of neural networks, including the architecture, activation functions, and optimization techniques."
+          },
+          {
+            "title": "Activation Functions",
+            "content": "This section will cover the different types of activation functions used in neural networks, including sigmoid, tanh, and ReLU."
+          },
+          {
+            "title": "Optimization Techniques",
+            "content": "This section will introduce the different optimization techniques used in deep learning, including stochastic gradient descent and Adam optimizer."
+          },
+          {
+            "title": "Quiz",
+            "questions": [
+              {
+                "question": "What is the primary function of a neural network?",
+                "answers": [
+                  "To classify data",
+                  "To predict continuous values",
+                  "To recognize patterns in data"
+                ],
+                "correct_answer": 2
+              },
+              {
+                "question": "What is the purpose of an activation function?",
+                "answers": [
+                  "To introduce non-linearity to the network",
+                  "To reduce the number of parameters in the network",
+                  "To increase the number of layers in the network"
+                ],
+                "correct_answer": 0
+              },
+              {
+                "question": "What is the primary goal of optimization techniques in deep learning?",
+                "answers": [
+                  "To minimize the loss function",
+                  "To maximize the accuracy of the model",
+                  "To increase the number of iterations"
+                ],
+                "correct_answer": 0
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "title": "Module 2: Neural Networks with TensorFlow",
+        "description": "In this module, we will implement neural networks using TensorFlow, including building and training a neural network.",
+        "learning_objectives": [
+          "Implement neural networks using TensorFlow",
+          "Understand how to build and train a neural network"
+        ],
+        "sections": [
+          {
+            "title": "Building a Neural Network",
+            "content": "This section will cover how to build a neural network using TensorFlow, including creating layers, adding activation functions, and defining the loss function."
+          },
+          {
+            "title": "Training a Neural Network",
+            "content": "This section will cover how to train a neural network using TensorFlow, including defining the optimizer, setting the hyperparameters, and monitoring the training process."
+          },
+          {
+            "title": "TensorFlow Basics",
+            "content": "This section will cover the basics of TensorFlow, including tensors, sessions, and graphs."
+          },
+          {
+            "title": "Quiz",
+            "questions": [
+              {
+                "question": "What is the primary function of the TensorFlow library?",
+                "answers": [
+                  "To perform linear algebra operations",
+                  "To build and train neural networks",
+                  "To perform data visualization"
+                ],
+                "correct_answer": 1
+              },
+              {
+                "question": "What is the purpose of a session in TensorFlow?",
+                "answers": [
+                  "To create a new graph",
+                  "To run a graph",
+                  "To close a graph"
+                ],
+                "correct_answer": 1
+              },
+              {
+                "question": "What is the primary goal of the optimizer in a neural network?",
+                "answers": [
+                  "To minimize the loss function",
+                  "To maximize the accuracy of the model",
+                  "To increase the number of iterations"
+                ],
+                "correct_answer": 0
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "title": "Module 3: Convolutional Networks",
+        "description": "In this module, we will cover convolutional networks, including convolutional layers, pooling layers, and fully connected layers.",
+        "learning_objectives": [
+          "Understand the basics of convolutional networks",
+          "Implement convolutional networks using TensorFlow"
+        ],
+        "sections": [
+          {
+            "title": "Convolutional Layers",
+            "content": "This section will cover the basics of convolutional layers, including the kernel size, stride, and padding."
+          },
+          {
+            "title": "Pooling Layers",
+            "content": "This section will cover the basics of pooling layers, including max pooling and average pooling."
+          },
+          {
+            "title": "Fully Connected Layers",
+            "content": "This section will cover the basics of fully connected layers, including the number of neurons and the activation function."
+          },
+          {
+            "title": "Quiz",
+            "questions": [
+              {
+                "question": "What is the primary function of a convolutional layer?",
+                "answers": [
+                  "To reduce the spatial dimensions of the input",
+                  "To increase the spatial dimensions of the input",
+                  "To extract features from the input"
+                ],
+                "correct_answer": 2
+              },
+              {
+                "question": "What is the purpose of a pooling layer?",
+                "answers": [
+                  "To increase the spatial dimensions of the input",
+                  "To reduce the spatial dimensions of the input",
+                  "To extract features from the input"
+                ],
+                "correct_answer": 1
+              },
+              {
+                "question": "What is the primary goal of a fully connected layer?",
+                "answers": [
+                  "To reduce the number of neurons",
+                  "To increase the number of neurons",
+                  "To classify the input"
+                ],
+                "correct_answer": 2
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "id": "course_29094fd6",
+  "metadata": {
+    "course_id": "course_29094fd6",
+    "employee_id": "test_d1f4209e",
+    "generated_at": "2025-03-27T10:11:26.608332",
+    "model": "llama3-8b-8192",
+    "prompt_tokens": 449,
+    "completion_tokens": 1319,
+    "total_tokens": 1768
+  }
+}

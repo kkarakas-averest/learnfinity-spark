@@ -9,13 +9,27 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { hrEmployeeService } from '@/services/hrEmployeeService';
 import hrCourseService from '@/services/hrCourseService';
-import type { Employee } from '@/services/hrEmployeeService';
 import type { ProficiencyLevel } from '@/types/employee-profile.types';
 import type { SupabaseResponse } from '@/types/service-responses';
 import BulkEmployeeImport from '@/components/hr/BulkEmployeeImport';
-import { BookOpen, FileText, User } from 'lucide-react';
+import { BookOpen, FileText, User, CheckCircle } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
+
+// Define our own interfaces for the component
+interface Employee {
+  id: string;
+  name: string;
+  email: string;
+  department_id: string;
+  position_id?: string;
+  status: string;
+  phone?: string;
+  department?: string;
+  position?: string;
+}
 
 interface Department {
   id: string;
@@ -47,15 +61,39 @@ interface SkillFormData {
   isRequired: boolean;
 }
 
+// Response types for the API calls
+interface EmployeeResponse {
+  success: boolean;
+  data?: Employee;
+  error?: string;
+  id?: string;
+}
+
+interface SkillResponse {
+  success: boolean;
+  data?: any;
+  error?: string;
+}
+
+interface CourseResponse {
+  success: boolean;
+  data?: any;
+  error?: string;
+}
+
 export default function AddEmployeeForm() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = React.useState('basic-info');
   const [loading, setLoading] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
   const [loadingDepartments, setLoadingDepartments] = React.useState(false);
+  const [loadingPositions, setLoadingPositions] = React.useState(false);
   const [loadingCourses, setLoadingCourses] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = React.useState<string | null>(null);
   const [departments, setDepartments] = React.useState<Department[]>([]);
+  const [positions, setPositions] = React.useState<{id: string, title: string, department_id: string}[]>([]);
+  const [filteredPositions, setFilteredPositions] = React.useState<{id: string, title: string, department_id: string}[]>([]);
   const [courses, setCourses] = React.useState<Course[]>([]);
   const [selectedCourses, setSelectedCourses] = React.useState<string[]>([]);
   const [skills, setSkills] = React.useState<SkillFormData[]>([]);
@@ -76,8 +114,20 @@ export default function AddEmployeeForm() {
 
   React.useEffect(() => {
     loadDepartments();
+    loadPositions();
     loadCourses();
   }, []);
+
+  // Update filtered positions when department changes
+  React.useEffect(() => {
+    if (formData.department_id) {
+      setFilteredPositions(
+        positions.filter(position => position.department_id === formData.department_id)
+      );
+    } else {
+      setFilteredPositions([]);
+    }
+  }, [formData.department_id, positions]);
 
   const loadDepartments = async () => {
     try {
@@ -102,6 +152,30 @@ export default function AddEmployeeForm() {
     }
   };
 
+  const loadPositions = async () => {
+    try {
+      console.log('Loading positions...');
+      setLoadingPositions(true);
+      
+      const { data, error } = await supabase
+        .from('hr_positions')
+        .select('id, title, department_id');
+      
+      if (error) {
+        console.error('Failed to load positions:', error);
+        setError(error.message || 'Failed to load positions');
+      } else if (data) {
+        console.log('Setting positions:', data);
+        setPositions(data);
+      }
+    } catch (err) {
+      console.error('Error loading positions:', err);
+      setError('Error loading positions');
+    } finally {
+      setLoadingPositions(false);
+    }
+  };
+
   const loadCourses = async () => {
     try {
       setLoadingCourses(true);
@@ -123,119 +197,130 @@ export default function AddEmployeeForm() {
     e.preventDefault();
     setSubmitting(true);
     setError(null);
+    setSuccessMessage(null);
 
     try {
       // Validate required fields
       if (!formData.name.trim()) {
         setError('Employee name is required');
+        setSubmitting(false);
         return;
       }
 
       if (!formData.email.trim()) {
         setError('Email address is required');
+        setSubmitting(false);
         return;
       }
 
       if (!formData.department_id) {
         setError('Department selection is required');
+        setSubmitting(false);
         return;
       }
 
       console.log('Submitting form data:', formData);
       
-      // Call createEmployee without type constraints
+      // Call createEmployee
       const response = await hrEmployeeService.createEmployee(formData);
       console.log('Employee response:', response);
       
-      // Check response shape at runtime
-      if (typeof response === 'object' && response !== null) {
-        // If it has an error property with a message
-        if ('error' in response && response.error) {
-          console.error('Error creating employee:', response.error);
-          setError(typeof response.error === 'string' ? response.error : 'Failed to create employee');
-          return;
-        }
-        
-        let employeeId: string | undefined;
-        
-        // If it has an id directly on the response
-        if ('id' in response && response.id) {
-          employeeId = response.id as string;
-        } 
-        // If it has a data property with an id
-        else if ('data' in response && response.data && typeof response.data === 'object' && 'id' in response.data) {
-          const data = response.data as { id: string };
-          employeeId = data.id;
-        }
-        
-        if (employeeId) {
-          console.log('Employee created successfully with ID:', employeeId);
-          
-          // Show success message
-          const successMessage = 'Employee created successfully!';
-          console.log(successMessage);
-          
-          try {
-            // For skills - only attempt if we have skills to add
-            if (skills.length > 0) {
-              try {
-                console.log('Attempting to add skills:', skills);
-                // Check if the method exists at runtime without triggering TypeScript errors
-                if (typeof (hrEmployeeService as any).addEmployeeSkill === 'function') {
-                  await Promise.all(skills.map(async (skill) => {
-                    await (hrEmployeeService as any).addEmployeeSkill(employeeId, {
-                      name: skill.name,
-                      category: skill.category,
-                      proficiency: skill.proficiency,
-                      isRequired: skill.isRequired
-                    });
-                  }));
-                  console.log('Skills added successfully');
-                } else {
-                  console.log('Skills API not implemented yet');
-                }
-              } catch (skillErr) {
-                console.error('Error adding skills:', skillErr);
-                // Continue anyway - we'll show the employee profile
-              }
-            }
+      // Explicitly cast response to any to handle different response shapes
+      const anyResponse = response as any;
+      
+      // Check for errors
+      if (anyResponse.error) {
+        console.error('Error creating employee:', anyResponse.error);
+        setError(anyResponse.error || 'Failed to create employee');
+        setSubmitting(false);
+        return;
+      }
+      
+      // Employee creation was successful - get ID from response
+      let employeeId: string | undefined;
+      
+      // Handle different response formats
+      if (anyResponse.id) {
+        employeeId = anyResponse.id;
+      } else if (anyResponse.data && typeof anyResponse.data === 'object' && 'id' in anyResponse.data) {
+        employeeId = anyResponse.data.id as string;
+      }
+      
+      if (!employeeId) {
+        setError('Employee created but no ID was returned');
+        setSubmitting(false);
+        return;
+      }
+      
+      setSuccessMessage('Employee created successfully!');
+      console.log('Employee created successfully with ID:', employeeId);
+      
+      // Add skills one by one
+      let skillsAdded = 0;
+      if (skills.length > 0) {
+        try {
+          for (const skill of skills) {
+            const skillResponse = await (hrEmployeeService as any).addEmployeeSkill(employeeId, {
+              name: skill.name,
+              category: skill.category,
+              proficiency: skill.proficiency,
+              isRequired: skill.isRequired
+            });
             
-            // For courses - only attempt if we have courses to assign
-            if (selectedCourses.length > 0) {
-              try {
-                console.log('Attempting to assign courses:', selectedCourses);
-                // Check if the method exists at runtime without triggering TypeScript errors
-                if (typeof (hrEmployeeService as any).assignCourseToEmployee === 'function') {
-                  await Promise.all(selectedCourses.map(async (courseId) => {
-                    await (hrEmployeeService as any).assignCourseToEmployee(employeeId, courseId);
-                  }));
-                  console.log('Courses assigned successfully');
-                } else {
-                  console.log('Course assignment API not implemented yet');
-                }
-              } catch (courseErr) {
-                console.error('Error assigning courses:', courseErr);
-                // Continue anyway - we'll show the employee profile
-              }
+            if (!skillResponse.error) {
+              skillsAdded++;
+            } else {
+              console.warn('Failed to add skill:', skill.name, skillResponse.error);
             }
-          } catch (err) {
-            console.error('Error processing skills/courses:', err);
-            // Don't fail the whole operation - still navigate to the profile
           }
-          
-          // Navigate to employee profile
-          navigate(`/hr-dashboard/employees/${employeeId}`);
-          return;
+          console.log(`Added ${skillsAdded} of ${skills.length} skills`);
+        } catch (skillErr) {
+          console.error('Error adding skills:', skillErr);
         }
       }
       
-      // If we get here, we have an unexpected response format
-      console.error('Unexpected response format or missing ID:', response);
-      setError('Failed to create employee: Invalid response from server');
+      // Assign courses one by one
+      let coursesAssigned = 0;
+      if (selectedCourses.length > 0) {
+        try {
+          for (const courseId of selectedCourses) {
+            const courseResponse = await (hrEmployeeService as any).assignCourseToEmployee(employeeId, courseId);
+            
+            if (!courseResponse.error) {
+              coursesAssigned++;
+            } else {
+              console.warn('Failed to assign course:', courseId, courseResponse.error);
+            }
+          }
+          console.log(`Assigned ${coursesAssigned} of ${selectedCourses.length} courses`);
+        } catch (courseErr) {
+          console.error('Error assigning courses:', courseErr);
+        }
+      }
+      
+      // Show success message with details
+      const successDetails = [];
+      if (skillsAdded > 0) {
+        successDetails.push(`${skillsAdded} skills added`);
+      }
+      if (coursesAssigned > 0) {
+        successDetails.push(`${coursesAssigned} courses assigned`);
+      }
+      
+      const detailsMessage = successDetails.length > 0 
+        ? ` (${successDetails.join(', ')})`
+        : '';
+        
+      setSuccessMessage(`Employee created successfully${detailsMessage}!`);
+      
+      // Wait 1.5 seconds to show the success message before navigating
+      setTimeout(() => {
+        // Navigate to employee profile
+        navigate(`/hr-dashboard/employees/${employeeId}`);
+      }, 1500);
     } catch (err) {
       console.error('Exception creating employee:', err);
-      setError('Error creating employee');
-    } finally {
+      setError('An unexpected error occurred. Please try again.');
       setSubmitting(false);
     }
   };
@@ -330,6 +415,16 @@ export default function AddEmployeeForm() {
           </div>
         )}
 
+        {successMessage && (
+          <div className="mb-6">
+            <Alert>
+              <CheckCircle className="h-4 w-4" />
+              <AlertTitle>Success</AlertTitle>
+              <AlertDescription>{successMessage}</AlertDescription>
+            </Alert>
+          </div>
+        )}
+
         <TabsContent value="basic-info">
           <Card>
             <CardHeader>
@@ -337,7 +432,7 @@ export default function AddEmployeeForm() {
               <CardDescription>Enter the basic details for the new employee</CardDescription>
             </CardHeader>
             <CardContent>
-              <form className="space-y-4">
+              <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="name">Full Name *</Label>
                   <Input
@@ -346,6 +441,8 @@ export default function AddEmployeeForm() {
                     value={formData.name}
                     onChange={handleChange}
                     required
+                    disabled={submitting}
+                    placeholder="Enter employee's full name"
                   />
                 </div>
 
@@ -358,6 +455,8 @@ export default function AddEmployeeForm() {
                     value={formData.email}
                     onChange={handleChange}
                     required
+                    disabled={submitting}
+                    placeholder="Enter employee's email address"
                   />
                 </div>
 
@@ -366,6 +465,7 @@ export default function AddEmployeeForm() {
                   <Select
                     value={formData.department_id}
                     onValueChange={(value) => handleChange({ target: { name: 'department_id', value } } as any)}
+                    disabled={submitting}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select department" />
@@ -381,12 +481,34 @@ export default function AddEmployeeForm() {
                 </div>
 
                 <div className="space-y-2">
+                  <Label htmlFor="position_id">Position</Label>
+                  <Select
+                    value={formData.position_id}
+                    onValueChange={(value) => handleChange({ target: { name: 'position_id', value } } as any)}
+                    disabled={submitting || !formData.department_id || filteredPositions.length === 0}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={!formData.department_id ? "Select department first" : filteredPositions.length === 0 ? "No positions available" : "Select position"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {filteredPositions.map((position) => (
+                        <SelectItem key={position.id} value={position.id}>
+                          {position.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
                   <Label htmlFor="phone">Phone Number</Label>
                   <Input
                     id="phone"
                     name="phone"
                     value={formData.phone}
                     onChange={handleChange}
+                    disabled={submitting}
+                    placeholder="Enter employee's phone number"
                   />
                 </div>
                 
@@ -395,6 +517,7 @@ export default function AddEmployeeForm() {
                   <Select
                     value={formData.status}
                     onValueChange={(value) => handleChange({ target: { name: 'status', value } } as any)}
+                    disabled={submitting}
                   >
                     <SelectTrigger>
                       <SelectValue />

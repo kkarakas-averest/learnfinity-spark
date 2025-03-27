@@ -32,6 +32,11 @@ export class LLMService {
     completion_tokens: 0,
     requests: 0
   };
+  private availableModels: string[] = [
+    'llama3-8b-8192',
+    'llama3-70b-8192',
+    'gemma-7b-it'
+  ];
   
   /**
    * Initialize the LLM service with a specific provider
@@ -58,6 +63,11 @@ export class LLMService {
       switch (this.config.provider) {
         case 'groq':
           if (this.config.apiKey) {
+            // Validate if model is in the available models list
+            if (!this.availableModels.includes(this.config.model)) {
+              console.warn(`Model ${this.config.model} is not in the list of known available models. Attempting to use it anyway, but may fall back if unavailable.`);
+            }
+            
             this.provider = new GroqAPI(
               this.config.apiKey, 
               this.config.model,
@@ -104,7 +114,51 @@ export class LLMService {
   }
   
   /**
-   * Get a completion from the LLM provider
+   * Try to get a completion, falling back to alternative models if needed
+   */
+  private async tryWithFallbacks(
+    prompt: string, 
+    options: any
+  ): Promise<{ text: string; usage: any }> {
+    // First try with the configured model
+    try {
+      return await this.provider.complete(prompt, options);
+    } catch (error) {
+      if (this.config.provider === 'groq' && error.message?.includes('model')) {
+        console.warn(`Error with model ${this.config.model}: ${error.message}`);
+        
+        // Try alternative models if available
+        for (const alternativeModel of this.availableModels) {
+          if (alternativeModel !== this.config.model) {
+            try {
+              console.log(`Trying alternative model: ${alternativeModel}`);
+              // Create a temporary provider with the alternative model
+              const tempProvider = new GroqAPI(
+                this.config.apiKey,
+                alternativeModel,
+                { 
+                  maxRetries: 1, // Reduced retries for fallback
+                  debug: this.config.debugMode
+                }
+              );
+              
+              const result = await tempProvider.complete(prompt, options);
+              console.log(`Successfully used alternative model: ${alternativeModel}`);
+              return result;
+            } catch (fallbackError) {
+              console.warn(`Alternative model ${alternativeModel} also failed: ${fallbackError.message}`);
+            }
+          }
+        }
+      }
+      
+      // If all alternative models fail or if it's not a model issue, throw the original error
+      throw error;
+    }
+  }
+  
+  /**
+   * Get a completion from the LLM
    */
   public async complete(
     prompt: string,
@@ -120,35 +174,34 @@ export class LLMService {
     const fullOptions = {
       temperature: options.temperature ?? this.config.temperature,
       maxTokens: options.maxTokens ?? this.config.maxTokens,
-      system: options.system ?? systemPrompts.ragAnalysis,
-      topP: options.topP ?? 0.7,
+      system: options.system ?? 'You are a helpful assistant.',
+      topP: options.topP ?? 1,
       stopSequences: options.stopSequences ?? []
     };
     
     try {
-      // Set a timeout for the request
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => {
-          reject(new Error(`LLM request timed out after ${this.config.timeout}ms`));
-        }, this.config.timeout);
-      });
+      if (this.config.debugMode) {
+        console.log(`Sending prompt (${prompt.length} chars) to ${this.config.provider} with model ${this.config.model}`);
+      }
       
-      // Race the completion against the timeout
-      const result = await Promise.race([
-        this.provider.complete(prompt, fullOptions),
-        timeoutPromise
-      ]) as { text: string, usage: any };
+      // Start timer
+      const startTime = Date.now();
       
-      // Track usage
-      if (result.usage) {
-        this.usageTotals.total_tokens += result.usage.total_tokens;
-        this.usageTotals.prompt_tokens += result.usage.prompt_tokens;
-        this.usageTotals.completion_tokens += result.usage.completion_tokens;
-        this.usageTotals.requests += 1;
-        
-        if (this.config.debugMode && this.usageTotals.requests % 5 === 0) {
-          console.log('LLM usage totals:', this.usageTotals);
-        }
+      // Get completion with fallback strategy
+      const result = await this.tryWithFallbacks(prompt, fullOptions);
+      
+      // End timer
+      const endTime = Date.now();
+      const elapsedTime = (endTime - startTime) / 1000; // in seconds
+      
+      // Update usage statistics
+      this.usageTotals.requests += 1;
+      this.usageTotals.prompt_tokens += result.usage.prompt_tokens;
+      this.usageTotals.completion_tokens += result.usage.completion_tokens;
+      this.usageTotals.total_tokens += result.usage.total_tokens;
+      
+      if (this.config.debugMode) {
+        console.log(`LLM response received in ${elapsedTime.toFixed(2)}s. Tokens: prompt=${result.usage.prompt_tokens}, completion=${result.usage.completion_tokens}`);
       }
       
       return result.text;

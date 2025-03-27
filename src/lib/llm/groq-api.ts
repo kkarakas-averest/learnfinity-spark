@@ -46,6 +46,41 @@ export class GroqAPI implements LLMProvider {
   }
 
   /**
+   * Check if a model is available through the Groq API
+   */
+  public async checkModelAvailability(model: string = this.model): Promise<boolean> {
+    try {
+      // Make a request to list available models
+      const response = await fetch('https://api.groq.com/openai/v1/models', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${this.apiKey}`
+        }
+      });
+      
+      if (!response.ok) {
+        console.warn(`Failed to check model availability: ${response.status} ${response.statusText}`);
+        return false;
+      }
+      
+      const data = await response.json();
+      const availableModels = data.data || [];
+      
+      // Check if the model is in the list
+      const isAvailable = availableModels.some((m: any) => m.id === model);
+      
+      if (!isAvailable && this.options.debug) {
+        console.warn(`Model ${model} is not available in Groq API. Available models: ${availableModels.map((m: any) => m.id).join(', ')}`);
+      }
+      
+      return isAvailable;
+    } catch (error) {
+      console.error('Error checking model availability:', error);
+      return false;
+    }
+  }
+
+  /**
    * Call the Groq API to generate a completion
    */
   public async complete(
@@ -99,6 +134,13 @@ export class GroqAPI implements LLMProvider {
       const data = await response.json();
       
       if (!response.ok) {
+        // Handle specific error cases
+        if (data.error && data.error.message && 
+            (data.error.message.includes('model') || 
+             data.error.message.includes('not found') || 
+             data.error.message.includes('deprecated'))) {
+          throw new Error(`Groq API model error: ${data.error.message}`);
+        }
         throw new Error(`Groq API error: ${data.error?.message || 'Unknown error'}`);
       }
 
@@ -123,10 +165,26 @@ export class GroqAPI implements LLMProvider {
         usage
       };
     } catch (error) {
-      // Retry logic for transient errors
+      const errorMessage = error.message || String(error);
+      
+      // Check if it's a model-related error
+      const isModelError = errorMessage.includes('model') || 
+                           errorMessage.includes('not found') || 
+                           errorMessage.includes('deprecated');
+      
+      // Retry logic for transient errors or model errors if max retries > 0
       if (this.options.maxRetries > 0) {
-        console.warn(`Groq API request failed, retrying... (${this.options.maxRetries} attempts left)`);
-        return this.complete(prompt, options);
+        if (isModelError) {
+          console.warn(`Model error with ${this.model}, retrying might not help unless we change models.`);
+          // Let the caller handle model switching
+          throw error;
+        } else {
+          console.warn(`Groq API request failed, retrying... (${this.options.maxRetries} attempts left)`);
+          // Create a new instance with one less retry
+          const newOptions = { ...this.options, maxRetries: this.options.maxRetries - 1 };
+          const retryAPI = new GroqAPI(this.apiKey, this.model, newOptions);
+          return retryAPI.complete(prompt, options);
+        }
       }
       
       console.error('Error calling Groq API:', error);
