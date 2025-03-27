@@ -338,7 +338,18 @@ export const hrEmployeeService = {
         .eq('id', id)
         .single();
 
-      return { data, error };
+      if (error) {
+        return { data: null, error };
+      }
+
+      // Map the joined data to the employee object
+      const employeeData = {
+        ...data,
+        department: data.hr_departments?.name || null,
+        position: data.hr_positions?.title || null
+      };
+
+      return { data: employeeData, error: null };
     } catch (error) {
       console.error('Error in getEmployee:', error);
       return { data: null, error };
