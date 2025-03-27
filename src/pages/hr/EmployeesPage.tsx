@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from '@/lib/react-helpers';
 import { Link, useNavigate } from 'react-router-dom';
-import { ROUTES } from '@/lib/routes';
+import { ROUTES, buildRoute } from '@/lib/routes';
 import { hrEmployeeService } from '@/lib/services/hrEmployeeService';
 import { RAGStatusBadge } from '@/components/hr/RAGStatusBadge';
 import { Button } from '@/components/ui/button';
@@ -273,7 +273,7 @@ const EmployeesPage: React.FC = () => {
             <Download className="mr-2 h-4 w-4" />
             Export
           </Button>
-          <Button onClick={() => navigate(`${ROUTES.HR_DASHBOARD}/employees/new`)}>
+          <Button onClick={() => navigate(ROUTES.HR_DASHBOARD_EMPLOYEES_NEW)}>
             <UserPlus className="mr-2 h-4 w-4" />
             Add Employee
           </Button>
@@ -423,13 +423,13 @@ const EmployeesPage: React.FC = () => {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem>
-                            <Link to={`${ROUTES.HR_DASHBOARD}/employees/${employee.id}`} className="flex items-center w-full">
+                            <Link to={buildRoute.HR_DASHBOARD_EMPLOYEES_VIEW(employee.id)} className="flex items-center w-full">
                               <FileText className="mr-2 h-4 w-4" />
                               View Profile
                             </Link>
                           </DropdownMenuItem>
                           <DropdownMenuItem>
-                            <Link to={`${ROUTES.HR_DASHBOARD}/employees/${employee.id}/edit`} className="flex items-center w-full">
+                            <Link to={buildRoute.HR_DASHBOARD_EMPLOYEES_EDIT(employee.id)} className="flex items-center w-full">
                               <Settings className="mr-2 h-4 w-4" />
                               Edit
                             </Link>

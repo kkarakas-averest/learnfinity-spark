@@ -16,6 +16,7 @@ import NotFoundPage from './pages/NotFoundPage';
 import LearnerDashboardPage from './pages/learner/LearnerDashboardPage';
 import LearnerCoursesPage from './pages/learner/LearnerCoursesPage';
 import LearnerProfilePage from './pages/learner/LearnerProfilePage';
+import LearnerOnboardingPage from './pages/learner/LearnerOnboardingPage';
 import CourseDetailsPage from './pages/course/CourseDetailsPage';
 import CourseListPage from './pages/course/CourseListPage';
 import CreateCoursePage from './pages/course/CreateCoursePage';
@@ -73,6 +74,7 @@ const AppRouter: React.FC = () => {
           <TypeSafeRoute index element={<LearnerDashboardPage />} />
           <TypeSafeRoute path="courses" element={<LearnerCoursesPage />} />
           <TypeSafeRoute path="profile" element={<LearnerProfilePage />} />
+          <TypeSafeRoute path="onboarding" element={<LearnerOnboardingPage />} />
         </TypeSafeRoute>
 
         {/* Course Routes */}
