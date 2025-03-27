@@ -359,18 +359,15 @@ export const hrEmployeeService = {
   /**
    * Create a new employee
    * @param {EmployeeUpdate} employee - Employee data to create
-   * @returns {Promise<SupabaseResponse<Employee>>}
+   * @returns {Promise<{success: boolean, data?: Employee, error?: string, id?: string}>}
    */
-  async createEmployee(employee: EmployeeUpdate): Promise<SupabaseResponse<Employee>> {
+  async createEmployee(employee: EmployeeUpdate): Promise<{success: boolean, data?: Employee, error?: string, id?: string}> {
     try {
       // Ensure all required fields are present
       if (!employee.name || !employee.email) {
         return {
-          data: null,
-          error: {
-            message: 'Name and email are required fields',
-            code: 'VALIDATION_ERROR'
-          }
+          success: false,
+          error: 'Name and email are required fields'
         };
       }
 
@@ -391,13 +388,17 @@ export const hrEmployeeService = {
         .single();
 
       if (error) {
-        return { data: null, error };
+        console.error('Supabase error in createEmployee:', error);
+        return { 
+          success: false, 
+          error: error.message 
+        };
       }
 
       if (!data) {
         return { 
-          data: null, 
-          error: { message: 'No data returned from the database' } 
+          success: false, 
+          error: 'No data returned from the database' 
         };
       }
 
@@ -427,15 +428,16 @@ export const hrEmployeeService = {
         hire_date: data.hire_date || null
       };
 
-      return { data: employeeData, error: null };
-    } catch (error: any) {
-      console.error('Error in createEmployee:', error);
       return { 
-        data: null, 
-        error: {
-          message: error?.message || 'Unknown error occurred',
-          code: error?.code || 'UNKNOWN_ERROR'
-        }
+        success: true, 
+        data: employeeData, 
+        id: employeeData.id 
+      };
+    } catch (error: any) {
+      console.error('Exception in createEmployee:', error);
+      return { 
+        success: false, 
+        error: error?.message || 'Unknown error occurred'
       };
     }
   },
@@ -875,6 +877,7 @@ export const hrEmployeeService = {
 
   /**
    * Get all departments
+   * @returns {Promise<{success: boolean, departments?: Department[], error?: string}>}
    */
   async getDepartments() {
     try {
