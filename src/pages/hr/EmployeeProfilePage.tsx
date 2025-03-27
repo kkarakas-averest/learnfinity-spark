@@ -1,5 +1,5 @@
 import React from '@/lib/react-helpers';
-import { useParams, Link, useLocation } from 'react-router-dom';
+import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from '@/lib/react-helpers';
 import { ROUTES } from '@/lib/routes';
 import { 
@@ -37,6 +37,8 @@ import { Progress } from '@/components/ui/progress';
 import { hrEmployeeService } from '@/services/hrEmployeeService';
 import { format } from 'date-fns';
 import MessageEmployeeModal from '@/components/hr/MessageEmployeeModal';
+import { CourseAssignmentDialog } from '@/components/hr';
+import { toast } from '@/components/ui/use-toast';
 
 // Define interfaces for the data
 interface Employee {
@@ -54,6 +56,7 @@ interface Employee {
   last_active_at?: string;
   current_rag_status?: 'green' | 'amber' | 'red';
   last_rag_update?: string;
+  user_id?: string;
 }
 
 interface Course {
@@ -80,14 +83,15 @@ interface Activity {
 }
 
 const EmployeeProfilePage: React.FC = () => {
-  const params = useParams();
+  const { id } = useParams();
   const location = useLocation();
+  const navigate = useNavigate();
   // Fallback to extracting ID from URL if params doesn't provide it
-  const id = params.id || params.subpath || location.pathname.split('/').filter(Boolean)[2];
+  const extractedId = id || location.pathname.split('/').filter(Boolean)[2];
   
-  console.log('EmployeeProfilePage - params:', params);
+  console.log('EmployeeProfilePage - params:', { id });
   console.log('EmployeeProfilePage - location:', location.pathname);
-  console.log('EmployeeProfilePage - extracted ID:', id);
+  console.log('EmployeeProfilePage - extracted ID:', extractedId);
   
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -96,9 +100,10 @@ const EmployeeProfilePage: React.FC = () => {
   const [skills, setSkills] = useState<Skill[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [isMessageModalOpen, setIsMessageModalOpen] = useState<boolean>(false);
+  const [assignDialogOpen, setAssignDialogOpen] = useState<boolean>(false);
   
   useEffect(() => {
-    if (!id) {
+    if (!extractedId) {
       console.error('No employee ID provided');
       setError('No employee ID provided');
       setLoading(false);
@@ -106,7 +111,7 @@ const EmployeeProfilePage: React.FC = () => {
     }
     
     // Skip loading if this is a "new" employee page
-    if (id === 'new') {
+    if (extractedId === 'new') {
       console.log('New employee form - skipping data loading');
       setLoading(false);
       return;
@@ -115,9 +120,9 @@ const EmployeeProfilePage: React.FC = () => {
     const loadEmployeeData = async () => {
       setLoading(true);
       try {
-        console.log('Fetching employee with ID:', id);
+        console.log('Fetching employee with ID:', extractedId);
         // Fetch employee details
-        const { data: employeeData, error: employeeError } = await hrEmployeeService.getEmployee(id);
+        const { data: employeeData, error: employeeError } = await hrEmployeeService.getEmployee(extractedId);
         
         console.log('Employee data response:', { data: employeeData, error: employeeError });
         
@@ -128,8 +133,8 @@ const EmployeeProfilePage: React.FC = () => {
         setEmployee(employeeData);
         
         // Fetch courses
-        console.log('Fetching courses for employee:', id);
-        const { data: coursesData, error: coursesError } = await hrEmployeeService.getEmployeeCourses(id);
+        console.log('Fetching courses for employee:', extractedId);
+        const { data: coursesData, error: coursesError } = await hrEmployeeService.getEmployeeCourses(extractedId);
         console.log('Courses data response:', { success: !coursesError, count: coursesData?.length });
         if (!coursesError && coursesData) {
           setCourses(coursesData);
@@ -140,7 +145,7 @@ const EmployeeProfilePage: React.FC = () => {
         }
         
         // Fetch skills
-        const { data: skillsData, error: skillsError } = await hrEmployeeService.getEmployeeSkills(id);
+        const { data: skillsData, error: skillsError } = await hrEmployeeService.getEmployeeSkills(extractedId);
         if (!skillsError && skillsData) {
           setSkills(skillsData);
         } else {
@@ -150,7 +155,7 @@ const EmployeeProfilePage: React.FC = () => {
         }
         
         // Fetch activities
-        const { data: activitiesData, error: activitiesError } = await hrEmployeeService.getEmployeeActivities(id);
+        const { data: activitiesData, error: activitiesError } = await hrEmployeeService.getEmployeeActivities(extractedId);
         if (!activitiesError && activitiesData) {
           setActivities(activitiesData);
         } else {
@@ -168,7 +173,7 @@ const EmployeeProfilePage: React.FC = () => {
     };
     
     loadEmployeeData();
-  }, [id]);
+  }, [extractedId]);
   
   // Helper function to get RAG status color and icon
   const getRagStatusInfo = (status: string | undefined) => {
@@ -323,6 +328,52 @@ const EmployeeProfilePage: React.FC = () => {
     );
   };
 
+  const handleAssignCourse = () => {
+    setAssignDialogOpen(true);
+  };
+
+  // Add a function to sync employee data to learner profile
+  const syncToLearnerProfile = async () => {
+    if (!employee?.id) return;
+    
+    try {
+      setLoading(true);
+      
+      // Make API call to sync HR data to learner profile
+      const response = await fetch('/api/learner/profile/sync-hr', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: employee.user_id,
+        }),
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to sync employee data');
+      }
+      
+      toast({
+        title: 'Success',
+        description: 'Employee data synced to learner profile',
+        variant: 'default',
+      });
+      
+    } catch (error) {
+      console.error('Error syncing employee data:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to sync employee data to learner profile',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="container mx-auto">
       <div className="flex justify-between items-center mb-6">
@@ -374,7 +425,7 @@ const EmployeeProfilePage: React.FC = () => {
 
               <div className="flex flex-col sm:flex-row gap-2">
                 <Button variant="outline" asChild>
-                  <Link to={`${ROUTES.HR_DASHBOARD_EMPLOYEES_EDIT.replace(':id', employee.id)}`}>
+                  <Link to={`/hr-dashboard/employees/${employee.id}/edit`}>
                     Edit Profile
                   </Link>
                 </Button>
@@ -457,13 +508,19 @@ const EmployeeProfilePage: React.FC = () => {
           
           <TabsContent value="courses">
             <Card>
-              <CardHeader>
-                <CardTitle>Enrolled Courses</CardTitle>
-                <CardDescription>
-                  {courses.length > 0 
-                    ? `${courses.length} courses | ${completedCourses} completed, ${inProgressCourses} in progress, ${notStartedCourses} not started`
-                    : 'No courses enrolled yet'}
-                </CardDescription>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle>Enrolled Courses</CardTitle>
+                  <CardDescription>
+                    {courses.length > 0 
+                      ? `${courses.length} courses | ${completedCourses} completed, ${inProgressCourses} in progress, ${notStartedCourses} not started`
+                      : 'No courses enrolled yet'}
+                  </CardDescription>
+                </div>
+                <Button onClick={handleAssignCourse} variant="default">
+                  <BookOpen className="h-4 w-4 mr-2" />
+                  Assign Course
+                </Button>
               </CardHeader>
               <CardContent>
                 {courses.length > 0 ? (
@@ -500,10 +557,14 @@ const EmployeeProfilePage: React.FC = () => {
                     ))}
                   </div>
                 ) : (
-                  <div className="text-center py-6 text-gray-500">
-                    <BookOpen className="h-16 w-16 mx-auto text-gray-300 mb-4" />
-                    <p>This employee hasn't been enrolled in any courses yet</p>
-                    <Button className="mt-4" variant="outline">Assign Course</Button>
+                  <div className="text-center py-8">
+                    <BookOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="text-lg font-medium mb-2">No courses assigned</h3>
+                    <p className="text-muted-foreground mb-4">This employee hasn't been assigned any courses yet.</p>
+                    <Button onClick={handleAssignCourse}>
+                      <BookOpen className="h-4 w-4 mr-2" />
+                      Assign Course
+                    </Button>
                   </div>
                 )}
               </CardContent>
@@ -576,20 +637,47 @@ const EmployeeProfilePage: React.FC = () => {
             </Card>
           </TabsContent>
         </Tabs>
+
+        <div className="mb-8">
+          <h3 className="text-lg font-medium mb-4">Learning & Development</h3>
+          <div className="flex gap-4">
+            <Button
+              onClick={() => navigate(`${ROUTES.HR_DASHBOARD}/employee/${employee.id}/development-plan`)}
+              variant="outline"
+            >
+              Development Plan
+            </Button>
+            <Button
+              onClick={() => navigate(`${ROUTES.HR_DASHBOARD}/employee/${employee.id}/trainings`)}
+              variant="outline"
+            >
+              Training History
+            </Button>
+            {employee.user_id && (
+              <Button
+                onClick={syncToLearnerProfile}
+                variant="default"
+              >
+                Sync to Learner Profile
+              </Button>
+            )}
+          </div>
+        </div>
       </div>
 
-      {/* Add the message modal */}
-      {employee && (
-        <MessageEmployeeModal
-          isOpen={isMessageModalOpen}
-          onClose={() => setIsMessageModalOpen(false)}
-          employee={{
-            id: employee.id,
-            name: employee.name,
-            email: employee.email
-          }}
-        />
-      )}
+      {/* Dialogs */}
+      <CourseAssignmentDialog 
+        open={assignDialogOpen}
+        onOpenChange={setAssignDialogOpen}
+        employeeId={employee?.id}
+      />
+      
+      <MessageEmployeeModal
+        open={isMessageModalOpen}
+        onOpenChange={setIsMessageModalOpen}
+        recipientId={employee?.id}
+        recipientName={employee?.name}
+      />
     </div>
   );
 };

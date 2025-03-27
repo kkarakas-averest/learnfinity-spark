@@ -1054,55 +1054,78 @@ const hrEmployeeService: EmployeeService = {
   },
 
   /**
-   * Get employee skills
-   * @param employeeId - The ID of the employee
-   * @returns A promise with the skills data and any error
+   * Get skills for an employee
+   * @param {string} employeeId - Employee ID
+   * @returns {Promise<{data: any, error: any}>}
    */
-  async getEmployeeSkills(employeeId: string) {
+  async getEmployeeSkills(employeeId: string): Promise<{data: any, error: any}> {
     try {
+      // First check if the table exists to avoid errors
+      const { error: tableCheckError } = await supabase
+        .from('hr_employee_skills')
+        .select('id')
+        .limit(1)
+        .maybeSingle();
+      
+      // If table doesn't exist, return empty array instead of erroring
+      if (tableCheckError && tableCheckError.code === '42P01') {
+        console.log('hr_employee_skills table does not exist, returning empty array');
+        return { data: [], error: null };
+      }
+      
+      // If table exists, get the employee skills
       const { data, error } = await supabase
         .from('hr_employee_skills')
-        .select(`
-          id,
-          skill_name,
-          proficiency_level,
-          is_in_progress
-        `)
+        .select('id, skill_name, proficiency_level, is_in_progress')
         .eq('employee_id', employeeId);
 
       if (error) throw error;
 
-      // Format the data to match our Skill interface
-      const formattedSkills = data.map(skill => ({
+      // Map to the expected skill format
+      const formattedSkills = (data || []).map(skill => ({
         name: skill.skill_name,
-        level: skill.proficiency_level,
-        inProgress: skill.is_in_progress
+        level: skill.proficiency_level || 'beginner',
+        inProgress: !!skill.is_in_progress
       }));
 
       return { data: formattedSkills, error: null };
     } catch (error) {
       console.error('Error fetching employee skills:', error);
-      return { data: null, error };
+      // Return empty array on error to avoid UI breakage
+      return { data: [], error };
     }
   },
 
   /**
-   * Get employee activities
-   * @param employeeId - The ID of the employee
-   * @param limit - Optional limit for the number of activities to return
-   * @returns A promise with the activities data and any error
+   * Get activities for an employee
+   * @param {string} employeeId - Employee ID
+   * @param {number} limit - Maximum number of activities to return (default: 10)
+   * @returns {Promise<{data: any, error: any}>}
    */
-  async getEmployeeActivities(employeeId: string, limit = 10) {
+  async getEmployeeActivities(employeeId: string, limit: number = 10): Promise<{data: any, error: any}> {
     try {
+      // First check if the table exists and get its columns
+      const { data: tableInfo, error: schemaError } = await supabase
+        .rpc('get_table_columns', { table_name: 'hr_employee_activities' });
+      
+      // If getting table info fails, return empty array
+      if (schemaError) {
+        console.log('Error checking hr_employee_activities schema:', schemaError);
+        return { data: [], error: null };
+      }
+      
+      // Get column names from the table info
+      const columnNames = tableInfo ? tableInfo.map((col: any) => col.column_name) : [];
+      const hasMetadata = columnNames.includes('metadata');
+      
+      // Build select query based on available columns
+      let selectQuery = 'id, activity_type, description, created_at';
+      if (hasMetadata) selectQuery += ', metadata';
+      
+      // Get the activities with the appropriate columns
       const { data, error } = await supabase
         .from('hr_employee_activities')
-        .select(`
-          id,
-          activity_type,
-          description,
-          created_at,
-          metadata
-        `)
+        .select(selectQuery)
         .eq('employee_id', employeeId)
         .order('created_at', { ascending: false })
         .limit(limit);
@@ -1110,18 +1133,19 @@ const hrEmployeeService: EmployeeService = {
       if (error) throw error;
 
       // Format the data to match our Activity interface
-      const formattedActivities = data.map(activity => ({
+      const formattedActivities = (data || []).map((activity: any) => ({
         id: activity.id,
         activity_type: activity.activity_type,
         description: activity.description,
         timestamp: activity.created_at,
-        course_title: activity.metadata?.course_title || undefined
+        course_title: hasMetadata && activity.metadata ? activity.metadata.course_title : undefined
       }));
 
       return { data: formattedActivities, error: null };
     } catch (error) {
       console.error('Error fetching employee activities:', error);
-      return { data: null, error };
+      // Return empty array on error to avoid UI breakage
+      return { data: [], error };
     }
   },
 

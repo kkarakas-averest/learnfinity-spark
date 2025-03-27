@@ -35,6 +35,7 @@ interface LearningPath {
 
 interface LearningPathAssignmentProps {
   programId?: string;
+  employeeId?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
@@ -64,12 +65,13 @@ const DatePicker = ({ date, setDate, disabled = false }: {
 const LearningPathAssignment: React.FC<LearningPathAssignmentProps> = ({
   open,
   onOpenChange,
-  programId
+  programId,
+  employeeId
 }) => {
   const { user } = useAuth();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [learningPaths, setLearningPaths] = useState<LearningPath[]>([]);
-  const [selectedEmployee, setSelectedEmployee] = useState<string | null>(null);
+  const [selectedEmployee, setSelectedEmployee] = useState<string | null>(employeeId || null);
   const [selectedPath, setSelectedPath] = useState<string>('');
   const [priority, setPriority] = useState<'high' | 'medium' | 'low'>('medium');
   const [isMandatory, setIsMandatory] = useState<boolean>(false);
@@ -98,8 +100,13 @@ const LearningPathAssignment: React.FC<LearningPathAssignmentProps> = ({
       if (programId) {
         setSelectedPath(programId);
       }
+      
+      // Set the selected employee if employeeId is provided
+      if (employeeId) {
+        setSelectedEmployee(employeeId);
+      }
     }
-  }, [open, programId]);
+  }, [open, programId, employeeId]);
   
   const fetchData = async () => {
     setIsLoading(true);

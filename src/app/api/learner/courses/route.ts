@@ -4,183 +4,150 @@ import { supabase } from '@/lib/supabase';
 
 // Define validation schema for request
 const requestSchema = z.object({
-  userId: z.string().uuid({ message: 'Invalid userId format' }),
-  status: z.enum(['all', 'in_progress', 'completed', 'not_started']).optional().default('all'),
-  limit: z.number().int().positive().optional().default(10),
-  offset: z.number().int().min(0).optional().default(0)
+  userId: z.string().uuid({ message: 'Invalid userId format' })
 });
 
-// Type definitions for Supabase data
-interface CourseData {
-  id: string;
-  title: string;
-  description: string;
-  estimated_duration: number;
-  skills: string[];
-  thumbnail_url: string;
-  featured: boolean;
-  category: string;
-}
-
-interface LearningPathData {
-  id: string;
-  name: string;
-}
-
-interface CourseItem {
-  id: string;
-  course_id: string;
-  learning_path_id: string;
-  progress: number;
-  rag_status: string;
-  completed_sections: number;
-  sections: number;
-  courses: CourseData;
-  learning_paths: LearningPathData;
-}
-
 /**
- * GET handler for fetching a learner's courses
+ * GET /api/learner/courses
+ * Gets the courses enrolled by a specific learner
  */
 export async function GET(req: NextRequest) {
   try {
-    // Extract and validate query parameters
-    const url = new URL(req.url);
-    const userId = url.searchParams.get('userId');
-    const status = url.searchParams.get('status') as 'all' | 'in_progress' | 'completed' | 'not_started' || 'all';
-    const limit = parseInt(url.searchParams.get('limit') || '10');
-    const offset = parseInt(url.searchParams.get('offset') || '0');
-
-    // Validate request parameters
-    const validatedData = requestSchema.safeParse({
-      userId,
-      status,
-      limit,
-      offset
-    });
-
-    if (!validatedData.success) {
+    // Get userId from query parameters
+    const { searchParams } = new URL(req.url);
+    const userId = searchParams.get('userId');
+    
+    // Validate request
+    const validationResult = requestSchema.safeParse({ userId });
+    if (!validationResult.success) {
       return NextResponse.json(
-        { error: 'Invalid request parameters', details: validatedData.error.format() },
+        { error: 'Invalid user ID' },
         { status: 400 }
       );
     }
-
-    const { userId: validUserId, status: validStatus, limit: validLimit, offset: validOffset } = validatedData.data;
-
-    // Build the query to fetch courses for the learner
-    let query = supabase
-      .from('learning_path_courses')
+    
+    // Fetch course enrollments for the user
+    const { data: enrollments, error: enrollmentsError } = await supabase
+      .from('course_enrollments')
       .select(`
         id,
-        course_id,
-        learning_path_id,
+        status,
         progress,
-        rag_status,
-        completed_sections,
-        sections,
-        courses (
-          id,
-          title,
-          description,
-          estimated_duration,
-          skills,
-          thumbnail_url,
-          featured,
-          category
-        ),
-        learning_paths (
-          id,
-          name
+        last_accessed,
+        completion_date,
+        enrolled_date,
+        courses:course_id(
+          id, 
+          title, 
+          description, 
+          thumbnail_url, 
+          category, 
+          level, 
+          duration_minutes,
+          content_type
         )
       `)
-      .eq('learning_paths.user_id', validUserId);
-
-    // Apply status filter if specified
-    if (validStatus !== 'all') {
-      switch (validStatus) {
-        case 'in_progress':
-          query = query.gt('progress', 0).lt('progress', 100);
-          break;
-        case 'completed':
-          query = query.eq('progress', 100);
-          break;
-        case 'not_started':
-          query = query.eq('progress', 0);
-          break;
-      }
-    }
-
-    // Apply pagination
-    query = query.range(validOffset, validOffset + validLimit - 1);
-
-    // Execute the query
-    const { data: coursesData, error } = await query;
-
-    if (error) {
-      console.error('Error fetching learner courses:', error);
+      .eq('user_id', userId);
+      
+    if (enrollmentsError) {
+      console.error('Error fetching enrollments:', enrollmentsError);
       return NextResponse.json(
-        { error: 'Failed to fetch courses', details: error.message },
+        { error: 'Failed to fetch course enrollments', details: enrollmentsError.message },
         { status: 500 }
       );
     }
-
-    // Transform the data for the frontend, ensuring proper type access
-    const formattedCourses = coursesData.map((item: any) => {
-      // Use type assertion to get proper typing for the Supabase nested objects
-      const course = item.courses as CourseData;
-      const learningPath = item.learning_paths as LearningPathData;
+    
+    // Fetch assigned courses (not yet enrolled)
+    const { data: assignments, error: assignmentsError } = await supabase
+      .from('course_assignments')
+      .select(`
+        id,
+        assigned_date,
+        due_date,
+        status,
+        courses:course_id(
+          id, 
+          title, 
+          description, 
+          thumbnail_url, 
+          category, 
+          level, 
+          duration_minutes,
+          content_type
+        )
+      `)
+      .eq('user_id', userId)
+      .eq('status', 'pending');
       
+    if (assignmentsError) {
+      console.error('Error fetching assignments:', assignmentsError);
+      // Continue anyway, we'll just return enrolled courses
+    }
+    
+    // Process enrolled courses
+    const enrolledCourses = enrollments.map(enrollment => {
+      if (!enrollment.courses) return null;
+      
+      const course = Array.isArray(enrollment.courses) ? 
+        enrollment.courses[0] : enrollment.courses;
+        
       return {
-        id: item.course_id,
+        id: course.id,
         title: course.title,
         description: course.description,
-        duration: course.estimated_duration,
-        progress: item.progress,
-        completedSections: item.completed_sections,
-        totalSections: item.sections,
-        thumbnailUrl: course.thumbnail_url,
-        featured: course.featured,
+        thumbnail_url: course.thumbnail_url,
         category: course.category,
-        skills: course.skills,
-        ragStatus: item.rag_status,
-        learningPathId: item.learning_path_id,
-        learningPathName: learningPath.name
+        level: course.level,
+        duration_minutes: course.duration_minutes,
+        content_type: course.content_type,
+        progress: enrollment.progress || 0,
+        last_accessed: enrollment.last_accessed,
+        completion_status: enrollment.status,
+        enrolled_date: enrollment.enrolled_date,
+        course_type: 'enrolled'
       };
-    });
-
-    // Get count of courses by status for summary stats
-    const { data: countData, error: countError } = await supabase
-      .from('learning_path_courses')
-      .select(`
-        progress,
-        id
-      `, { count: 'exact' })
-      .eq('learning_paths.user_id', validUserId);
-
-    if (countError) {
-      console.error('Error fetching course counts:', countError);
-    }
-
-    // Calculate counts
-    const counts = {
-      total: countData?.length || 0,
-      inProgress: countData?.filter(c => c.progress > 0 && c.progress < 100).length || 0,
-      completed: countData?.filter(c => c.progress === 100).length || 0,
-      notStarted: countData?.filter(c => c.progress === 0).length || 0
-    };
-
-    // Find a featured course if available
-    const featuredCourse = formattedCourses.find(course => course.featured) || 
-                          (formattedCourses.length > 0 ? formattedCourses[0] : null);
-
+    }).filter(Boolean);
+    
+    // Process assigned courses
+    const assignedCourses = assignments ? assignments.map(assignment => {
+      if (!assignment.courses) return null;
+      
+      const course = Array.isArray(assignment.courses) ? 
+        assignment.courses[0] : assignment.courses;
+        
+      return {
+        id: course.id,
+        title: course.title,
+        description: course.description,
+        thumbnail_url: course.thumbnail_url,
+        category: course.category,
+        level: course.level,
+        duration_minutes: course.duration_minutes,
+        content_type: course.content_type,
+        progress: 0,
+        assigned_date: assignment.assigned_date,
+        due_date: assignment.due_date,
+        completion_status: 'not_started',
+        course_type: 'assigned'
+      };
+    }).filter(Boolean) : [];
+    
+    // Combine all courses
+    const allCourses = [...enrolledCourses, ...assignedCourses];
+    
     return NextResponse.json({
-      courses: formattedCourses,
-      counts,
-      featuredCourse
+      courses: allCourses,
+      stats: {
+        total: allCourses.length,
+        enrolled: enrolledCourses.length,
+        assigned: assignedCourses.length,
+        completed: enrolledCourses.filter(c => c.completion_status === 'completed').length,
+        in_progress: enrolledCourses.filter(c => c.progress > 0 && c.completion_status !== 'completed').length
+      }
     });
+    
   } catch (error) {
-    console.error('Unexpected error in courses API:', error);
+    console.error('Unexpected error in learner courses API:', error);
     return NextResponse.json(
       { error: 'An unexpected error occurred' },
       { status: 500 }

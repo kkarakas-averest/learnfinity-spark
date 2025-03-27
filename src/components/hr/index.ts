@@ -14,4 +14,5 @@ export { default as MessagingInterface } from './MessagingInterface';
 export { default as ConversationList } from './ConversationList';
 export { default as ConversationChat } from './ConversationChat';
 export { default as NewConversationDialog } from './NewConversationDialog';
-export { default as MessageEmployeeModal } from './MessageEmployeeModal'; 
+export { default as MessageEmployeeModal } from './MessageEmployeeModal';
+export { default as CourseAssignmentDialog } from './CourseAssignmentDialog'; 

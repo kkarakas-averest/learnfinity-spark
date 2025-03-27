@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
-import { Home, BookOpen, Trophy, User, ArrowRight, Sparkles, AlertCircle, Calendar, Clock } from "lucide-react";
+import { Home, BookOpen, Trophy, User, ArrowRight, Sparkles, AlertCircle, Calendar, Clock, Check } from "lucide-react";
 import DashboardHeader from "@/components/learner/DashboardHeader";
 import TestNotificationButton from "@/components/learner/TestNotificationButton";
 import AICourseRecommendations from "@/components/learner/AICourseRecommendations";
@@ -32,6 +32,23 @@ interface Course {
   learningPathName: string;
 }
 
+// Learning path interface
+interface LearningPath {
+  id: string;
+  title: string;
+  description: string;
+  thumbnail_url?: string;
+  category?: string;
+  course_count: number;
+  completed_courses: number;
+  progress: number;
+  path_type: 'enrolled' | 'assigned' | 'hr_assigned';
+  hr_plan_id?: string;
+  hr_plan_title?: string;
+  due_date?: string;
+  assigned_date?: string;
+}
+
 // Achievements interface
 interface Achievement {
   id: string;
@@ -51,6 +68,7 @@ interface LearnerProfile {
   email: string | null;
   name: string | null;
   bio: string | null;
+  phone: string | null;
   title: string | null;
   department: string | null;
   skills: string[];
@@ -62,6 +80,16 @@ interface LearnerProfile {
   createdAt: string;
   updatedAt: string | null;
   exists: boolean;
+  hr?: {
+    id: string;
+    hire_date?: string;
+    status?: string;
+    phone?: string;
+    manager?: string;
+    manager_id?: string;
+    department_id?: string;
+    position_id?: string;
+  };
 }
 
 const LearnerDashboard: React.FC = () => {
@@ -94,6 +122,11 @@ const LearnerDashboard: React.FC = () => {
   const [coursesLoading, setCoursesLoading] = React.useState(true);
   const [coursesError, setCoursesError] = React.useState<string | null>(null);
   
+  // Learning paths state
+  const [learningPaths, setLearningPaths] = React.useState<LearningPath[]>([]);
+  const [pathsLoading, setPathsLoading] = React.useState(true);
+  const [pathsError, setPathsError] = React.useState<string | null>(null);
+  
   // Achievements state
   const [certificates, setCertificates] = React.useState<Achievement[]>([]);
   const [badges, setBadges] = React.useState<Achievement[]>([]);
@@ -119,14 +152,46 @@ const LearnerDashboard: React.FC = () => {
         setStatsLoading(true);
         setStatsError(null);
         
-        const response = await fetch(`/api/learner/stats?userId=${user.id}`);
+        console.log(`Fetching stats data for user: ${user.id}`);
+        const response = await fetch(`/api/learner/dashboard?userId=${user.id}`);
+        
+        // Debug the response
+        console.log(`Dashboard API response status: ${response.status}`);
         
         if (!response.ok) {
-          throw new Error('Failed to fetch learner stats');
+          // Try to get error details if available
+          try {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to fetch learner stats');
+          } catch (jsonError) {
+            throw new Error(`Failed to fetch learner stats: ${response.statusText}`);
+          }
         }
         
-        const data = await response.json();
-        setLearnerStats(data);
+        // Parse the response
+        let dashboardData;
+        try {
+          dashboardData = await response.json();
+          console.log('Dashboard data received:', dashboardData);
+        } catch (parseError) {
+          console.error('Error parsing dashboard response:', parseError);
+          throw new Error('Failed to parse dashboard data');
+        }
+        
+        // Extract stats from dashboard data
+        const { stats } = dashboardData;
+        if (stats) {
+          setLearnerStats({
+            coursesInProgress: stats.coursesInProgress || 0,
+            hoursRemaining: stats.totalTimeSpent || 0,
+            overallCompletion: Math.round(dashboardData.courses?.reduce((acc, c) => acc + c.progress, 0) / 
+              Math.max(dashboardData.courses?.length || 1, 1)) || 0,
+            completionChange: 0, // We don't have this data yet
+            achievements: (dashboardData.badges?.length || 0) + (dashboardData.certificates?.length || 0),
+            newAchievements: 0, // We don't have this data yet
+            learningStreak: 0 // We don't have this data yet
+          });
+        }
       } catch (error) {
         console.error('Error fetching learner stats:', error);
         setStatsError('Failed to load your dashboard stats');
@@ -159,16 +224,35 @@ const LearnerDashboard: React.FC = () => {
         setCoursesLoading(true);
         setCoursesError(null);
         
+        console.log(`Fetching courses data for user: ${user.id}`);
         const response = await fetch(`/api/learner/courses?userId=${user.id}`);
         
+        // Debug the response
+        console.log(`Courses API response status: ${response.status}`);
+        
         if (!response.ok) {
-          throw new Error('Failed to fetch courses');
+          // Try to get error details if available
+          try {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to fetch courses');
+          } catch (jsonError) {
+            throw new Error(`Failed to fetch courses: ${response.statusText}`);
+          }
         }
         
-        const data = await response.json();
-        setCourses(data.courses);
-        setCourseCounts(data.counts);
-        setFeaturedCourse(data.featuredCourse);
+        // Parse the response
+        let coursesData;
+        try {
+          coursesData = await response.json();
+          console.log('Courses data received:', coursesData);
+        } catch (parseError) {
+          console.error('Error parsing courses response:', parseError);
+          throw new Error('Failed to parse courses data');
+        }
+        
+        setCourses(coursesData.courses);
+        setCourseCounts(coursesData.counts || coursesData.stats);
+        setFeaturedCourse(coursesData.featuredCourse);
       } catch (error) {
         console.error('Error fetching courses:', error);
         setCoursesError('Failed to load your courses');
@@ -186,6 +270,63 @@ const LearnerDashboard: React.FC = () => {
     fetchCourses();
   }, [user?.id, activeTab, toast]);
   
+  // Fetch learning paths when tab is activated or user changes
+  React.useEffect(() => {
+    if (!user?.id || activeTab !== 'paths') return;
+    
+    const fetchLearningPaths = async () => {
+      try {
+        setPathsLoading(true);
+        setPathsError(null);
+        
+        console.log(`Fetching learning paths for user: ${user.id}`);
+        const response = await fetch(`/api/learner/learning-paths?userId=${user.id}`);
+        
+        // Debug the response
+        console.log(`Learning paths API response status: ${response.status}`);
+        
+        if (!response.ok) {
+          // Try to get error details if available
+          try {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to fetch learning paths');
+          } catch (jsonError) {
+            throw new Error(`Failed to fetch learning paths: ${response.statusText}`);
+          }
+        }
+        
+        // Parse the response
+        let pathsData;
+        try {
+          pathsData = await response.json();
+          console.log('Learning paths data received:', pathsData);
+        } catch (parseError) {
+          console.error('Error parsing learning paths response:', parseError);
+          throw new Error('Failed to parse learning paths data');
+        }
+        
+        if (pathsData && pathsData.learning_paths) {
+          setLearningPaths(pathsData.learning_paths);
+        } else {
+          setLearningPaths([]);
+        }
+      } catch (error) {
+        console.error('Error fetching learning paths:', error);
+        setPathsError('Failed to load your learning paths');
+        
+        toast({
+          variant: 'destructive',
+          title: 'Error loading learning paths',
+          description: 'Could not load your learning paths. Please try again later.'
+        });
+      } finally {
+        setPathsLoading(false);
+      }
+    };
+    
+    fetchLearningPaths();
+  }, [user?.id, activeTab, toast]);
+  
   // Fetch achievements when tab is activated or user changes
   React.useEffect(() => {
     if (!user?.id || activeTab !== 'achievements') return;
@@ -195,16 +336,39 @@ const LearnerDashboard: React.FC = () => {
         setAchievementsLoading(true);
         setAchievementsError(null);
         
+        console.log(`Fetching achievements data for user: ${user.id}`);
         const response = await fetch(`/api/learner/achievements?userId=${user.id}`);
         
+        // Debug the response
+        console.log(`Achievements API response status: ${response.status}`);
+        
         if (!response.ok) {
-          throw new Error('Failed to fetch achievements');
+          // Try to get error details if available
+          try {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to fetch achievements');
+          } catch (jsonError) {
+            throw new Error(`Failed to fetch achievements: ${response.statusText}`);
+          }
         }
         
-        const data = await response.json();
-        setCertificates(data.certificates);
-        setBadges(data.badges);
-        setAchievementsSummary(data.summary);
+        // Parse the response
+        let achievementsData;
+        try {
+          achievementsData = await response.json();
+          console.log('Achievements data received:', achievementsData);
+        } catch (parseError) {
+          console.error('Error parsing achievements response:', parseError);
+          throw new Error('Failed to parse achievements data');
+        }
+        
+        setCertificates(achievementsData.certificates || []);
+        setBadges(achievementsData.badges || []);
+        setAchievementsSummary(achievementsData.summary || {
+          totalCertificates: achievementsData.certificates?.length || 0,
+          totalBadges: achievementsData.badges?.length || 0,
+          recentAchievements: []
+        });
       } catch (error) {
         console.error('Error fetching achievements:', error);
         setAchievementsError('Failed to load your achievements');
@@ -231,14 +395,33 @@ const LearnerDashboard: React.FC = () => {
         setProfileLoading(true);
         setProfileError(null);
         
+        console.log(`Fetching profile data for user: ${user.id}`);
         const response = await fetch(`/api/learner/profile?userId=${user.id}`);
         
+        // Debug the response
+        console.log(`Profile API response status: ${response.status}`);
+        
         if (!response.ok) {
-          throw new Error('Failed to fetch profile');
+          // Try to get error details if available
+          try {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to fetch profile');
+          } catch (jsonError) {
+            throw new Error(`Failed to fetch profile: ${response.statusText}`);
+          }
         }
         
-        const data = await response.json();
-        setProfile(data);
+        // Parse the response
+        let profileData;
+        try {
+          profileData = await response.json();
+          console.log('Profile data received:', profileData);
+        } catch (parseError) {
+          console.error('Error parsing profile response:', parseError);
+          throw new Error('Failed to parse profile data');
+        }
+        
+        setProfile(profileData);
       } catch (error) {
         console.error('Error fetching profile:', error);
         setProfileError('Failed to load your profile');
@@ -297,6 +480,10 @@ const LearnerDashboard: React.FC = () => {
             <TabsTrigger value="courses" className="flex items-center gap-2">
               <BookOpen className="h-4 w-4" />
               My Courses
+            </TabsTrigger>
+            <TabsTrigger value="paths" className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4" />
+              Learning Paths
             </TabsTrigger>
             <TabsTrigger value="achievements" className="flex items-center gap-2">
               <Trophy className="h-4 w-4" />
@@ -619,6 +806,112 @@ const LearnerDashboard: React.FC = () => {
             </Card>
           </TabsContent>
 
+          <TabsContent value="paths">
+            <h2 className="text-2xl font-bold mb-4">My Learning Paths</h2>
+            {pathsLoading ? (
+              <div className="flex items-center justify-center h-40">
+                <LoadingSpinner size="md" />
+              </div>
+            ) : pathsError ? (
+              <div className="text-center py-8">
+                <AlertCircle className="mx-auto h-10 w-10 text-red-500 mb-4" />
+                <p className="text-lg font-medium text-red-500">Error loading learning paths</p>
+                <p className="text-muted-foreground">{pathsError}</p>
+              </div>
+            ) : learningPaths.length === 0 ? (
+              <div className="text-center py-12 border rounded-lg bg-muted/20">
+                <Sparkles className="mx-auto h-12 w-12 text-muted-foreground mb-3" />
+                <p className="text-lg font-medium mb-1">No learning paths yet</p>
+                <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+                  You don't have any learning paths assigned or enrolled. Explore learning paths or check with your manager.
+                </p>
+                <Button asChild>
+                  <Link to="/catalog/paths">Browse Learning Paths</Link>
+                </Button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-6">
+                {learningPaths.map((path) => (
+                  <Card key={path.id} className="overflow-hidden">
+                    <div className="flex flex-col md:flex-row">
+                      <div className="md:w-1/4 bg-muted p-6 flex items-center justify-center">
+                        {path.thumbnail_url ? (
+                          <div 
+                            className="h-40 w-full bg-center bg-cover rounded-lg"
+                            style={{ backgroundImage: `url(${path.thumbnail_url})` }}
+                          ></div>
+                        ) : (
+                          <Sparkles className="h-20 w-20 text-primary/20" />
+                        )}
+                      </div>
+                      <div className="p-6 md:w-3/4">
+                        <div className="flex flex-wrap gap-2 mb-2">
+                          {path.path_type === 'hr_assigned' && (
+                            <Badge variant="secondary">HR Assigned</Badge>
+                          )}
+                          {path.path_type === 'assigned' && (
+                            <Badge>Assigned</Badge>
+                          )}
+                          {path.category && (
+                            <Badge variant="outline">{path.category}</Badge>
+                          )}
+                        </div>
+                        
+                        <h3 className="text-xl font-medium mb-2">{path.title}</h3>
+                        <p className="text-muted-foreground mb-4 line-clamp-2">{path.description}</p>
+                        
+                        {path.hr_plan_title && (
+                          <div className="mb-4">
+                            <Badge variant="outline" className="font-normal">
+                              Part of: {path.hr_plan_title}
+                            </Badge>
+                          </div>
+                        )}
+                        
+                        <div className="mb-4 space-y-1">
+                          <div className="flex justify-between text-sm">
+                            <span>Progress</span>
+                            <span>{path.progress}%</span>
+                          </div>
+                          <Progress value={path.progress} />
+                        </div>
+                        
+                        <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground mb-4">
+                          <div className="flex items-center">
+                            <BookOpen className="h-4 w-4 mr-1" />
+                            <span>{path.course_count} {path.course_count === 1 ? 'course' : 'courses'}</span>
+                          </div>
+                          <div className="flex items-center">
+                            <Check className="h-4 w-4 mr-1" />
+                            <span>{path.completed_courses} completed</span>
+                          </div>
+                          {path.assigned_date && (
+                            <div className="flex items-center">
+                              <Calendar className="h-4 w-4 mr-1" />
+                              <span>Assigned: {new Date(path.assigned_date).toLocaleDateString()}</span>
+                            </div>
+                          )}
+                          {path.due_date && (
+                            <div className="flex items-center">
+                              <Clock className="h-4 w-4 mr-1" />
+                              <span>Due: {new Date(path.due_date).toLocaleDateString()}</span>
+                            </div>
+                          )}
+                        </div>
+                        
+                        <Button asChild>
+                          <Link to={`/learning-path/${path.id}`}>
+                            {path.progress > 0 ? 'Continue' : 'Start'} Learning Path
+                          </Link>
+                        </Button>
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
           <TabsContent value="achievements" className="space-y-4">
             <Card>
               <CardHeader>
@@ -729,7 +1022,7 @@ const LearnerDashboard: React.FC = () => {
                             View All {badges.length} Badges
                           </Button>
                         )}
-                </div>
+                  </div>
                     )}
                   </>
                 )}
@@ -848,6 +1141,12 @@ const LearnerDashboard: React.FC = () => {
                               <div className="font-medium text-sm">Bio</div>
                               <div className="mt-1">{profile.bio || "No bio provided"}</div>
                             </div>
+                            {profile.phone && (
+                              <div>
+                                <div className="font-medium text-sm">Phone</div>
+                                <div className="mt-1">{profile.phone}</div>
+                              </div>
+                            )}
                           </div>
                         </div>
                         
@@ -865,11 +1164,54 @@ const LearnerDashboard: React.FC = () => {
                           )}
                         </div>
                         
-                        <div className="pt-4 border-t">
-                          <Button className="w-full">Edit Profile</Button>
-                  </div>
-                </div>
-                </div>
+                        {/* HR Information */}
+                        {profile.hr && (
+                          <div>
+                            <h3 className="text-lg font-medium mb-3">HR Information</h3>
+                            <div className="rounded-md bg-slate-50 p-4 border border-slate-200">
+                              <div className="space-y-3">
+                                {profile.hr.hire_date && (
+                                  <div>
+                                    <div className="font-medium text-sm">Hire Date</div>
+                                    <div className="mt-1 flex items-center">
+                                      <Calendar className="h-4 w-4 mr-2 text-slate-500" />
+                                      {new Date(profile.hr.hire_date).toLocaleDateString()}
+                                    </div>
+                                  </div>
+                                )}
+                                
+                                {profile.hr.status && (
+                                  <div>
+                                    <div className="font-medium text-sm">Status</div>
+                                    <div className="mt-1 capitalize">
+                                      <Badge variant={profile.hr.status === 'active' ? 'default' : 'secondary'}>
+                                        {profile.hr.status.replace('_', ' ')}
+                                      </Badge>
+                                    </div>
+                                  </div>
+                                )}
+                                
+                                {profile.hr.manager && (
+                                  <div>
+                                    <div className="font-medium text-sm">Manager</div>
+                                    <div className="mt-1 flex items-center">
+                                      <User className="h-4 w-4 mr-2 text-slate-500" />
+                                      {profile.hr.manager}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                        
+                        <div className="pt-4">
+                          <Button asChild>
+                            <Link to="/edit-profile">Edit Profile</Link>
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
                   </>
                 )}
               </CardContent>

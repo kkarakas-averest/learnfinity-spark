@@ -18,21 +18,19 @@ import { supabase } from '@/lib/supabase';
 import { hrEmployeeService } from '@/services/hrEmployeeService';
 
 interface MessageEmployeeModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  employee: {
-    id: string;
-    name: string;
-    email: string;
-    first_name: string;
-    last_name: string;
-  };
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  recipientId?: string;
+  recipientName?: string;
+  recipientEmail?: string;
 }
 
 const MessageEmployeeModal: React.FC<MessageEmployeeModalProps> = ({ 
-  isOpen, 
-  onClose, 
-  employee 
+  open, 
+  onOpenChange, 
+  recipientId,
+  recipientName,
+  recipientEmail
 }) => {
   const [message, setMessage] = useState('');
   const [priority, setPriority] = useState<'normal' | 'high' | 'urgent'>('normal');
@@ -40,8 +38,10 @@ const MessageEmployeeModal: React.FC<MessageEmployeeModalProps> = ({
   const [sendEmail, setSendEmail] = useState(false);
   const [initComplete, setInitComplete] = useState(false);
 
-  // Initialize the service when the component mounts
+  // Initialize the service when the component mounts and is visible
   useEffect(() => {
+    if (!open) return;
+    
     const initializeService = async () => {
       try {
         // Check if user_notifications table exists
@@ -70,12 +70,19 @@ const MessageEmployeeModal: React.FC<MessageEmployeeModalProps> = ({
       }
     };
     
-    if (isOpen) {
-      initializeService();
-    }
-  }, [isOpen]);
+    initializeService();
+  }, [open]);
 
   const handleSendMessage = async () => {
+    if (!recipientId) {
+      toast({
+        title: 'Error',
+        description: 'Recipient ID is missing',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
     if (!message.trim()) {
       toast({
         title: 'Message required',
@@ -114,7 +121,7 @@ const MessageEmployeeModal: React.FC<MessageEmployeeModalProps> = ({
 
       // Prepare notification data
       const notificationData = {
-        user_id: employee.id, // Using the correct field name user_id
+        user_id: recipientId,
         title: 'Message from HR',
         message: message,
         type: 'hr_message',
@@ -122,8 +129,8 @@ const MessageEmployeeModal: React.FC<MessageEmployeeModalProps> = ({
         is_read: false,
         metadata: {
           sent_by: 'HR',
-          employee_id: employee.id,
-          employee_name: employee.name || `${employee.first_name} ${employee.last_name}`,
+          employee_id: recipientId,
+          employee_name: recipientName || 'Employee',
         }
       };
       
@@ -138,81 +145,53 @@ const MessageEmployeeModal: React.FC<MessageEmployeeModalProps> = ({
         throw notificationError;
       }
       
-      // Prepare a simplified activity record without any timestamp fields
+      // Prepare a simplified activity record
       const activityData = {
-        employee_id: employee.id,
+        employee_id: recipientId,
         activity_type: 'hr_message',
-        description: message,
-        metadata: {
-          priority: priority,
-          title: 'Message from HR',
-          sent_at: new Date().toISOString() // Include timestamp in metadata only
-        }
-        // Let Supabase generate any timestamp fields automatically
+        description: message
       };
       
-      const { error: activityError } = await supabase
-        .from('hr_employee_activities')
-        .insert([activityData]);
-      
-      if (activityError) {
-        console.warn('Could not create activity record:', activityError);
-        // This is non-critical, so we continue
+      // Try to insert activity - using try/catch to handle missing columns
+      try {
+        const { error: activityError } = await supabase
+          .from('hr_employee_activities')
+          .insert([activityData]);
+        
+        if (activityError) {
+          console.warn('Could not create activity record:', activityError);
+          // This is non-critical, so we continue
+        }
+      } catch (activityErr) {
+        console.warn('Error creating activity record:', activityErr);
+        // Continue as this is non-critical
       }
       
       toast({
         title: 'Message sent',
-        description: `Message sent to ${employee.name || `${employee.first_name} ${employee.last_name}`}`,
+        description: `Message sent to ${recipientName || 'employee'}`,
       });
       
       setMessage('');
-      onClose();
+      onOpenChange(false);
     } catch (error) {
       console.error('Error sending message:', error);
       
-      // Fallback to just creating an activity if notification fails
-      try {
-        console.log('Falling back to employee activity record');
-        
-        // Create a minimal object with only essential fields
-        const { error: fallbackError } = await supabase
-          .from('hr_employee_activities')
-          .insert([{
-            employee_id: employee.id,
-            activity_type: 'hr_message',
-            description: message,
-            metadata: { timestamp: new Date().toISOString() }
-          }]);
-        
-        if (fallbackError) {
-          console.error('Fallback also failed:', fallbackError);
-          throw fallbackError;
-        }
-        
-        toast({
-          title: 'Message recorded',
-          description: 'Message was recorded, but notification delivery may be delayed',
-        });
-        
-        setMessage('');
-        onClose();
-      } catch (fallbackError) {
-        toast({
-          title: 'Error sending message',
-          description: 'Could not send message. Please try again later.',
-          variant: 'destructive',
-        });
-      }
+      toast({
+        title: 'Error sending message',
+        description: 'Could not send message. Please try again later.',
+        variant: 'destructive',
+      });
     } finally {
       setSending(false);
     }
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Send Message to {employee.name}</DialogTitle>
+          <DialogTitle>Send Message to {recipientName || 'Employee'}</DialogTitle>
           <DialogDescription>
             This message will appear in the employee's notification panel when they log in.
           </DialogDescription>
@@ -250,27 +229,20 @@ const MessageEmployeeModal: React.FC<MessageEmployeeModalProps> = ({
 
           <div className="flex items-center space-x-2">
             <Switch
-              id="email-notification"
+              id="email-copy"
               checked={sendEmail}
               onCheckedChange={setSendEmail}
             />
-            <Label htmlFor="email-notification">
-              Also send as email notification
-            </Label>
+            <Label htmlFor="email-copy">Send email copy</Label>
           </div>
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={sending}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={sending}>
             Cancel
           </Button>
           <Button onClick={handleSendMessage} disabled={sending || !message.trim()}>
-            {sending ? 'Sending...' : (
-              <>
-                Send Message
-                <Mail className="ml-2 h-4 w-4" />
-              </>
-            )}
+            {sending ? 'Sending...' : 'Send Message'}
           </Button>
         </DialogFooter>
       </DialogContent>
