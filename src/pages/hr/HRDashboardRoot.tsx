@@ -18,6 +18,7 @@ import CourseTemplates from '@/pages/hr/CourseTemplates';
 import ModuleEditor from '@/pages/hr/ModuleEditor';
 import AgentManagement from '@/components/hr/AgentManagement';
 import LearnerProgressSummary from '@/components/hr/LearnerProgressSummary';
+import AddEmployeeForm from '@/pages/hr/AddEmployeeForm';
 
 /**
  * Root layout component for the HR Dashboard
@@ -64,12 +65,18 @@ const HRDashboardRoot: React.FC = () => {
       return <EmployeeProfilePage />;
     }
     
-    // Handle direct employee profile URLs (without /profile suffix)
-    if (path.match(/^\/hr-dashboard\/employees\/[a-zA-Z0-9-]+$/)) {
-      // Extract the employee ID from the URL
-      const employeeId = path.split('/').filter(Boolean)[2];
+    // Handle direct employee profile URLs
+    if (path.match(/^\/hr-dashboard\/employees\/[^/]+$/)) {
+      const employeeId = path.split('/').pop();
       console.log('Loading employee profile with ID:', employeeId);
-      return <EmployeeProfilePage key={employeeId} />;
+      
+      // If the ID is "new", render the AddEmployeeForm
+      if (employeeId === 'new') {
+        return <AddEmployeeForm />;
+      }
+      
+      // Otherwise render the EmployeeProfilePage with the specific ID
+      return <EmployeeProfilePage key={employeeId} />; // Add key to force re-render
     }
     
     if (path.startsWith('/hr-dashboard/course-builder/modules/')) {

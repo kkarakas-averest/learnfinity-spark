@@ -102,6 +102,13 @@ const EmployeeProfilePage: React.FC = () => {
       return;
     }
     
+    // Skip loading if this is a "new" employee page
+    if (id === 'new') {
+      console.log('New employee form - skipping data loading');
+      setLoading(false);
+      return;
+    }
+    
     const loadEmployeeData = async () => {
       setLoading(true);
       try {
