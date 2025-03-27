@@ -19,8 +19,6 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/components/ui/use-toast';
 import { hrEmployeeService } from '@/lib/services/hrEmployeeService';
 import { hrServices } from '@/lib/services/hrServices';
-import RAGStatusDemo from '@/components/hr/visualization/RAGStatusDemo';
-import DatabaseSeedingPanel from '@/components/admin/DatabaseSeedingPanel';
 
 // Define an extended type for hrServices
 type HRServicesExtended = typeof hrServices & {
@@ -136,8 +134,8 @@ const DashboardOverview: React.FC = () => {
       <h2 className="text-3xl font-bold tracking-tight">Dashboard Overview</h2>
       
       {/* RAG Status Overview */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        <Card className="xl:col-span-2">
+      <div className="grid grid-cols-1 gap-6">
+        <Card>
           <CardHeader>
             <CardTitle>Employee RAG Status</CardTitle>
             <CardDescription>
@@ -214,24 +212,6 @@ const DashboardOverview: React.FC = () => {
             </div>
           </CardContent>
         </Card>
-        
-        {/* New RAG Status Demo Card */}
-        <Card>
-          <CardHeader>
-            <CardTitle>RAG Status Animation</CardTitle>
-            <CardDescription>
-              Visualize employee status transitions
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <RAGStatusDemo 
-              title="Status Transitions" 
-              description="Interactive demo of status change animations"
-              initialStatus="green"
-              showControls={true}
-            />
-          </CardContent>
-        </Card>
       </div>
       
       {/* Original key metrics grid */}
@@ -292,40 +272,6 @@ const DashboardOverview: React.FC = () => {
             <p className="text-muted-foreground">No recent activities found.</p>
           </div>
         )}
-      </div>
-
-      {/* Admin Tools Section */}
-      <div className="mt-12 pt-6 border-t">
-        <h2 className="text-2xl font-bold tracking-tight mb-6">Admin Tools</h2>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <DatabaseSeedingPanel />
-          
-          {/* Additional admin tools can be added here */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <BarChart2 className="h-5 w-5" />
-                System Status
-              </CardTitle>
-              <CardDescription>
-                Monitor and manage system health and performance
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Alert className="mb-4">
-                <CheckCircle className="h-4 w-4" />
-                <AlertTitle>All Systems Operational</AlertTitle>
-                <AlertDescription>
-                  The system is currently running smoothly with no reported issues.
-                </AlertDescription>
-              </Alert>
-              
-              <Button variant="outline" className="w-full">
-                View System Health Dashboard
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
       </div>
     </div>
   );
