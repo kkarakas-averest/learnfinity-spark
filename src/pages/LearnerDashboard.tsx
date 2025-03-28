@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
-import { Home, BookOpen, Trophy, User, ArrowRight, Sparkles, AlertCircle, Calendar, Clock, Check } from "lucide-react";
+import { Home, BookOpen, Trophy, User, ArrowRight, Sparkles, AlertCircle, Calendar, Clock, Check, Users } from "lucide-react";
 import DashboardHeader from "@/components/learner/DashboardHeader";
 import TestNotificationButton from "@/components/learner/TestNotificationButton";
 import AICourseRecommendations from "@/components/learner/AICourseRecommendations";
@@ -30,6 +30,8 @@ interface Course {
   ragStatus: 'green' | 'amber' | 'red';
   learningPathId: string;
   learningPathName: string;
+  hrTrainingId?: string;
+  hrTrainingTitle?: string;
 }
 
 // Learning path interface
@@ -723,6 +725,11 @@ const LearnerDashboard: React.FC = () => {
                                     Falling Behind
                                   </Badge>
                                 )}
+                                {course.hrTrainingId && (
+                                  <Badge className="bg-purple-100 text-purple-800 hover:bg-purple-200">
+                                    HR Assigned
+                                  </Badge>
+                                )}
                               </div>
                               
                               <h3 className="text-lg font-medium mb-1">{course.title}</h3>
@@ -1173,8 +1180,7 @@ const LearnerDashboard: React.FC = () => {
                                 {profile.hr.hire_date && (
                                   <div>
                                     <div className="font-medium text-sm">Hire Date</div>
-                                    <div className="mt-1 flex items-center">
-                                      <Calendar className="h-4 w-4 mr-2 text-slate-500" />
+                                    <div className="mt-1">
                                       {new Date(profile.hr.hire_date).toLocaleDateString()}
                                     </div>
                                   </div>
@@ -1194,9 +1200,35 @@ const LearnerDashboard: React.FC = () => {
                                 {profile.hr.manager && (
                                   <div>
                                     <div className="font-medium text-sm">Manager</div>
-                                    <div className="mt-1 flex items-center">
-                                      <User className="h-4 w-4 mr-2 text-slate-500" />
+                                    <div className="mt-1">
                                       {profile.hr.manager}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {profile.department && (
+                                  <div>
+                                    <div className="font-medium text-sm">Department</div>
+                                    <div className="mt-1">
+                                      {profile.department}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {profile.title && (
+                                  <div>
+                                    <div className="font-medium text-sm">Position</div>
+                                    <div className="mt-1">
+                                      {profile.title}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {profile.hr.phone && (
+                                  <div>
+                                    <div className="font-medium text-sm">Phone</div>
+                                    <div className="mt-1">
+                                      {profile.hr.phone}
                                     </div>
                                   </div>
                                 )}

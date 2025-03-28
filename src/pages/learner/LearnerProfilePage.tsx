@@ -207,6 +207,39 @@ const LearnerProfilePage: React.FC = () => {
               </div>
             </div>
 
+            {/* HR Information */}
+            {profile.hr && (
+              <div className="mb-6">
+                <h3 className="text-sm font-medium mb-2">HR Information</h3>
+                <div className="space-y-2 text-sm bg-slate-50 p-3 rounded-md border border-slate-200">
+                  {profile.hr.hire_date && (
+                    <div className="flex items-center">
+                      <span className="text-xs text-muted-foreground w-24">Hire Date:</span>
+                      <span className="text-xs ml-2">
+                        {format(new Date(profile.hr.hire_date), 'MMMM d, yyyy')}
+                      </span>
+                    </div>
+                  )}
+                  {profile.hr.status && (
+                    <div className="flex items-center">
+                      <span className="text-xs text-muted-foreground w-24">Status:</span>
+                      <span className="text-xs ml-2 capitalize">
+                        <Badge variant={profile.hr.status === 'active' ? 'default' : 'secondary'}>
+                          {profile.hr.status.replace('_', ' ')}
+                        </Badge>
+                      </span>
+                    </div>
+                  )}
+                  {profile.hr.manager && (
+                    <div className="flex items-center">
+                      <span className="text-xs text-muted-foreground w-24">Manager:</span>
+                      <span className="text-xs ml-2">{profile.hr.manager}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {profile.skills && profile.skills.length > 0 && (
               <div className="mb-6">
                 <h3 className="text-sm font-medium mb-2">Skills</h3>
@@ -251,38 +284,6 @@ const LearnerProfilePage: React.FC = () => {
                         <li key={index}>{goal}</li>
                       ))}
                     </ul>
-                  </div>
-                )}
-
-                {/* HR Information (if available) */}
-                {profile.hr && (
-                  <div className="mt-4 pt-4 border-t border-gray-100">
-                    <h3 className="text-sm font-medium mb-2">HR Information</h3>
-                    <div className="space-y-2 text-xs">
-                      {profile.hr.hire_date && (
-                        <div className="flex items-center">
-                          <Calendar className="h-3 w-3 mr-1 text-muted-foreground" />
-                          <span className="text-muted-foreground">Hired: </span>
-                          <span className="ml-1">{new Date(profile.hr.hire_date).toLocaleDateString()}</span>
-                        </div>
-                      )}
-                      
-                      {profile.hr.status && (
-                        <div className="flex items-center">
-                          <Badge className="text-[10px] px-1 capitalize" variant={profile.hr.status === 'active' ? 'default' : 'secondary'}>
-                            {profile.hr.status.replace('_', ' ')}
-                          </Badge>
-                        </div>
-                      )}
-                      
-                      {profile.hr.manager && (
-                        <div className="flex items-center">
-                          <User className="h-3 w-3 mr-1 text-muted-foreground" />
-                          <span className="text-muted-foreground">Manager: </span>
-                          <span className="ml-1">{profile.hr.manager}</span>
-                        </div>
-                      )}
-                    </div>
                   </div>
                 )}
               </div>
