@@ -941,6 +941,77 @@ export type Database = {
           },
         ]
       }
+      conversation_messages: {
+        Row: {
+          conversation_id: string
+          created_at: string | null
+          id: string
+          is_read: boolean | null
+          message: string
+          metadata: Json | null
+          sender_id: string
+          sender_type: string
+        }
+        Insert: {
+          conversation_id: string
+          created_at?: string | null
+          id?: string
+          is_read?: boolean | null
+          message: string
+          metadata?: Json | null
+          sender_id: string
+          sender_type: string
+        }
+        Update: {
+          conversation_id?: string
+          created_at?: string | null
+          id?: string
+          is_read?: boolean | null
+          message?: string
+          metadata?: Json | null
+          sender_id?: string
+          sender_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conversations: {
+        Row: {
+          created_at: string | null
+          employee_id: string
+          hr_user_id: string
+          id: string
+          last_message_at: string | null
+          metadata: Json | null
+          title: string
+        }
+        Insert: {
+          created_at?: string | null
+          employee_id: string
+          hr_user_id: string
+          id?: string
+          last_message_at?: string | null
+          metadata?: Json | null
+          title: string
+        }
+        Update: {
+          created_at?: string | null
+          employee_id?: string
+          hr_user_id?: string
+          id?: string
+          last_message_at?: string | null
+          metadata?: Json | null
+          title?: string
+        }
+        Relationships: []
+      }
       course_completion_records: {
         Row: {
           average_score: number | null
@@ -1026,6 +1097,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "course_enrollments_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "course_enrollments_employee_id_fkey"
             columns: ["employee_id"]
@@ -1575,7 +1653,9 @@ export type Database = {
           created_at: string | null
           department_id: string | null
           description: string | null
+          difficulty_level: string | null
           duration: number | null
+          duration_hours: number | null
           id: string
           skill_level: string | null
           status: string | null
@@ -1586,7 +1666,9 @@ export type Database = {
           created_at?: string | null
           department_id?: string | null
           description?: string | null
+          difficulty_level?: string | null
           duration?: number | null
+          duration_hours?: number | null
           id?: string
           skill_level?: string | null
           status?: string | null
@@ -1597,7 +1679,9 @@ export type Database = {
           created_at?: string | null
           department_id?: string | null
           description?: string | null
+          difficulty_level?: string | null
           duration?: number | null
+          duration_hours?: number | null
           id?: string
           skill_level?: string | null
           status?: string | null
@@ -1639,6 +1723,8 @@ export type Database = {
         Row: {
           activity_type: string
           course_id: string | null
+          created_at: string | null
+          createdAt: string | null
           description: string | null
           employee_id: string | null
           id: string
@@ -1647,6 +1733,8 @@ export type Database = {
         Insert: {
           activity_type: string
           course_id?: string | null
+          created_at?: string | null
+          createdAt?: string | null
           description?: string | null
           employee_id?: string | null
           id?: string
@@ -1655,6 +1743,8 @@ export type Database = {
         Update: {
           activity_type?: string
           course_id?: string | null
+          created_at?: string | null
+          createdAt?: string | null
           description?: string | null
           employee_id?: string | null
           id?: string
@@ -1681,71 +1771,71 @@ export type Database = {
         Row: {
           company_id: string | null
           created_at: string | null
-          current_rag_status: string | null
           department_id: string | null
           email: string
           hire_date: string | null
           id: string
           last_active_at: string | null
-          last_rag_update: string | null
           manager_id: string | null
           name: string
           phone: string | null
           position_id: string | null
           profile_image_url: string | null
           rag_status: string | null
+          rag_status_reason: string | null
+          rag_status_updated_at: string | null
+          rag_status_updated_by: string | null
           resume_url: string | null
+          skills: string[] | null
           status: string | null
-          status_history: Json | null
-          status_justification: string | null
-          status_updated_at: string | null
           updated_at: string | null
+          user_id: string | null
         }
         Insert: {
           company_id?: string | null
           created_at?: string | null
-          current_rag_status?: string | null
           department_id?: string | null
           email: string
           hire_date?: string | null
           id?: string
           last_active_at?: string | null
-          last_rag_update?: string | null
           manager_id?: string | null
           name: string
           phone?: string | null
           position_id?: string | null
           profile_image_url?: string | null
           rag_status?: string | null
+          rag_status_reason?: string | null
+          rag_status_updated_at?: string | null
+          rag_status_updated_by?: string | null
           resume_url?: string | null
+          skills?: string[] | null
           status?: string | null
-          status_history?: Json | null
-          status_justification?: string | null
-          status_updated_at?: string | null
           updated_at?: string | null
+          user_id?: string | null
         }
         Update: {
           company_id?: string | null
           created_at?: string | null
-          current_rag_status?: string | null
           department_id?: string | null
           email?: string
           hire_date?: string | null
           id?: string
           last_active_at?: string | null
-          last_rag_update?: string | null
           manager_id?: string | null
           name?: string
           phone?: string | null
           position_id?: string | null
           profile_image_url?: string | null
           rag_status?: string | null
+          rag_status_reason?: string | null
+          rag_status_updated_at?: string | null
+          rag_status_updated_by?: string | null
           resume_url?: string | null
+          skills?: string[] | null
           status?: string | null
-          status_history?: Json | null
-          status_justification?: string | null
-          status_updated_at?: string | null
           updated_at?: string | null
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -3318,6 +3408,45 @@ export type Database = {
           },
         ]
       }
+      user_notifications: {
+        Row: {
+          created_at: string | null
+          createdAt: string | null
+          id: string
+          is_read: boolean | null
+          message: string
+          metadata: Json | null
+          priority: string | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          createdAt?: string | null
+          id?: string
+          is_read?: boolean | null
+          message: string
+          metadata?: Json | null
+          priority?: string | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          createdAt?: string | null
+          id?: string
+          is_read?: boolean | null
+          message?: string
+          metadata?: Json | null
+          priority?: string | null
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_preferences: {
         Row: {
           created_at: string | null
@@ -3462,6 +3591,10 @@ export type Database = {
             }
             Returns: unknown
           }
+      check_and_fix_column_names: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       create_confirmed_user: {
         Args: {
           user_email: string
@@ -3469,6 +3602,14 @@ export type Database = {
           user_data?: Json
         }
         Returns: Json
+      }
+      create_notifications_table: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      create_required_tables: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
       }
       exec_sql: {
         Args: {

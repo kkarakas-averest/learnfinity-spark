@@ -10,8 +10,8 @@ import { Calendar, Check, Clock, GraduationCap, Award, Book, User } from 'lucide
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { format, formatDistance } from 'date-fns';
+import { LearnerHRProfileCard } from '@/components/hr';
 
-// Utility function to display how many days ago a date was
 const getDaysAgo = (dateString: string): string => {
   try {
     const date = new Date(dateString);
@@ -21,7 +21,6 @@ const getDaysAgo = (dateString: string): string => {
   }
 };
 
-// Types
 interface LearningPreferences {
   preferredLearningStyle: string | null;
   preferredContentTypes: string[];
@@ -79,11 +78,12 @@ const LearnerProfilePage: React.FC = () => {
   const { user, isLoading: authLoading } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [courses, setCourses] = useState<Course[]>([]);
+  const [hrProfile, setHrProfile] = useState<any>(null);
+  const [hrAssignedCourses, setHrAssignedCourses] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { id: userId } = router.query;
 
-  // Fetch profile data
   useEffect(() => {
     const fetchProfileData = async () => {
       if (!userId && !user?.id) return;
@@ -92,7 +92,6 @@ const LearnerProfilePage: React.FC = () => {
       setError(null);
       
       try {
-        // Fetch profile data
         const targetId = (userId as string) || user?.id;
         const response = await fetch(`/api/learner/profile?userId=${targetId}`);
         
@@ -103,12 +102,28 @@ const LearnerProfilePage: React.FC = () => {
         const profileData = await response.json();
         setProfile(profileData);
         
-        // Fetch enrolled courses for the user
         const coursesResponse = await fetch(`/api/learner/courses?userId=${targetId}`);
         
         if (coursesResponse.ok) {
           const coursesData = await coursesResponse.json();
           setCourses(coursesData.courses || []);
+        }
+
+        const hrResponse = await fetch(`/api/learner/hr-profile?userId=${targetId}`);
+        if (hrResponse.ok) {
+          const hrData = await hrResponse.json();
+          setHrProfile(hrData.hrProfile);
+          setHrAssignedCourses(hrData.assignedCourses || []);
+          
+          if (hrData.assignedCourses && hrData.assignedCourses.length > 0) {
+            setCourses(prevCourses => {
+              const existingIds = new Set(prevCourses.map(c => c.id));
+              const newHrCourses = hrData.assignedCourses.filter(
+                (c: any) => !existingIds.has(c.id)
+              );
+              return [...prevCourses, ...newHrCourses];
+            });
+          }
         }
       } catch (err) {
         console.error('Error fetching profile data:', err);
@@ -121,7 +136,6 @@ const LearnerProfilePage: React.FC = () => {
     fetchProfileData();
   }, [userId, user?.id]);
 
-  // Loading state
   if (authLoading || isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -131,7 +145,6 @@ const LearnerProfilePage: React.FC = () => {
     );
   }
 
-  // Error state
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen">
@@ -143,7 +156,6 @@ const LearnerProfilePage: React.FC = () => {
     );
   }
 
-  // Not found state
   if (!profile) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen">
@@ -159,10 +171,11 @@ const LearnerProfilePage: React.FC = () => {
     ? profile.name.split(' ').map(n => n[0]).join('').toUpperCase() 
     : profile.email.substring(0, 2).toUpperCase();
 
+  const allCourses = courses;
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Profile Card */}
         <Card className="md:col-span-1">
           <CardHeader className="flex flex-col items-center">
             <Avatar className="h-24 w-24 mb-4">
@@ -190,7 +203,6 @@ const LearnerProfilePage: React.FC = () => {
               </div>
             )}
             
-            {/* Contact Information */}
             <div className="mb-6">
               <h3 className="text-sm font-medium mb-2">Contact Information</h3>
               <div className="space-y-2 text-sm">
@@ -207,7 +219,6 @@ const LearnerProfilePage: React.FC = () => {
               </div>
             </div>
 
-            {/* HR Information */}
             {profile.hr && (
               <div className="mb-6">
                 <h3 className="text-sm font-medium mb-2">HR Information</h3>
@@ -301,19 +312,19 @@ const LearnerProfilePage: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* Courses and Data */}
         <div className="md:col-span-2">
           <Tabs defaultValue="courses">
             <TabsList className="mb-4">
-              <TabsTrigger value="courses">Courses</TabsTrigger>
+              <TabsTrigger value="courses">My Courses</TabsTrigger>
               <TabsTrigger value="stats">Learning Stats</TabsTrigger>
+              <TabsTrigger value="hr-profile">HR Profile</TabsTrigger>
             </TabsList>
             
             <TabsContent value="courses">
               <div className="space-y-4">
-                <h2 className="text-xl font-semibold">Enrolled Courses</h2>
+                <h2 className="text-xl font-semibold mb-4">Enrolled Courses</h2>
                 
-                {courses.length === 0 ? (
+                {allCourses.length === 0 ? (
                   <Card>
                     <CardContent className="pt-6 flex flex-col items-center justify-center h-40">
                       <Book className="h-12 w-12 text-muted-foreground mb-2 opacity-50" />
@@ -332,7 +343,7 @@ const LearnerProfilePage: React.FC = () => {
                     </CardContent>
                   </Card>
                 ) : (
-                  courses.map((course) => (
+                  allCourses.map((course) => (
                     <Card key={course.id} className="overflow-hidden">
                       <div className="flex flex-col md:flex-row">
                         <div className="md:w-1/4 bg-muted">
@@ -393,13 +404,19 @@ const LearnerProfilePage: React.FC = () => {
                                 <span>Assigned {getDaysAgo(course.assigned_date)}</span>
                               </div>
                             )}
+                            {course.enrollment_date && (
+                              <div className="flex items-center">
+                                <Calendar className="h-3 w-3 mr-1" />
+                                <span>Enrolled {getDaysAgo(course.enrollment_date)}</span>
+                              </div>
+                            )}
                             {course.due_date && (
                               <div className="flex items-center">
                                 <Calendar className="h-3 w-3 mr-1" />
                                 <span>Due {getDaysAgo(course.due_date)}</span>
                               </div>
                             )}
-                            {course.completion_status === 'completed' && (
+                            {(course.completion_status === 'completed' || course.status === 'completed') && (
                               <div className="flex items-center">
                                 <Check className="h-3 w-3 mr-1" />
                                 <span>Completed</span>
@@ -493,6 +510,69 @@ const LearnerProfilePage: React.FC = () => {
                     )}
                   </CardContent>
                 </Card>
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="hr-profile">
+              <div className="space-y-4">
+                <h2 className="text-xl font-semibold mb-4">HR Information</h2>
+                
+                {hrProfile ? (
+                  <LearnerHRProfileCard hrProfile={hrProfile} />
+                ) : (
+                  <Card>
+                    <CardContent className="pt-6 flex flex-col items-center justify-center h-40">
+                      <User className="h-12 w-12 text-muted-foreground mb-2 opacity-50" />
+                      <p className="text-muted-foreground text-center">
+                        No HR profile information available
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
+                
+                {hrAssignedCourses.length > 0 && (
+                  <div className="mt-6">
+                    <h3 className="text-lg font-medium mb-3">HR Assigned Courses</h3>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      {hrAssignedCourses.map((course) => (
+                        <Card key={course.id} className="overflow-hidden">
+                          <div className="p-4">
+                            <h4 className="text-base font-medium">{course.title}</h4>
+                            <p className="text-sm text-muted-foreground line-clamp-2 mt-1 mb-2">
+                              {course.description}
+                            </p>
+                            
+                            <div className="flex flex-wrap gap-2 text-xs mb-3">
+                              <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-700">
+                                HR Assigned
+                              </Badge>
+                              <Badge variant="outline">{course.level}</Badge>
+                              <Badge variant="outline">{course.status}</Badge>
+                            </div>
+                            
+                            <div className="mb-2">
+                              <div className="flex justify-between text-xs mb-1">
+                                <span>Progress</span>
+                                <span>{course.progress}%</span>
+                              </div>
+                              <Progress value={course.progress} className="h-1.5" />
+                            </div>
+                            
+                            <div className="mt-3 flex justify-end">
+                              <Button
+                                onClick={() => router.push(`/learner/courses/${course.id}`)}
+                                size="sm"
+                                variant="secondary"
+                              >
+                                {course.progress > 0 ? 'Continue' : 'Start'} Course
+                              </Button>
+                            </div>
+                          </div>
+                        </Card>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </TabsContent>
           </Tabs>

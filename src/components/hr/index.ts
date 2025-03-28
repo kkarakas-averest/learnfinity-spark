@@ -1,3 +1,4 @@
+
 "use client";
 
 // Export existing HR components
@@ -15,4 +16,5 @@ export { default as ConversationList } from './ConversationList';
 export { default as ConversationChat } from './ConversationChat';
 export { default as NewConversationDialog } from './NewConversationDialog';
 export { default as MessageEmployeeModal } from './MessageEmployeeModal';
-export { default as CourseAssignmentDialog } from './CourseAssignmentDialog'; 
+export { default as CourseAssignmentDialog } from './CourseAssignmentDialog';
+export { default as LearnerHRProfileCard } from './LearnerHRProfileCard'; 
