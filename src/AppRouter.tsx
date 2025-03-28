@@ -17,6 +17,7 @@ import LearnerDashboardPage from './pages/learner/LearnerDashboardPage';
 import LearnerCoursesPage from './pages/learner/LearnerCoursesPage';
 import LearnerProfilePage from './pages/learner/LearnerProfilePage';
 import LearnerOnboardingPage from './pages/learner/LearnerOnboardingPage';
+import CourseViewPage from './pages/course/CourseViewPage';
 import CourseDetailsPage from './pages/course/CourseDetailsPage';
 import CourseListPage from './pages/course/CourseListPage';
 import CreateCoursePage from './pages/course/CreateCoursePage';
@@ -79,6 +80,7 @@ const AppRouter: React.FC = () => {
 
         {/* Course Routes */}
         <TypeSafeRoute path={ROUTES.COURSE_LIST} element={<CourseListPage />} />
+        <TypeSafeRoute path={ROUTES.COURSE_VIEW(':id')} element={<CourseViewPage />} />
         <TypeSafeRoute path={ROUTES.COURSE_DETAILS(':id')} element={<CourseDetailsPage />} />
         <TypeSafeRoute path={ROUTES.COURSE_CREATE} element={<CreateCoursePage />} />
       </Routes>

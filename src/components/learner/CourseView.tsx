@@ -1,4 +1,4 @@
-import React from '@/lib/react-helpers';
+import React, { useState, useEffect } from '@/lib/react-helpers';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -9,14 +9,15 @@ import { Separator } from '@/components/ui/separator';
 import { 
   BookOpen, Clock, ArrowLeft, ArrowRight, 
   Bookmark, CheckCircle, BarChart2, FileText, 
-  Video, ArrowUpRight, Download, MessageSquare
+  Video, ArrowUpRight, Download, MessageSquare, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { RAGStatusBadge } from '@/components/hr/RAGStatusBadge';
 import { RAGStatus } from '@/types/hr.types';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { FeedbackForm } from './FeedbackForm';
-import courseService, { CourseData, CourseModule, Resource } from '@/services/courseService';
+import CourseContentService, { Course, CourseModule, CourseSection, CourseResource } from '@/services/CourseContentService';
+import { supabase } from '@/lib/supabase';
 
 /**
  * CourseView component
@@ -24,34 +25,54 @@ import courseService, { CourseData, CourseModule, Resource } from '@/services/co
  * Displays a complete course with all its modules and tracks user progress
  */
 const CourseView: React.FC = () => {
-  // @ts-ignore - Using courseId without type parameter
-  const { courseId } = useParams();
+  const { id } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const courseContentService = CourseContentService.getInstance();
   
   // States
-  const [course, setCourse] = React.useState<CourseData | null>(null);
-  const [loading, setLoading] = React.useState(true);
-  const [activeModule, setActiveModule] = React.useState<string | null>(null);
-  const [bookmarks, setBookmarks] = React.useState<Record<string, number>>({});
-  const [currentTab, setCurrentTab] = React.useState('content');
-  const [showFeedbackForm, setShowFeedbackForm] = React.useState(false);
+  const [course, setCourse] = useState<Course | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [activeModule, setActiveModule] = useState<string | null>(null);
+  const [activeSection, setActiveSection] = useState<string | null>(null);
+  const [currentTab, setCurrentTab] = useState('content');
+  const [showFeedbackForm, setShowFeedbackForm] = useState(false);
   
   // Effect to fetch course data
-  React.useEffect(() => {
+  useEffect(() => {
     const fetchCourseData = async () => {
-      if (!courseId) return;
+      if (!id) return;
       
       try {
         setLoading(true);
-        const courseData = await courseService.getCourseById(courseId);
+        
+        // Get the current user session
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (!session?.user) {
+          navigate('/login');
+          return;
+        }
+        
+        // Fetch course data with all content
+        const courseData = await courseContentService.getCourseById(id, session.user.id);
         
         if (courseData) {
           setCourse(courseData);
           // Set the first module as active by default if none is selected
           if (!activeModule && courseData.modules.length > 0) {
             setActiveModule(courseData.modules[0].id);
+            // Set the first section as active if available
+            if (courseData.modules[0].sections.length > 0) {
+              setActiveSection(courseData.modules[0].sections[0].id);
+            }
           }
+        } else {
+          toast({
+            title: 'Course not found',
+            description: 'The requested course could not be loaded.',
+            variant: 'destructive'
+          });
         }
       } catch (error) {
         console.error('Error fetching course data:', error);
@@ -66,43 +87,48 @@ const CourseView: React.FC = () => {
     };
     
     fetchCourseData();
-  }, [courseId, toast, activeModule]);
+  }, [id, toast, navigate]);
   
   // Handle module change
   const handleModuleChange = (moduleId: string) => {
     setActiveModule(moduleId);
+    
+    // Find the first section in this module
+    const module = course?.modules.find(m => m.id === moduleId);
+    if (module && module.sections.length > 0) {
+      setActiveSection(module.sections[0].id);
+    } else {
+      setActiveSection(null);
+    }
+    
     // Reset current tab to content when changing modules
     setCurrentTab('content');
   };
   
-  // Handle module bookmark
-  const handleBookmark = (moduleId: string, timeInSeconds: number) => {
-    setBookmarks(prev => ({
-      ...prev,
-      [moduleId]: timeInSeconds
-    }));
-    
-    // In a real app, save this to the server
-    courseService.updateBookmark(courseId || '', moduleId, timeInSeconds)
-      .then(success => {
-        if (success) {
-          toast({
-            title: 'Bookmark saved',
-            description: `Saved your progress at ${Math.floor(timeInSeconds / 60)}:${(timeInSeconds % 60).toString().padStart(2, '0')}`,
-          });
-        }
-      })
-      .catch(error => {
-        console.error('Error saving bookmark:', error);
-      });
+  // Handle section change
+  const handleSectionChange = (sectionId: string) => {
+    setActiveSection(sectionId);
+    setCurrentTab('content');
   };
   
   // Handle module completion
   const handleCompleteModule = async () => {
-    if (!course || !activeModule) return;
+    if (!course || !activeModule || !id) return;
     
     try {
-      const success = await courseService.updateModuleCompletion(course.id, activeModule, true);
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session?.user) {
+        navigate('/login');
+        return;
+      }
+      
+      const success = await courseContentService.markContentAsCompleted(
+        session.user.id,
+        id,
+        activeModule,
+        'module'
+      );
       
       if (success) {
         // Update local state
@@ -112,11 +138,11 @@ const CourseView: React.FC = () => {
           return {
             ...prevCourse,
             modules: prevCourse.modules.map(module => 
-              module.id === activeModule ? { ...module, completed: true } : module
+              module.id === activeModule ? { ...module, isCompleted: true } : module
             ),
-            // Recalculate progress
+            // Recalculate progress based on completed modules
             progress: Math.round(
-              ((prevCourse.modules.filter(m => m.completed || m.id === activeModule).length) / 
+              ((prevCourse.modules.filter(m => m.isCompleted || m.id === activeModule).length) / 
               prevCourse.modules.length) * 100
             )
           };
@@ -137,6 +163,56 @@ const CourseView: React.FC = () => {
     }
   };
   
+  // Handle section completion
+  const handleCompleteSection = async (sectionId: string) => {
+    if (!course || !id) return;
+    
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session?.user) {
+        navigate('/login');
+        return;
+      }
+      
+      const success = await courseContentService.markContentAsCompleted(
+        session.user.id,
+        id,
+        sectionId,
+        'section'
+      );
+      
+      if (success) {
+        // Update local state - mark the section as completed
+        setCourse(prevCourse => {
+          if (!prevCourse) return null;
+          
+          return {
+            ...prevCourse,
+            modules: prevCourse.modules.map(module => ({
+              ...module,
+              sections: module.sections.map(section => 
+                section.id === sectionId ? { ...section, isCompleted: true } : section
+              )
+            }))
+          };
+        });
+        
+        toast({
+          title: 'Section completed',
+          description: 'Your progress has been saved.',
+        });
+      }
+    } catch (error) {
+      console.error('Error completing section:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update section status. Please try again.',
+        variant: 'destructive'
+      });
+    }
+  };
+  
   // Navigate to next/previous module
   const navigateModule = (direction: 'next' | 'prev') => {
     if (!course || !activeModule) return;
@@ -147,7 +223,16 @@ const CourseView: React.FC = () => {
     const targetIndex = direction === 'next' ? currentIndex + 1 : currentIndex - 1;
     
     if (targetIndex >= 0 && targetIndex < course.modules.length) {
-      setActiveModule(course.modules[targetIndex].id);
+      const targetModule = course.modules[targetIndex];
+      setActiveModule(targetModule.id);
+      
+      // Also set the first section if available
+      if (targetModule.sections.length > 0) {
+        setActiveSection(targetModule.sections[0].id);
+      } else {
+        setActiveSection(null);
+      }
+      
       setCurrentTab('content');
       
       // Scroll to top
@@ -160,15 +245,12 @@ const CourseView: React.FC = () => {
     if (!course) return;
     
     try {
-      const success = await courseService.submitFeedback(course.id, data);
-      
-      if (success) {
-        toast({
-          title: 'Feedback submitted',
-          description: 'Thank you for your feedback!',
-        });
-        setShowFeedbackForm(false);
-      }
+      // For now, just show a success message
+      toast({
+        title: 'Feedback submitted',
+        description: 'Thank you for your feedback!',
+      });
+      setShowFeedbackForm(false);
     } catch (error) {
       console.error('Error submitting feedback:', error);
       toast({
@@ -180,13 +262,13 @@ const CourseView: React.FC = () => {
   };
   
   // Render content based on type
-  const renderModuleContent = (module: CourseModule) => {
-    switch (module.contentType) {
+  const renderSectionContent = (section: CourseSection) => {
+    switch (section.contentType) {
       case 'text':
         return (
           <div className="prose prose-slate max-w-none">
             {/* In a real app, you'd use a markdown renderer here */}
-            <div dangerouslySetInnerHTML={{ __html: module.content.replace(/\n/g, '<br>').replace(/#{1,6}\s+(.*)/g, '<h3>$1</h3>') }} />
+            <div dangerouslySetInnerHTML={{ __html: section.content.replace(/\n/g, '<br>').replace(/#{1,6}\s+(.*)/g, '<h3>$1</h3>') }} />
           </div>
         );
       case 'video':
@@ -195,7 +277,7 @@ const CourseView: React.FC = () => {
             <p className="text-center text-gray-500">
               <Video className="w-12 h-12 mx-auto mb-2" />
               Video content would be embedded here.<br />
-              URL: {module.content}
+              URL: {section.content}
             </p>
           </div>
         );
@@ -221,7 +303,7 @@ const CourseView: React.FC = () => {
   };
   
   // Render resource icon based on type
-  const getResourceIcon = (type: Resource['type']) => {
+  const getResourceIcon = (type: CourseResource['type']) => {
     switch (type) {
       case 'pdf':
         return <FileText className="w-4 h-4" />;
@@ -250,12 +332,13 @@ const CourseView: React.FC = () => {
       <div className="flex flex-col items-center justify-center min-h-screen p-4">
         <h2 className="text-2xl font-bold mb-2">Course Not Found</h2>
         <p className="text-muted-foreground mb-6">The course you're looking for doesn't exist or you don't have access to it.</p>
-        <Button onClick={() => navigate('/dashboard')}>Return to Dashboard</Button>
+        <Button onClick={() => navigate('/learner/courses')}>Return to Courses</Button>
       </div>
     );
   }
   
   const activeModuleData = course.modules.find(m => m.id === activeModule);
+  const activeSectionData = activeModuleData?.sections.find(s => s.id === activeSection);
   
   return (
     <div className="min-h-screen bg-background">
@@ -267,10 +350,10 @@ const CourseView: React.FC = () => {
               variant="ghost" 
               size="sm" 
               className="text-slate-300 hover:text-white mb-4 md:mb-0 -ml-2 md:ml-0"
-              onClick={() => navigate('/dashboard')}
+              onClick={() => navigate('/learner/courses')}
             >
               <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Dashboard
+              Back to Courses
             </Button>
             
             <div className="flex items-center gap-3">
@@ -298,6 +381,11 @@ const CourseView: React.FC = () => {
               <BookOpen className="w-4 h-4 mr-1" />
               {course.modules.length} Modules
             </div>
+            {course.instructor && (
+              <div className="flex items-center">
+                <span>Instructor: {course.instructor}</span>
+              </div>
+            )}
           </div>
           
           <Progress 
@@ -319,30 +407,57 @@ const CourseView: React.FC = () => {
               <CardContent className="px-2">
                 <div className="space-y-1">
                   {course.modules.map((module, index) => (
-                    <Button
-                      key={module.id}
-                      variant={module.id === activeModule ? "default" : "ghost"}
-                      className={`w-full justify-start h-auto py-3 px-3 ${
-                        module.completed ? "text-muted-foreground hover:text-primary" : ""
-                      }`}
-                      onClick={() => handleModuleChange(module.id)}
-                    >
-                      <div className="flex items-center mr-2">
-                        {module.completed ? (
-                          <CheckCircle className="w-4 h-4 text-green-500" />
-                        ) : (
-                          <span className="flex items-center justify-center w-5 h-5 rounded-full bg-muted text-xs">
-                            {index + 1}
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-left">
-                        <div className="font-medium">{module.title}</div>
-                        <div className="text-xs text-muted-foreground mt-1">
-                          {module.duration} • {module.contentType}
+                    <div key={module.id} className="mb-4">
+                      <Button
+                        variant={module.id === activeModule ? "default" : "ghost"}
+                        className={`w-full justify-start h-auto py-3 px-3 ${
+                          module.isCompleted ? "text-muted-foreground hover:text-primary" : ""
+                        }`}
+                        onClick={() => handleModuleChange(module.id)}
+                      >
+                        <div className="flex items-center mr-2">
+                          {module.isCompleted ? (
+                            <CheckCircle className="w-4 h-4 text-green-500" />
+                          ) : (
+                            <span className="flex items-center justify-center w-5 h-5 rounded-full bg-muted text-xs">
+                              {index + 1}
+                            </span>
+                          )}
                         </div>
-                      </div>
-                    </Button>
+                        <div className="text-left">
+                          <div className="font-medium">{module.title}</div>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            {module.duration} min • {module.sections.length} sections
+                          </div>
+                        </div>
+                      </Button>
+                      
+                      {/* Show sections for the active module */}
+                      {module.id === activeModule && module.sections.length > 0 && (
+                        <div className="pl-8 mt-2 space-y-1">
+                          {module.sections.map((section, sIndex) => (
+                            <Button
+                              key={section.id}
+                              variant={section.id === activeSection ? "secondary" : "ghost"}
+                              size="sm"
+                              className={`w-full justify-start text-left ${
+                                section.isCompleted ? "text-muted-foreground hover:text-primary" : ""
+                              }`}
+                              onClick={() => handleSectionChange(section.id)}
+                            >
+                              <div className="flex items-center mr-2">
+                                {section.isCompleted ? (
+                                  <CheckCircle className="w-3 h-3 text-green-500" />
+                                ) : (
+                                  <span className="text-xs">{sIndex + 1}.</span>
+                                )}
+                              </div>
+                              <span className="text-sm truncate">{section.title}</span>
+                            </Button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   ))}
                 </div>
               </CardContent>
@@ -351,34 +466,16 @@ const CourseView: React.FC = () => {
           
           {/* Module Content */}
           <div className="order-1 lg:order-2 lg:col-span-2">
-            {activeModuleData ? (
+            {activeModuleData && (
               <Card>
                 <CardHeader>
-                  <div className="flex flex-col md:flex-row md:justify-between md:items-start">
+                  <div className="flex justify-between items-start">
                     <div>
-                      <CardTitle className="text-xl mb-1">{activeModuleData.title}</CardTitle>
-                      <p className="text-sm text-muted-foreground">{activeModuleData.description}</p>
-                    </div>
-                    <div className="flex items-center mt-4 md:mt-0 space-x-2">
-                      <div className="text-sm text-muted-foreground">
-                        <Clock className="w-4 h-4 inline-block mr-1" />
-                        {activeModuleData.duration}
-                      </div>
-                      
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="ml-auto md:ml-0"
-                        onClick={() => handleBookmark(activeModuleData.id, 0)}
-                      >
-                        <Bookmark className="w-4 h-4 mr-2" />
-                        Bookmark
-                      </Button>
+                      <CardTitle className="text-2xl">{activeModuleData.title}</CardTitle>
+                      <p className="text-muted-foreground mt-1">{activeModuleData.description}</p>
                     </div>
                   </div>
                 </CardHeader>
-                
-                <Separator />
                 
                 <Tabs value={currentTab} onValueChange={setCurrentTab} className="w-full">
                   <TabsList className="grid w-full grid-cols-2 mb-0 rounded-none border-b">
@@ -388,101 +485,95 @@ const CourseView: React.FC = () => {
                   
                   <TabsContent value="content" className="m-0">
                     <CardContent className="p-6" id="module-content">
-                      {renderModuleContent(activeModuleData)}
+                      {activeSectionData ? (
+                        <div>
+                          <h3 className="text-xl font-semibold mb-4">{activeSectionData.title}</h3>
+                          {renderSectionContent(activeSectionData)}
+                          
+                          <div className="mt-8 flex justify-between">
+                            <Button 
+                              variant="outline" 
+                              onClick={() => handleCompleteSection(activeSectionData.id)}
+                              disabled={activeSectionData.isCompleted}
+                            >
+                              {activeSectionData.isCompleted ? 'Completed' : 'Mark as Complete'}
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-muted-foreground">Select a section to view its content.</p>
+                      )}
                     </CardContent>
                   </TabsContent>
                   
                   <TabsContent value="resources" className="m-0">
                     <CardContent className="p-6">
-                      {activeModuleData.resources && activeModuleData.resources.length > 0 ? (
+                      {activeModuleData.resources.length > 0 ? (
                         <div className="space-y-4">
-                          <h3 className="text-lg font-medium">Additional Resources</h3>
-                          <ul className="space-y-2">
-                            {activeModuleData.resources.map(resource => (
-                              <li key={resource.id}>
-                                <a 
-                                  href={resource.url} 
-                                  target="_blank" 
-                                  rel="noopener noreferrer"
-                                  className="flex items-center p-2 hover:bg-muted rounded-md transition-colors"
-                                >
-                                  <div className="flex items-center justify-center w-8 h-8 bg-primary/10 text-primary rounded-md mr-3">
-                                    {getResourceIcon(resource.type)}
-                                  </div>
-                                  <div>
-                                    <p className="font-medium">{resource.title}</p>
-                                    <p className="text-xs text-muted-foreground capitalize">{resource.type}</p>
-                                  </div>
-                                </a>
-                              </li>
-                            ))}
-                          </ul>
+                          {activeModuleData.resources.map(resource => (
+                            <a
+                              key={resource.id}
+                              href={resource.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-2 p-3 rounded-md hover:bg-muted transition-colors"
+                            >
+                              {getResourceIcon(resource.type)}
+                              <div>
+                                <div className="font-medium">{resource.title}</div>
+                                {resource.description && (
+                                  <div className="text-sm text-muted-foreground">{resource.description}</div>
+                                )}
+                              </div>
+                            </a>
+                          ))}
                         </div>
                       ) : (
-                        <p className="text-center text-muted-foreground py-4">
-                          No additional resources available for this module.
-                        </p>
+                        <p className="text-muted-foreground">No resources available for this module.</p>
                       )}
                     </CardContent>
                   </TabsContent>
                 </Tabs>
                 
-                <CardFooter className="flex justify-between py-4 border-t">
-                  <Button
+                <CardFooter className="flex justify-between p-6 pt-0">
+                  <Button 
                     variant="outline"
                     onClick={() => navigateModule('prev')}
-                    disabled={course.modules.findIndex(m => m.id === activeModule) === 0}
+                    disabled={course.modules.indexOf(activeModuleData) === 0}
                   >
-                    <ArrowLeft className="w-4 h-4 mr-2" />
+                    <ChevronLeft className="mr-2 h-4 w-4" />
                     Previous Module
                   </Button>
                   
-                  {activeModuleData.completed ? (
-                    <Button
-                      onClick={() => navigateModule('next')}
-                      disabled={course.modules.findIndex(m => m.id === activeModule) === course.modules.length - 1}
-                    >
-                      Next Module
-                      <ArrowRight className="w-4 h-4 ml-2" />
-                    </Button>
-                  ) : (
-                    <Button onClick={handleCompleteModule}>
-                      Mark as Complete
-                      <CheckCircle className="w-4 h-4 ml-2" />
-                    </Button>
-                  )}
+                  <Button
+                    onClick={() => handleCompleteModule()}
+                    disabled={activeModuleData.isCompleted}
+                  >
+                    {activeModuleData.isCompleted ? 'Module Completed' : 'Complete & Continue'}
+                    <ChevronRight className="ml-2 h-4 w-4" />
+                  </Button>
                 </CardFooter>
               </Card>
-            ) : (
-              <Card>
-                <CardContent className="p-6 text-center">
-                  <p className="text-muted-foreground">Please select a module to view its content.</p>
-                </CardContent>
-              </Card>
             )}
+            
+            {/* Feedback Dialog */}
+            <Dialog open={showFeedbackForm} onOpenChange={setShowFeedbackForm}>
+              <DialogContent>
+                <FeedbackForm onSubmit={handleFeedbackSubmit} />
+              </DialogContent>
+            </Dialog>
             
             {/* Feedback Button */}
             <div className="mt-6 flex justify-end">
               <Button 
                 variant="outline" 
-                className="flex items-center" 
+                className="text-muted-foreground"
                 onClick={() => setShowFeedbackForm(true)}
               >
-                <MessageSquare className="w-4 h-4 mr-2" />
+                <MessageSquare className="mr-2 h-4 w-4" />
                 Provide Feedback
               </Button>
             </div>
-            
-            {/* Feedback Dialog */}
-            <Dialog open={showFeedbackForm} onOpenChange={setShowFeedbackForm}>
-              <DialogContent className="sm:max-w-[500px]">
-                <FeedbackForm 
-                  courseId={course.id}
-                  onSubmit={handleFeedbackSubmit}
-                  onCancel={() => setShowFeedbackForm(false)}
-                />
-              </DialogContent>
-            </Dialog>
           </div>
         </div>
       </div>

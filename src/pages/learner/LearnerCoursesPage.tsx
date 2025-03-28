@@ -14,7 +14,7 @@ import {
   BookOpen,
   CheckCircle
 } from 'lucide-react';
-import { ROUTES } from '@/lib/routes';
+import { ROUTES, buildRoute } from '@/lib/routes';
 
 interface Course {
   id: string;
@@ -116,7 +116,7 @@ const LearnerCoursesPage: React.FC = () => {
   });
   
   const handleContinueCourse = (courseId: string) => {
-    navigate(`/course/${courseId}`);
+    navigate(buildRoute.COURSE_VIEW(courseId));
   };
   
   const renderCourseCard = (course: Course) => (

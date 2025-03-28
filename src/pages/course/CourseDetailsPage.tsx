@@ -24,6 +24,7 @@ import {
   ChevronLeft,
   AlertCircle
 } from 'lucide-react';
+import { ROUTES, buildRoute } from '@/lib/routes';
 
 interface CourseModule {
   id: string;
@@ -729,6 +730,18 @@ const CourseDetailsPage: React.FC = () => {
               {renderModulesList()}
             </CardContent>
           </Card>
+        </div>
+      </div>
+      
+      <div className="mt-6">
+        <div className="flex items-center gap-3">
+          <Button 
+            variant="secondary"
+            onClick={() => navigate(buildRoute.COURSE_VIEW(id || ''))}
+          >
+            <BookOpen className="w-4 h-4 mr-2" />
+            View Course
+          </Button>
         </div>
       </div>
     </div>
