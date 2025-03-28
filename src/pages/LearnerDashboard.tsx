@@ -1,11 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
+import { useState, useEffect } from '@/lib/react-helpers';
 import { Navigate, Link } from "react-router-dom";
 import { useAuth } from "@/state";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
-import { Home, BookOpen, Trophy, User, ArrowRight, Sparkles, AlertCircle, Calendar, Clock, Check, Users } from "lucide-react";
+import { 
+  Home, BookOpen, Trophy, User, ArrowRight, 
+  Sparkles, AlertCircle, Calendar, Clock, Check, 
+  Users, Award
+} from "lucide-react";
 import DashboardHeader from "@/components/learner/DashboardHeader";
 import TestNotificationButton from "@/components/learner/TestNotificationButton";
 import AICourseRecommendations from "@/components/learner/AICourseRecommendations";
@@ -643,7 +648,7 @@ const LearnerDashboard: React.FC = () => {
                   label="completed"
                 />
                 <StatCard 
-                  icon={<Briefcase className="h-5 w-5" />} 
+                  icon={<User className="h-5 w-5" />} 
                   title="HR Assigned" 
                   value={stats.assignedCourses.toString()}
                   label="courses"
@@ -739,7 +744,7 @@ const LearnerDashboard: React.FC = () => {
                         <div className="flex justify-between text-sm">
                           <span>{path.courses_count || 0} courses</span>
                           <span className="flex items-center gap-1">
-                            <CalendarIcon className="h-3 w-3" />
+                            <Calendar className="h-3 w-3" />
                             Due {formatDistanceToNow(new Date(path.due_date || Date.now()), { addSuffix: true })}
                           </span>
                         </div>
@@ -796,7 +801,7 @@ const LearnerDashboard: React.FC = () => {
                             <Badge 
                               variant={
                                 course.rag_status === 'completed' ? 'success' : 
-                                course.rag_status === 'in_progress' ? 'warning' : 'default'
+                                course.rag_status === 'in_progress' ? 'secondary' : 'default'
                               }
                             >
                               {course.rag_status === 'completed' ? 'Completed' : 
@@ -872,7 +877,7 @@ const LearnerDashboard: React.FC = () => {
                       <div className="flex justify-between text-sm">
                         <span>{path.courses_count || 0} courses</span>
                         <span className="flex items-center gap-1">
-                          <CalendarIcon className="h-3 w-3" />
+                          <Calendar className="h-3 w-3" />
                           Due {formatDistanceToNow(new Date(path.due_date || Date.now()), { addSuffix: true })}
                         </span>
                       </div>
@@ -988,34 +993,29 @@ const LearnerDashboard: React.FC = () => {
                   {dashboardProfile.hr && (
                     <div className="mt-6 border-t pt-6">
                       <div className="flex items-center gap-2 mb-4">
-                        <Briefcase className="h-5 w-5" />
+                        <User className="h-5 w-5" />
                         <h4 className="text-base font-medium">HR Information</h4>
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <ProfileField 
                           label="Hire Date" 
                           value={formatDate(dashboardProfile.hr.hire_date)} 
-                          icon={<CalendarIcon className="h-4 w-4 text-muted-foreground" />}
+                          icon={<Calendar className="h-4 w-4 text-muted-foreground" />}
                         />
                         <ProfileField 
                           label="Employment Status" 
                           value={dashboardProfile.hr.status || 'Active'} 
-                          icon={<Badge variant={dashboardProfile.hr.status === 'active' ? 'success' : 'outline'} className="mr-2">
-                            {dashboardProfile.hr.status || 'Active'}
-                          </Badge>}
                         />
                         {dashboardProfile.hr.manager && (
                           <ProfileField 
                             label="Manager" 
                             value={dashboardProfile.hr.manager} 
-                            icon={<Users className="h-4 w-4 text-muted-foreground" />}
                           />
                         )}
                         {dashboardProfile.department && (
                           <ProfileField 
                             label="Department" 
                             value={dashboardProfile.department} 
-                            icon={<Building className="h-4 w-4 text-muted-foreground" />}
                           />
                         )}
                       </div>
@@ -1046,10 +1046,10 @@ const ProfileField: React.FC<{
   return (
     <div className="flex flex-col">
       <span className="text-xs text-muted-foreground">{label}</span>
-      <div className="flex items-center gap-2">
-        {icon}
-        <span className="text-sm font-medium">{value}</span>
-      </div>
+      <span className="text-sm font-medium">
+        {icon && <span className="mr-2">{icon}</span>}
+        {value}
+      </span>
     </div>
   );
 };
