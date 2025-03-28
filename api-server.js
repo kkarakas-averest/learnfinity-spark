@@ -2,7 +2,6 @@ import express from 'express';
 import cors from 'cors';
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
-import { networkInterfaces } from 'os';
 
 // Load environment variables
 dotenv.config();
@@ -30,7 +29,8 @@ const supabase = createClient(supabaseUrl, supabaseKey, {
 
 // Create Express app
 const app = express();
-const PORT = process.env.API_PORT || 3083;
+const PORT = process.env.PORT || 3083;
+const HOST = process.env.HOST || '0.0.0.0';
 
 // Middleware
 app.use(cors({
@@ -47,10 +47,14 @@ app.use((req, res, next) => {
   next();
 });
 
-// Error handling middleware
+// Global error handler middleware
 app.use((err, req, res, next) => {
-  console.error('Unexpected error:', err);
-  res.status(500).json({ error: 'An unexpected error occurred', details: err.message });
+  console.error('Global error handler caught:', err);
+  res.status(500).json({
+    error: 'An unexpected server error occurred',
+    message: err.message || 'Unknown error',
+    status: 500
+  });
 });
 
 // Health check endpoint
@@ -62,23 +66,22 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Helper function to get local IP - fixed ES module version
-function getLocalIP() {
-  try {
-    const nets = networkInterfaces();
-    for (const name of Object.keys(nets)) {
-      for (const net of nets[name]) {
-        // Skip over non-IPv4 and internal (i.e. 127.0.0.1) addresses
-        if (net.family === 'IPv4' && !net.internal) {
-          return net.address;
-        }
-      }
-    }
-    return '127.0.0.1'; // Default to localhost if no external IP found
-  } catch (error) {
-    console.error('Error getting local IP:', error);
-    return '127.0.0.1';
+// Helper function to handle API errors consistently
+function handleApiError(res, error, fallbackData = null) {
+  console.error('API Error:', error);
+  
+  if (fallbackData) {
+    // If fallback data is provided, return it instead of an error
+    console.log('Returning fallback data due to error');
+    return res.json(fallbackData);
   }
+  
+  // Otherwise return a structured error response
+  return res.status(500).json({
+    error: 'API Error',
+    message: error.message || 'Unknown error',
+    status: 500
+  });
 }
 
 /**
@@ -454,7 +457,7 @@ app.get('/api/learner/courses', async (req, res) => {
 
 /**
  * GET /api/learner/dashboard
- * Gets dashboard data for a learner
+ * Returns dashboard data including profile, courses, learning paths and stats
  */
 app.get('/api/learner/dashboard', async (req, res) => {
   try {
@@ -1685,23 +1688,48 @@ app.post('/api/sync-hr/employee/:id', async (req, res) => {
   }
 });
 
-// Start the server with error handling
-const server = app.listen(PORT, '0.0.0.0', () => {
+// Server start with error handling
+const server = app.listen(PORT, HOST, () => {
+  console.log('Starting API server with config:');
+  console.log(`- Supabase URL available: ${!!process.env.SUPABASE_URL}`);
+  console.log(`- Supabase Key available: ${!!process.env.SUPABASE_KEY}`);
+  
+  // For local development, provide the localhost URL
   console.log(`API server running at http://localhost:${PORT}`);
-  console.log(`API server also accessible on your network at http://${getLocalIP()}:${PORT}`);
-})
-.on('error', (err) => {
-  if (err.code === 'EADDRINUSE') {
-    console.error(`Port ${PORT} is already in use. Please choose a different port.`);
-    // Try alternative port
-    const altPort = parseInt(PORT) + 1;
-    console.log(`Attempting to use port ${altPort} instead...`);
-    app.listen(altPort, '0.0.0.0', () => {
-      console.log(`API server running at http://localhost:${altPort}`);
-      console.log(`API server also accessible on your network at http://${getLocalIP()}:${altPort}`);
+  
+  // For production, just output the port the server is listening on
+  if (process.env.NODE_ENV === 'production') {
+    console.log(`API server running in production mode on port ${PORT}`);
+  } else {
+    console.log(`API server also accessible on your local network at http://${HOST}:${PORT}`);
+  }
+});
+
+// Handle port conflicts gracefully
+server.on('error', (error) => {
+  if (error.code === 'EADDRINUSE' && process.env.NODE_ENV !== 'production') {
+    console.log(`Port ${PORT} is already in use. Trying another port...`);
+    const newPort = PORT + 1;
+    console.log(`Attempting to use port ${newPort} instead...`);
+    server.close();
+    app.listen(newPort, HOST, () => {
+      console.log(`API server running at http://localhost:${newPort}`);
+      console.log(`API server also accessible on your local network at http://${HOST}:${newPort}`);
       console.log(`WARNING: Using alternative port. Update your frontend proxy configuration!`);
     });
   } else {
-    console.error('Failed to start server:', err);
+    console.error('Server error:', error);
+    process.exit(1); // Exit in production to allow container orchestration to restart
   }
+});
+
+// Add process-level unhandled exception handling to prevent server crashes
+process.on('uncaughtException', (error) => {
+  console.error('UNCAUGHT EXCEPTION - keeping process alive:', error);
+  // Optionally alert developers in production via email/message etc.
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('UNHANDLED REJECTION - keeping process alive:', reason);
+  // Optionally alert developers in production via email/message etc.
 }); 
