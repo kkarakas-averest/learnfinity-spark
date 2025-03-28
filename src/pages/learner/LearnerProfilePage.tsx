@@ -462,7 +462,7 @@ const LearnerProfilePage: React.FC = () => {
                           } 
                         />
                       </div>
-                      <div>
+    <div>
                         <div className="flex justify-between mb-1 text-sm">
                           <span>Overall Progress</span>
                           <span className="font-medium">
