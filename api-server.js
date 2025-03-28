@@ -76,6 +76,37 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// Debug endpoint
+app.get('/api/debug', (req, res) => {
+  const debugInfo = {
+    timestamp: new Date().toISOString(),
+    serverInfo: {
+      nodeEnv: process.env.NODE_ENV || 'development',
+      port: process.env.PORT || 3083,
+      hostname: req.hostname,
+    },
+    requestInfo: {
+      headers: req.headers,
+      url: req.url,
+      method: req.method,
+      ip: req.ip,
+      xhr: req.xhr,
+      protocol: req.protocol,
+    },
+    supabaseInfo: {
+      supabaseUrlAvailable: !!process.env.SUPABASE_URL,
+      supabaseKeyAvailable: !!process.env.SUPABASE_KEY,
+    }
+  };
+  
+  // Set correct headers
+  res.setHeader('Content-Type', 'application/json');
+  res.setHeader('Cache-Control', 'no-cache');
+  
+  // Return debug info
+  return res.json(debugInfo);
+});
+
 // Helper function to handle API errors consistently
 function handleApiError(res, error, fallbackData = null) {
   console.error('API Error:', error);

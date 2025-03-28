@@ -155,7 +155,63 @@ interface DashboardData {
 }
 
 const LearnerDashboard: React.FC = () => {
-  const { user, userDetails, isLoading } = useAuth();
+  console.log("LearnerDashboard - Current state:", {
+    loading: "State not initialized yet",
+    user: "State not initialized yet"
+  });
+
+  // Add a utility function to fetch from multiple potential sources
+  const fetchWithFallback = async (endpoint: string, userId: string) => {
+    // List of fetch sources to try, in order of preference
+    const sources = [
+      { label: "vite-proxy", url: `/api/learner/${endpoint}?userId=${userId}` },
+      { label: "direct-api", url: `http://localhost:3083/api/learner/${endpoint}?userId=${userId}` },
+      { label: "alt-port", url: `http://localhost:8084/api/learner/${endpoint}?userId=${userId}` }
+    ];
+    
+    let lastError = null;
+    
+    for (const source of sources) {
+      try {
+        console.log(`Trying ${source.label}: ${source.url}`);
+        
+        const response = await fetch(source.url, {
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        console.log(`${source.label} response status: ${response.status}`);
+        console.log(`${source.label} response content-type: ${response.headers.get('content-type')}`);
+        
+        if (!response.ok) {
+          throw new Error(`${source.label} API error: ${response.status} ${response.statusText}`);
+        }
+        
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+          const responseText = await response.text();
+          console.error(`${source.label} response is not JSON. First 100 chars: ${responseText.substring(0, 100)}`);
+          throw new Error(`${source.label}: Expected JSON response but got ${contentType}`);
+        }
+        
+        const data = await response.json();
+        console.log(`${source.label} data received successfully`);
+        return data;
+      } catch (err) {
+        console.error(`${source.label} fetch failed:`, err);
+        lastError = err;
+        // Continue to next source
+      }
+    }
+    
+    // If we've tried all sources and all failed, throw the last error
+    throw lastError || new Error('All fetch attempts failed');
+  };
+
+  // Initialize auth state
+  const { user, isLoading: authLoading, userDetails } = useAuth();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("overview");
   
@@ -218,19 +274,10 @@ const LearnerDashboard: React.FC = () => {
         setLoading(true);
         setError(null);
         
-        // Fetch dashboard data from API
-        const response = await fetch(`/api/learner/dashboard?userId=${userId}`);
+        console.log(`Attempting to fetch dashboard data for userId=${userId}`);
         
-        if (!response.ok) {
-          throw new Error(`API error: ${response.status}`);
-        }
-        
-        const contentType = response.headers.get('content-type');
-        if (!contentType || !contentType.includes('application/json')) {
-          throw new Error(`Expected JSON response but got ${contentType}`);
-        }
-        
-        const data = await response.json();
+        // Use our utility function
+        const data = await fetchWithFallback('dashboard', userId);
         console.log('Dashboard data:', data);
         setDashboardData(data);
       } catch (err) {
@@ -278,30 +325,9 @@ const LearnerDashboard: React.FC = () => {
         setStatsError(null);
         
         console.log(`Fetching stats data for user: ${user.id}`);
-        const response = await fetch(`/api/learner/dashboard?userId=${user.id}`);
-        
-        // Debug the response
-        console.log(`Dashboard API response status: ${response.status}`);
-        
-        if (!response.ok) {
-          // Try to get error details if available
-          try {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Failed to fetch learner stats');
-          } catch (jsonError) {
-            throw new Error(`Failed to fetch learner stats: ${response.statusText}`);
-          }
-        }
-        
-        // Parse the response
-        let dashboardData;
-        try {
-          dashboardData = await response.json();
-          console.log('Dashboard data received:', dashboardData);
-        } catch (parseError) {
-          console.error('Error parsing dashboard response:', parseError);
-          throw new Error('Failed to parse dashboard data');
-        }
+        // Use our utility function
+        const dashboardData = await fetchWithFallback('dashboard', user.id);
+        console.log('Dashboard data received for stats:', dashboardData);
         
         // Extract stats from dashboard data
         const { stats } = dashboardData;
@@ -562,25 +588,22 @@ const LearnerDashboard: React.FC = () => {
     fetchProfile();
   }, [user?.id, activeTab, toast]);
   
-  console.log("LearnerDashboard - Current state:", { user, userDetails, isLoading, learnerStats });
+  console.log("LearnerDashboard - Current state:", { user, userDetails, authLoading, learnerStats });
 
   // Redirect if not authenticated
-  if (!isLoading && !user) {
-    console.log("LearnerDashboard: No user found, redirecting to login");
-    return <Navigate to="/login" />;
-  }
-
-  // Show loading state
-  if (isLoading) {
-    console.log("LearnerDashboard: Auth is loading, showing spinner");
+  if (authLoading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <LoadingSpinner size="xl" />
+      <div className="flex justify-center items-center min-h-screen">
+        <LoadingSpinner size="lg" />
       </div>
     );
   }
 
-  console.log("LearnerDashboard: Rendering for user:", user?.id, "details:", userDetails);
+  if (!user) {
+    return <Navigate to="/login" />;
+  }
+
+  console.log("LearnerDashboard: Rendering for user:", user?.id, "details:", user);
 
   if (loading) {
     return (

@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>API Debug Tool</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            line-height: 1.6;
+        }
+        button {
+            padding: 10px;
+            margin: 5px;
+            cursor: pointer;
+        }
+        pre {
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            overflow: auto;
+            max-height: 400px;
+        }
+        .error {
+            color: red;
+        }
+        .success {
+            color: green;
+        }
+    </style>
+</head>
+<body>
+    <h1>API Debug Tool</h1>
+    
+    <div>
+        <h2>Test Endpoints</h2>
+        <button id="testDebug">Test Debug Endpoint</button>
+        <button id="testDashboard">Test Dashboard Endpoint</button>
+    </div>
+    
+    <div>
+        <h2>Results:</h2>
+        <pre id="results">Click a button to test an endpoint</pre>
+    </div>
+    
+    <script>
+        document.getElementById('testDebug').addEventListener('click', async () => {
+            try {
+                const results = document.getElementById('results');
+                results.textContent = 'Fetching debug endpoint...';
+                
+                // Test with different ports
+                const ports = [3083, 8084];
+                let succeeded = false;
+                
+                for (const port of ports) {
+                    try {
+                        const url = `http://localhost:${port}/api/debug`;
+                        results.textContent += `\nTrying ${url}...`;
+                        
+                        const response = await fetch(url, {
+                            headers: {
+                                'Accept': 'application/json'
+                            }
+                        });
+                        
+                        results.textContent += `\nStatus: ${response.status} ${response.statusText}`;
+                        results.textContent += `\nHeaders: ${JSON.stringify(Object.fromEntries([...response.headers]), null, 2)}`;
+                        
+                        if (response.ok) {
+                            const data = await response.json();
+                            results.textContent = `SUCCESS (port ${port}):\n${JSON.stringify(data, null, 2)}`;
+                            results.className = 'success';
+                            succeeded = true;
+                            break;
+                        } else {
+                            results.textContent += `\nEndpoint returned error: ${response.status} ${response.statusText}`;
+                        }
+                    } catch (err) {
+                        results.textContent += `\nError with port ${port}: ${err.message}`;
+                    }
+                }
+                
+                if (!succeeded) {
+                    results.className = 'error';
+                    results.textContent += '\n\nAll port attempts failed';
+                }
+            } catch (err) {
+                document.getElementById('results').textContent = `Error: ${err.message}`;
+                document.getElementById('results').className = 'error';
+            }
+        });
+        
+        document.getElementById('testDashboard').addEventListener('click', async () => {
+            try {
+                const results = document.getElementById('results');
+                results.textContent = 'Fetching dashboard endpoint...';
+                
+                const userId = '6e2c2548-c04a-419b-a17c-c2feb6a3d9c6';
+                
+                // Test with different ports
+                const ports = [3083, 8084];
+                let succeeded = false;
+                
+                for (const port of ports) {
+                    try {
+                        const url = `http://localhost:${port}/api/learner/dashboard?userId=${userId}`;
+                        results.textContent += `\nTrying ${url}...`;
+                        
+                        const response = await fetch(url, {
+                            headers: {
+                                'Accept': 'application/json'
+                            }
+                        });
+                        
+                        results.textContent += `\nStatus: ${response.status} ${response.statusText}`;
+                        results.textContent += `\nHeaders: ${JSON.stringify(Object.fromEntries([...response.headers]), null, 2)}`;
+                        
+                        if (response.ok) {
+                            // Check content type
+                            const contentType = response.headers.get('content-type');
+                            if (contentType && contentType.includes('application/json')) {
+                                // It's JSON, parse it
+                                const data = await response.json();
+                                results.textContent = `SUCCESS (port ${port}):\n${JSON.stringify(data, null, 2).substring(0, 500)}...`;
+                                results.className = 'success';
+                                succeeded = true;
+                                break;
+                            } else {
+                                // Not JSON, show the raw text
+                                const text = await response.text();
+                                results.textContent = `ERROR: Response is not JSON (port ${port}):\nContent-Type: ${contentType}\nFirst 500 chars:\n${text.substring(0, 500)}...`;
+                                results.className = 'error';
+                            }
+                        } else {
+                            results.textContent += `\nEndpoint returned error: ${response.status} ${response.statusText}`;
+                        }
+                    } catch (err) {
+                        results.textContent += `\nError with port ${port}: ${err.message}`;
+                    }
+                }
+                
+                if (!succeeded) {
+                    results.className = 'error';
+                    results.textContent += '\n\nAll port attempts failed';
+                }
+            } catch (err) {
+                document.getElementById('results').textContent = `Error: ${err.message}`;
+                document.getElementById('results').className = 'error';
+            }
+        });
+    </script>
+</body>
+</html> 
