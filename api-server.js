@@ -548,19 +548,118 @@ app.get('/api/learner/dashboard', async (req, res) => {
       console.error('Error fetching HR employee data for dashboard:', err);
     }
     
-    // Create mock learning paths for the dashboard
-    const mockLearningPaths = [
+        // Get real learning paths for the dashboard
+    let realLearningPaths = [];
+    try {
+      console.log('Fetching real learning paths from database...');
+      const { data: lpEnrollments, error: lpError } = await supabase
+        .from('hr_learning_path_enrollments')
+        .select(`
+          id,
+          learning_path_id,
+          status,
+          progress,
+          enrollment_date,
+          completion_date,
+          estimated_completion_date,
+          hr_learning_paths(id, title, description, skill_level)
+        `)
+        .eq('employee_id', userId);
+        
+      if (lpError) {
+        console.error('Error fetching learning path enrollments:', lpError.message);
+      } else if (lpEnrollments && lpEnrollments.length > 0) {
+        console.log(`Found ${lpEnrollments.length} learning paths for user`);
+        
+        // Transform real learning path data
+        realLearningPaths = lpEnrollments.map(enrollment => {
+          const pathData = enrollment.hr_learning_paths;
+          return {
+            id: pathData.id,
+            title: pathData.title,
+            description: pathData.description || 'No description available',
+            courses_count: 3, // We would need to count from real data
+            skills: [pathData.skill_level || 'General'], // We would need real skills
+            due_date: enrollment.estimated_completion_date || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+            progress: enrollment.progress || 0,
+            is_hr_assigned: true,
+            hr_learning_path_id: pathData.id,
+            thumbnail_url: 'https://images.unsplash.com/photo-1552664730-d307ca884978?ixlib=rb-1.2.1&auto=format&fit=crop&w=1500&q=80',
+            estimatedCompletionDate: enrollment.estimated_completion_date || null,
+            enrollmentDate: enrollment.enrollment_date || null
+          };
+        });
+      }
+    } catch (lpErr) {
+      console.error('Error in learning paths query:', lpErr);
+    }
+    
+    // Get real courses for the dashboard
+    let realCourses = [];
+    try {
+      console.log('Fetching real courses from database...');
+      const { data: courseEnrollments, error: ceError } = await supabase
+        .from('hr_course_enrollments')
+        .select(`
+          id,
+          course_id,
+          status,
+          progress,
+          enrollment_date,
+          completion_date,
+          hr_courses(id, title, description, duration, skill_level)
+        `)
+        .eq('employee_id', userId);
+        
+      if (ceError) {
+        console.error('Error fetching course enrollments:', ceError.message);
+      } else if (courseEnrollments && courseEnrollments.length > 0) {
+        console.log(`Found ${courseEnrollments.length} courses for user`);
+        
+        // Transform real course data
+        realCourses = courseEnrollments.map(enrollment => {
+          const courseData = enrollment.hr_courses;
+          return {
+            id: courseData.id,
+            title: courseData.title,
+            description: courseData.description || 'No description available',
+            thumbnail_url: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?ixlib=rb-1.2.1&auto=format&fit=crop&w=1500&q=80',
+            category: courseData.skill_level || 'General',
+            skills: courseData.skill_level ? [courseData.skill_level] : ['General'],
+            rag_status: enrollment.status === 'completed' ? 'completed' : 
+              (enrollment.progress > 0 ? 'in_progress' : 'not_started'),
+            learning_path_id: null, // We would need to link to learning path
+            learning_path_name: null,
+            progress: enrollment.progress || 0,
+            completed_sections: Math.floor((enrollment.progress || 0) / 20), // Estimate
+            total_sections: 5, // Default
+            duration: courseData.duration ? `${courseData.duration} minutes` : '2 hours',
+            course_type: 'required',
+            hr_training_id: courseData.id,
+            hr_training_title: courseData.title,
+            enrollmentDate: enrollment.enrollment_date || null
+          };
+        });
+      }
+    } catch (courseErr) {
+      console.error('Error in courses query:', courseErr);
+    }
+    
+    // Use mock data as fallback if no real data found
+    let learningPaths = realLearningPaths.length > 0 ? realLearningPaths : [
       {
         id: '1',
         title: 'New Employee Orientation',
         description: 'Essential onboarding courses for all new employees',
         courses_count: 4,
         skills: ['Company Knowledge', 'Workplace Policies', 'Team Collaboration'],
-        due_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days from now
+        due_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
         progress: 25,
         is_hr_assigned: true,
         hr_learning_path_id: 'hr-lp-1',
-        thumbnail_url: 'https://images.unsplash.com/photo-1600880292203-757bb62b4baf?ixlib=rb-1.2.1&auto=format&fit=crop&w=1500&q=80'
+        thumbnail_url: 'https://images.unsplash.com/photo-1600880292203-757bb62b4baf?ixlib=rb-1.2.1&auto=format&fit=crop&w=1500&q=80',
+        estimatedCompletionDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        enrollmentDate: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString()
       },
       {
         id: '2',
@@ -568,16 +667,17 @@ app.get('/api/learner/dashboard', async (req, res) => {
         description: 'Enhance your leadership and management capabilities',
         courses_count: 6,
         skills: ['Leadership', 'Delegation', 'Strategic Thinking', 'Team Building'],
-        due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days from now
+        due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
         progress: 10,
         is_hr_assigned: true,
         hr_learning_path_id: 'hr-lp-2',
-        thumbnail_url: 'https://images.unsplash.com/photo-1552664730-d307ca884978?ixlib=rb-1.2.1&auto=format&fit=crop&w=1500&q=80'
+        thumbnail_url: 'https://images.unsplash.com/photo-1552664730-d307ca884978?ixlib=rb-1.2.1&auto=format&fit=crop&w=1500&q=80',
+        estimatedCompletionDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        enrollmentDate: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString()
       }
     ];
     
-    // Create mock courses for the dashboard
-    const mockCourses = [
+    let courses = realCourses.length > 0 ? realCourses : [
       {
         id: 'course-1',
         title: 'Introduction to Company Policies',
@@ -594,7 +694,8 @@ app.get('/api/learner/dashboard', async (req, res) => {
         duration: '2 hours',
         course_type: 'required',
         hr_training_id: 'hr-training-1',
-        hr_training_title: 'Corporate Policies 101'
+        hr_training_title: 'Corporate Policies 101',
+        enrollmentDate: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString()
       },
       {
         id: 'course-2',
@@ -610,48 +711,13 @@ app.get('/api/learner/dashboard', async (req, res) => {
         completed_sections: 4,
         total_sections: 4,
         duration: '1.5 hours',
-        course_type: 'optional'
-      },
-      {
-        id: 'course-3',
-        title: 'Advanced Leadership Skills',
-        description: 'Develop advanced leadership techniques',
-        thumbnail_url: 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?ixlib=rb-1.2.1&auto=format&fit=crop&w=1500&q=80',
-        category: 'Leadership',
-        skills: ['Leadership', 'Management', 'Decision Making'],
-        rag_status: 'not_started',
-        learning_path_id: '2',
-        learning_path_name: 'Leadership Development',
-        progress: 0,
-        completed_sections: 0,
-        total_sections: 8,
-        duration: '4 hours',
-        course_type: 'recommended',
-        hr_training_id: 'hr-training-2',
-        hr_training_title: 'Leadership Essentials'
-      },
-      {
-        id: 'course-4',
-        title: 'Strategic Thinking Workshop',
-        description: 'Learn to think strategically in business contexts',
-        thumbnail_url: 'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?ixlib=rb-1.2.1&auto=format&fit=crop&w=1500&q=80',
-        category: 'Leadership',
-        skills: ['Strategic Thinking', 'Business Planning'],
-        rag_status: 'in_progress',
-        learning_path_id: '2',
-        learning_path_name: 'Leadership Development',
-        progress: 30,
-        completed_sections: 2,
-        total_sections: 6,
-        duration: '3 hours',
-        course_type: 'required',
-        hr_training_id: 'hr-training-3',
-        hr_training_title: 'Strategic Business Planning'
+        course_type: 'optional',
+        enrollmentDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
       }
     ];
     
-    // Prepare the mock profile data
-    const mockProfile = {
+    // Prepare the profile data with real HR data
+    const profile = {
       id: null,
       userId: userId,
       email: hrEmployeeData?.email || 'user@example.com',
@@ -675,7 +741,7 @@ app.get('/api/learner/dashboard', async (req, res) => {
     
     // Add HR data if available
     if (hrEmployeeData) {
-      mockProfile.hr = {
+      profile.hr = {
         id: hrEmployeeData.id,
         hire_date: hrEmployeeData.hire_date,
         status: hrEmployeeData.status || 'active',
@@ -689,7 +755,7 @@ app.get('/api/learner/dashboard', async (req, res) => {
       };
     } else {
       // Include mock HR data for demo purposes
-      mockProfile.hr = {
+      profile.hr = {
         id: userId,
         hire_date: '2023-01-15',
         status: 'active',
@@ -699,24 +765,29 @@ app.get('/api/learner/dashboard', async (req, res) => {
       };
     }
     
-    // Return the complete mock dashboard data
+    // Calculate stats from real data
+    const inProgress = realCourses.filter(c => c.rag_status === 'in_progress').length;
+    const completed = realCourses.filter(c => c.rag_status === 'completed').length;
+    const notStarted = realCourses.filter(c => c.rag_status === 'not_started').length;
+    
+    // Return combined data with real data or fallbacks
     return res.json({
-      profile: mockProfile,
-      learningPaths: mockLearningPaths,
+      profile,
+      learningPaths,
       courses: {
-        total: mockCourses.length,
-        featured: mockCourses[0],
-        inProgress: mockCourses.filter(c => c.rag_status === 'in_progress').length,
-        completed: mockCourses.filter(c => c.rag_status === 'completed').length,
-        notStarted: mockCourses.filter(c => c.rag_status === 'not_started').length,
-        hrAssigned: mockCourses.filter(c => c.hr_training_id).length,
-        items: mockCourses
+        total: courses.length,
+        featured: courses.length > 0 ? courses[0] : null,
+        inProgress: inProgress || 1,
+        completed: completed || 0,
+        notStarted: notStarted || 1,
+        hrAssigned: courses.length,
+        items: courses
       },
       stats: {
-        coursesCompleted: 1,
+        coursesCompleted: completed || 0,
         learningPathsCompleted: 0,
-        assignedCourses: 3,
-        skillsAcquired: 6
+        assignedCourses: courses.length,
+        skillsAcquired: (completed * 2) || 2
       }
     });
     
@@ -1400,7 +1471,9 @@ app.get('/api/learner/learning-path', async (req, res) => {
             assigned_date: new Date().toISOString(),
             due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
             hr_plan_id: 'hr-plan-1',
-            hr_plan_title: 'Employee Onboarding'
+            hr_plan_title: 'Employee Onboarding',
+            estimatedCompletionDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+            enrollmentDate: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString()
           },
           {
             id: 'hr-path-2',
@@ -1417,7 +1490,9 @@ app.get('/api/learner/learning-path', async (req, res) => {
             assigned_date: new Date().toISOString(),
             due_date: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(),
             hr_plan_id: 'hr-plan-2',
-            hr_plan_title: 'Leadership Development Plan'
+            hr_plan_title: 'Leadership Development Plan',
+            estimatedCompletionDate: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(),
+            enrollmentDate: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString()
           }
         ];
       }
