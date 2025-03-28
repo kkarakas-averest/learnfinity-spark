@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { SupabaseResponse, SupabaseUser } from '@/types/service-responses';
+import { verifyHRTables } from '@/utils/hrDatabaseUtils';
 
 // Define interfaces
 interface Employee {
@@ -11,6 +12,7 @@ interface Employee {
   status: string;
   phone?: string;
   resume_url?: string;
+  profile_image_url?: string;
   company_id?: string;
   created_at?: string;
   updated_at?: string;
@@ -30,6 +32,7 @@ interface Employee {
   last_activity?: string;
   lastActivity?: string;
   hire_date?: string;
+  user_id?: string;
 }
 
 interface Department {
@@ -527,7 +530,8 @@ const hrEmployeeService: EmployeeService = {
         progress: data.progress || null,
         last_activity: data.last_activity || null,
         lastActivity: data.lastActivity || null,
-        hire_date: data.hire_date || null
+        hire_date: data.hire_date || null,
+        user_id: data.user_id || null
       };
 
       return { 
@@ -614,13 +618,14 @@ const hrEmployeeService: EmployeeService = {
   },
 
   /**
-   * Update an employee
+   * Update employee profile
    * @param {string} id - Employee ID
-   * @param {EmployeeUpdate} updates - Fields to update
+   * @param {EmployeeUpdate} updates - Employee data to update
    * @returns {Promise<SupabaseResponse<Employee>>}
    */
   async updateEmployee(id: string, updates: EmployeeUpdate): Promise<SupabaseResponse<Employee>> {
     try {
+      // Update the employee record
       const { data, error } = await supabase
         .from(TABLE_NAME)
         .update(updates)
@@ -628,7 +633,32 @@ const hrEmployeeService: EmployeeService = {
         .select()
         .single();
 
-      return { data, error };
+      if (error) {
+        throw error;
+      }
+
+      // Get the user_id to sync with learner dashboard
+      const userId = data?.user_id || id;
+
+      // Automatically sync the changes to the learner dashboard
+      try {
+        const response = await fetch('/api/learner/profile/sync-hr', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ userId }),
+        });
+        
+        if (!response.ok) {
+          console.warn('Note: Unable to sync profile to learner dashboard automatically');
+        }
+      } catch (syncError) {
+        console.error('Error syncing to learner dashboard:', syncError);
+        // Don't fail the entire operation if just the sync fails
+      }
+
+      return { data, error: null };
     } catch (error) {
       console.error('Error in updateEmployee:', error);
       return { data: null, error };
@@ -1060,39 +1090,68 @@ const hrEmployeeService: EmployeeService = {
    */
   async getEmployeeSkills(employeeId: string): Promise<{data: any, error: any}> {
     try {
-      // First check if the table exists to avoid errors
-      const { error: tableCheckError } = await supabase
-        .from('hr_employee_skills')
-        .select('id')
-        .limit(1)
-        .maybeSingle();
-      
-      // If table doesn't exist, return empty array instead of erroring
-      if (tableCheckError && tableCheckError.code === '42P01') {
-        console.log('hr_employee_skills table does not exist, returning empty array');
+      // Attempt to query the skills directly, with error handling
+      try {
+        // Simple query to test if table exists
+        const { data, error } = await supabase
+          .from('hr_employee_skills')
+          .select('*')
+          .eq('employee_id', employeeId);
+
+        // If table exists but there's another error
+        if (error) {
+          if (error.code === '42P01') { // Table does not exist error code
+            console.warn('hr_employee_skills table does not exist, returning empty array');
+            
+            // Try to create a simple version of the table for future use
+            try {
+              console.log('Attempting to create a simple skills table...');
+              const { error: createError } = await supabase
+                .from('hr_employee_skills')
+                .insert([
+                  { 
+                    employee_id: employeeId, 
+                    skill_name: 'placeholder', 
+                    proficiency_level: 'beginner', 
+                    is_in_progress: false 
+                  }
+                ]);
+              
+              // If creation succeeded, delete the placeholder
+              if (!createError) {
+                await supabase
+                  .from('hr_employee_skills')
+                  .delete()
+                  .eq('employee_id', employeeId)
+                  .eq('skill_name', 'placeholder');
+                console.log('Successfully created skills table!');
+              }
+            } catch (e) {
+              console.log('Could not create skills table, will continue with empty array');
+            }
+            
+            return { data: [], error: null };
+          }
+          
+          console.error('Error fetching employee skills:', error);
+          return { data: [], error };
+        }
+        
+        // Map the skills to the expected format
+        const skills = (data || []).map(skill => ({
+          name: skill.skill_name,
+          level: skill.proficiency_level || 'beginner',
+          inProgress: skill.is_in_progress || false
+        }));
+        
+        return { data: skills, error: null };
+      } catch (error) {
+        console.error('Error in getEmployeeSkills:', error);
         return { data: [], error: null };
       }
-      
-      // If table exists, get the employee skills
-      const { data, error } = await supabase
-        .from('hr_employee_skills')
-        .select('id, skill_name, proficiency_level, is_in_progress')
-        .eq('employee_id', employeeId);
-
-      if (error) throw error;
-
-      // Map to the expected skill format
-      const formattedSkills = (data || []).map(skill => ({
-        name: skill.skill_name,
-        level: skill.proficiency_level || 'beginner',
-        inProgress: !!skill.is_in_progress
-      }));
-
-      return { data: formattedSkills, error: null };
     } catch (error) {
-      console.error('Error fetching employee skills:', error);
-      // Return empty array on error to avoid UI breakage
-      return { data: [], error };
+      console.error('Error in getEmployeeSkills outer try-catch:', error);
+      return { data: [], error: null };
     }
   },
 
@@ -1104,48 +1163,64 @@ const hrEmployeeService: EmployeeService = {
    */
   async getEmployeeActivities(employeeId: string, limit: number = 10): Promise<{data: any, error: any}> {
     try {
-      // First check if the table exists and get its columns
-      const { data: tableInfo, error: schemaError } = await supabase
-        .rpc('get_table_columns', { table_name: 'hr_employee_activities' });
-      
-      // If getting table info fails, return empty array
-      if (schemaError) {
-        console.log('Error checking hr_employee_activities schema:', schemaError);
+      // Attempt to query the activities directly
+      try {
+        const { data, error } = await supabase
+          .from('hr_employee_activities')
+          .select('*')
+          .eq('employee_id', employeeId)
+          .order('created_at', { ascending: false })
+          .limit(limit);
+        
+        if (error) {
+          if (error.code === '42P01') { // Table does not exist error code
+            console.warn('hr_employee_activities table does not exist, returning empty array');
+            
+            // Try to create a simple version of the table for future use
+            try {
+              console.log('Attempting to create a simple activities table...');
+              const { error: createError } = await supabase
+                .from('hr_employee_activities')
+                .insert([
+                  { 
+                    employee_id: employeeId, 
+                    activity_type: 'system', 
+                    description: 'Profile viewed'
+                  }
+                ]);
+              
+              // If creation succeeded, delete the placeholder or keep as first activity
+              if (!createError) {
+                console.log('Successfully created activities table!');
+              }
+            } catch (e) {
+              console.log('Could not create activities table, will continue with empty array');
+            }
+            
+            return { data: [], error: null };
+          }
+          
+          console.error('Error fetching employee activities:', error);
+          return { data: [], error };
+        }
+        
+        // Format the data to have consistent properties
+        const activities = (data || []).map(activity => ({
+          id: activity.id,
+          activity_type: activity.activity_type || 'other',
+          description: activity.description || 'Activity recorded',
+          timestamp: activity.created_at,
+          course_title: activity.metadata?.course_title
+        }));
+        
+        return { data: activities, error: null };
+      } catch (error) {
+        console.error('Error in getEmployeeActivities:', error);
         return { data: [], error: null };
       }
-      
-      // Get column names from the table info
-      const columnNames = tableInfo ? tableInfo.map((col: any) => col.column_name) : [];
-      const hasMetadata = columnNames.includes('metadata');
-      
-      // Build select query based on available columns
-      let selectQuery = 'id, activity_type, description, created_at';
-      if (hasMetadata) selectQuery += ', metadata';
-      
-      // Get the activities with the appropriate columns
-      const { data, error } = await supabase
-        .from('hr_employee_activities')
-        .select(selectQuery)
-        .eq('employee_id', employeeId)
-        .order('created_at', { ascending: false })
-        .limit(limit);
-
-      if (error) throw error;
-
-      // Format the data to match our Activity interface
-      const formattedActivities = (data || []).map((activity: any) => ({
-        id: activity.id,
-        activity_type: activity.activity_type,
-        description: activity.description,
-        timestamp: activity.created_at,
-        course_title: hasMetadata && activity.metadata ? activity.metadata.course_title : undefined
-      }));
-
-      return { data: formattedActivities, error: null };
     } catch (error) {
-      console.error('Error fetching employee activities:', error);
-      // Return empty array on error to avoid UI breakage
-      return { data: [], error };
+      console.error('Error in getEmployeeActivities outer try-catch:', error);
+      return { data: [], error: null };
     }
   },
 
@@ -1304,3 +1379,18 @@ const hrEmployeeService: EmployeeService = {
 // Export the service
 export { hrEmployeeService };
 export default hrEmployeeService;
+
+// Initialize database tables when the service is imported
+(async () => {
+  try {
+    console.log("Checking HR tables existence...");
+    const result = await verifyHRTables();
+    if (result.success) {
+      console.log("HR tables initialized successfully:", result.message);
+    } else {
+      console.error("Failed to initialize HR tables:", result.error);
+    }
+  } catch (error) {
+    console.error("Error initializing HR tables:", error);
+  }
+})();

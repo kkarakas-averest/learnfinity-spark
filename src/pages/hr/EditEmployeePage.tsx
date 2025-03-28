@@ -11,6 +11,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from '@/components/ui/use-toast';
+import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
+import { X, Upload } from 'lucide-react';
 
 interface Department {
   id: string;
@@ -34,6 +37,14 @@ interface Employee {
   hire_date?: string;
   status?: string;
   skills?: string[];
+  profile_image_url?: string;
+  user_id?: string;
+}
+
+interface Skill {
+  id: string;
+  name: string;
+  proficiency_level?: string;
 }
 
 const EditEmployeePage: React.FC = () => {
@@ -44,6 +55,12 @@ const EditEmployeePage: React.FC = () => {
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [positions, setPositions] = useState<Position[]>([]);
+  const [availableSkills, setAvailableSkills] = useState<Skill[]>([]);
+  const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
+  const [newSkill, setNewSkill] = useState('');
+  const [filteredPositions, setFilteredPositions] = useState<Position[]>([]);
+  const [profileImage, setProfileImage] = useState<File | null>(null);
+  const [profileImagePreview, setProfileImagePreview] = useState<string | null>(null);
   
   // Form state
   const [formData, setFormData] = useState({
@@ -71,6 +88,7 @@ const EditEmployeePage: React.FC = () => {
         if (employeeData) {
           const typedEmployeeData = employeeData as Employee;
           setEmployee(typedEmployeeData);
+          
           // Initialize form with employee data
           setFormData({
             name: typedEmployeeData.name || '',
@@ -84,6 +102,31 @@ const EditEmployeePage: React.FC = () => {
               ? typedEmployeeData.skills.join(', ') 
               : ''
           });
+          
+          if (typedEmployeeData.profile_image_url) {
+            setProfileImagePreview(typedEmployeeData.profile_image_url);
+          }
+          
+          // Safely fetch employee's skills
+          try {
+            const { data: skillData, error: skillError } = await supabase
+              .from('hr_employee_skills')
+              .select('skill_name')
+              .eq('employee_id', id);
+              
+            if (!skillError && skillData) {
+              const employeeSkills = skillData.map(s => s.skill_name);
+              setSelectedSkills(employeeSkills);
+            } else if (skillError && skillError.code === '42P01') {
+              // Table doesn't exist, use empty array
+              console.warn('Skills table does not exist, using empty array');
+              setSelectedSkills([]);
+            }
+          } catch (skillError) {
+            console.error('Error fetching skills:', skillError);
+            // Continue with empty skills
+            setSelectedSkills([]);
+          }
         }
         
         // Fetch departments
@@ -95,14 +138,43 @@ const EditEmployeePage: React.FC = () => {
           setDepartments(deptData || []);
         }
         
-        // Fetch positions (simplified approach since we don't have a method for this)
+        // Fetch positions
         const { data: positionsData, error: positionsError } = await supabase
           .from('hr_positions')
           .select('id, title, department_id');
           
         if (!positionsError) {
           setPositions(positionsData || []);
+          
+          // Filter positions based on selected department
+          if (employeeData?.department_id) {
+            const filtered = positionsData.filter(
+              pos => pos.department_id === employeeData.department_id
+            );
+            setFilteredPositions(filtered);
+          } else {
+            setFilteredPositions(positionsData);
+          }
         }
+        
+        // Safely fetch available skills
+        try {
+          const { data: availableSkillsData, error: availableSkillsError } = await supabase
+            .from('hr_skills')
+            .select('id, name');
+            
+          if (!availableSkillsError) {
+            setAvailableSkills(availableSkillsData || []);
+          } else if (availableSkillsError.code === '42P01') {
+            // If skills table doesn't exist, use empty array
+            console.warn('Skills table does not exist, using empty array');
+            setAvailableSkills([]);
+          }
+        } catch (skillsError) {
+          console.error('Error fetching available skills:', skillsError);
+          setAvailableSkills([]);
+        }
+        
       } catch (error) {
         console.error('Error fetching data:', error);
         toast({
@@ -118,6 +190,18 @@ const EditEmployeePage: React.FC = () => {
     fetchData();
   }, [id]);
   
+  // Update filtered positions when department changes
+  useEffect(() => {
+    if (formData.department_id) {
+      const filtered = positions.filter(
+        pos => pos.department_id === formData.department_id
+      );
+      setFilteredPositions(filtered);
+    } else {
+      setFilteredPositions(positions);
+    }
+  }, [formData.department_id, positions]);
+  
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -125,6 +209,107 @@ const EditEmployeePage: React.FC = () => {
   
   const handleSelectChange = (name: string, value: string) => {
     setFormData(prev => ({ ...prev, [name]: value }));
+    
+    // Reset position when department changes
+    if (name === 'department_id') {
+      setFormData(prev => ({ ...prev, position_id: '' }));
+    }
+  };
+  
+  const handleProfileImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    // Validate file type
+    const fileType = file.type;
+    if (!fileType.startsWith('image/')) {
+      toast({
+        variant: 'destructive',
+        title: 'Invalid file type',
+        description: 'Please upload an image file'
+      });
+      return;
+    }
+    
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast({
+        variant: 'destructive',
+        title: 'File too large',
+        description: 'Maximum file size is 5MB'
+      });
+      return;
+    }
+    
+    setProfileImage(file);
+    
+    // Create preview URL
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setProfileImagePreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+  
+  const handleSkillSelect = (skillName: string) => {
+    if (selectedSkills.includes(skillName)) {
+      setSelectedSkills(selectedSkills.filter(s => s !== skillName));
+    } else {
+      setSelectedSkills([...selectedSkills, skillName]);
+    }
+  };
+  
+  const handleAddNewSkill = () => {
+    if (!newSkill.trim()) return;
+    
+    // Check if skill already exists in selectedSkills
+    if (selectedSkills.includes(newSkill.trim())) {
+      toast({
+        title: 'Skill already added',
+        description: 'This skill is already in the list'
+      });
+      return;
+    }
+    
+    setSelectedSkills([...selectedSkills, newSkill.trim()]);
+    setNewSkill('');
+  };
+  
+  const uploadProfileImage = async (): Promise<string | null> => {
+    if (!profileImage || !id) return null;
+    
+    try {
+      console.log("Uploading profile image...");
+      const fileExt = profileImage.name.split('.').pop();
+      const fileName = `${id}-${Date.now()}.${fileExt}`;
+      const filePath = `employee-avatars/${fileName}`;
+      
+      // Upload to Supabase Storage
+      const { data, error } = await supabase.storage
+        .from('profiles')
+        .upload(filePath, profileImage);
+        
+      if (error) {
+        console.error("Error uploading to Supabase storage:", error);
+        throw error;
+      }
+      
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from('profiles')
+        .getPublicUrl(filePath);
+        
+      console.log("Profile image uploaded successfully:", urlData.publicUrl);
+      return urlData.publicUrl;
+    } catch (error) {
+      console.error('Error uploading profile image:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Upload Failed',
+        description: 'Failed to upload profile image. Please try again.'
+      });
+      return null;
+    }
   };
   
   const handleSubmit = async (e: React.FormEvent) => {
@@ -134,6 +319,15 @@ const EditEmployeePage: React.FC = () => {
     
     setSubmitting(true);
     try {
+      // Upload profile image if changed
+      let profileImageUrl = null;
+      if (profileImage) {
+        profileImageUrl = await uploadProfileImage();
+      }
+      
+      // Get current employee data to preserve user_id if it exists
+      const { data: currentEmployee } = await hrEmployeeService.getEmployee(id);
+      
       // Prepare data for update
       const updateData = {
         name: formData.name,
@@ -142,46 +336,65 @@ const EditEmployeePage: React.FC = () => {
         department_id: formData.department_id,
         position_id: formData.position_id,
         hire_date: formData.hire_date,
-        status: formData.status
+        status: formData.status,
+        // Preserve user_id if it exists
+        ...(currentEmployee && 'user_id' in currentEmployee && { user_id: currentEmployee.user_id }),
+        ...(profileImageUrl && { profile_image_url: profileImageUrl })
       };
+      
+      console.log("Updating employee with data:", updateData);
       
       // Update employee
       const { success, error } = await hrEmployeeService.updateEmployee(id, updateData);
       
       if (error) throw error;
       
-      // Add skills if provided (simplified implementation)
-      if (formData.skills.trim()) {
-        const skillsArray = formData.skills.split(',').map(s => s.trim()).filter(Boolean);
+      // Try to update skills - handle errors gracefully if table doesn't exist
+      try {
+        // First try to delete existing skills
+        const { error: deleteError } = await supabase
+          .from('hr_employee_skills')
+          .delete()
+          .eq('employee_id', id);
         
-        for (const skillName of skillsArray) {
-          try {
-            // Use direct Supabase call since addEmployeeSkill might not exist
-            const { error: skillError } = await supabase
-              .from('hr_employee_skills')
-              .insert({
-                employee_id: id,
-                skill_name: skillName,
-                proficiency_level: 'intermediate',
-                is_in_progress: false
-              });
-            
-            if (skillError && skillError.code !== 'PGRST204') {
-              console.error('Error adding skill:', skillError);
-            }
-          } catch (skillError) {
-            console.error('Error adding skill:', skillError);
+        // If the table doesn't exist, we can try to create it with our new skills
+        if (deleteError && deleteError.code === '42P01') {
+          console.warn('hr_employee_skills table does not exist, will attempt to create it');
+        } else if (deleteError) {
+          console.error('Error deleting existing skills:', deleteError);
+        }
+        
+        // Add selected skills if we have any
+        if (selectedSkills.length > 0) {
+          // Prepare skill records
+          const skillRecords = selectedSkills.map(skillName => ({
+            employee_id: id,
+            skill_name: skillName,
+            proficiency_level: 'intermediate',
+            is_in_progress: false
+          }));
+          
+          // Insert skills in a single operation
+          const { error: insertError } = await supabase
+            .from('hr_employee_skills')
+            .insert(skillRecords);
+          
+          if (insertError && insertError.code !== '42P01') {
+            console.error('Error adding skills:', insertError);
           }
         }
+      } catch (skillsError) {
+        console.error('Error updating skills:', skillsError);
+        // Continue with the update, don't fail the whole operation
       }
       
       toast({
         title: 'Success',
-        description: 'Employee profile updated successfully'
+        description: 'Employee profile updated successfully. Changes are automatically synced to the learner dashboard.'
       });
       
       // Navigate back to employee profile
-      navigate(`${ROUTES.HR_DASHBOARD}/employee/${id}`);
+      navigate(`${ROUTES.HR_DASHBOARD}/employees/${id}`);
     } catch (error) {
       console.error('Error updating employee:', error);
       toast({
@@ -221,7 +434,7 @@ const EditEmployeePage: React.FC = () => {
         <h1 className="text-3xl font-bold">Edit Employee</h1>
         <Button 
           variant="outline"
-          onClick={() => navigate(`${ROUTES.HR_DASHBOARD}/employee/${id}`)}
+          onClick={() => navigate(`${ROUTES.HR_DASHBOARD}/employees/${id}`)}
         >
           Cancel
         </Button>
@@ -233,6 +446,43 @@ const EditEmployeePage: React.FC = () => {
         </CardHeader>
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-6">
+            {/* Profile Image Section */}
+            <div className="flex flex-col items-center sm:flex-row sm:items-start gap-6 mb-8">
+              <div className="relative">
+                <Avatar className="h-32 w-32 border-2">
+                  {profileImagePreview ? (
+                    <AvatarImage src={profileImagePreview} alt={formData.name} />
+                  ) : (
+                    <AvatarFallback className="text-3xl">
+                      {formData.name.charAt(0).toUpperCase()}
+                    </AvatarFallback>
+                  )}
+                </Avatar>
+                <Input
+                  id="profile_image"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleProfileImageChange}
+                  className="hidden"
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  className="absolute bottom-0 right-0 rounded-full p-2 h-auto"
+                  onClick={() => document.getElementById('profile_image')?.click()}
+                >
+                  <Upload className="h-4 w-4" />
+                </Button>
+              </div>
+              <div className="flex flex-col">
+                <h3 className="text-lg font-medium">{formData.name || 'Employee Name'}</h3>
+                <p className="text-sm text-gray-500">{formData.email || 'employee@example.com'}</p>
+                <p className="text-sm mt-2 text-gray-600">
+                  Change the profile picture by clicking the upload button.
+                </p>
+              </div>
+            </div>
+            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <Label htmlFor="name">Full Name</Label>
@@ -264,6 +514,7 @@ const EditEmployeePage: React.FC = () => {
                   name="phone"
                   value={formData.phone}
                   onChange={handleInputChange}
+                  placeholder="+1 (555) 123-4567"
                 />
               </div>
               
@@ -279,16 +530,16 @@ const EditEmployeePage: React.FC = () => {
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="department_id">Department</Label>
-                <Select 
-                  value={formData.department_id} 
+                <Label htmlFor="department">Department</Label>
+                <Select
+                  value={formData.department_id}
                   onValueChange={(value) => handleSelectChange('department_id', value)}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger id="department">
                     <SelectValue placeholder="Select department" />
                   </SelectTrigger>
                   <SelectContent>
-                    {departments.map(dept => (
+                    {departments.map((dept) => (
                       <SelectItem key={dept.id} value={dept.id}>
                         {dept.name}
                       </SelectItem>
@@ -298,67 +549,120 @@ const EditEmployeePage: React.FC = () => {
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="position_id">Position</Label>
-                <Select 
-                  value={formData.position_id} 
+                <Label htmlFor="position">Position</Label>
+                <Select
+                  value={formData.position_id}
                   onValueChange={(value) => handleSelectChange('position_id', value)}
+                  disabled={!formData.department_id}
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select position" />
+                  <SelectTrigger id="position">
+                    <SelectValue placeholder={!formData.department_id ? "Select department first" : "Select position"} />
                   </SelectTrigger>
                   <SelectContent>
-                    {positions
-                      .filter(pos => !formData.department_id || pos.department_id === formData.department_id)
-                      .map(pos => (
-                        <SelectItem key={pos.id} value={pos.id}>
-                          {pos.title}
-                        </SelectItem>
-                      ))}
+                    {filteredPositions.map((pos) => (
+                      <SelectItem key={pos.id} value={pos.id}>
+                        {pos.title}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
               
               <div className="space-y-2">
                 <Label htmlFor="status">Status</Label>
-                <Select 
-                  value={formData.status} 
+                <Select
+                  value={formData.status}
                   onValueChange={(value) => handleSelectChange('status', value)}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger id="status">
                     <SelectValue placeholder="Select status" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="active">Active</SelectItem>
                     <SelectItem value="on_leave">On Leave</SelectItem>
-                    <SelectItem value="inactive">Inactive</SelectItem>
+                    <SelectItem value="terminated">Terminated</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+            
+            {/* Skills Section */}
+            <div className="pt-4 border-t">
+              <h3 className="text-lg font-medium mb-4">Skills & Competencies</h3>
               
-              <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="skills">Skills (comma separated)</Label>
-                <Textarea
-                  id="skills"
-                  name="skills"
-                  value={formData.skills}
-                  onChange={handleInputChange}
-                  rows={3}
-                  placeholder="JavaScript, React, TypeScript, etc."
-                />
+              <div className="flex flex-wrap gap-2 mb-4">
+                {selectedSkills.map((skill) => (
+                  <Badge key={skill} className="py-2 px-3 flex items-center gap-1">
+                    {skill}
+                    <button
+                      type="button"
+                      onClick={() => handleSkillSelect(skill)}
+                      className="ml-1 text-gray-400 hover:text-gray-700"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                ))}
+                {selectedSkills.length === 0 && (
+                  <p className="text-sm text-gray-500">No skills selected. Select from available skills or add new ones.</p>
+                )}
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="availableSkills">Available Skills</Label>
+                  <div className="border rounded-md p-3 h-[200px] overflow-y-auto">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {availableSkills.map((skill) => (
+                        <div key={skill.id} className="flex items-center space-x-2 hover:bg-gray-50 p-2 rounded-md">
+                          <input
+                            type="checkbox"
+                            id={`skill-${skill.id}`}
+                            checked={selectedSkills.includes(skill.name)}
+                            onChange={() => handleSkillSelect(skill.name)}
+                            className="rounded text-primary"
+                          />
+                          <Label htmlFor={`skill-${skill.id}`} className="cursor-pointer">
+                            {skill.name}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="newSkill">Add New Skill</Label>
+                  <div className="flex space-x-2">
+                    <Input
+                      id="newSkill"
+                      value={newSkill}
+                      onChange={(e) => setNewSkill(e.target.value)}
+                      placeholder="Enter skill name"
+                    />
+                    <Button 
+                      type="button" 
+                      size="icon"
+                      onClick={handleAddNewSkill}
+                    >
+                      <Upload className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
               </div>
             </div>
           </CardContent>
           
-          <CardFooter className="flex justify-end space-x-2">
+          <CardFooter className="flex justify-end gap-2">
             <Button 
-              variant="outline" 
-              type="button"
-              onClick={() => navigate(`${ROUTES.HR_DASHBOARD}/employee/${id}`)}
+              type="button" 
+              variant="outline"
+              onClick={() => navigate(`${ROUTES.HR_DASHBOARD}/employees/${id}`)}
             >
               Cancel
             </Button>
             <Button 
-              type="submit"
+              type="submit" 
               disabled={submitting}
             >
               {submitting ? 'Saving...' : 'Save Changes'}

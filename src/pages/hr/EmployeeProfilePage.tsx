@@ -31,7 +31,8 @@ import {
   AlertTriangle, 
   AlertCircle,
   FileText,
-  MessageSquare
+  MessageSquare,
+  Upload
 } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { hrEmployeeService } from '@/services/hrEmployeeService';
@@ -39,6 +40,21 @@ import { format } from 'date-fns';
 import MessageEmployeeModal from '@/components/hr/MessageEmployeeModal';
 import { CourseAssignmentDialog } from '@/components/hr';
 import { toast } from '@/components/ui/use-toast';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogClose
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { supabase } from '@/lib/supabase';
 
 // Define interfaces for the data
 interface Employee {
@@ -57,15 +73,16 @@ interface Employee {
   current_rag_status?: 'green' | 'amber' | 'red';
   last_rag_update?: string;
   user_id?: string;
+  status?: string;
 }
 
 interface Course {
   id: string;
   title: string;
   description?: string;
-  progress: number;
-  enrollment_date?: string;
+  enrollment_date: string;
   completion_date?: string;
+  progress: number;
 }
 
 interface Skill {
@@ -82,12 +99,24 @@ interface Activity {
   course_title?: string;
 }
 
+interface Department {
+  id: string;
+  name: string;
+}
+
+interface Position {
+  id: string;
+  title: string;
+  department_id: string;
+}
+
 const EmployeeProfilePage: React.FC = () => {
-  const { id } = useParams();
+  const params = useParams();
+  const id = params.id;
   const location = useLocation();
   const navigate = useNavigate();
   // Fallback to extracting ID from URL if params doesn't provide it
-  const extractedId = id || location.pathname.split('/').filter(Boolean)[2];
+  const extractedId = id || location.pathname.split('/').pop();
   
   console.log('EmployeeProfilePage - params:', { id });
   console.log('EmployeeProfilePage - location:', location.pathname);
@@ -101,78 +130,84 @@ const EmployeeProfilePage: React.FC = () => {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [isMessageModalOpen, setIsMessageModalOpen] = useState<boolean>(false);
   const [assignDialogOpen, setAssignDialogOpen] = useState<boolean>(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editFormData, setEditFormData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    department_id: '',
+    position_id: '',
+    hire_date: '',
+    status: 'active'
+  });
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [positions, setPositions] = useState<Position[]>([]);
+  const [filteredPositions, setFilteredPositions] = useState<Position[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [profileImage, setProfileImage] = useState<File | null>(null);
+  const [profileImagePreview, setProfileImagePreview] = useState<string | null>(null);
+  const [completedCourses, setCompletedCourses] = useState(0);
+  const [inProgressCourses, setInProgressCourses] = useState(0);
+  const [notStartedCourses, setNotStartedCourses] = useState(0);
   
   useEffect(() => {
-    if (!extractedId) {
-      console.error('No employee ID provided');
-      setError('No employee ID provided');
-      setLoading(false);
-      return;
-    }
-    
-    // Skip loading if this is a "new" employee page
-    if (extractedId === 'new') {
-      console.log('New employee form - skipping data loading');
-      setLoading(false);
-      return;
-    }
-    
     const loadEmployeeData = async () => {
+      if (!extractedId) return;
+      
       setLoading(true);
       try {
         console.log('Fetching employee with ID:', extractedId);
-        // Fetch employee details
-        const { data: employeeData, error: employeeError } = await hrEmployeeService.getEmployee(extractedId);
+        const { data, error } = await hrEmployeeService.getEmployee(extractedId);
         
-        console.log('Employee data response:', { data: employeeData, error: employeeError });
+        if (error) throw error;
         
-        if (employeeError || !employeeData) {
-          throw new Error(employeeError?.message || 'Failed to fetch employee details');
-        }
+        console.log('Employee data response:', { data, error });
+        setEmployee(data);
         
-        setEmployee(employeeData);
-        
-        // Fetch courses
+        // Fetch employee's courses
         console.log('Fetching courses for employee:', extractedId);
         const { data: coursesData, error: coursesError } = await hrEmployeeService.getEmployeeCourses(extractedId);
-        console.log('Courses data response:', { success: !coursesError, count: coursesData?.length });
+        console.log('Courses data response:', { data: coursesData, error: coursesError });
+        
         if (!coursesError && coursesData) {
           setCourses(coursesData);
-        } else {
-          console.warn('Error fetching courses:', coursesError);
-          // Fallback to empty array if there's an error
-          setCourses([]);
+          
+          // Calculate course statistics
+          const completed = coursesData.filter(c => c.progress === 100).length;
+          const notStarted = coursesData.filter(c => c.progress === 0).length;
+          const inProgress = coursesData.length - completed - notStarted;
+          
+          setCompletedCourses(completed);
+          setNotStartedCourses(notStarted);
+          setInProgressCourses(inProgress);
         }
         
-        // Fetch skills
-        const { data: skillsData, error: skillsError } = await hrEmployeeService.getEmployeeSkills(extractedId);
-        if (!skillsError && skillsData) {
+        // Fetch employee skills
+        const { data: skillsData } = await hrEmployeeService.getEmployeeSkills(extractedId);
+        if (skillsData) {
           setSkills(skillsData);
-        } else {
-          console.warn('Error fetching skills:', skillsError);
-          // Fallback to empty array if there's an error
-          setSkills([]);
         }
         
-        // Fetch activities
-        const { data: activitiesData, error: activitiesError } = await hrEmployeeService.getEmployeeActivities(extractedId);
-        if (!activitiesError && activitiesData) {
+        // Fetch employee activities
+        const { data: activitiesData } = await hrEmployeeService.getEmployeeActivities(extractedId);
+        if (activitiesData) {
           setActivities(activitiesData);
-        } else {
-          console.warn('Error fetching activities:', activitiesError);
-          // Fallback to empty array if there's an error
-          setActivities([]);
         }
-        
-      } catch (err: any) {
-        setError(err.message || 'An error occurred while fetching employee data');
-        console.error('Error fetching employee data:', err);
+      } catch (error) {
+        console.error('Error loading employee data:', error);
+        toast({
+          variant: 'destructive',
+          title: 'Error',
+          description: 'Failed to load employee data'
+        });
       } finally {
         setLoading(false);
       }
     };
     
-    loadEmployeeData();
+    if (extractedId) {
+      loadEmployeeData();
+    }
   }, [extractedId]);
   
   // Helper function to get RAG status color and icon
@@ -282,11 +317,6 @@ const EmployeeProfilePage: React.FC = () => {
     return Math.round(total / courses.length);
   };
   
-  // Get completed and in-progress course counts
-  const completedCourses = courses.filter(c => c.progress === 100).length;
-  const inProgressCourses = courses.filter(c => c.progress > 0 && c.progress < 100).length;
-  const notStartedCourses = courses.filter(c => c.progress === 0).length;
-  
   const SkillsSection: React.FC<{ skills: Skill[] }> = ({ skills }) => {
     if (skills.length === 0) {
       return (
@@ -332,45 +362,225 @@ const EmployeeProfilePage: React.FC = () => {
     setAssignDialogOpen(true);
   };
 
-  // Add a function to sync employee data to learner profile
-  const syncToLearnerProfile = async () => {
-    if (!employee?.id) return;
+  const handleEditClick = async () => {
+    if (!employee) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Cannot edit employee: No employee data loaded'
+      });
+      return;
+    }
+    
+    // Initialize form with employee data
+    setEditFormData({
+      name: employee.name || '',
+      email: employee.email || '',
+      phone: employee.phone || '',
+      department_id: employee.department_id || '',
+      position_id: employee.position_id || '',
+      hire_date: employee.hire_date ? new Date(employee.hire_date).toISOString().split('T')[0] : '',
+      status: employee.status || 'active'
+    });
+    
+    if (employee.profile_image_url) {
+      setProfileImagePreview(employee.profile_image_url);
+    }
+    
+    // Fetch departments if needed
+    if (departments.length === 0) {
+      try {
+        const { departments: deptData, error: deptError } = await hrEmployeeService.getDepartments();
+        if (!deptError && deptData) {
+          setDepartments(deptData);
+        }
+      } catch (error) {
+        console.error('Error fetching departments:', error);
+      }
+    }
+    
+    // Fetch positions if needed
+    if (positions.length === 0) {
+      try {
+        const { data: posData, error: posError } = await supabase
+          .from('hr_positions')
+          .select('id, title, department_id');
+          
+        if (!posError && posData) {
+          setPositions(posData);
+          
+          // Filter positions based on selected department
+          if (employee.department_id) {
+            const filtered = posData.filter(pos => pos.department_id === employee.department_id);
+            setFilteredPositions(filtered);
+          } else {
+            setFilteredPositions(posData);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching positions:', error);
+      }
+    }
+    
+    // Open the modal
+    setIsEditModalOpen(true);
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setEditFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleSelectChange = (name, value) => {
+    setEditFormData(prev => ({ ...prev, [name]: value }));
+    
+    // Reset position when department changes
+    if (name === 'department_id') {
+      setEditFormData(prev => ({ ...prev, position_id: '' }));
+      
+      // Filter positions based on selected department
+      const filtered = positions.filter(pos => pos.department_id === value);
+      setFilteredPositions(filtered);
+    }
+  };
+
+  const handleProfileImageChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    // Validate file type
+    const fileType = file.type;
+    if (!fileType.startsWith('image/')) {
+      toast({
+        variant: 'destructive',
+        title: 'Invalid file type',
+        description: 'Please upload an image file'
+      });
+      return;
+    }
+    
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast({
+        variant: 'destructive',
+        title: 'File too large',
+        description: 'Maximum file size is 5MB'
+      });
+      return;
+    }
+    
+    setProfileImage(file);
+    
+    // Create preview URL
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setProfileImagePreview(reader.result);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const uploadProfileImage = async () => {
+    if (!profileImage || !extractedId) return null;
     
     try {
-      setLoading(true);
+      console.log("Uploading profile image...");
+      const fileExt = profileImage.name.split('.').pop();
+      const fileName = `${extractedId}-${Date.now()}.${fileExt}`;
+      const filePath = `employee-avatars/${fileName}`;
       
-      // Make API call to sync HR data to learner profile
-      const response = await fetch('/api/learner/profile/sync-hr', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          userId: employee.user_id,
-        }),
-      });
-      
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to sync employee data');
+      // Upload to Supabase Storage
+      const { data, error } = await supabase.storage
+        .from('profiles')
+        .upload(filePath, profileImage);
+        
+      if (error) {
+        console.error("Error uploading to Supabase storage:", error);
+        throw error;
       }
+      
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from('profiles')
+        .getPublicUrl(filePath);
+        
+      console.log("Profile image uploaded successfully:", urlData.publicUrl);
+      return urlData.publicUrl;
+    } catch (error) {
+      console.error('Error uploading profile image:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Upload Failed',
+        description: 'Failed to upload profile image. Please try again.'
+      });
+      return null;
+    }
+  };
+
+  const handleSubmitEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!extractedId) return;
+    
+    setSubmitting(true);
+    try {
+      // Upload profile image if changed
+      let profileImageUrl = null;
+      if (profileImage) {
+        profileImageUrl = await uploadProfileImage();
+      }
+      
+      // Prepare data for update
+      const updateData = {
+        name: editFormData.name,
+        email: editFormData.email,
+        phone: editFormData.phone,
+        department_id: editFormData.department_id,
+        position_id: editFormData.position_id,
+        hire_date: editFormData.hire_date,
+        status: editFormData.status,
+        ...(profileImageUrl && { profile_image_url: profileImageUrl })
+      };
+      
+      console.log("Updating employee with data:", updateData);
+      
+      // Update employee
+      const { success, error } = await hrEmployeeService.updateEmployee(extractedId, updateData);
+      
+      if (error) throw error;
       
       toast({
         title: 'Success',
-        description: 'Employee data synced to learner profile',
-        variant: 'default',
+        description: 'Employee profile updated successfully.'
       });
       
+      // Close modal and reload employee data
+      setIsEditModalOpen(false);
+      // Reload the employee data
+      if (extractedId) {
+        // Force a reload by setting a flag that will trigger the useEffect
+        setEmployee(null);
+        setLoading(true);
+        // Directly call the API again
+        const { data } = await hrEmployeeService.getEmployee(extractedId);
+        setEmployee(data);
+        // Fetch other related data
+        const { data: updatedCourses } = await hrEmployeeService.getEmployeeCourses(extractedId);
+        if (updatedCourses) setCourses(updatedCourses);
+        const { data: updatedSkills } = await hrEmployeeService.getEmployeeSkills(extractedId);
+        if (updatedSkills) setSkills(updatedSkills);
+        const { data: updatedActivities } = await hrEmployeeService.getEmployeeActivities(extractedId);
+        if (updatedActivities) setActivities(updatedActivities);
+        setLoading(false);
+      }
     } catch (error) {
-      console.error('Error syncing employee data:', error);
+      console.error('Error updating employee:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to sync employee data to learner profile',
         variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to update employee profile'
       });
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 
@@ -424,10 +634,8 @@ const EmployeeProfilePage: React.FC = () => {
           </div>
 
               <div className="flex flex-col sm:flex-row gap-2">
-                <Button variant="outline" asChild>
-                  <Link to={`/hr-dashboard/employees/${employee.id}/edit`}>
-                    Edit Profile
-                  </Link>
+                <Button variant="outline" onClick={handleEditClick}>
+                  Edit Profile
                 </Button>
                 
                 <Button 
@@ -642,25 +850,17 @@ const EmployeeProfilePage: React.FC = () => {
           <h3 className="text-lg font-medium mb-4">Learning & Development</h3>
           <div className="flex gap-4">
             <Button
-              onClick={() => navigate(`${ROUTES.HR_DASHBOARD}/employee/${employee.id}/development-plan`)}
+              onClick={() => navigate(`${ROUTES.HR_DASHBOARD}/employees/${employee.id}/development-plan`)}
               variant="outline"
             >
               Development Plan
             </Button>
             <Button
-              onClick={() => navigate(`${ROUTES.HR_DASHBOARD}/employee/${employee.id}/trainings`)}
+              onClick={() => navigate(`${ROUTES.HR_DASHBOARD}/employees/${employee.id}/trainings`)}
               variant="outline"
             >
               Training History
             </Button>
-            {employee.user_id && (
-              <Button
-                onClick={syncToLearnerProfile}
-                variant="default"
-              >
-                Sync to Learner Profile
-              </Button>
-            )}
           </div>
         </div>
       </div>
@@ -678,6 +878,170 @@ const EmployeeProfilePage: React.FC = () => {
         recipientId={employee?.id}
         recipientName={employee?.name}
       />
+
+      <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Edit Employee Profile</DialogTitle>
+            <DialogDescription>
+              Make changes to the employee profile. Click save when you're done.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <form onSubmit={handleSubmitEdit}>
+            <div className="space-y-6 py-4">
+              {/* Profile Image Section */}
+              <div className="flex flex-col items-center sm:flex-row sm:items-start gap-6 mb-8">
+                <div className="relative">
+                  <Avatar className="h-24 w-24 border-2">
+                    {profileImagePreview ? (
+                      <AvatarImage src={profileImagePreview} alt={editFormData.name} />
+                    ) : (
+                      <AvatarFallback className="text-2xl">
+                        {editFormData.name?.charAt(0).toUpperCase() || 'U'}
+                      </AvatarFallback>
+                    )}
+                  </Avatar>
+                  <Input
+                    id="profile_image"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleProfileImageChange}
+                    className="hidden"
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="absolute bottom-0 right-0 rounded-full p-2 h-auto"
+                    onClick={() => document.getElementById('profile_image')?.click()}
+                  >
+                    <Upload className="h-4 w-4" />
+                  </Button>
+                </div>
+                <div className="flex flex-col">
+                  <h3 className="text-lg font-medium">{editFormData.name || 'Employee Name'}</h3>
+                  <p className="text-sm text-gray-500">{editFormData.email || 'employee@example.com'}</p>
+                  <p className="text-sm mt-2 text-gray-600">
+                    Change the profile picture by clicking the upload button.
+                  </p>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Full Name</Label>
+                  <Input
+                    id="name"
+                    name="name"
+                    value={editFormData.name}
+                    onChange={handleInputChange}
+                    required
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    name="email"
+                    type="email"
+                    value={editFormData.email}
+                    onChange={handleInputChange}
+                    required
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Phone</Label>
+                  <Input
+                    id="phone"
+                    name="phone"
+                    value={editFormData.phone || ''}
+                    onChange={handleInputChange}
+                    placeholder="+1 (555) 123-4567"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="hire_date">Hire Date</Label>
+                  <Input
+                    id="hire_date"
+                    name="hire_date"
+                    type="date"
+                    value={editFormData.hire_date || ''}
+                    onChange={handleInputChange}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="department">Department</Label>
+                  <Select
+                    value={editFormData.department_id || ''}
+                    onValueChange={(value) => handleSelectChange('department_id', value)}
+                  >
+                    <SelectTrigger id="department">
+                      <SelectValue placeholder="Select department" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {departments.map((dept) => (
+                        <SelectItem key={dept.id} value={dept.id}>
+                          {dept.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="position">Position</Label>
+                  <Select
+                    value={editFormData.position_id || ''}
+                    onValueChange={(value) => handleSelectChange('position_id', value)}
+                    disabled={!editFormData.department_id}
+                  >
+                    <SelectTrigger id="position">
+                      <SelectValue placeholder={!editFormData.department_id ? "Select department first" : "Select position"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {filteredPositions.map((pos) => (
+                        <SelectItem key={pos.id} value={pos.id}>
+                          {pos.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="status">Status</Label>
+                  <Select
+                    value={editFormData.status || 'active'}
+                    onValueChange={(value) => handleSelectChange('status', value)}
+                  >
+                    <SelectTrigger id="status">
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="on_leave">On Leave</SelectItem>
+                      <SelectItem value="terminated">Terminated</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+            
+            <DialogFooter>
+              <DialogClose asChild>
+                <Button type="button" variant="outline">Cancel</Button>
+              </DialogClose>
+              <Button type="submit" disabled={submitting}>
+                {submitting ? 'Saving...' : 'Save Changes'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

@@ -29,7 +29,9 @@ export async function verifyHRTables() {
       'hr_positions',
       'hr_employees',
       'hr_courses',
-      'hr_course_enrollments'
+      'hr_course_enrollments',
+      'hr_employee_skills',
+      'hr_employee_activities'
     ];
     
     // Check one main table first to see if we need to verify all tables
@@ -180,6 +182,50 @@ async function createHRSchema() {
     if (empError) {
       console.error('Error creating hr_employees table:', empError);
       return { success: false, error: empError.message };
+    }
+    
+    // Create employee skills table
+    const { error: skillsError } = await supabase.rpc('execute_sql', {
+      sql: `
+        CREATE TABLE IF NOT EXISTS hr_employee_skills (
+          id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+          employee_id UUID REFERENCES hr_employees(id) ON DELETE CASCADE,
+          skill_name VARCHAR(100) NOT NULL,
+          proficiency_level VARCHAR(20) NOT NULL,
+          is_in_progress BOOLEAN DEFAULT false,
+          verification_status VARCHAR(20) DEFAULT 'unverified',
+          verified_by UUID,
+          verification_date TIMESTAMP WITH TIME ZONE,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(employee_id, skill_name)
+        );
+      `
+    });
+    
+    if (skillsError) {
+      console.error('Error creating hr_employee_skills table:', skillsError);
+      return { success: false, error: skillsError.message };
+    }
+    
+    // Create employee activities table
+    const { error: activitiesError } = await supabase.rpc('execute_sql', {
+      sql: `
+        CREATE TABLE IF NOT EXISTS hr_employee_activities (
+          id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+          employee_id UUID REFERENCES hr_employees(id) ON DELETE CASCADE,
+          activity_type VARCHAR(50) NOT NULL,
+          description TEXT NOT NULL,
+          course_id UUID,
+          metadata JSONB,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
+      `
+    });
+    
+    if (activitiesError) {
+      console.error('Error creating hr_employee_activities table:', activitiesError);
+      return { success: false, error: activitiesError.message };
     }
     
     return { success: true };
