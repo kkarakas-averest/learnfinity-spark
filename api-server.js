@@ -50,6 +50,16 @@ app.use((req, res, next) => {
 // Global error handler middleware
 app.use((err, req, res, next) => {
   console.error('Global error handler caught:', err);
+  
+  // Only handle errors that haven't been sent yet
+  if (res.headersSent) {
+    return next(err);
+  }
+  
+  // Ensure contentType is set to JSON
+  res.setHeader('Content-Type', 'application/json');
+  
+  // Return a structured JSON error response
   res.status(500).json({
     error: 'An unexpected server error occurred',
     message: err.message || 'Unknown error',
@@ -1686,6 +1696,16 @@ app.post('/api/sync-hr/employee/:id', async (req, res) => {
       details: error.message 
     });
   }
+});
+
+// Add a final catchall error handler to ensure JSON responses
+app.use((req, res, next) => {
+  // Route not found - send JSON instead of HTML
+  res.status(404).json({
+    error: 'Not Found',
+    message: `Route ${req.method} ${req.url} not found`,
+    status: 404
+  });
 });
 
 // Server start with error handling
