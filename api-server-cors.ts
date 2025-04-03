@@ -2,10 +2,12 @@
  * Simple API Server with CORS support
  * Designed to work with the Vite development server
  */
-import express from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
+import * as fs from 'fs';
+import * as path from 'path';
 
 // Load environment variables
 dotenv.config();
@@ -28,13 +30,13 @@ app.use(cors(corsOptions));
 app.use(express.json());
 
 // Request logging middleware
-app.use((req, res, next) => {
+app.use((req: Request, res: Response, next: NextFunction) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
   next();
 });
 
 // Set appropriate headers for all responses
-app.use((req, res, next) => {
+app.use((req: Request, res: Response, next: NextFunction) => {
   res.setHeader('Content-Type', 'application/json');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
@@ -43,29 +45,51 @@ app.use((req, res, next) => {
 });
 
 // Initialize Supabase
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
 console.log(`Using Supabase key: ${supabaseKey ? 'Key found' : 'Key missing'}`);
 console.log(`Using Supabase service key: ${supabaseServiceKey ? 'Key found' : 'Key missing'}`);
 
-let supabase;
-let supabaseAdmin;
+let supabase: SupabaseClient | null = null;
+let supabaseAdmin: SupabaseClient | null = null;
 
 try {
-  supabase = createClient(supabaseUrl, supabaseKey);
-  if (supabaseServiceKey) {
-    supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+  if (supabaseUrl && supabaseKey) {
+    supabase = createClient(supabaseUrl, supabaseKey);
+    
+    if (supabaseServiceKey) {
+      supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+    } else {
+      supabaseAdmin = supabase;
+    }
   } else {
-    supabaseAdmin = supabase;
+    console.warn('Missing Supabase URL or key. Mocked data will be used.');
   }
 } catch (error) {
   console.error('Error initializing Supabase:', error);
 }
 
+// Type for user profile data
+interface UserProfile {
+  id?: string;
+  user_id?: string;
+  name?: string;
+  full_name?: string;
+  username?: string;
+  email?: string;
+  role?: string;
+  department?: string;
+  position?: string;
+  job_title?: string;
+  avatar_url?: string;
+  avatar?: string;
+  [key: string]: any;
+}
+
 // Debug endpoint
-app.get('/api/debug', (req, res) => {
+app.get('/api/debug', (req: Request, res: Response) => {
   res.json({
     status: 'ok',
     message: 'API server is running correctly',
@@ -76,7 +100,7 @@ app.get('/api/debug', (req, res) => {
 });
 
 // Mock data for the learner dashboard
-const getMockDashboardData = (userId) => {
+const getMockDashboardData = (userId: string): any => {
   return {
     profile: {
       id: userId || '6e2c2548-c04a-419b-a17c-c2feb6a3d9c6',
@@ -133,9 +157,10 @@ const getMockDashboardData = (userId) => {
 };
 
 // Learner dashboard endpoint
-app.get('/api/learner/dashboard', async (req, res) => {
+// @ts-ignore: Express type issue with async handler
+app.get('/api/learner/dashboard', async (req: Request, res: Response) => {
   console.log('Received request for /api/learner/dashboard');
-  const userId = req.query.userId;
+  const userId = req.query.userId as string;
   
   if (!userId) {
     return res.status(400).json({
@@ -154,41 +179,52 @@ app.get('/api/learner/dashboard', async (req, res) => {
       
       try {
         // Try to get user profile from different tables
-        let profileData = null;
+        let profileData: UserProfile | null = null;
         
         const tables = [
           // Try the custom get_user_by_id function first
           { name: 'RPC get_user_by_id', method: async () => {
+            if (!supabaseAdmin) return null;
             const { data, error } = await supabaseAdmin.rpc('get_user_by_id', { user_id: userId });
             if (error) throw error;
             return data;
           }},
           // Then try the auth.users table with admin key
           { name: 'users', method: async () => {
-            const { data, error } = await supabaseAdmin.auth.admin.getUserById(userId);
-            if (error) throw error;
-            return data?.user;
+            if (!supabaseAdmin) return null;
+            try {
+              const { data, error } = await supabaseAdmin.auth.admin.getUserById(userId);
+              if (error) throw error;
+              return data?.user;
+            } catch (e) {
+              console.error('Error with admin.getUserById:', e);
+              return null;
+            }
           }},
           // Try learner_profiles table
           { name: 'learner_profiles', method: async () => {
+            if (!supabase) return null;
             const { data, error } = await supabase.from('learner_profiles').select('*').eq('user_id', userId).single();
             if (error) throw error;
             return data;
           }},
           // Try user_profiles table
           { name: 'user_profiles', method: async () => {
+            if (!supabase) return null;
             const { data, error } = await supabase.from('user_profiles').select('*').eq('id', userId).single();
             if (error) throw error;
             return data;
           }},
           // Try profiles table
           { name: 'profiles', method: async () => {
+            if (!supabase) return null;
             const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
             if (error) throw error;
             return data;
           }},
           // Try users table
           { name: 'users', method: async () => {
+            if (!supabase) return null;
             const { data, error } = await supabase.from('users').select('*').eq('id', userId).single();
             if (error) throw error;
             return data;
@@ -201,7 +237,7 @@ app.get('/api/learner/dashboard', async (req, res) => {
             if (data) {
               console.log(`Successfully fetched profile data from '${table.name}' table:`);
               console.log(JSON.stringify(data, null, 2));
-              profileData = data;
+              profileData = data as UserProfile;
               break;
             }
           } catch (error) {
@@ -227,6 +263,8 @@ app.get('/api/learner/dashboard', async (req, res) => {
         
         // Try to get courses
         try {
+          if (!supabase) throw new Error('Supabase client not initialized');
+          
           const { data: coursesData, error: coursesError } = await supabase
             .from('courses')
             .select('*')
@@ -263,6 +301,8 @@ app.get('/api/learner/dashboard', async (req, res) => {
         
         // Try to get learning paths
         try {
+          if (!supabase) throw new Error('Supabase client not initialized');
+          
           const { data: pathsData, error: pathsError } = await supabase
             .from('learning_paths')
             .select('*')
@@ -297,7 +337,7 @@ app.get('/api/learner/dashboard', async (req, res) => {
     console.error('Error processing dashboard request:', error);
     return res.status(500).json({
       error: 'Internal Server Error',
-      message: error.message,
+      message: error instanceof Error ? error.message : 'Unknown error',
       status: 500,
       timestamp: new Date().toISOString()
     });
