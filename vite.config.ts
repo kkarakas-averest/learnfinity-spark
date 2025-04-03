@@ -22,16 +22,10 @@ export default defineConfig(({ mode }) => ({
         changeOrigin: true,
         secure: false,
         ws: true, // Support WebSockets
-        rewrite: (path) => {
-          // In development, completely bypass the proxy for learner API routes
-          // This prevents the HTML response issue by not letting Vite handle these requests
-          if (process.env.NODE_ENV === 'development' && path.startsWith('/api/learner/')) {
-            console.log(`[Rewrite] No rewrite for ${path} - direct API access`);
-            return path;
-          }
-          console.log(`[Rewrite] Standard proxy for ${path}`);
-          return path;
-        },
+        // Set to true to pass along the host header to ensure the API server knows we're using the dev server
+        preserveHeaderKeyCase: true,
+        // Don't rewrite the path - send it as is to the API server
+        rewrite: (path) => path,
         configure: (proxy, options) => {
           // Log proxy setup
           console.log(`[Config] Setting up proxy to ${options.target}`);
@@ -88,7 +82,7 @@ export default defineConfig(({ mode }) => ({
               proxyReq.setHeader('Content-Type', 'application/json');
             }
             
-            // Always set accept header
+            // Always set accept header for all requests to ensure JSON responses
             proxyReq.setHeader('Accept', 'application/json');
           });
 
@@ -101,9 +95,9 @@ export default defineConfig(({ mode }) => ({
               console.warn(`[Proxy] API returned error status: ${statusCode}`);
             }
             
-            // Log if response is not JSON for debugging
-            if (!contentType.includes('application/json')) {
-              console.warn(`[Proxy] API returned non-JSON response: ${contentType}`);
+            // Check if the response has the correct content type
+            if (contentType && !contentType.includes('application/json') && req.url?.includes('/api/learner/')) {
+              console.warn(`[Proxy] API returned non-JSON response: ${contentType} for ${req.url}`);
               
               // Capture non-JSON responses and convert to JSON error
               let body = '';

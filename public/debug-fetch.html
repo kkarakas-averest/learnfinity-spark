@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>API Debug Page</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        pre { background: #f5f5f5; padding: 10px; border-radius: 5px; overflow: auto; }
+        button { padding: 10px; margin: 5px; cursor: pointer; }
+        .success { color: green; }
+        .error { color: red; }
+    </style>
+</head>
+<body>
+    <h1>API Connection Debugger</h1>
+    
+    <div>
+        <h2>Test Direct API Connection</h2>
+        <button id="testDirectApi">Test Direct API (port 3083)</button>
+        <pre id="directApiResult">Click to test...</pre>
+    </div>
+    
+    <div>
+        <h2>Test Same-Origin API Connection</h2>
+        <button id="testSameOrigin">Test Same-Origin API (/api/...)</button>
+        <pre id="sameOriginResult">Click to test...</pre>
+    </div>
+
+    <script>
+        document.getElementById('testDirectApi').addEventListener('click', async () => {
+            const result = document.getElementById('directApiResult');
+            result.textContent = 'Testing direct API connection...';
+            
+            try {
+                const response = await fetch('http://localhost:3083/api/learner/dashboard?userId=6e2c2548-c04a-419b-a17c-c2feb6a3d9c6', {
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                result.textContent = `Status: ${response.status}\nContent-Type: ${response.headers.get('content-type')}\n`;
+                
+                if (response.ok) {
+                    if (response.headers.get('content-type')?.includes('application/json')) {
+                        const data = await response.json();
+                        result.textContent += `\nSuccess! Data received (first profile values):\n${JSON.stringify(data.profile, null, 2).substring(0, 200)}...`;
+                        result.className = 'success';
+                    } else {
+                        const text = await response.text();
+                        result.textContent += `\nError: Non-JSON response:\n${text.substring(0, 200)}...`;
+                        result.className = 'error';
+                    }
+                } else {
+                    result.textContent += `\nError: ${response.status} ${response.statusText}`;
+                    result.className = 'error';
+                }
+            } catch (err) {
+                result.textContent = `Error: ${err.message}`;
+                result.className = 'error';
+            }
+        });
+        
+        document.getElementById('testSameOrigin').addEventListener('click', async () => {
+            const result = document.getElementById('sameOriginResult');
+            result.textContent = 'Testing same-origin API connection...';
+            
+            try {
+                const response = await fetch('/api/learner/dashboard?userId=6e2c2548-c04a-419b-a17c-c2feb6a3d9c6', {
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                result.textContent = `Status: ${response.status}\nContent-Type: ${response.headers.get('content-type')}\n`;
+                
+                if (response.ok) {
+                    if (response.headers.get('content-type')?.includes('application/json')) {
+                        const data = await response.json();
+                        result.textContent += `\nSuccess! Data received (first profile values):\n${JSON.stringify(data.profile, null, 2).substring(0, 200)}...`;
+                        result.className = 'success';
+                    } else {
+                        const text = await response.text();
+                        result.textContent += `\nError: Non-JSON response:\n${text.substring(0, 200)}...`;
+                        result.className = 'error';
+                    }
+                } else {
+                    result.textContent += `\nError: ${response.status} ${response.statusText}`;
+                    result.className = 'error';
+                }
+            } catch (err) {
+                result.textContent = `Error: ${err.message}`;
+                result.className = 'error';
+            }
+        });
+    </script>
+</body>
+</html> 

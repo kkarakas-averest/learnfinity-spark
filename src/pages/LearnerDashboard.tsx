@@ -167,62 +167,43 @@ const LearnerDashboard: React.FC = () => {
     
     console.log(`Attempting to fetch ${endpoint} data for userId=${userId}`);
     
-    // In development, try multiple ports for API server
-    // In production, use the proxied endpoint
-    const sources = isProduction 
-      ? [
-          // In production, only use the same-origin endpoint
-          { 
-            label: "same-origin", 
-            url: `/api/learner/${endpoint}?userId=${userId}`,
-            headers: {
-              'Accept': 'application/json',
-              'Content-Type': 'application/json',
-              'Cache-Control': 'no-cache'
-            }
+    // Create sources array with appropriate ordering
+    const sources = [
+      // Always try same-origin first since we fixed the proxy
+      { 
+        label: "same-origin", 
+        url: `/api/learner/${endpoint}?userId=${userId}`,
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache'
+        }
+      }
+    ];
+    
+    // In development mode, add direct API connections as fallbacks
+    if (!isProduction) {
+      sources.push(
+        { 
+          label: "direct-api-3083", 
+          url: `http://localhost:3083/api/learner/${endpoint}?userId=${userId}`,
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache'
           }
-        ]
-      : [
-          // In development, try multiple ports starting with 3083
-          // Try with direct API connection first to bypass Vite proxy issues
-          { 
-            label: "direct-api-3083", 
-            url: `http://localhost:3083/api/learner/${endpoint}?userId=${userId}`,
-            headers: {
-              'Accept': 'application/json',
-              'Content-Type': 'application/json',
-              'Cache-Control': 'no-cache'
-            }
-          },
-          { 
-            label: "direct-api-3084", 
-            url: `http://localhost:3084/api/learner/${endpoint}?userId=${userId}`,
-            headers: {
-              'Accept': 'application/json',
-              'Content-Type': 'application/json',
-              'Cache-Control': 'no-cache'
-            }
-          },
-          { 
-            label: "direct-api-3085", 
-            url: `http://localhost:3085/api/learner/${endpoint}?userId=${userId}`,
-            headers: {
-              'Accept': 'application/json',
-              'Content-Type': 'application/json',
-              'Cache-Control': 'no-cache'
-            }
-          },
-          // Then try the same-origin proxy as a last resort
-          { 
-            label: "same-origin", 
-            url: `/api/learner/${endpoint}?userId=${userId}`,
-            headers: {
-              'Accept': 'application/json',
-              'Content-Type': 'application/json',
-              'Cache-Control': 'no-cache'
-            }
+        },
+        { 
+          label: "direct-api-3084", 
+          url: `http://localhost:3084/api/learner/${endpoint}?userId=${userId}`,
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache'
           }
-        ];
+        }
+      );
+    }
         
     // Add fallback mock data for when servers are unreachable
     const mockData = {
@@ -323,10 +304,10 @@ const LearnerDashboard: React.FC = () => {
         const response = await fetch(source.url, {
           method: 'GET',
           headers: source.headers,
-          // Don't include credentials for cross-origin requests to avoid CORS issues
+          // Set appropriate credentials mode
           credentials: source.label === 'same-origin' ? 'same-origin' : 'omit',
-          // Shorter timeout to fail faster
-          signal: AbortSignal.timeout(2000) // 2 second timeout for faster fallback
+          // Shorter timeout to fail faster for non-working sources
+          signal: AbortSignal.timeout(3000) 
         });
         
         console.log(`${source.label} response status: ${response.status}`);
