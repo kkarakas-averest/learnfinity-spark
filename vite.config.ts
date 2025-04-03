@@ -24,8 +24,19 @@ export default defineConfig(({ mode }) => ({
         ws: true, // Support WebSockets
         // Set to true to pass along the host header to ensure the API server knows we're using the dev server
         preserveHeaderKeyCase: true,
-        // Don't rewrite the path - send it as is to the API server
-        rewrite: (path) => path,
+        // Rewrite function now explicitly checks for API routes
+        rewrite: (path) => {
+          // Check if this is an API request
+          if (path.startsWith('/api/')) {
+            console.log(`[Rewrite] API path: ${path} - forwarding to API server`);
+            // Keep the path as is for API requests
+            return path;
+          } else {
+            console.log(`[Rewrite] Non-API path: ${path} - handling as SPA route`);
+            // For non-API requests, handle as SPA route
+            return path;
+          }
+        },
         configure: (proxy, options) => {
           // Log proxy setup
           console.log(`[Config] Setting up proxy to ${options.target}`);
@@ -77,7 +88,7 @@ export default defineConfig(({ mode }) => ({
               return;
             }
             
-            // Ensure content type headers are set
+            // Ensure content type headers are set for API requests
             if (!proxyReq.getHeader('Content-Type') && req.method !== 'GET') {
               proxyReq.setHeader('Content-Type', 'application/json');
             }
@@ -96,7 +107,7 @@ export default defineConfig(({ mode }) => ({
             }
             
             // Check if the response has the correct content type
-            if (contentType && !contentType.includes('application/json') && req.url?.includes('/api/learner/')) {
+            if (contentType && !contentType.includes('application/json') && req.url?.includes('/api/')) {
               console.warn(`[Proxy] API returned non-JSON response: ${contentType} for ${req.url}`);
               
               // Capture non-JSON responses and convert to JSON error

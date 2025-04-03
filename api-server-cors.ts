@@ -9,8 +9,13 @@ import dotenv from 'dotenv';
 import * as fs from 'fs';
 import * as path from 'path';
 
-// Load environment variables
-dotenv.config();
+// Load environment variables - do this at the very beginning
+const result = dotenv.config();
+if (result.error) {
+  console.error('Error loading .env file:', result.error);
+} else {
+  console.log('Environment variables loaded from .env file');
+}
 
 // Create Express app
 const app = express();
@@ -54,11 +59,13 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   next();
 });
 
-// Initialize Supabase
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+// Initialize Supabase - Look for both VITE_ prefixed and regular env vars
+const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
+const supabaseKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY || process.env.VITE_SUPABASE_SERVICE_KEY || '';
 
+// Log what we found without exposing the full keys (security measure)
+console.log(`Using Supabase URL: ${supabaseUrl ? supabaseUrl.substring(0, 15) + '...' : 'Missing URL'}`);
 console.log(`Using Supabase key: ${supabaseKey ? 'Key found' : 'Key missing'}`);
 console.log(`Using Supabase service key: ${supabaseServiceKey ? 'Key found' : 'Key missing'}`);
 
@@ -67,11 +74,14 @@ let supabaseAdmin: SupabaseClient | null = null;
 
 try {
   if (supabaseUrl && supabaseKey) {
+    console.log('Initializing Supabase client with anon key');
     supabase = createClient(supabaseUrl, supabaseKey);
     
     if (supabaseServiceKey) {
+      console.log('Initializing Supabase admin client with service role key');
       supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
     } else {
+      console.warn('No service role key found, using anon key for admin operations (reduced functionality)');
       supabaseAdmin = supabase;
     }
   } else {
@@ -105,7 +115,21 @@ app.get('/api/debug', (req: Request, res: Response) => {
     message: 'API server is running correctly',
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development',
-    supabase_connected: !!supabase
+    supabase_connected: !!supabase,
+    supabase_url_set: !!supabaseUrl,
+    supabase_key_set: !!supabaseKey,
+    env_vars: {
+      // Don't include actual values of sensitive env vars
+      NODE_ENV: process.env.NODE_ENV,
+      PORT: PORT,
+      VITE_APP_URL: process.env.VITE_APP_URL,
+      VITE_SUPABASE_URL: process.env.VITE_SUPABASE_URL ? '✅ Set' : '❌ Not set',
+      SUPABASE_URL: process.env.SUPABASE_URL ? '✅ Set' : '❌ Not set',
+      VITE_SUPABASE_ANON_KEY: process.env.VITE_SUPABASE_ANON_KEY ? '✅ Set' : '❌ Not set',
+      SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY ? '✅ Set' : '❌ Not set',
+      VITE_SUPABASE_SERVICE_KEY: process.env.VITE_SUPABASE_SERVICE_KEY ? '✅ Set' : '❌ Not set',
+      SUPABASE_SERVICE_KEY: process.env.SUPABASE_SERVICE_KEY ? '✅ Set' : '❌ Not set'
+    }
   });
 });
 
