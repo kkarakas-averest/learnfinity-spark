@@ -168,16 +168,16 @@ const LearnerDashboard: React.FC = () => {
     
     // List of fetch sources to try, in order of preference
     const sources = [
-      // Try the same origin first (works in both local and Vercel)
+      // Try the API server directly first in development
+      { label: "direct-api", url: `http://localhost:3083/api/learner/${endpoint}?userId=${userId}` },
+      // Then try the relative path (which may be proxied)
       { label: "same-origin", url: `/api/learner/${endpoint}?userId=${userId}` }
     ];
     
-    // Only add these fallbacks in development
-    if (!isProduction) {
-      sources.push(
-        { label: "direct-api", url: `http://localhost:3083/api/learner/${endpoint}?userId=${userId}` },
-        { label: "alt-port", url: `http://localhost:8084/api/learner/${endpoint}?userId=${userId}` }
-      );
+    // In production, only use the same-origin endpoint
+    if (isProduction) {
+      sources.length = 0; // Clear the array
+      sources.push({ label: "same-origin", url: `/api/learner/${endpoint}?userId=${userId}` });
     }
     
     let lastError = null;
