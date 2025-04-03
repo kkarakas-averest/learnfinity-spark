@@ -167,7 +167,7 @@ const LearnerDashboard: React.FC = () => {
     
     console.log(`Attempting to fetch ${endpoint} data for userId=${userId}`);
     
-    // In development, ONLY try direct connection to API server
+    // In development, try multiple ports for API server
     // In production, use the proxied endpoint
     const sources = isProduction 
       ? [
@@ -183,10 +183,39 @@ const LearnerDashboard: React.FC = () => {
           }
         ]
       : [
-          // In development, only use direct API connection to bypass Vite proxy issues
+          // In development, try multiple ports starting with 3083
+          // Try with direct API connection first to bypass Vite proxy issues
           { 
-            label: "direct-api", 
+            label: "direct-api-3083", 
             url: `http://localhost:3083/api/learner/${endpoint}?userId=${userId}`,
+            headers: {
+              'Accept': 'application/json',
+              'Content-Type': 'application/json',
+              'Cache-Control': 'no-cache'
+            }
+          },
+          { 
+            label: "direct-api-3084", 
+            url: `http://localhost:3084/api/learner/${endpoint}?userId=${userId}`,
+            headers: {
+              'Accept': 'application/json',
+              'Content-Type': 'application/json',
+              'Cache-Control': 'no-cache'
+            }
+          },
+          { 
+            label: "direct-api-3085", 
+            url: `http://localhost:3085/api/learner/${endpoint}?userId=${userId}`,
+            headers: {
+              'Accept': 'application/json',
+              'Content-Type': 'application/json',
+              'Cache-Control': 'no-cache'
+            }
+          },
+          // Then try the same-origin proxy as a last resort
+          { 
+            label: "same-origin", 
+            url: `/api/learner/${endpoint}?userId=${userId}`,
             headers: {
               'Accept': 'application/json',
               'Content-Type': 'application/json',
@@ -297,7 +326,7 @@ const LearnerDashboard: React.FC = () => {
           // Don't include credentials for cross-origin requests to avoid CORS issues
           credentials: source.label === 'same-origin' ? 'same-origin' : 'omit',
           // Shorter timeout to fail faster
-          signal: AbortSignal.timeout(3000) // 3 second timeout
+          signal: AbortSignal.timeout(2000) // 2 second timeout for faster fallback
         });
         
         console.log(`${source.label} response status: ${response.status}`);
@@ -319,7 +348,7 @@ const LearnerDashboard: React.FC = () => {
         }
         
         const data = await response.json();
-        console.log(`${source.label} data received successfully:`, data);
+        console.log(`${source.label} data received successfully`);
         
         // Personalize the data with real user info if available
         if (user && userDetails && data.profile) {
@@ -331,7 +360,7 @@ const LearnerDashboard: React.FC = () => {
       } catch (err) {
         console.error(`${source.label} fetch failed:`, err);
         lastError = err;
-        // Continue to next source if available
+        // Continue to next source
       }
     }
     
@@ -344,6 +373,15 @@ const LearnerDashboard: React.FC = () => {
         mockData.dashboard.profile.email = user.email || mockData.dashboard.profile.email;
         mockData.dashboard.profile.name = userDetails.name || user.email?.split('@')[0] || mockData.dashboard.profile.name;
       }
+      
+      // Show a toast to inform the user we're using mock data
+      toast({
+        title: "Using offline data",
+        description: "Could not connect to the API server. Using cached data instead.",
+        variant: "warning",
+        duration: 5000
+      });
+      
       return mockData[endpoint as keyof typeof mockData];
     }
     

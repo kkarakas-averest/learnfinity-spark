@@ -22,18 +22,15 @@ export default defineConfig(({ mode }) => ({
         changeOrigin: true,
         secure: false,
         ws: true, // Support WebSockets
-        bypass: (req, res, options) => {
-          // Bypass the proxy for certain requests (debugging purposes)
-          console.log(`[Bypass Check] ${req.method} ${req.url}`);
-          
-          // In development, bypass the proxy for API routes to allow direct connection
-          // This prevents the HTML response issue
-          if (process.env.NODE_ENV === 'development' && req.url?.startsWith('/api/learner/')) {
-            console.log(`[Bypass] Bypassing proxy for ${req.url} in development`);
-            return req.url; // Return the URL to bypass proxy
+        rewrite: (path) => {
+          // In development, completely bypass the proxy for learner API routes
+          // This prevents the HTML response issue by not letting Vite handle these requests
+          if (process.env.NODE_ENV === 'development' && path.startsWith('/api/learner/')) {
+            console.log(`[Rewrite] No rewrite for ${path} - direct API access`);
+            return path;
           }
-          
-          return false; // Don't bypass for other requests
+          console.log(`[Rewrite] Standard proxy for ${path}`);
+          return path;
         },
         configure: (proxy, options) => {
           // Log proxy setup

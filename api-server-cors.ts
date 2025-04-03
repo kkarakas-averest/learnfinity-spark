@@ -14,7 +14,9 @@ dotenv.config();
 
 // Create Express app
 const app = express();
-const PORT = process.env.API_PORT || 3083;
+
+// Parse PORT as a number to fix type issues
+const PORT = typeof process.env.PORT === 'string' ? parseInt(process.env.PORT, 10) : 3083;
 
 // CORS Configuration - Allow all origins, including localhost with any port
 const corsOptions = {
@@ -441,10 +443,39 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`✅ API Server listening on port ${PORT}`);
-});
+// Start server with port fallback mechanism
+const startServer = (port: number, maxRetries: number = 3) => {
+  const server = app.listen(port)
+    .on('error', (error: any) => {
+      if (error.code === 'EADDRINUSE' && maxRetries > 0) {
+        console.warn(`⚠️ Port ${port} is already in use, trying ${port + 1}...`);
+        server.close();
+        startServer(port + 1, maxRetries - 1);
+      } else {
+        console.error(`❌ Failed to start server:`, error);
+        process.exit(1);
+      }
+    })
+    .on('listening', () => {
+      const address = server.address();
+      const actualPort = typeof address === 'object' && address ? address.port : port;
+      console.log(`✅ API Server listening on port ${actualPort}`);
+      
+      // Set up graceful shutdown
+      process.on('SIGINT', () => {
+        console.log('Gracefully shutting down API server...');
+        server.close(() => {
+          console.log('API server closed');
+          process.exit(0);
+        });
+      });
+    });
+    
+  return server;
+};
+
+// Start the server with the preferred port
+startServer(PORT);
 
 process.on('uncaughtException', (error) => {
   console.error('Uncaught Exception:', error);
