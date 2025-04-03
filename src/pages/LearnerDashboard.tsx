@@ -182,7 +182,7 @@ const LearnerDashboard: React.FC = () => {
           }
         ]
       : [
-          // In development, try direct connection to API server first (most reliable)
+          // In development environment, ONLY try direct API connection to bypass Vite proxy issues
           { 
             label: "direct-api", 
             url: `http://localhost:3083/api/learner/${endpoint}?userId=${userId}`,
@@ -190,17 +190,6 @@ const LearnerDashboard: React.FC = () => {
               'Accept': 'application/json',
               'Content-Type': 'application/json',
               'Cache-Control': 'no-cache'
-            }
-          },
-          // Then try same-origin which should be proxied by Vite
-          { 
-            label: "same-origin", 
-            url: `/api/learner/${endpoint}?userId=${userId}`,
-            headers: {
-              'Accept': 'application/json',
-              'Content-Type': 'application/json',
-              'Cache-Control': 'no-cache',
-              'X-Requested-With': 'XMLHttpRequest' // Helps some servers detect AJAX requests
             }
           }
         ];
@@ -304,10 +293,10 @@ const LearnerDashboard: React.FC = () => {
         const response = await fetch(source.url, {
           method: 'GET',
           headers: source.headers,
-          // Include credentials for same-origin requests
+          // Don't include credentials for cross-origin requests to avoid CORS issues
           credentials: source.label === 'same-origin' ? 'same-origin' : 'omit',
-          // Add timeout to avoid hanging requests
-          signal: AbortSignal.timeout(5000) // 5 second timeout
+          // Shorter timeout to fail faster
+          signal: AbortSignal.timeout(3000) // 3 second timeout
         });
         
         console.log(`${source.label} response status: ${response.status}`);
@@ -329,7 +318,7 @@ const LearnerDashboard: React.FC = () => {
         }
         
         const data = await response.json();
-        console.log(`${source.label} data received successfully`);
+        console.log(`${source.label} data received successfully:`, data);
         
         // If we're returning mock data, add the user's real email and name if available
         if (user && userDetails && data.profile) {
@@ -348,6 +337,12 @@ const LearnerDashboard: React.FC = () => {
     // If all sources failed and we have mock data for this endpoint, use it as final fallback
     console.warn(`All fetch attempts failed, using mock data for ${endpoint}`);
     if (mockData[endpoint as keyof typeof mockData]) {
+      // Add real user data to mock data
+      if (user && userDetails && mockData.dashboard?.profile) {
+        mockData.dashboard.profile.id = user.id;
+        mockData.dashboard.profile.email = user.email || mockData.dashboard.profile.email;
+        mockData.dashboard.profile.name = userDetails.name || user.email?.split('@')[0] || mockData.dashboard.profile.name;
+      }
       return mockData[endpoint as keyof typeof mockData];
     }
     

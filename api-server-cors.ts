@@ -16,23 +16,28 @@ dotenv.config();
 const app = express();
 const PORT = process.env.API_PORT || 3083;
 
-// CORS Configuration
+// CORS Configuration - Allow all origins, including localhost with any port
 const corsOptions = {
-  origin: '*', // Allow all origins
+  origin: function(origin, callback) {
+    // Allow any origin (null means same origin/server-to-server)
+    callback(null, true);
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
   credentials: true,
   preflightContinue: false,
-  optionsSuccessStatus: 204
+  optionsSuccessStatus: 204,
+  maxAge: 86400 // 24 hours
 };
 
 // Middleware
 app.use(cors(corsOptions));
 app.use(express.json());
 
-// Request logging middleware
+// Request logging middleware with more details
 app.use((req: Request, res: Response, next: NextFunction) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url} from ${req.ip}`);
+  console.log('Headers:', req.headers['user-agent'], req.headers['origin'] || 'no-origin', req.headers['referer'] || 'no-referer');
   next();
 });
 
@@ -41,7 +46,9 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   res.setHeader('Content-Type', 'application/json');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Max-Age', '86400'); // 24 hours
   next();
 });
 
@@ -201,6 +208,14 @@ const getMockDashboardData = (userId: string): any => {
 // @ts-ignore: Express type issue with async handler
 app.get('/api/learner/dashboard', async (req: Request, res: Response) => {
   console.log('Received request for /api/learner/dashboard');
+  console.log('Query parameters:', req.query);
+  console.log('Request headers:', {
+    accept: req.headers.accept,
+    origin: req.headers.origin,
+    referer: req.headers.referer,
+    'user-agent': req.headers['user-agent']
+  });
+  
   const userId = req.query.userId as string;
   
   if (!userId) {
@@ -371,7 +386,9 @@ app.get('/api/learner/dashboard', async (req: Request, res: Response) => {
       }
     }
     
-    // Return the dashboard data (either mock or real)
+    // Return the dashboard data (either mock or real) with explicit content-type
+    console.log('Returning dashboard data for user', userId);
+    res.set('Content-Type', 'application/json');
     return res.json(dashboardData);
     
   } catch (error) {

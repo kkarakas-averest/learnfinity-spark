@@ -7,6 +7,8 @@
             font-family: Arial, sans-serif;
             margin: 20px;
             line-height: 1.6;
+            max-width: 1200px;
+            margin: 0 auto;
         }
         button {
             padding: 10px;
@@ -26,64 +28,98 @@
         .success {
             color: green;
         }
+        .panel {
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .control-panel {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        input, select {
+            padding: 8px;
+            margin-right: 10px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
     <h1>API Debug Tool</h1>
     
-    <div>
-        <h2>Test Endpoints</h2>
-        <button id="testDebug">Test Debug Endpoint</button>
-        <button id="testDashboard">Test Dashboard Endpoint</button>
-        <button id="testDirectAPI">Test Direct API Connection</button>
+    <div class="panel">
+        <h2>Configuration</h2>
+        <div class="control-panel">
+            <div>
+                <label for="userId">User ID:</label>
+                <input type="text" id="userId" value="6e2c2548-c04a-419b-a17c-c2feb6a3d9c6" style="width: 300px;">
+            </div>
+            <div>
+                <label for="apiPort">API Port:</label>
+                <input type="number" id="apiPort" value="3083">
+            </div>
+        </div>
     </div>
     
-    <div>
+    <div class="panel">
+        <h2>Test Endpoints</h2>
+        <div class="control-panel">
+            <button id="testDebug">Test Debug Endpoint</button>
+            <button id="testDashboard">Test Dashboard Endpoint</button>
+            <button id="testDirectAPI">Test Direct API Connection</button>
+            <button id="testCORS">Test CORS Support</button>
+        </div>
+    </div>
+    
+    <div class="panel">
         <h2>Results:</h2>
         <pre id="results">Click a button to test an endpoint</pre>
     </div>
     
     <script>
+        // Get DOM elements
+        const userId = document.getElementById('userId');
+        const apiPort = document.getElementById('apiPort');
+        const results = document.getElementById('results');
+        
         document.getElementById('testDebug').addEventListener('click', async () => {
             try {
-                const results = document.getElementById('results');
                 results.textContent = 'Fetching debug endpoint...';
+                results.className = '';
                 
-                // Test with different ports
-                const ports = [3083, 8084];
-                let succeeded = false;
-                
-                for (const port of ports) {
-                    try {
-                        const url = `http://localhost:${port}/api/debug`;
-                        results.textContent += `\nTrying ${url}...`;
-                        
-                        const response = await fetch(url, {
-                            headers: {
-                                'Accept': 'application/json'
-                            }
-                        });
-                        
-                        results.textContent += `\nStatus: ${response.status} ${response.statusText}`;
-                        results.textContent += `\nHeaders: ${JSON.stringify(Object.fromEntries([...response.headers]), null, 2)}`;
-                        
-                        if (response.ok) {
-                            const data = await response.json();
-                            results.textContent = `SUCCESS (port ${port}):\n${JSON.stringify(data, null, 2)}`;
-                            results.className = 'success';
-                            succeeded = true;
-                            break;
-                        } else {
-                            results.textContent += `\nEndpoint returned error: ${response.status} ${response.statusText}`;
+                // Test with configured port
+                const port = apiPort.value;
+                try {
+                    const url = `http://localhost:${port}/api/debug`;
+                    results.textContent += `\nTrying ${url}...`;
+                    
+                    const response = await fetch(url, {
+                        headers: {
+                            'Accept': 'application/json'
                         }
-                    } catch (err) {
-                        results.textContent += `\nError with port ${port}: ${err.message}`;
+                    });
+                    
+                    results.textContent += `\nStatus: ${response.status} ${response.statusText}`;
+                    results.textContent += `\nHeaders: ${JSON.stringify(Object.fromEntries([...response.headers]), null, 2)}`;
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        results.textContent = `SUCCESS (port ${port}):\n${JSON.stringify(data, null, 2)}`;
+                        results.className = 'success';
+                    } else {
+                        results.textContent += `\nEndpoint returned error: ${response.status} ${response.statusText}`;
+                        results.className = 'error';
                     }
-                }
-                
-                if (!succeeded) {
+                } catch (err) {
+                    results.textContent += `\nError with port ${port}: ${err.message}`;
                     results.className = 'error';
-                    results.textContent += '\n\nAll port attempts failed';
                 }
             } catch (err) {
                 document.getElementById('results').textContent = `Error: ${err.message}`;
@@ -93,56 +129,46 @@
         
         document.getElementById('testDashboard').addEventListener('click', async () => {
             try {
-                const results = document.getElementById('results');
                 results.textContent = 'Fetching dashboard endpoint...';
+                results.className = '';
                 
-                const userId = '6e2c2548-c04a-419b-a17c-c2feb6a3d9c6';
+                const userIdValue = userId.value;
+                const port = apiPort.value;
                 
-                // Test with different ports
-                const ports = [3083, 8084];
-                let succeeded = false;
-                
-                for (const port of ports) {
-                    try {
-                        const url = `http://localhost:${port}/api/learner/dashboard?userId=${userId}`;
-                        results.textContent += `\nTrying ${url}...`;
-                        
-                        const response = await fetch(url, {
-                            headers: {
-                                'Accept': 'application/json'
-                            }
-                        });
-                        
-                        results.textContent += `\nStatus: ${response.status} ${response.statusText}`;
-                        results.textContent += `\nHeaders: ${JSON.stringify(Object.fromEntries([...response.headers]), null, 2)}`;
-                        
-                        if (response.ok) {
-                            // Check content type
-                            const contentType = response.headers.get('content-type');
-                            if (contentType && contentType.includes('application/json')) {
-                                // It's JSON, parse it
-                                const data = await response.json();
-                                results.textContent = `SUCCESS (port ${port}):\n${JSON.stringify(data, null, 2).substring(0, 500)}...`;
-                                results.className = 'success';
-                                succeeded = true;
-                                break;
-                            } else {
-                                // Not JSON, show the raw text
-                                const text = await response.text();
-                                results.textContent = `ERROR: Response is not JSON (port ${port}):\nContent-Type: ${contentType}\nFirst 500 chars:\n${text.substring(0, 500)}...`;
-                                results.className = 'error';
-                            }
-                        } else {
-                            results.textContent += `\nEndpoint returned error: ${response.status} ${response.statusText}`;
+                try {
+                    const url = `http://localhost:${port}/api/learner/dashboard?userId=${userIdValue}`;
+                    results.textContent += `\nTrying ${url}...`;
+                    
+                    const response = await fetch(url, {
+                        headers: {
+                            'Accept': 'application/json'
                         }
-                    } catch (err) {
-                        results.textContent += `\nError with port ${port}: ${err.message}`;
+                    });
+                    
+                    results.textContent += `\nStatus: ${response.status} ${response.statusText}`;
+                    results.textContent += `\nHeaders: ${JSON.stringify(Object.fromEntries([...response.headers]), null, 2)}`;
+                    
+                    if (response.ok) {
+                        // Check content type
+                        const contentType = response.headers.get('content-type');
+                        if (contentType && contentType.includes('application/json')) {
+                            // It's JSON, parse it
+                            const data = await response.json();
+                            results.textContent = `SUCCESS (port ${port}):\n${JSON.stringify(data, null, 2).substring(0, 1000)}...`;
+                            results.className = 'success';
+                        } else {
+                            // Not JSON, show the raw text
+                            const text = await response.text();
+                            results.textContent = `ERROR: Response is not JSON (port ${port}):\nContent-Type: ${contentType}\nFirst 500 chars:\n${text.substring(0, 500)}...`;
+                            results.className = 'error';
+                        }
+                    } else {
+                        results.textContent += `\nEndpoint returned error: ${response.status} ${response.statusText}`;
+                        results.className = 'error';
                     }
-                }
-                
-                if (!succeeded) {
+                } catch (err) {
+                    results.textContent += `\nError with port ${port}: ${err.message}`;
                     results.className = 'error';
-                    results.textContent += '\n\nAll port attempts failed';
                 }
             } catch (err) {
                 document.getElementById('results').textContent = `Error: ${err.message}`;
@@ -154,24 +180,32 @@
             try {
                 const results = document.getElementById('results');
                 results.textContent = 'Testing direct connection to API...';
+                results.className = '';
                 
-                const userId = '6e2c2548-c04a-419b-a17c-c2feb6a3d9c6';
-                const url = `http://localhost:3083/api/learner/dashboard?userId=${userId}`;
+                const userIdValue = userId.value;
+                const port = apiPort.value;
+                const url = `http://localhost:${port}/api/learner/dashboard?userId=${userIdValue}`;
                 
                 results.textContent += `\nMaking direct API call to: ${url}`;
                 
                 try {
+                    const startTime = Date.now();
                     const response = await fetch(url, {
                         method: 'GET',
                         headers: {
                             'Accept': 'application/json',
-                            'Content-Type': 'application/json'
-                        }
+                            'Content-Type': 'application/json',
+                            'Cache-Control': 'no-cache'
+                        },
+                        mode: 'cors' // Explicitly request CORS
                     });
+                    const endTime = Date.now();
                     
                     const contentType = response.headers.get('content-type');
                     results.textContent += `\nStatus: ${response.status} ${response.statusText}`;
                     results.textContent += `\nContent-Type: ${contentType}`;
+                    results.textContent += `\nRequest took: ${endTime - startTime}ms`;
+                    results.textContent += `\nAll headers: ${JSON.stringify(Object.fromEntries([...response.headers]), null, 2)}`;
                     
                     if (response.ok) {
                         if (contentType && contentType.includes('application/json')) {
@@ -190,6 +224,57 @@
                     }
                 } catch (err) {
                     results.textContent += `\n\nConnection Error: ${err.message}`;
+                    results.className = 'error';
+                }
+            } catch (err) {
+                document.getElementById('results').textContent = `Error: ${err.message}`;
+                document.getElementById('results').className = 'error';
+            }
+        });
+        
+        document.getElementById('testCORS').addEventListener('click', async () => {
+            try {
+                const results = document.getElementById('results');
+                results.textContent = 'Testing CORS support...';
+                results.className = '';
+                
+                const port = apiPort.value;
+                
+                // Test CORS preflight
+                results.textContent += '\n\nTesting CORS preflight (OPTIONS)...';
+                
+                try {
+                    // Can't directly make OPTIONS request with fetch in some browsers,
+                    // so we'll test with a normal request that should trigger preflight
+                    const preflightUrl = `http://localhost:${port}/api/debug`;
+                    const preflightResponse = await fetch(preflightUrl, {
+                        method: 'GET',
+                        headers: {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json',
+                            'X-Custom-Header': 'test' // This should trigger preflight
+                        },
+                        mode: 'cors'
+                    });
+                    
+                    results.textContent += `\nPreflight Status: ${preflightResponse.status} ${preflightResponse.statusText}`;
+                    results.textContent += `\nCORS Headers: ${
+                        JSON.stringify({
+                            'access-control-allow-origin': preflightResponse.headers.get('access-control-allow-origin'),
+                            'access-control-allow-methods': preflightResponse.headers.get('access-control-allow-methods'),
+                            'access-control-allow-headers': preflightResponse.headers.get('access-control-allow-headers')
+                        }, null, 2)
+                    }`;
+                    
+                    if (preflightResponse.ok) {
+                        results.textContent += '\nCORS preflight successful!';
+                        results.className = 'success';
+                    } else {
+                        results.textContent += '\nCORS preflight failed.';
+                        results.className = 'error';
+                    }
+                } catch (err) {
+                    results.textContent += `\nCORS Error: ${err.message}`;
                     results.className = 'error';
                 }
             } catch (err) {
