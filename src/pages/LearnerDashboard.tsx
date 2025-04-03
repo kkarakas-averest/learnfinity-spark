@@ -216,23 +216,69 @@ const LearnerDashboard: React.FC = () => {
           avatar: null,
           bio: 'Learning enthusiast',
           lastLogin: new Date().toISOString(),
-          joinDate: '2023-01-15T00:00:00.000Z'
+          joinDate: '2023-01-15T00:00:00.000Z',
+          department: 'Engineering',
+          position: 'Developer'
         },
         courses: {
           total: 5,
           inProgress: 2,
           completed: 1,
           notStarted: 2,
+          hrAssigned: 0,
           featured: {
             id: 'mock-course-1',
             title: 'Getting Started with React',
             description: 'Learn the basics of React development',
             progress: 30,
             completed_sections: 3,
-            total_sections: 10
+            total_sections: 10,
+            category: 'Web Development',
+            thumbnail_url: null
           },
-          items: []
+          items: [
+            {
+              id: 'mock-course-1',
+              title: 'Getting Started with React',
+              description: 'Learn the basics of React development',
+              duration: '2 hours',
+              progress: 30,
+              completed_sections: 3,
+              total_sections: 10,
+              category: 'Web Development',
+              thumbnail_url: null,
+              skills: ['React', 'JavaScript', 'Web Development'],
+              rag_status: 'in_progress'
+            },
+            {
+              id: 'mock-course-2',
+              title: 'Advanced TypeScript',
+              description: 'Master TypeScript features for large applications',
+              duration: '3 hours',
+              progress: 0,
+              completed_sections: 0,
+              total_sections: 8,
+              category: 'Programming',
+              thumbnail_url: null,
+              skills: ['TypeScript', 'JavaScript', 'Programming'],
+              rag_status: 'not_started'
+            }
+          ]
         },
+        learningPaths: [
+          {
+            id: 'mock-path-1',
+            title: 'Frontend Development',
+            description: 'Complete path to become a frontend developer',
+            courses_count: 3,
+            progress: 25,
+            thumbnail_url: null,
+            due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+            skills: ['React', 'CSS', 'JavaScript']
+          }
+        ],
+        completedCourses: 1,
+        inProgressCourses: 2,
         stats: {
           coursesCompleted: 1,
           coursesInProgress: 2,
@@ -241,6 +287,10 @@ const LearnerDashboard: React.FC = () => {
           assignedCourses: 3,
           skillsAcquired: 5,
           totalHours: 12
+        },
+        achievements: {
+          certificates: [],
+          badges: []
         }
       }
     };
@@ -257,7 +307,7 @@ const LearnerDashboard: React.FC = () => {
           // Include credentials for same-origin requests
           credentials: source.label === 'same-origin' ? 'same-origin' : 'omit',
           // Add timeout to avoid hanging requests
-          signal: AbortSignal.timeout(10000) // 10 second timeout
+          signal: AbortSignal.timeout(5000) // 5 second timeout
         });
         
         console.log(`${source.label} response status: ${response.status}`);
@@ -296,13 +346,13 @@ const LearnerDashboard: React.FC = () => {
     }
     
     // If all sources failed and we have mock data for this endpoint, use it as final fallback
+    console.warn(`All fetch attempts failed, using mock data for ${endpoint}`);
     if (mockData[endpoint as keyof typeof mockData]) {
-      console.warn(`All fetch attempts failed, using mock data for ${endpoint}`);
       return mockData[endpoint as keyof typeof mockData];
     }
     
-    // If we've tried all sources and all failed, throw the last error
-    throw lastError || new Error('All fetch attempts failed');
+    // If we've tried all sources and all failed with no mock data, throw the last error
+    throw lastError || new Error('All fetch attempts failed and no mock data available');
   };
 
   // Initialize auth state

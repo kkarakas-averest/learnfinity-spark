@@ -18,11 +18,12 @@ const PORT = process.env.API_PORT || 3083;
 
 // CORS Configuration
 const corsOptions = {
-  origin: ['http://localhost:8080', 'http://localhost:8081', 'http://127.0.0.1:8080', 'http://127.0.0.1:8081'],
+  origin: '*', // Allow all origins
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   credentials: true,
-  optionsSuccessStatus: 200
+  preflightContinue: false,
+  optionsSuccessStatus: 204
 };
 
 // Middleware
@@ -117,10 +118,10 @@ const getMockDashboardData = (userId: string): any => {
       position: 'Software Developer'
     },
     courses: {
-      total: 0,
-      inProgress: 0,
+      total: 2,
+      inProgress: 1,
       completed: 0,
-      notStarted: 0,
+      notStarted: 1,
       hrAssigned: 0,
       featured: {
         id: 'course1',
@@ -135,16 +136,56 @@ const getMockDashboardData = (userId: string): any => {
         hr_training_id: 'HR123',
         hr_training_title: 'Frontend Essentials'
       },
-      items: []
+      items: [
+        {
+          id: 'course1',
+          title: 'Introduction to React',
+          description: 'Learn the basics of React',
+          duration: '2 hours',
+          progress: 30,
+          completed_sections: 3,
+          total_sections: 10,
+          thumbnail_url: null,
+          category: 'Web Development',
+          skills: ['React', 'JavaScript', 'Web Development'],
+          rag_status: 'in_progress',
+          hr_training_id: 'HR123',
+          hr_training_title: 'Frontend Essentials'
+        },
+        {
+          id: 'course2',
+          title: 'Advanced TypeScript',
+          description: 'Master TypeScript for large applications',
+          duration: '3 hours',
+          progress: 0,
+          completed_sections: 0,
+          total_sections: 8,
+          thumbnail_url: null,
+          category: 'Programming',
+          skills: ['TypeScript', 'JavaScript', 'Programming'],
+          rag_status: 'not_started'
+        }
+      ]
     },
-    learningPaths: [],
+    learningPaths: [
+      {
+        id: 'path1',
+        title: 'Frontend Development',
+        description: 'Complete path to become a frontend developer',
+        courses_count: 3,
+        progress: 25,
+        thumbnail_url: null,
+        skills: ['React', 'CSS', 'JavaScript'],
+        due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+      }
+    ],
     completedCourses: 0,
-    inProgressCourses: 0,
+    inProgressCourses: 1,
     stats: {
       coursesCompleted: 0,
-      coursesInProgress: 0,
+      coursesInProgress: 1,
       learningPathsCompleted: 0,
-      learningPathsInProgress: 0,
+      learningPathsInProgress: 1,
       assignedCourses: 0,
       skillsAcquired: 7,
       totalHours: 24
