@@ -265,31 +265,54 @@ const LearnerDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
-  // Mock user ID for demonstration
-  const userId = '6e2c2548-c04a-419b-a17c-c2feb6a3d9c6';
+  // Remove the separate userId state, use user.id directly where needed
+  // const userId = '6e2c2548-c04a-419b-a17c-c2feb6a3d9c6'; // Removed mock ID
 
   useEffect(() => {
-    const fetchDashboardData = async () => {
+    // Ensure user ID exists before fetching
+    if (!user?.id) {
+      setLoading(false); // Stop loading if no user ID
+      return;
+    }
+
+    const fetchDashboardData = async (currentUserId: string) => {
       try {
         setLoading(true);
         setError(null);
+        setDashboardData(null); // Clear previous data on new fetch
         
-        console.log(`Attempting to fetch dashboard data for userId=${userId}`);
+        console.log(`Attempting to fetch dashboard data for userId=${currentUserId}`);
         
         // Use our utility function
-        const data = await fetchWithFallback('dashboard', userId);
-        console.log('Dashboard data:', data);
-        setDashboardData(data);
+        const data = await fetchWithFallback('dashboard', currentUserId);
+        console.log('Dashboard data received:', data);
+        
+        // Check for errors within the received data
+        if (data?.error) {
+          console.error('API returned an error in dashboard data:', data.error);
+          setError(data.message || data.error || 'Error loading dashboard data.');
+          setDashboardData(null);
+        } else {
+          setDashboardData(data); // Set data on success
+        }
+
       } catch (err) {
         console.error('Error fetching dashboard data:', err);
-        setError('Error loading dashboard data. Please try again later.');
+        let errorMessage = 'Error loading dashboard data. Please try again later.';
+        if (err instanceof Error) {
+          errorMessage = err.message;
+        }
+        setError(errorMessage);
+        setDashboardData(null);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchDashboardData();
-  }, [userId]);
+    fetchDashboardData(user.id);
+    
+    // Dependency array includes user.id to refetch if the user changes
+  }, [user?.id]);
 
   // Helper function to get initials from name
   const getInitials = (name: string) => {
@@ -364,229 +387,148 @@ const LearnerDashboard: React.FC = () => {
     return () => clearInterval(interval);
   }, [user?.id, toast]);
   
-  // Fetch courses when tab is activated or user changes
+  // Fetch courses data *if needed* when tab is active
   useEffect(() => {
-    if (!user?.id || activeTab !== 'courses') return;
-    
-    const fetchCourses = async () => {
-      try {
-        setCoursesLoading(true);
-        setCoursesError(null);
-        
-        console.log(`Fetching courses data for user: ${user.id}`);
-        const response = await fetch(`/api/learner/courses?userId=${user.id}`);
-        
-        // Debug the response
-        console.log(`Courses API response status: ${response.status}`);
-        
-        if (!response.ok) {
-          // Try to get error details if available
-          try {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Failed to fetch courses');
-          } catch (jsonError) {
-            throw new Error(`Failed to fetch courses: ${response.statusText}`);
-          }
-        }
-        
-        // Parse the response
-        let coursesData;
+    // Only fetch if the user exists, the tab is active, AND courses haven't been loaded yet
+    if (user?.id && activeTab === 'courses' && courses.length === 0 && !coursesLoading) {
+      const fetchCourses = async () => {
         try {
-          coursesData = await response.json();
-          console.log('Courses data received:', coursesData);
-        } catch (parseError) {
-          console.error('Error parsing courses response:', parseError);
-          throw new Error('Failed to parse courses data');
+          setCoursesLoading(true);
+          setCoursesError(null);
+          
+          console.log(`Fetching courses data for user: ${user.id} (Tab Active)`);
+          // Use fetchWithFallback or direct fetch as appropriate
+          const data = await fetchWithFallback('courses', user.id);
+          
+          if (data?.error) {
+            throw new Error(data.message || data.error || 'Failed to fetch courses');
+          }
+          
+          setCourses(data.courses || []);
+          setCourseCounts(data.counts || data.stats || { total: 0, inProgress: 0, completed: 0, notStarted: 0 });
+          setFeaturedCourse(data.featuredCourse || null);
+        } catch (error) {
+          console.error('Error fetching courses:', error);
+          setCoursesError('Failed to load your courses');
+          toast({
+            variant: 'destructive',
+            title: 'Error loading courses',
+            description: error instanceof Error ? error.message : 'Could not load your courses. Please try again later.'
+          });
+        } finally {
+          setCoursesLoading(false);
         }
-        
-        setCourses(coursesData.courses);
-        setCourseCounts(coursesData.counts || coursesData.stats);
-        setFeaturedCourse(coursesData.featuredCourse);
-      } catch (error) {
-        console.error('Error fetching courses:', error);
-        setCoursesError('Failed to load your courses');
-        
-        toast({
-          variant: 'destructive',
-          title: 'Error loading courses',
-          description: 'Could not load your courses. Please try again later.'
-        });
-      } finally {
-        setCoursesLoading(false);
-      }
-    };
-    
-    fetchCourses();
-  }, [user?.id, activeTab, toast]);
+      };
+      
+      fetchCourses();
+    }
+    // Dependencies: user.id, activeTab, courses.length (to check if loaded), coursesLoading
+  }, [user?.id, activeTab, courses.length, coursesLoading, toast]);
   
-  // Fetch learning paths when tab is activated or user changes
+  // Fetch learning paths data *if needed* when tab is active
   useEffect(() => {
-    if (!user?.id || activeTab !== 'paths') return;
-    
-    const fetchLearningPaths = async () => {
-      try {
-        setPathsLoading(true);
-        setPathsError(null);
-        
-        console.log(`Fetching learning paths for user: ${user.id}`);
-        const response = await fetch(`/api/learner/learning-paths?userId=${user.id}`);
-        
-        // Debug the response
-        console.log(`Learning paths API response status: ${response.status}`);
-        
-        if (!response.ok) {
-          // Try to get error details if available
-          try {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Failed to fetch learning paths');
-          } catch (jsonError) {
-            throw new Error(`Failed to fetch learning paths: ${response.statusText}`);
-          }
-        }
-        
-        // Parse the response
-        let pathsData;
+    if (user?.id && activeTab === 'paths' && learningPaths.length === 0 && !pathsLoading) {
+      const fetchLearningPaths = async () => {
         try {
-          pathsData = await response.json();
-          console.log('Learning paths data received:', pathsData);
-        } catch (parseError) {
-          console.error('Error parsing learning paths response:', parseError);
-          throw new Error('Failed to parse learning paths data');
+          setPathsLoading(true);
+          setPathsError(null);
+          
+          console.log(`Fetching learning paths for user: ${user.id} (Tab Active)`);
+          const data = await fetchWithFallback('learning-paths', user.id);
+
+          if (data?.error) {
+            throw new Error(data.message || data.error || 'Failed to fetch learning paths');
+          }
+          
+          setLearningPaths(data?.learning_paths || []);
+        } catch (error) {
+          console.error('Error fetching learning paths:', error);
+          setPathsError('Failed to load your learning paths');
+          toast({
+            variant: 'destructive',
+            title: 'Error loading learning paths',
+            description: error instanceof Error ? error.message : 'Could not load your learning paths. Please try again later.'
+          });
+        } finally {
+          setPathsLoading(false);
         }
-        
-        if (pathsData && pathsData.learning_paths) {
-          setLearningPaths(pathsData.learning_paths);
-        } else {
-          setLearningPaths([]);
-        }
-      } catch (error) {
-        console.error('Error fetching learning paths:', error);
-        setPathsError('Failed to load your learning paths');
-        
-        toast({
-          variant: 'destructive',
-          title: 'Error loading learning paths',
-          description: 'Could not load your learning paths. Please try again later.'
-        });
-      } finally {
-        setPathsLoading(false);
-      }
-    };
-    
-    fetchLearningPaths();
-  }, [user?.id, activeTab, toast]);
+      };
+      
+      fetchLearningPaths();
+    }
+  }, [user?.id, activeTab, learningPaths.length, pathsLoading, toast]);
   
-  // Fetch achievements when tab is activated or user changes
+  // Fetch achievements data *if needed* when tab is active
   useEffect(() => {
-    if (!user?.id || activeTab !== 'achievements') return;
-    
-    const fetchAchievements = async () => {
-      try {
-        setAchievementsLoading(true);
-        setAchievementsError(null);
-        
-        console.log(`Fetching achievements data for user: ${user.id}`);
-        const response = await fetch(`/api/learner/achievements?userId=${user.id}`);
-        
-        // Debug the response
-        console.log(`Achievements API response status: ${response.status}`);
-        
-        if (!response.ok) {
-          // Try to get error details if available
-          try {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Failed to fetch achievements');
-          } catch (jsonError) {
-            throw new Error(`Failed to fetch achievements: ${response.statusText}`);
-          }
-        }
-        
-        // Parse the response
-        let achievementsData;
+    if (user?.id && activeTab === 'achievements' && certificates.length === 0 && badges.length === 0 && !achievementsLoading) {
+      const fetchAchievements = async () => {
         try {
-          achievementsData = await response.json();
-          console.log('Achievements data received:', achievementsData);
-        } catch (parseError) {
-          console.error('Error parsing achievements response:', parseError);
-          throw new Error('Failed to parse achievements data');
+          setAchievementsLoading(true);
+          setAchievementsError(null);
+          
+          console.log(`Fetching achievements data for user: ${user.id} (Tab Active)`);
+          const data = await fetchWithFallback('achievements', user.id);
+
+          if (data?.error) {
+            throw new Error(data.message || data.error || 'Failed to fetch achievements');
+          }
+          
+          setCertificates(data.certificates || []);
+          setBadges(data.badges || []);
+          setAchievementsSummary(data.summary || {
+            totalCertificates: data.certificates?.length || 0,
+            totalBadges: data.badges?.length || 0,
+            recentAchievements: []
+          });
+        } catch (error) {
+          console.error('Error fetching achievements:', error);
+          setAchievementsError('Failed to load your achievements');
+          toast({
+            variant: 'destructive',
+            title: 'Error loading achievements',
+            description: error instanceof Error ? error.message : 'Could not load your achievements. Please try again later.'
+          });
+        } finally {
+          setAchievementsLoading(false);
         }
-        
-        setCertificates(achievementsData.certificates || []);
-        setBadges(achievementsData.badges || []);
-        setAchievementsSummary(achievementsData.summary || {
-          totalCertificates: achievementsData.certificates?.length || 0,
-          totalBadges: achievementsData.badges?.length || 0,
-          recentAchievements: []
-        });
-      } catch (error) {
-        console.error('Error fetching achievements:', error);
-        setAchievementsError('Failed to load your achievements');
-        
-        toast({
-          variant: 'destructive',
-          title: 'Error loading achievements',
-          description: 'Could not load your achievements. Please try again later.'
-        });
-      } finally {
-        setAchievementsLoading(false);
-      }
-    };
-    
-    fetchAchievements();
-  }, [user?.id, activeTab, toast]);
+      };
+      
+      fetchAchievements();
+    }
+  }, [user?.id, activeTab, certificates.length, badges.length, achievementsLoading, toast]);
   
-  // Fetch profile when tab is activated or user changes
+  // Fetch profile data *if needed* when tab is active
   useEffect(() => {
-    if (!user?.id || activeTab !== 'profile') return;
-    
-    const fetchProfile = async () => {
-      try {
-        setProfileLoading(true);
-        setProfileError(null);
-        
-        console.log(`Fetching profile data for user: ${user.id}`);
-        const response = await fetch(`/api/learner/profile?userId=${user.id}`);
-        
-        // Debug the response
-        console.log(`Profile API response status: ${response.status}`);
-        
-        if (!response.ok) {
-          // Try to get error details if available
-          try {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Failed to fetch profile');
-          } catch (jsonError) {
-            throw new Error(`Failed to fetch profile: ${response.statusText}`);
-          }
-        }
-        
-        // Parse the response
-        let profileData;
+    if (user?.id && activeTab === 'profile' && !profile && !profileLoading) {
+      const fetchProfile = async () => {
         try {
-          profileData = await response.json();
-          console.log('Profile data received:', profileData);
-        } catch (parseError) {
-          console.error('Error parsing profile response:', parseError);
-          throw new Error('Failed to parse profile data');
+          setProfileLoading(true);
+          setProfileError(null);
+          
+          console.log(`Fetching profile data for user: ${user.id} (Tab Active)`);
+          const data = await fetchWithFallback('profile', user.id);
+
+          if (data?.error) {
+            throw new Error(data.message || data.error || 'Failed to fetch profile');
+          }
+          
+          setProfile(data);
+        } catch (error) {
+          console.error('Error fetching profile:', error);
+          setProfileError('Failed to load your profile');
+          toast({
+            variant: 'destructive',
+            title: 'Error loading profile',
+            description: error instanceof Error ? error.message : 'Could not load your profile. Please try again later.'
+          });
+        } finally {
+          setProfileLoading(false);
         }
-        
-        setProfile(profileData);
-      } catch (error) {
-        console.error('Error fetching profile:', error);
-        setProfileError('Failed to load your profile');
-        
-        toast({
-          variant: 'destructive',
-          title: 'Error loading profile',
-          description: 'Could not load your profile. Please try again later.'
-        });
-      } finally {
-        setProfileLoading(false);
-      }
-    };
-    
-    fetchProfile();
-  }, [user?.id, activeTab, toast]);
+      };
+      
+      fetchProfile();
+    }
+  }, [user?.id, activeTab, profile, profileLoading, toast]);
   
   console.log("LearnerDashboard - Current state:", { user, userDetails, authLoading, learnerStats });
 
@@ -626,17 +568,6 @@ const LearnerDashboard: React.FC = () => {
   }
 
   const { profile: dashboardProfile, courses: dashboardCourses, learningPaths: dashboardLearningPaths, stats } = dashboardData;
-
-  useEffect(() => {
-    if (dashboardData?.error) {
-      // Use functional update pattern to avoid stale closures
-      setLearnerStats(prev => ({
-        ...prev,
-        error: dashboardData.error,
-        loading: false
-      }));
-    }
-  }, [dashboardData]);
 
   return (
     <div className="container py-6 mx-auto max-w-7xl">
