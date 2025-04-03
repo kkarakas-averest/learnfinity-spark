@@ -63,24 +63,46 @@ app.get('/api/learner/dashboard', (req, res) => {
       department: "Engineering",
       position: "Software Developer"
     },
-    courses: [
-      {
+    courses: {
+      total: 2,
+      inProgress: 1,
+      completed: 0,
+      notStarted: 1,
+      hrAssigned: 1,
+      featured: {
         id: "course1",
-        name: "Introduction to React",
         title: "Introduction to React",
         description: "Learn the basics of React",
+        duration: "2 hours",
         progress: 30,
-        status: "in_progress"
+        completed_sections: 3,
+        total_sections: 10,
+        thumbnail_url: null,
+        category: "Web Development",
+        hr_training_id: "HR123",
+        hr_training_title: "Frontend Essentials"
       },
-      {
-        id: "course2",
-        name: "Advanced JavaScript",
-        title: "Advanced JavaScript",
-        description: "Master JavaScript concepts",
-        progress: 0,
-        status: "not_started"
-      }
-    ],
+      items: [
+        {
+          id: "course1",
+          name: "Introduction to React",
+          title: "Introduction to React",
+          description: "Learn the basics of React",
+          progress: 30,
+          status: "in_progress",
+          category: "Web Development"
+        },
+        {
+          id: "course2",
+          name: "Advanced JavaScript",
+          title: "Advanced JavaScript",
+          description: "Master JavaScript concepts",
+          progress: 0,
+          status: "not_started",
+          category: "Programming"
+        }
+      ]
+    },
     learningPaths: [
       {
         id: "path1",
@@ -90,7 +112,9 @@ app.get('/api/learner/dashboard', (req, res) => {
         progress: 25,
         courses: ["course1", "course2"],
         thumbnail_url: null,
-        is_hr_assigned: true
+        is_hr_assigned: true,
+        courses_count: 2,
+        due_date: "2025-06-30T00:00:00.000Z"
       }
     ],
     completedCourses: 0,
