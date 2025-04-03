@@ -18,17 +18,24 @@ const PORT = process.env.API_PORT || 3083;
 // Use the singleton Supabase client
 const supabase = getSupabase();
 
+// Fix the typing for the response.end override
+declare module 'express-serve-static-core' {
+  interface Response {
+    end: any;
+  }
+}
+
 // Middleware
-app.use((req, res, next) => {
+app.use((req: Request, res: Response, next: NextFunction) => {
   const startTime = Date.now();
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
   
-  // Add response logging
+  // Add response logging with proper typing
   const originalEnd = res.end;
-  res.end = function(...args) {
+  res.end = function(...args: any[]) {
     const duration = Date.now() - startTime;
     console.log(`[${new Date().toISOString()}] ${req.method} ${req.path} - ${res.statusCode} (${duration}ms)`);
-    originalEnd.apply(res, args);
+    return originalEnd.apply(res, args);
   };
   
   next();
@@ -48,7 +55,7 @@ app.use((req, res, next) => {
 });
 
 // Add a timeout handler to avoid long-running requests
-app.use((req, res, next) => {
+app.use((req: Request, res: Response, next: NextFunction) => {
   // Set a 30-second timeout for all requests
   req.setTimeout(30000, () => {
     console.error(`Request timeout for ${req.method} ${req.path}`);
@@ -83,7 +90,7 @@ app.get('/api/debug', (req: Request, res: Response) => {
 // API Routes
 
 // Helper function for error handling
-const handleApiError = (res, error, message, statusCode = 500) => {
+const handleApiError = (res: Response, error: any, message: string, statusCode = 500) => {
   console.error(message, error);
   res.status(statusCode).json({
     error: message,
@@ -100,18 +107,18 @@ app.get('/api/learner/dashboard', async (req: Request, res: Response) => {
     console.error("User ID is required for dashboard data");
     return res.status(400).json({ error: 'User ID is required' });
   }
-  /* // Original logic commented out
-  try {
-    console.log(`Fetching dashboard data for userId: ${userId}`);
-    const data = await getLearnerDashboardData(userId); // This function doesn't exist yet
-    console.log("Successfully fetched dashboard data");
-    res.json(data);
-  } catch (error) {
-    console.error('Error fetching learner dashboard data:', error);
-    res.status(500).json({ error: 'Failed to fetch learner dashboard data' });
-  }
-  */
-  res.status(501).json({ message: "Endpoint temporarily disabled" }); 
+  
+  // Send mock data to unblock frontend development
+  res.json({
+    courses: [],
+    learningPaths: [],
+    completedCourses: 0,
+    inProgressCourses: 0,
+    achievements: {
+      certificates: [],
+      badges: []
+    }
+  });
 });
 
 // --- Courses Endpoint --- (Temporarily disabled)
@@ -122,18 +129,9 @@ app.get('/api/learner/courses', async (req: Request, res: Response) => {
     console.error("User ID is required for courses data");
     return res.status(400).json({ error: 'User ID is required' });
   }
-  /* // Original logic commented out
-  try {
-    console.log(`Fetching courses for userId: ${userId}`);
-    const data = await getLearnerCourses(userId); // This function doesn't exist yet
-    console.log("Successfully fetched courses data");
-    res.json(data);
-  } catch (error) {
-    console.error('Error fetching learner courses:', error);
-    res.status(500).json({ error: 'Failed to fetch learner courses' });
-  }
-  */
-   res.status(501).json({ message: "Endpoint temporarily disabled" });
+  
+  // Send mock data
+  res.json([]);
 });
 
 // --- Learning Paths Endpoint --- (Temporarily disabled)
@@ -144,18 +142,9 @@ app.get('/api/learner/learning-paths', async (req: Request, res: Response) => {
     console.error("User ID is required for learning paths data");
     return res.status(400).json({ error: 'User ID is required' });
   }
-  /* // Original logic commented out
-  try {
-    console.log(`Fetching learning paths for userId: ${userId}`);
-    const data = await getLearnerLearningPaths(userId); // This function doesn't exist yet
-    console.log("Successfully fetched learning paths data");
-    res.json(data);
-  } catch (error) {
-    console.error('Error fetching learner learning paths:', error);
-    res.status(500).json({ error: 'Failed to fetch learner learning paths' });
-  }
-  */
-   res.status(501).json({ message: "Endpoint temporarily disabled" });
+  
+  // Send mock data
+  res.json([]);
 });
 
 // --- Achievements Endpoint --- (Temporarily disabled)
@@ -166,18 +155,12 @@ app.get('/api/learner/achievements', async (req: Request, res: Response) => {
     console.error("User ID is required for achievements data");
     return res.status(400).json({ error: 'User ID is required' });
   }
-  /* // Original logic commented out
-  try {
-    console.log(`Fetching achievements for userId: ${userId}`);
-    const data = await getLearnerAchievements(userId); // This function doesn't exist yet
-    console.log("Successfully fetched achievements data");
-    res.json(data);
-  } catch (error) {
-    console.error('Error fetching learner achievements:', error);
-    res.status(500).json({ error: 'Failed to fetch learner achievements' });
-  }
-  */
-   res.status(501).json({ message: "Endpoint temporarily disabled" });
+  
+  // Send mock data
+  res.json({
+    certificates: [],
+    badges: []
+  });
 });
 
 // --- Profile Endpoint --- (Temporarily disabled)
@@ -188,22 +171,18 @@ app.get('/api/learner/profile', async (req: Request, res: Response) => {
     console.error("User ID is required for profile data");
     return res.status(400).json({ error: 'User ID is required' });
   }
-  /* // Original logic commented out
-  try {
-    console.log(`Fetching profile for userId: ${userId}`);
-    const data = await getLearnerProfile(userId); // This function doesn't exist yet
-    console.log("Successfully fetched profile data");
-    res.json(data);
-  } catch (error) {
-    console.error('Error fetching learner profile:', error);
-    res.status(500).json({ error: 'Failed to fetch learner profile' });
-  }
-  */
-   res.status(501).json({ message: "Endpoint temporarily disabled" });
+  
+  // Send mock data
+  res.json({
+    id: userId,
+    name: "Test User",
+    email: "test@example.com",
+    role: "learner"
+  });
 });
 
 // General Error Handler
-app.use((err, req, res, next) => {
+app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
   console.error("Unhandled API Error:", err);
   if (!res.headersSent) {
     res.status(500).json({
