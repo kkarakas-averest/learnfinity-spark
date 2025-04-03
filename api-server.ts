@@ -1,9 +1,9 @@
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
-import { getSupabase } from './src/lib/supabase.ts'; // Corrected path and extension
-import dotenv from 'dotenv';
 import path, { dirname } from 'path';
 import { fileURLToPath } from 'url';
+import dotenv from 'dotenv';
+import { getSupabase } from './src/lib/supabase.js'; // Use .js extension for ESM imports, not .ts
 
 // Setup __dirname for ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -61,6 +61,24 @@ app.use((req, res, next) => {
 });
 
 app.use(express.json());
+app.use(cors());
+app.use(express.urlencoded({ extended: true }));
+
+// Add request logging middleware
+app.use((req: Request, res: Response, next: NextFunction) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  next();
+});
+
+// Add a simple debug endpoint that doesn't rely on any services
+app.get('/api/debug', (req: Request, res: Response) => {
+  res.json({ 
+    status: 'ok',
+    message: 'API server is running correctly',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development'
+  });
+});
 
 // API Routes
 

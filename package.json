@@ -20,7 +20,7 @@
     "db:setup": "npm run db:create-exec-sql && npm run db:apply-schema",
     "db:seed": "tsx src/utils/database/seedDatabase.ts",
     "db:check-config": "tsx src/utils/database/checkSupabaseConfig.ts",
-    "dev:server": "ts-node api-server.ts",
+    "dev:server": "node --loader ts-node/esm api-server.ts",
     "test:db": "NODE_ENV=test pnpm run db:migrate && vitest run --config ./vitest.config.db.ts",
     "test:db:ui": "NODE_ENV=test pnpm run db:migrate && vitest --ui --config ./vitest.config.db.ts"
   },
