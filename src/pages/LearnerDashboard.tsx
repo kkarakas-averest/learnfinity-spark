@@ -164,20 +164,46 @@ const LearnerDashboard: React.FC = () => {
   const fetchWithFallback = async (endpoint: string, userId: string) => {
     // Get the current hostname for production detection
     const isProduction = window.location.hostname !== 'localhost';
-    const vercelUrl = window.location.origin; // e.g. https://yourapp.vercel.app
+    
+    console.log(`Attempting to fetch ${endpoint} data for userId=${userId}`);
     
     // List of fetch sources to try, in order of preference
     const sources = [
-      // Try the API server directly first in development
-      { label: "direct-api", url: `http://localhost:3083/api/learner/${endpoint}?userId=${userId}` },
-      // Then try the relative path (which may be proxied)
-      { label: "same-origin", url: `/api/learner/${endpoint}?userId=${userId}` }
+      // Try the direct API connection first in development (most reliable)
+      { 
+        label: "direct-api", 
+        url: `http://localhost:3083/api/learner/${endpoint}?userId=${userId}`,
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache'
+        }
+      },
+      // Then try the relative path (which may be proxied by Vite)
+      { 
+        label: "same-origin", 
+        url: `/api/learner/${endpoint}?userId=${userId}`,
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache',
+          'X-Requested-With': 'XMLHttpRequest' // Helps some servers detect AJAX requests
+        }
+      }
     ];
     
     // In production, only use the same-origin endpoint
     if (isProduction) {
       sources.length = 0; // Clear the array
-      sources.push({ label: "same-origin", url: `/api/learner/${endpoint}?userId=${userId}` });
+      sources.push({ 
+        label: "same-origin", 
+        url: `/api/learner/${endpoint}?userId=${userId}`,
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache'
+        }
+      });
     }
     
     let lastError = null;
@@ -187,20 +213,24 @@ const LearnerDashboard: React.FC = () => {
         console.log(`Trying ${source.label}: ${source.url}`);
         
         const response = await fetch(source.url, {
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-          }
+          method: 'GET',
+          headers: source.headers,
+          // Include credentials for same-origin requests
+          credentials: source.label === 'same-origin' ? 'same-origin' : 'omit'
         });
         
         console.log(`${source.label} response status: ${response.status}`);
-        console.log(`${source.label} response content-type: ${response.headers.get('content-type')}`);
+        
+        const contentType = response.headers.get('content-type');
+        console.log(`${source.label} response content-type: ${contentType}`);
         
         if (!response.ok) {
+          console.error(`${source.label} API error: ${response.status} ${response.statusText}`);
+          const errorText = await response.text();
+          console.error(`Error response body (first 100 chars): ${errorText.substring(0, 100)}`);
           throw new Error(`${source.label} API error: ${response.status} ${response.statusText}`);
         }
         
-        const contentType = response.headers.get('content-type');
         if (!contentType || !contentType.includes('application/json')) {
           const responseText = await response.text();
           console.error(`${source.label} response is not JSON. First 100 chars: ${responseText.substring(0, 100)}`);

@@ -35,6 +35,7 @@
         <h2>Test Endpoints</h2>
         <button id="testDebug">Test Debug Endpoint</button>
         <button id="testDashboard">Test Dashboard Endpoint</button>
+        <button id="testDirectAPI">Test Direct API Connection</button>
     </div>
     
     <div>
@@ -142,6 +143,54 @@
                 if (!succeeded) {
                     results.className = 'error';
                     results.textContent += '\n\nAll port attempts failed';
+                }
+            } catch (err) {
+                document.getElementById('results').textContent = `Error: ${err.message}`;
+                document.getElementById('results').className = 'error';
+            }
+        });
+
+        document.getElementById('testDirectAPI').addEventListener('click', async () => {
+            try {
+                const results = document.getElementById('results');
+                results.textContent = 'Testing direct connection to API...';
+                
+                const userId = '6e2c2548-c04a-419b-a17c-c2feb6a3d9c6';
+                const url = `http://localhost:3083/api/learner/dashboard?userId=${userId}`;
+                
+                results.textContent += `\nMaking direct API call to: ${url}`;
+                
+                try {
+                    const response = await fetch(url, {
+                        method: 'GET',
+                        headers: {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    
+                    const contentType = response.headers.get('content-type');
+                    results.textContent += `\nStatus: ${response.status} ${response.statusText}`;
+                    results.textContent += `\nContent-Type: ${contentType}`;
+                    
+                    if (response.ok) {
+                        if (contentType && contentType.includes('application/json')) {
+                            const data = await response.json();
+                            results.textContent += `\n\nResponse Data (first 500 chars):\n${JSON.stringify(data, null, 2).substring(0, 500)}...`;
+                            results.className = 'success';
+                        } else {
+                            const text = await response.text();
+                            results.textContent += `\n\nWarning: Response is not JSON:\n${text.substring(0, 500)}...`;
+                            results.className = 'error';
+                        }
+                    } else {
+                        const text = await response.text();
+                        results.textContent += `\n\nError Response:\n${text.substring(0, 500)}...`;
+                        results.className = 'error';
+                    }
+                } catch (err) {
+                    results.textContent += `\n\nConnection Error: ${err.message}`;
+                    results.className = 'error';
                 }
             } catch (err) {
                 document.getElementById('results').textContent = `Error: ${err.message}`;

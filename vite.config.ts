@@ -9,6 +9,12 @@ export default defineConfig(({ mode }) => ({
     host: "::",
     port: 8080,
     historyApiFallback: true,
+    headers: {
+      // CORS headers that apply to all responses
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With'
+    },
     proxy: {
       // Forward API requests to our development server
       '/api': {
@@ -16,6 +22,7 @@ export default defineConfig(({ mode }) => ({
         changeOrigin: true,
         secure: false,
         ws: true, // Add support for WebSockets if needed
+        rewrite: (path) => path, // Keep path unchanged
         configure: (proxy, options) => {
           proxy.on('error', (err, req, res) => {
             console.error('Proxy Error:', err);
@@ -25,17 +32,32 @@ export default defineConfig(({ mode }) => ({
                 'Content-Type': 'application/json',
                 'Access-Control-Allow-Origin': '*',
                 'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-                'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+                'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With'
               });
               res.end(JSON.stringify({
                 error: 'API server unavailable',
                 message: err.message,
-                status: 503
+                status: 503,
+                timestamp: new Date().toISOString()
               }));
             }
           });
+
+          // Handle OPTIONS requests for CORS
           proxy.on('proxyReq', (proxyReq, req, res) => {
             console.log(`[Proxy] Requesting: ${req.method} ${req.url} -> ${options.target}${req.url}`);
+            
+            // Handle preflight requests
+            if (req.method === 'OPTIONS') {
+              res.writeHead(200, {
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+                'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
+                'Access-Control-Max-Age': '86400'
+              });
+              res.end();
+              return;
+            }
             
             // Ensure the proper content-type is set
             if (!proxyReq.getHeader('Content-Type') && req.method !== 'GET') {
@@ -45,6 +67,7 @@ export default defineConfig(({ mode }) => ({
             // Always set accept header
             proxyReq.setHeader('Accept', 'application/json');
           });
+
           proxy.on('proxyRes', (proxyRes, req, res) => {
             const statusCode = proxyRes.statusCode ?? 500; // Default to 500 if undefined
             console.log(`[Proxy] Response from API: ${statusCode}`);
@@ -62,7 +85,8 @@ export default defineConfig(({ mode }) => ({
                   res.end(JSON.stringify({
                     error: 'API Server Error',
                     message: `Received non-JSON response from API: ${body.substring(0, 100)}...`,
-                    status: statusCode
+                    status: statusCode,
+                    timestamp: new Date().toISOString()
                   }));
                 }
               });
@@ -70,9 +94,7 @@ export default defineConfig(({ mode }) => ({
               proxyRes.resume(); 
             }
           });
-        },
-        // By default, the path is the same on both client and server
-        rewrite: (path) => path
+        }
       }
     }
   },

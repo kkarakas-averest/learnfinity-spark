@@ -22,6 +22,8 @@
     "db:check-config": "tsx src/utils/database/checkSupabaseConfig.ts",
     "dev:server": "NODE_OPTIONS=\"--no-warnings\" npx tsx api-server.ts",
     "dev:simple-server": "npx tsx api-server-simple.ts",
+    "dev:cors-server": "npx tsx api-server-cors.ts",
+    "dev:full": "concurrently \"npm run dev\" \"npm run dev:cors-server\"",
     "test:db": "NODE_ENV=test pnpm run db:migrate && vitest run --config ./vitest.config.db.ts",
     "test:db:ui": "NODE_ENV=test pnpm run db:migrate && vitest --ui --config ./vitest.config.db.ts"
   },
