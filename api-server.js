@@ -1,6 +1,6 @@
 import express from 'express';
 import cors from 'cors';
-import { getSupabase } from './src/lib/supabase.js'; // Use the singleton
+import { getSupabase } from './src/lib/supabase.ts'; // Corrected path extension
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
