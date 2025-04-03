@@ -1,8 +1,8 @@
 import express from 'express';
 import cors from 'cors';
-import { getSupabase } from './src/lib/supabase.ts'; // Corrected path extension
+import { getSupabase } from './src/lib/supabase.js'; // Corrected path
 import dotenv from 'dotenv';
-import path from 'path';
+import path, { dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { 
   getLearnerDashboardData,
@@ -10,11 +10,15 @@ import {
   getLearningPathsData,
   getAchievementsData,
   getProfileData
-} from './src/services/learnerDashboardService.js'; // Adjust path if needed
+} from './src/services/learnerDashboardService.js'; // Corrected path
+import { getLearnerCourses } from './src/services/learnerCourseService.js'; // Corrected path
+import { getLearnerLearningPaths } from './src/services/learnerLearningPathService.js'; // Corrected path
+import { getLearnerAchievements } from './src/services/learnerAchievementService.js'; // Corrected path
+import { getLearnerProfile } from './src/services/learnerProfileService.js'; // Corrected path
 
 // Setup __dirname for ES modules
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const __dirname = dirname(__filename);
 
 // Load environment variables
 dotenv.config({ path: path.resolve(__dirname, '.env') });
