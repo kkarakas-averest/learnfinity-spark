@@ -9,7 +9,7 @@
     "dev:all": "concurrently \"npm run dev\" \"npm run api\"",
     "build": "vite build",
     "build:dev": "vite build --mode development",
-    "lint": "eslint .",
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
     "serve": "node serve.js",
     "test": "NODE_OPTIONS=--experimental-vm-modules jest",
@@ -19,7 +19,10 @@
     "db:apply-schema": "node src/db/apply-foundation-schema.js",
     "db:setup": "npm run db:create-exec-sql && npm run db:apply-schema",
     "db:seed": "tsx src/utils/database/seedDatabase.ts",
-    "db:check-config": "tsx src/utils/database/checkSupabaseConfig.ts"
+    "db:check-config": "tsx src/utils/database/checkSupabaseConfig.ts",
+    "dev:server": "ts-node api-server.ts",
+    "test:db": "NODE_ENV=test pnpm run db:migrate && vitest run --config ./vitest.config.db.ts",
+    "test:db:ui": "NODE_ENV=test pnpm run db:migrate && vitest --ui --config ./vitest.config.db.ts"
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",
@@ -95,8 +98,10 @@
     "@eslint/js": "^9.9.0",
     "@jest/globals": "^29.7.0",
     "@tailwindcss/typography": "^0.5.15",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.1",
     "@types/jest": "^29.5.14",
-    "@types/node": "^22.5.5",
+    "@types/node": "^22.13.8",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react-swc": "^3.5.0",
@@ -115,7 +120,7 @@
     "ts-jest": "^29.3.0",
     "ts-node": "^10.9.2",
     "tsx": "^4.19.3",
-    "typescript": "^5.5.3",
+    "typescript": "^5.8.2",
     "typescript-eslint": "^8.0.1",
     "vite": "^5.4.1"
   }
