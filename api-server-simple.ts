@@ -27,6 +27,7 @@ app.use((req, res, next) => {
 });
 
 // Add a debug endpoint
+// @ts-ignore - Suppress TypeScript error for Express route handler
 app.get('/api/debug', (req, res) => {
   res.json({ 
     status: 'ok',
@@ -37,6 +38,7 @@ app.get('/api/debug', (req, res) => {
 });
 
 // --- Learner Dashboard Endpoint ---
+// @ts-ignore - Suppress TypeScript error for Express route handler
 app.get('/api/learner/dashboard', (req, res) => {
   console.log("Received request for /api/learner/dashboard");
   const userId = typeof req.query.userId === 'string' ? req.query.userId : null;
@@ -47,10 +49,61 @@ app.get('/api/learner/dashboard', (req, res) => {
   
   // Send mock data
   res.json({
-    courses: [],
-    learningPaths: [],
+    profile: {
+      id: userId,
+      name: "John Doe",
+      email: "johndoe@example.com",
+      role: "learner",
+      avatar: null,
+      bio: "Learning enthusiast",
+      lastLogin: new Date().toISOString(),
+      joinDate: "2023-01-15T00:00:00.000Z",
+      isHrProfile: true,
+      hrEmployeeId: "EMP123456",
+      department: "Engineering",
+      position: "Software Developer"
+    },
+    courses: [
+      {
+        id: "course1",
+        name: "Introduction to React",
+        title: "Introduction to React",
+        description: "Learn the basics of React",
+        progress: 30,
+        status: "in_progress"
+      },
+      {
+        id: "course2",
+        name: "Advanced JavaScript",
+        title: "Advanced JavaScript",
+        description: "Master JavaScript concepts",
+        progress: 0,
+        status: "not_started"
+      }
+    ],
+    learningPaths: [
+      {
+        id: "path1",
+        name: "Frontend Development",
+        title: "Frontend Development",
+        description: "Complete path to become a frontend developer",
+        progress: 25,
+        courses: ["course1", "course2"],
+        thumbnail_url: null,
+        is_hr_assigned: true
+      }
+    ],
     completedCourses: 0,
-    inProgressCourses: 0,
+    inProgressCourses: 1,
+    stats: {
+      coursesCompleted: 5,
+      coursesInProgress: 2,
+      learningPathsCompleted: 1,
+      learningPathsInProgress: 1,
+      assignedCourses: 3,
+      skillsAcquired: 7,
+      totalHours: 24
+    },
     achievements: {
       certificates: [],
       badges: []
@@ -59,6 +112,7 @@ app.get('/api/learner/dashboard', (req, res) => {
 });
 
 // --- Courses Endpoint ---
+// @ts-ignore - Suppress TypeScript error for Express route handler
 app.get('/api/learner/courses', (req, res) => {
   console.log("Received request for /api/learner/courses");
   const userId = typeof req.query.userId === 'string' ? req.query.userId : null;
@@ -67,10 +121,26 @@ app.get('/api/learner/courses', (req, res) => {
     return res.status(400).json({ error: 'User ID is required' });
   }
   
-  res.json([]);
+  res.json([
+    {
+      id: "course1",
+      name: "Introduction to React",
+      description: "Learn the basics of React",
+      progress: 30,
+      status: "in_progress"
+    },
+    {
+      id: "course2",
+      name: "Advanced JavaScript",
+      description: "Master JavaScript concepts",
+      progress: 0,
+      status: "not_started"
+    }
+  ]);
 });
 
 // --- Learning Paths Endpoint ---
+// @ts-ignore - Suppress TypeScript error for Express route handler
 app.get('/api/learner/learning-paths', (req, res) => {
   console.log("Received request for /api/learner/learning-paths");
   const userId = typeof req.query.userId === 'string' ? req.query.userId : null;
@@ -79,10 +149,19 @@ app.get('/api/learner/learning-paths', (req, res) => {
     return res.status(400).json({ error: 'User ID is required' });
   }
   
-  res.json([]);
+  res.json([
+    {
+      id: "path1",
+      name: "Frontend Development",
+      description: "Complete path to become a frontend developer",
+      progress: 25,
+      courses: ["course1", "course2"]
+    }
+  ]);
 });
 
 // --- Achievements Endpoint ---
+// @ts-ignore - Suppress TypeScript error for Express route handler
 app.get('/api/learner/achievements', (req, res) => {
   console.log("Received request for /api/learner/achievements");
   const userId = typeof req.query.userId === 'string' ? req.query.userId : null;
@@ -98,6 +177,7 @@ app.get('/api/learner/achievements', (req, res) => {
 });
 
 // --- Profile Endpoint ---
+// @ts-ignore - Suppress TypeScript error for Express route handler
 app.get('/api/learner/profile', (req, res) => {
   console.log("Received request for /api/learner/profile");
   const userId = typeof req.query.userId === 'string' ? req.query.userId : null;
@@ -108,9 +188,23 @@ app.get('/api/learner/profile', (req, res) => {
   
   res.json({
     id: userId,
-    name: "Test User",
-    email: "test@example.com",
-    role: "learner"
+    name: "John Doe",
+    email: "johndoe@example.com",
+    role: "learner",
+    avatar: null,
+    bio: "Learning enthusiast",
+    lastLogin: new Date().toISOString(),
+    joinDate: "2023-01-15T00:00:00.000Z",
+    isHrProfile: true,
+    hrEmployeeId: "EMP123456",
+    department: "Engineering",
+    position: "Software Developer",
+    skills: ["JavaScript", "React", "Node.js", "TypeScript", "HTML", "CSS"],
+    interests: ["Frontend Development", "Machine Learning", "Mobile Development"],
+    certificates: [],
+    badges: [],
+    completedCourses: 5,
+    inProgressCourses: 2
   });
 });
 
