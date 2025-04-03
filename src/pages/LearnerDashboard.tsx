@@ -167,7 +167,8 @@ const LearnerDashboard: React.FC = () => {
     
     console.log(`Attempting to fetch ${endpoint} data for userId=${userId}`);
     
-    // List of fetch sources to try, in order of preference
+    // In development, ONLY try direct connection to API server
+    // In production, use the proxied endpoint
     const sources = isProduction 
       ? [
           // In production, only use the same-origin endpoint
@@ -182,7 +183,7 @@ const LearnerDashboard: React.FC = () => {
           }
         ]
       : [
-          // In development environment, ONLY try direct API connection to bypass Vite proxy issues
+          // In development, only use direct API connection to bypass Vite proxy issues
           { 
             label: "direct-api", 
             url: `http://localhost:3083/api/learner/${endpoint}?userId=${userId}`,
@@ -199,9 +200,9 @@ const LearnerDashboard: React.FC = () => {
       dashboard: {
         profile: {
           id: userId,
-          name: user?.email?.split('@')[0] || 'Anonymous User',
+          name: userDetails?.name || user?.email?.split('@')[0] || 'Anonymous User',
           email: user?.email || 'user@example.com',
-          role: 'learner',
+          role: userDetails?.role || 'learner',
           avatar: null,
           bio: 'Learning enthusiast',
           lastLogin: new Date().toISOString(),
@@ -320,7 +321,7 @@ const LearnerDashboard: React.FC = () => {
         const data = await response.json();
         console.log(`${source.label} data received successfully:`, data);
         
-        // If we're returning mock data, add the user's real email and name if available
+        // Personalize the data with real user info if available
         if (user && userDetails && data.profile) {
           data.profile.email = user.email || data.profile.email;
           data.profile.name = userDetails.name || user.email || data.profile.name;
@@ -330,14 +331,14 @@ const LearnerDashboard: React.FC = () => {
       } catch (err) {
         console.error(`${source.label} fetch failed:`, err);
         lastError = err;
-        // Continue to next source
+        // Continue to next source if available
       }
     }
     
-    // If all sources failed and we have mock data for this endpoint, use it as final fallback
+    // If all sources failed, use mock data as final fallback
     console.warn(`All fetch attempts failed, using mock data for ${endpoint}`);
     if (mockData[endpoint as keyof typeof mockData]) {
-      // Add real user data to mock data
+      // Add real user data to mock data for personalization
       if (user && userDetails && mockData.dashboard?.profile) {
         mockData.dashboard.profile.id = user.id;
         mockData.dashboard.profile.email = user.email || mockData.dashboard.profile.email;
@@ -346,7 +347,7 @@ const LearnerDashboard: React.FC = () => {
       return mockData[endpoint as keyof typeof mockData];
     }
     
-    // If we've tried all sources and all failed with no mock data, throw the last error
+    // If no mock data available either, throw the last error
     throw lastError || new Error('All fetch attempts failed and no mock data available');
   };
 

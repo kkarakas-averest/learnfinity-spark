@@ -21,11 +21,22 @@ export default defineConfig(({ mode }) => ({
         target: 'http://localhost:3083',
         changeOrigin: true,
         secure: false,
-        ws: true, // Add support for WebSockets if needed
-        rewrite: (path) => path, // Keep path unchanged
-        // Fix for CORS preflight requests
+        ws: true, // Support WebSockets
+        bypass: (req, res, options) => {
+          // Bypass the proxy for certain requests (debugging purposes)
+          console.log(`[Bypass Check] ${req.method} ${req.url}`);
+          
+          // In development, bypass the proxy for API routes to allow direct connection
+          // This prevents the HTML response issue
+          if (process.env.NODE_ENV === 'development' && req.url?.startsWith('/api/learner/')) {
+            console.log(`[Bypass] Bypassing proxy for ${req.url} in development`);
+            return req.url; // Return the URL to bypass proxy
+          }
+          
+          return false; // Don't bypass for other requests
+        },
         configure: (proxy, options) => {
-          // Log each proxy attempt
+          // Log proxy setup
           console.log(`[Config] Setting up proxy to ${options.target}`);
           
           proxy.on('error', (err, req, res) => {
@@ -75,33 +86,36 @@ export default defineConfig(({ mode }) => ({
               return;
             }
             
-            // Ensure the proper content-type is set
+            // Ensure content type headers are set
             if (!proxyReq.getHeader('Content-Type') && req.method !== 'GET') {
               proxyReq.setHeader('Content-Type', 'application/json');
             }
             
-            // Always set accept header to ensure we get JSON back
+            // Always set accept header
             proxyReq.setHeader('Accept', 'application/json');
           });
 
           proxy.on('proxyRes', (proxyRes, req, res) => {
-            const statusCode = proxyRes.statusCode ?? 500; // Default to 500 if undefined
+            const statusCode = proxyRes.statusCode ?? 500;
             console.log(`[Proxy] Response from API: ${statusCode} for ${req.method} ${req.url}`);
             const contentType = proxyRes.headers['content-type'] || '';
             
-            // Debug proxy response
             if (statusCode >= 400) {
               console.warn(`[Proxy] API returned error status: ${statusCode}`);
             }
             
-            // Handle non-JSON responses from the API server
+            // Log if response is not JSON for debugging
             if (!contentType.includes('application/json')) {
-              console.warn(`[Proxy] API returned non-JSON response (${statusCode}): ${contentType}. Converting to JSON.`);
+              console.warn(`[Proxy] API returned non-JSON response: ${contentType}`);
               
+              // Capture non-JSON responses and convert to JSON error
               let body = '';
               proxyRes.on('data', chunk => body += chunk);
+              
               proxyRes.on('end', () => {
                 if (!res.headersSent) {
+                  console.warn(`[Proxy] Converting HTML response to JSON error. First 100 chars: ${body.substring(0, 100)}`);
+                  
                   res.writeHead(statusCode === 200 ? 500 : statusCode, { 'Content-Type': 'application/json' });
                   res.end(JSON.stringify({
                     error: 'API Server Error',
@@ -111,8 +125,9 @@ export default defineConfig(({ mode }) => ({
                   }));
                 }
               });
-              // Consume the original response data to prevent it from being sent
-              proxyRes.resume(); 
+              
+              // Consume the original response
+              proxyRes.resume();
             }
           });
         }

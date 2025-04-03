@@ -388,11 +388,26 @@ app.get('/api/learner/dashboard', async (req: Request, res: Response) => {
     
     // Return the dashboard data (either mock or real) with explicit content-type
     console.log('Returning dashboard data for user', userId);
-    res.set('Content-Type', 'application/json');
+    
+    // Set these headers explicitly for this response
+    res.set({
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With, Accept'
+    });
+    
     return res.json(dashboardData);
     
   } catch (error) {
     console.error('Error processing dashboard request:', error);
+    
+    // Set headers for error response too
+    res.set({
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': '*'
+    });
+    
     return res.status(500).json({
       error: 'Internal Server Error',
       message: error instanceof Error ? error.message : 'Unknown error',
