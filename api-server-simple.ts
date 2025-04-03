@@ -61,19 +61,72 @@ app.get('/api/learner/dashboard', async (req, res) => {
     let realLearningPathsData: any[] = [];
     
     if (supabaseKey) {
-      console.log(`Attempting to fetch real data from Supabase for user: ${userId}`);
+      console.log(`Attempting to fetch profile data for user: ${userId}`);
       
-      // Fetch user profile from Supabase
-      const { data: userData, error: userError } = await supabase
-        .from('profiles')
+      // Try multiple profile tables
+      let userData = null;
+      let userError: any = null;
+      let sourceTable: string | null = null;
+      
+      // First try learner_profiles
+      const { data: learnerData, error: learnerError } = await supabase
+        .from('learner_profiles')
         .select('*')
         .eq('id', userId)
         .single();
         
-      if (userError) {
-        console.error("Error fetching real profile data:", userError);
-      } else if (userData) {
-        console.log("Successfully fetched real profile data");
+      if (learnerError) {
+        console.error("Error fetching from learner_profiles:", learnerError);
+        // Try user_profiles next
+        const { data: userData2, error: userError2 } = await supabase
+          .from('user_profiles')
+          .select('*')
+          .eq('id', userId)
+          .single();
+          
+        if (userError2) {
+          console.error("Error fetching from user_profiles:", userError2);
+          // Try profiles
+          const { data: userData3, error: userError3 } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', userId)
+            .single();
+            
+            if (userError3) {
+              console.error("Error fetching from profiles:", userError3);
+              // Try users
+              const { data: userData4, error: userError4 } = await supabase
+                .from('users')
+                .select('*')
+                .eq('id', userId)
+                .single();
+                
+                if (userError4) {
+                  console.error("Error fetching from users:", userError4);
+                  userError = userError4;
+                } else {
+                  userData = userData4;
+                  sourceTable = 'users';
+                }
+            } else {
+              userData = userData3;
+              sourceTable = 'profiles';
+            }
+        } else {
+          userData = userData2;
+          sourceTable = 'user_profiles';
+        }
+      } else {
+        userData = learnerData;
+        sourceTable = 'learner_profiles';
+      }
+      
+      if (!userData) {
+        console.error("Could not find user profile in any table:", userError);
+      } else {
+        console.log(`Successfully fetched profile data from '${sourceTable}' table:`);
+        console.log(JSON.stringify(userData, null, 2));
         realUserData = userData;
       }
       
