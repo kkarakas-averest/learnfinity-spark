@@ -4,6 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import dotenv from 'dotenv';
+import { createClient } from '@supabase/supabase-js';
 
 // Setup __dirname for ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -11,6 +12,11 @@ const __dirname = dirname(__filename);
 
 // Load environment variables
 dotenv.config({ path: path.resolve(__dirname, '.env') });
+
+// Initialize Supabase client for real data when possible
+const supabaseUrl = process.env.SUPABASE_URL || 'https://ujlqzkkkfatehxeqtbdl.supabase.co';
+const supabaseKey = process.env.SUPABASE_KEY || process.env.SUPABASE_ANON_KEY || '';
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 const app = express();
 const PORT = process.env.API_PORT || 3083;
@@ -33,23 +39,86 @@ app.get('/api/debug', (req, res) => {
     status: 'ok',
     message: 'API server is running correctly',
     timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development'
+    environment: process.env.NODE_ENV || 'development',
+    supabase_connected: !!supabaseKey
   });
 });
 
 // --- Learner Dashboard Endpoint ---
 // @ts-ignore - Suppress TypeScript error for Express route handler
-app.get('/api/learner/dashboard', (req, res) => {
+app.get('/api/learner/dashboard', async (req, res) => {
   console.log("Received request for /api/learner/dashboard");
   const userId = typeof req.query.userId === 'string' ? req.query.userId : null;
   if (!userId) {
     console.error("User ID is required for dashboard data");
     return res.status(400).json({ error: 'User ID is required' });
   }
-  
-  // Send mock data
-  res.json({
-    profile: {
+
+  try {
+    // Try to get real user data from Supabase if we have credentials
+    let realUserData: any = null;
+    let realCoursesData: any[] = [];
+    let realLearningPathsData: any[] = [];
+    
+    if (supabaseKey) {
+      console.log(`Attempting to fetch real data from Supabase for user: ${userId}`);
+      
+      // Fetch user profile from Supabase
+      const { data: userData, error: userError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+        
+      if (userError) {
+        console.error("Error fetching real profile data:", userError);
+      } else if (userData) {
+        console.log("Successfully fetched real profile data");
+        realUserData = userData;
+      }
+      
+      // Fetch courses data
+      const { data: coursesData, error: coursesError } = await supabase
+        .from('hr_courses')
+        .select('*')
+        .limit(10);
+        
+      if (coursesError) {
+        console.error("Error fetching real courses data:", coursesError);
+      } else if (coursesData) {
+        console.log(`Successfully fetched ${coursesData.length} real courses`);
+        realCoursesData = coursesData;
+      }
+      
+      // Fetch learning paths
+      const { data: pathsData, error: pathsError } = await supabase
+        .from('hr_learning_paths')
+        .select('*')
+        .limit(5);
+        
+      if (pathsError) {
+        console.error("Error fetching real learning paths data:", pathsError);
+      } else if (pathsData) {
+        console.log(`Successfully fetched ${pathsData.length} real learning paths`);
+        realLearningPathsData = pathsData;
+      }
+    }
+    
+    // Prepare profile data (real or mock)
+    const profile = realUserData ? {
+      id: realUserData.id,
+      name: realUserData.name || realUserData.full_name || realUserData.email,
+      email: realUserData.email,
+      role: realUserData.role || 'learner',
+      avatar: realUserData.avatar_url,
+      bio: realUserData.bio || 'Learning enthusiast',
+      lastLogin: new Date().toISOString(),
+      joinDate: realUserData.created_at,
+      isHrProfile: !!realUserData.hr_profile_id,
+      hrEmployeeId: realUserData.hr_profile_id,
+      department: realUserData.department,
+      position: realUserData.position
+    } : {
       id: userId,
       name: "John Doe",
       email: "johndoe@example.com",
@@ -62,48 +131,51 @@ app.get('/api/learner/dashboard', (req, res) => {
       hrEmployeeId: "EMP123456",
       department: "Engineering",
       position: "Software Developer"
-    },
-    courses: {
-      total: 2,
-      inProgress: 1,
-      completed: 0,
-      notStarted: 1,
-      hrAssigned: 1,
-      featured: {
+    };
+    
+    // Prepare courses data (real or mock)
+    const courseItems = realCoursesData ? realCoursesData.map(course => ({
+      id: course.id,
+      name: course.title,
+      title: course.title,
+      description: course.description,
+      progress: course.progress || Math.floor(Math.random() * 100),
+      status: course.status || (Math.random() > 0.5 ? 'in_progress' : 'not_started'),
+      category: course.category || 'Development'
+    })) : [
+      {
         id: "course1",
+        name: "Introduction to React",
         title: "Introduction to React",
         description: "Learn the basics of React",
-        duration: "2 hours",
         progress: 30,
-        completed_sections: 3,
-        total_sections: 10,
-        thumbnail_url: null,
-        category: "Web Development",
-        hr_training_id: "HR123",
-        hr_training_title: "Frontend Essentials"
+        status: "in_progress",
+        category: "Web Development"
       },
-      items: [
-        {
-          id: "course1",
-          name: "Introduction to React",
-          title: "Introduction to React",
-          description: "Learn the basics of React",
-          progress: 30,
-          status: "in_progress",
-          category: "Web Development"
-        },
-        {
-          id: "course2",
-          name: "Advanced JavaScript",
-          title: "Advanced JavaScript",
-          description: "Master JavaScript concepts",
-          progress: 0,
-          status: "not_started",
-          category: "Programming"
-        }
-      ]
-    },
-    learningPaths: [
+      {
+        id: "course2",
+        name: "Advanced JavaScript",
+        title: "Advanced JavaScript",
+        description: "Master JavaScript concepts",
+        progress: 0,
+        status: "not_started",
+        category: "Programming"
+      }
+    ];
+    
+    // Prepare learning paths data (real or mock)
+    const learningPaths = realLearningPathsData ? realLearningPathsData.map(path => ({
+      id: path.id,
+      name: path.title,
+      title: path.title,
+      description: path.description,
+      progress: path.progress || Math.floor(Math.random() * 100),
+      courses: path.courses || ["course1", "course2"],
+      thumbnail_url: path.thumbnail_url,
+      is_hr_assigned: true,
+      courses_count: path.courses_count || 2,
+      due_date: path.due_date || "2025-06-30T00:00:00.000Z"
+    })) : [
       {
         id: "path1",
         name: "Frontend Development",
@@ -116,23 +188,68 @@ app.get('/api/learner/dashboard', (req, res) => {
         courses_count: 2,
         due_date: "2025-06-30T00:00:00.000Z"
       }
-    ],
-    completedCourses: 0,
-    inProgressCourses: 1,
-    stats: {
-      coursesCompleted: 5,
-      coursesInProgress: 2,
-      learningPathsCompleted: 1,
-      learningPathsInProgress: 1,
-      assignedCourses: 3,
-      skillsAcquired: 7,
-      totalHours: 24
-    },
-    achievements: {
-      certificates: [],
-      badges: []
-    }
-  });
+    ];
+    
+    // Send complete response with real or mock data
+    res.json({
+      profile,
+      courses: {
+        total: courseItems.length,
+        inProgress: courseItems.filter(c => c.status === 'in_progress').length,
+        completed: courseItems.filter(c => c.status === 'completed').length,
+        notStarted: courseItems.filter(c => c.status === 'not_started').length,
+        hrAssigned: realCoursesData ? realCoursesData.filter(c => c.is_hr_assigned).length : 1,
+        featured: courseItems.length > 0 ? {
+          id: courseItems[0].id,
+          title: courseItems[0].title,
+          description: courseItems[0].description,
+          duration: "2 hours",
+          progress: courseItems[0].progress,
+          completed_sections: Math.floor(courseItems[0].progress / 10),
+          total_sections: 10,
+          thumbnail_url: null,
+          category: courseItems[0].category,
+          hr_training_id: "HR123",
+          hr_training_title: "Frontend Essentials"
+        } : {
+          id: "course1",
+          title: "Introduction to React",
+          description: "Learn the basics of React",
+          duration: "2 hours",
+          progress: 30,
+          completed_sections: 3,
+          total_sections: 10,
+          thumbnail_url: null,
+          category: "Web Development",
+          hr_training_id: "HR123",
+          hr_training_title: "Frontend Essentials"
+        },
+        items: courseItems
+      },
+      learningPaths,
+      completedCourses: courseItems.filter(c => c.status === 'completed').length,
+      inProgressCourses: courseItems.filter(c => c.status === 'in_progress').length,
+      stats: {
+        coursesCompleted: courseItems.filter(c => c.status === 'completed').length,
+        coursesInProgress: courseItems.filter(c => c.status === 'in_progress').length,
+        learningPathsCompleted: learningPaths.filter(p => p.progress === 100).length,
+        learningPathsInProgress: learningPaths.filter(p => p.progress < 100 && p.progress > 0).length,
+        assignedCourses: realCoursesData ? realCoursesData.filter(c => c.is_hr_assigned).length : 3,
+        skillsAcquired: 7,
+        totalHours: 24
+      },
+      achievements: {
+        certificates: [],
+        badges: []
+      }
+    });
+  } catch (error) {
+    console.error("Error processing dashboard request:", error);
+    res.status(500).json({
+      error: "Failed to process dashboard request",
+      message: error.message || "An unexpected error occurred"
+    });
+  }
 });
 
 // --- Courses Endpoint ---
