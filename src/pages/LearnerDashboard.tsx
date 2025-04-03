@@ -162,12 +162,23 @@ const LearnerDashboard: React.FC = () => {
 
   // Add a utility function to fetch from multiple potential sources
   const fetchWithFallback = async (endpoint: string, userId: string) => {
+    // Get the current hostname for production detection
+    const isProduction = window.location.hostname !== 'localhost';
+    const vercelUrl = window.location.origin; // e.g. https://yourapp.vercel.app
+    
     // List of fetch sources to try, in order of preference
     const sources = [
-      { label: "vite-proxy", url: `/api/learner/${endpoint}?userId=${userId}` },
-      { label: "direct-api", url: `http://localhost:3083/api/learner/${endpoint}?userId=${userId}` },
-      { label: "alt-port", url: `http://localhost:8084/api/learner/${endpoint}?userId=${userId}` }
+      // Try the same origin first (works in both local and Vercel)
+      { label: "same-origin", url: `/api/learner/${endpoint}?userId=${userId}` }
     ];
+    
+    // Only add these fallbacks in development
+    if (!isProduction) {
+      sources.push(
+        { label: "direct-api", url: `http://localhost:3083/api/learner/${endpoint}?userId=${userId}` },
+        { label: "alt-port", url: `http://localhost:8084/api/learner/${endpoint}?userId=${userId}` }
+      );
+    }
     
     let lastError = null;
     
@@ -198,6 +209,13 @@ const LearnerDashboard: React.FC = () => {
         
         const data = await response.json();
         console.log(`${source.label} data received successfully`);
+        
+        // If we're returning mock data, add the user's real email and name if available
+        if (user && userDetails && data.profile) {
+          data.profile.email = user.email || data.profile.email;
+          data.profile.name = userDetails.name || user.email || data.profile.name;
+        }
+        
         return data;
       } catch (err) {
         console.error(`${source.label} fetch failed:`, err);

@@ -15,7 +15,8 @@ dotenv.config({ path: path.resolve(__dirname, '.env') });
 
 // Initialize Supabase client for real data when possible
 const supabaseUrl = process.env.SUPABASE_URL || 'https://ujlqzkkkfatehxeqtbdl.supabase.co';
-const supabaseKey = process.env.SUPABASE_KEY || process.env.SUPABASE_ANON_KEY || '';
+const supabaseKey = process.env.SUPABASE_SERVICE_KEY || process.env.VITE_SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY || process.env.SUPABASE_ANON_KEY || '';
+console.log("Using Supabase key:", supabaseKey ? "Key found" : "No key found");
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 const app = express();
@@ -63,35 +64,71 @@ app.get('/api/learner/dashboard', async (req, res) => {
     if (supabaseKey) {
       console.log(`Attempting to fetch profile data for user: ${userId}`);
       
-      // Try multiple profile tables
+      // Fetch user profile from Supabase
       let userData = null;
       let userError: any = null;
       let sourceTable: string | null = null;
       
-      // First try learner_profiles
-      const { data: learnerData, error: learnerError } = await supabase
-        .from('learner_profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
-        
-      if (learnerError) {
-        console.error("Error fetching from learner_profiles:", learnerError);
-        // Try user_profiles next
-        const { data: userData2, error: userError2 } = await supabase
-          .from('user_profiles')
-          .select('*')
-          .eq('id', userId)
-          .single();
+      // Try auth.users first with RPC call
+      try {
+        // Using rpc to access auth schema users table
+        const { data: authUserData, error: authUserError } = await supabase
+          .rpc('get_user_by_id', { user_id: userId });
+
+        if (!authUserError && authUserData) {
+          console.log("Found data via RPC get_user_by_id:");
+          console.log(JSON.stringify(authUserData, null, 2));
+          userData = authUserData;
+          sourceTable = 'auth.users via RPC';
+        } else {
+          console.error("Error fetching from RPC get_user_by_id:", authUserError);
           
-        if (userError2) {
-          console.error("Error fetching from user_profiles:", userError2);
-          // Try profiles
-          const { data: userData3, error: userError3 } = await supabase
-            .from('profiles')
+          // Try a direct query to auth.users (admin only)
+          const { data: authUser2, error: authError2 } = await supabase
+            .from('users')
             .select('*')
             .eq('id', userId)
             .single();
+            
+          if (!authError2 && authUser2) {
+            console.log("Found data in users table:");
+            console.log(JSON.stringify(authUser2, null, 2));
+            userData = authUser2;
+            sourceTable = 'users';
+          } else {
+            console.error("Error fetching from users:", authError2);
+          }
+        }
+      } catch (e) {
+        console.error("Exception querying auth users:", e);
+      }
+      
+      // If we couldn't get data from auth.users, try other tables
+      if (!userData) {
+        // First try learner_profiles
+        const { data: learnerData, error: learnerError } = await supabase
+          .from('learner_profiles')
+          .select('*')
+          .eq('id', userId)
+          .single();
+        
+        if (learnerError) {
+          console.error("Error fetching from learner_profiles:", learnerError);
+          // Try user_profiles next
+          const { data: userData2, error: userError2 } = await supabase
+            .from('user_profiles')
+            .select('*')
+            .eq('id', userId)
+            .single();
+          
+          if (userError2) {
+            console.error("Error fetching from user_profiles:", userError2);
+            // Try profiles
+            const { data: userData3, error: userError3 } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', userId)
+              .single();
             
             if (userError3) {
               console.error("Error fetching from profiles:", userError3);
@@ -113,13 +150,14 @@ app.get('/api/learner/dashboard', async (req, res) => {
               userData = userData3;
               sourceTable = 'profiles';
             }
+          } else {
+            userData = userData2;
+            sourceTable = 'user_profiles';
+          }
         } else {
-          userData = userData2;
-          sourceTable = 'user_profiles';
+          userData = learnerData;
+          sourceTable = 'learner_profiles';
         }
-      } else {
-        userData = learnerData;
-        sourceTable = 'learner_profiles';
       }
       
       if (!userData) {
