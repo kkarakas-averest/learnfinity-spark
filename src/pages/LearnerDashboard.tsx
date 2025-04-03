@@ -627,6 +627,17 @@ const LearnerDashboard: React.FC = () => {
 
   const { profile: dashboardProfile, courses: dashboardCourses, learningPaths: dashboardLearningPaths, stats } = dashboardData;
 
+  useEffect(() => {
+    if (dashboardData?.error) {
+      // Use functional update pattern to avoid stale closures
+      setLearnerStats(prev => ({
+        ...prev,
+        error: dashboardData.error,
+        loading: false
+      }));
+    }
+  }, [dashboardData]);
+
   return (
     <div className="container py-6 mx-auto max-w-7xl">
       <h1 className="text-3xl font-bold mb-6">Learner Dashboard</h1>

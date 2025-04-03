@@ -33,11 +33,46 @@ const PORT = process.env.PORT || 3083;
 const HOST = process.env.HOST || '0.0.0.0';
 
 // Middleware
-app.use(cors({
-  origin: '*', // Allow all origins in development
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
+app.use((req, res, next) => {
+  const startTime = Date.now();
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+  
+  // Add response logging
+  const originalEnd = res.end;
+  res.end = function(...args) {
+    const duration = Date.now() - startTime;
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.path} - ${res.statusCode} (${duration}ms)`);
+    originalEnd.apply(res, args);
+  };
+  
+  next();
+});
+
+// Enable CORS for development
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, PUT, POST, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  
+  next();
+});
+
+// Add a timeout handler to avoid long-running requests
+app.use((req, res, next) => {
+  // Set a 30-second timeout for all requests
+  req.setTimeout(30000, () => {
+    console.error(`Request timeout for ${req.method} ${req.path}`);
+    if (!res.headersSent) {
+      res.status(504).json({ error: 'Request timeout', status: 504 });
+    }
+  });
+  
+  next();
+});
 
 app.use(express.json());
 

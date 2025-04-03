@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from './database.types';
 
 // Check if Supabase environment variables are configured
@@ -12,18 +12,32 @@ if (import.meta.env.MODE === 'development') {
   if (!supabaseAnonKey) console.error('Missing VITE_SUPABASE_ANON_KEY');
 }
 
-// Create a supabase client
-export const supabase = createClient<Database>(
-  supabaseUrl || 'https://placeholder.supabase.co',
-  supabaseAnonKey || 'placeholder-key',
-  {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-      detectSessionInUrl: true
-    }
+// Initialize Supabase client once
+let supabaseInstance: SupabaseClient | null = null;
+
+export const getSupabase = (): SupabaseClient => {
+  if (!supabaseInstance) {
+    console.log('Initializing Supabase client...');
+    supabaseInstance = createClient<Database>(
+      supabaseUrl || 'https://placeholder.supabase.co',
+      supabaseAnonKey || 'placeholder-key',
+      {
+        auth: {
+          persistSession: true,
+          autoRefreshToken: true,
+          detectSessionInUrl: true
+        }
+      }
+    );
+    console.log('Supabase client initialized.');
+  } else {
+    // console.log('Reusing existing Supabase client instance.');
   }
-);
+  return supabaseInstance;
+};
+
+// Export the singleton instance directly for convenience
+export const supabase = getSupabase();
 
 // Utility to check if Supabase is properly configured
 export const isSupabaseConfigured = () => {

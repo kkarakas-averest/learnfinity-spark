@@ -15,54 +15,53 @@ export default defineConfig(({ mode }) => ({
         target: 'http://localhost:3083',
         changeOrigin: true,
         secure: false,
-        // Add additional logging and error handling
         configure: (proxy, options) => {
           proxy.on('error', (err, req, res) => {
-            console.error('Proxy error:', err);
-            // Send a valid JSON response even when the API server is down
+            console.error('Proxy Error:', err);
+            // Ensure JSON response even if API server is unreachable
             if (!res.headersSent) {
-              res.setHeader('Content-Type', 'application/json');
-              const body = {
-                error: 'API server error or unavailable',
+              res.writeHead(503, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({
+                error: 'API server unavailable',
                 message: err.message,
-                status: 500
-              };
-              res.end(JSON.stringify(body));
+                status: 503
+              }));
             }
           });
           proxy.on('proxyReq', (proxyReq, req, res) => {
-            console.log(`Proxying ${req.method} ${req.url} to API server`);
+            console.log(`[Proxy] Requesting: ${req.method} ${req.url} -> ${options.target}${req.url}`);
           });
-          // Handle proxy response to ensure JSON
           proxy.on('proxyRes', (proxyRes, req, res) => {
-            // If the API server returns HTML for some reason, convert it to JSON
+            const statusCode = proxyRes.statusCode ?? 500; // Default to 500 if undefined
+            console.log(`[Proxy] Response from API: ${statusCode}`);
             const contentType = proxyRes.headers['content-type'] || '';
-            if (contentType.includes('text/html')) {
-              console.warn('API server returned HTML instead of JSON. Converting to JSON error response.');
+            
+            // Handle non-JSON responses from the API server
+            if (statusCode >= 400 && !contentType.includes('application/json')) {
+              console.warn(`[Proxy] API returned non-JSON error (${statusCode}). Converting to JSON.`);
               
-              // Collect the original response
-              let responseBody = '';
-              proxyRes.on('data', (chunk) => {
-                responseBody += chunk;
-              });
-              
-              // When the response is complete, replace it with JSON
+              let body = '';
+              proxyRes.on('data', chunk => body += chunk);
               proxyRes.on('end', () => {
-                res.setHeader('Content-Type', 'application/json');
-                res.end(JSON.stringify({
-                  error: 'API server error',
-                  message: 'The API server returned an invalid response format',
-                  status: 500
-                }));
+                if (!res.headersSent) {
+                  res.writeHead(statusCode, { 'Content-Type': 'application/json' });
+                  res.end(JSON.stringify({
+                    error: 'API Server Error',
+                    message: `Received non-JSON response from API: ${body.substring(0, 100)}...`,
+                    status: statusCode
+                  }));
+                }
               });
+              // Consume the original response data to prevent it from being sent
+              proxyRes.resume(); 
             }
           });
         },
-        // Try the next available port if 8083 fails
-        rewrite: (path) => {
-          console.log(`Proxying request to: ${path}`);
-          return path;
-        }
+        // Remove rewrite as it's not needed with explicit target
+        // rewrite: (path) => {
+        //   console.log(`Proxying request to: ${path}`);
+        //   return path;
+        // }
       }
     }
   },
@@ -90,15 +89,18 @@ export default defineConfig(({ mode }) => ({
     },
   },
   optimizeDeps: {
-    esbuildOptions: {
-      // Using string format for tsconfigRaw as that's what Vite expects
-      tsconfigRaw: `{
-        "compilerOptions": {
-          "allowSyntheticDefaultImports": true,
-          "esModuleInterop": true,
-          "jsx": "react-jsx"
-        }
-      }`
-    }
-  }
+    exclude: [
+      '@tanstack/react-query'
+    ],
+    // Force include these dependencies to ensure they're pre-bundled properly
+    include: [
+      'react', 
+      'react-dom',
+      'react-router-dom'
+    ],
+    // Force re-optimization on server restart
+    force: true
+  },
+  // Clear the cache on startup to avoid stale dependencies
+  cacheDir: '.vite'
 }));

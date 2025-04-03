@@ -1,6 +1,6 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
-import { ROUTES } from '@/lib/routes';
+import { ROUTES, buildRoute } from '@/lib/routes';
 
 // Layouts
 import MainLayout from './layouts/MainLayout';
@@ -80,8 +80,8 @@ const AppRouter: React.FC = () => {
 
         {/* Course Routes */}
         <TypeSafeRoute path={ROUTES.COURSE_LIST} element={<CourseListPage />} />
-        <TypeSafeRoute path={ROUTES.COURSE_VIEW(':id')} element={<CourseViewPage />} />
-        <TypeSafeRoute path={ROUTES.COURSE_DETAILS(':id')} element={<CourseDetailsPage />} />
+        <TypeSafeRoute path={ROUTES.COURSE_VIEW} element={<CourseViewPage />} />
+        <TypeSafeRoute path="/course/:id" element={<CourseDetailsPage />} />
         <TypeSafeRoute path={ROUTES.COURSE_CREATE} element={<CreateCoursePage />} />
       </Routes>
     </BrowserRouter>
