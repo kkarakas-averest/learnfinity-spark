@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Agent Testing Interface</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1, h2, h3 {
+            margin-top: 1.5rem;
+            margin-bottom: 1rem;
+        }
+        .card {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+        input[type="text"], textarea, select {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-size: 16px;
+        }
+        textarea {
+            height: 100px;
+            resize: vertical;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        .checkbox-group {
+            margin-bottom: 15px;
+        }
+        .checkbox-label {
+            display: inline-flex;
+            align-items: center;
+            margin-right: 15px;
+            cursor: pointer;
+        }
+        .checkbox-label input {
+            margin-right: 5px;
+        }
+        .interests-container {
+            margin-top: 10px;
+        }
+        .interest-item {
+            display: flex;
+            margin-bottom: 8px;
+        }
+        .interest-item input {
+            flex-grow: 1;
+            margin-right: 8px;
+        }
+        .add-button {
+            background-color: #2196F3;
+            margin-top: 8px;
+        }
+        .remove-button {
+            background-color: #f44336;
+        }
+        pre {
+            background-color: #f5f5f5;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+        .spinner {
+            border: 6px solid #f3f3f3;
+            border-top: 6px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 2s linear infinite;
+            margin: 0 auto 10px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <h1>Groq LLM Agent Testing Interface</h1>
+    <p>Use this form to directly test the agent's content generation capabilities using the Groq LLM API.</p>
+    
+    <div class="card">
+        <h2>Course Generation Request</h2>
+        <form id="agentForm">
+            <div class="form-group">
+                <label for="title">Course Title:</label>
+                <input type="text" id="title" name="title" required placeholder="e.g. Machine Learning Fundamentals">
+            </div>
+            
+            <div class="form-group">
+                <label for="description">Course Description:</label>
+                <textarea id="description" name="description" placeholder="A brief description of what the course covers..."></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="targetAudience">Target Audience:</label>
+                <select id="targetAudience" name="targetAudience">
+                    <option value="beginner">Beginner</option>
+                    <option value="intermediate" selected>Intermediate</option>
+                    <option value="advanced">Advanced</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="duration">Duration:</label>
+                <select id="duration" name="duration">
+                    <option value="short">Short (1-2 hours)</option>
+                    <option value="medium" selected>Medium (3-5 hours)</option>
+                    <option value="long">Long (6+ hours)</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="moduleCount">Number of Modules:</label>
+                <input type="number" id="moduleCount" name="moduleCount" min="1" max="10" value="5">
+            </div>
+            
+            <div class="form-group">
+                <label for="learningObjectives">Learning Objectives (one per line):</label>
+                <textarea id="learningObjectives" name="learningObjectives" placeholder="Enter one learning objective per line"></textarea>
+            </div>
+            
+            <div class="checkbox-group">
+                <div class="checkbox-label">
+                    <input type="checkbox" id="includeQuizzes" name="includeQuizzes" checked>
+                    <label for="includeQuizzes">Include Quizzes</label>
+                </div>
+                
+                <div class="checkbox-label">
+                    <input type="checkbox" id="includeAssignments" name="includeAssignments" checked>
+                    <label for="includeAssignments">Include Assignments</label>
+                </div>
+                
+                <div class="checkbox-label">
+                    <input type="checkbox" id="includeResources" name="includeResources" checked>
+                    <label for="includeResources">Include Resources</label>
+                </div>
+            </div>
+            
+            <h3>Personalization</h3>
+            
+            <div class="form-group">
+                <label for="difficultyPreference">Preferred Difficulty:</label>
+                <select id="difficultyPreference" name="difficultyPreference">
+                    <option value="easy">Easy</option>
+                    <option value="medium">Medium</option>
+                    <option value="hard">Hard</option>
+                    <option value="adaptive" selected>Adaptive</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="learningStyle">Learning Style:</label>
+                <select id="learningStyle" name="learningStyle">
+                    <option value="visual">Visual</option>
+                    <option value="auditory">Auditory</option>
+                    <option value="reading">Reading/Writing</option>
+                    <option value="kinesthetic">Kinesthetic</option>
+                    <option value="mixed" selected>Mixed</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>Interests:</label>
+                <div id="interestsContainer" class="interests-container">
+                    <div class="interest-item">
+                        <input type="text" name="interests[]" placeholder="Enter an interest area">
+                        <button type="button" class="remove-button" onclick="removeInterest(this)">Remove</button>
+                    </div>
+                </div>
+                <button type="button" class="add-button" onclick="addInterest()">Add Interest</button>
+            </div>
+            
+            <button type="submit" id="submitButton">Generate Course</button>
+        </form>
+    </div>
+    
+    <div id="loading" class="loading">
+        <div class="spinner"></div>
+        <p>Generating course content with Groq LLM...</p>
+        <p>This may take 15-30 seconds depending on course complexity.</p>
+    </div>
+    
+    <div id="responseContainer" class="card" style="display: none;">
+        <h2>Generated Course</h2>
+        <div id="stats"></div>
+        <pre id="response"></pre>
+    </div>
+    
+    <script>
+        // Function to add a new interest field
+        function addInterest() {
+            const container = document.getElementById('interestsContainer');
+            const newInterest = document.createElement('div');
+            newInterest.className = 'interest-item';
+            newInterest.innerHTML = `
+                <input type="text" name="interests[]" placeholder="Enter an interest area">
+                <button type="button" class="remove-button" onclick="removeInterest(this)">Remove</button>
+            `;
+            container.appendChild(newInterest);
+        }
+        
+        // Function to remove an interest field
+        function removeInterest(button) {
+            const container = document.getElementById('interestsContainer');
+            if (container.children.length > 1) {
+                button.parentElement.remove();
+            }
+        }
+        
+        // Handle form submission
+        document.getElementById('agentForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            // Get form data
+            const formData = new FormData(e.target);
+            const submitButton = document.getElementById('submitButton');
+            const loadingDiv = document.getElementById('loading');
+            const responseContainer = document.getElementById('responseContainer');
+            const responseElement = document.getElementById('response');
+            const statsElement = document.getElementById('stats');
+            
+            // Process learning objectives (split by newline)
+            const learningObjectives = formData.get('learningObjectives')
+                .split('\n')
+                .map(obj => obj.trim())
+                .filter(obj => obj.length > 0);
+            
+            // Process interests
+            const interestInputs = document.querySelectorAll('input[name="interests[]"]');
+            const interests = Array.from(interestInputs)
+                .map(input => input.value.trim())
+                .filter(interest => interest.length > 0);
+            
+            // Construct request object
+            const requestData = {
+                title: formData.get('title'),
+                description: formData.get('description'),
+                targetAudience: formData.get('targetAudience'),
+                duration: formData.get('duration'),
+                moduleCount: parseInt(formData.get('moduleCount')),
+                learningObjectives,
+                includeQuizzes: formData.get('includeQuizzes') === 'on',
+                includeAssignments: formData.get('includeAssignments') === 'on',
+                includeResources: formData.get('includeResources') === 'on',
+                personalizationData: {
+                    learningStyle: formData.get('learningStyle'),
+                    difficultyPreference: formData.get('difficultyPreference'),
+                    interests
+                }
+            };
+            
+            try {
+                // Show loading state
+                submitButton.disabled = true;
+                loadingDiv.style.display = 'block';
+                responseContainer.style.display = 'none';
+                
+                // Send request to test agent API
+                const response = await fetch('/api/test/agent', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestData)
+                });
+                
+                const result = await response.json();
+                
+                // Show response
+                if (result.success) {
+                    // Format and display stats
+                    const stats = result.stats;
+                    statsElement.innerHTML = `
+                        <p><strong>Generation time:</strong> ${(stats.generation_time_ms / 1000).toFixed(2)} seconds</p>
+                        <p><strong>Modules:</strong> ${stats.modules_count} | 
+                           <strong>Quizzes:</strong> ${stats.quizzes_count} | 
+                           <strong>Assignments:</strong> ${stats.assignments_count}</p>
+                    `;
+                    
+                    // Format response as JSON
+                    responseElement.textContent = JSON.stringify(result.course, null, 2);
+                    responseContainer.style.display = 'block';
+                } else {
+                    responseElement.textContent = JSON.stringify(result, null, 2);
+                    responseContainer.style.display = 'block';
+                }
+            } catch (error) {
+                responseElement.textContent = `Error: ${error.message || 'Unknown error'}`;
+                responseContainer.style.display = 'block';
+            } finally {
+                // Hide loading state
+                submitButton.disabled = false;
+                loadingDiv.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html> 

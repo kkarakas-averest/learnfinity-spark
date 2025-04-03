@@ -8,6 +8,25 @@ import { z } from "zod";
 import { LLMService } from '@/lib/llm/llm-service';
 import envConfig from '@/lib/env-config';
 
+// Type extensions for ContentGenerationRequest
+interface EnhancedContentGenerationRequest extends ContentGenerationRequest {
+  options?: {
+    moduleCount?: number;
+    includeQuizzes?: boolean;
+    includeAssignments?: boolean;
+    includeResources?: boolean;
+    format?: string;
+    depth?: string;
+  };
+  personalization?: {
+    adaptToLearningStyle?: boolean;
+    difficultyLevel?: string;
+    paceAdjustment?: string;
+    interestAreas?: string[];
+    priorKnowledge?: Record<string, any>;
+  };
+}
+
 // Simulated agent interfaces to avoid importing problematic files
 interface SimulatedAgent {
   id: string;
@@ -107,7 +126,7 @@ class SimulatedEducatorAgent implements SimulatedAgent {
     };
   }
   
-  private async generateContentWithLLM(contentRequest: ContentGenerationRequest): Promise<any> {
+  private async generateContentWithLLM(contentRequest: EnhancedContentGenerationRequest): Promise<any> {
     try {
       console.log(`[${this.name}] Generating content with Groq LLM for topic: ${contentRequest.topic}`);
       
@@ -155,7 +174,7 @@ class SimulatedEducatorAgent implements SimulatedAgent {
     }
   }
   
-  private createContentGenerationPrompt(request: ContentGenerationRequest): string {
+  private createContentGenerationPrompt(request: EnhancedContentGenerationRequest): string {
     return `
       Generate a detailed, personalized course on "${request.topic}".
       
@@ -409,12 +428,12 @@ export class AgentService {
 
     try {
       // Convert the course request to a content generation request
-      const contentRequest: ContentGenerationRequest = {
+      const contentRequest: EnhancedContentGenerationRequest = {
         contentType: "course" as ContentType,
         topic: request.title,
         targetAudience: {
           skillLevel: request.targetAudience as DifficultyLevel,
-          roles: ["learner"]
+          role: "learner"
         },
         learningObjectives: request.learningObjectives,
         keywords: request.description ? request.description.split(/\s+/).filter(word => word.length > 4) : [],
@@ -429,7 +448,13 @@ export class AgentService {
       };
 
       if (request.personalization) {
-        contentRequest.personalization = request.personalization;
+        contentRequest.personalization = {
+          adaptToLearningStyle: request.personalization.adaptToLearningStyle,
+          difficultyLevel: request.personalization.difficultyLevel,
+          paceAdjustment: request.personalization.paceAdjustment,
+          interestAreas: request.personalization.interestAreas,
+          priorKnowledge: request.personalization.priorKnowledge
+        };
       }
 
       // For direct content generation using the educator agent (bypassing manager)
@@ -506,6 +531,10 @@ export class AgentService {
       paceAdjustment: "moderate",
       interestAreas: [],
       priorKnowledge: {}
+    } as PersonalizationParams & {
+      paceAdjustment: string;
+      interestAreas: string[];
+      priorKnowledge: Record<string, any>;
     };
   }
 
@@ -652,7 +681,7 @@ export class AgentService {
       },
       {
         id: "resource_2",
-        title: `Video Tutorials for ${request.title}`,
+        title: `${request.title} Best Practices`,
         type: "video",
         url: "#",
         description: "A series of video tutorials demonstrating key concepts."
