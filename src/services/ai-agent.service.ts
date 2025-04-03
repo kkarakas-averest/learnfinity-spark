@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { AgentService, CourseGenerationRequest } from './agent-service';
 
 export interface AgentTaskRequest {
   user_id: string;
@@ -30,6 +31,12 @@ export interface LearningTask {
  * Service for interacting with AI agents in the system
  */
 export class AIAgentService {
+  private agentService: AgentService;
+  
+  constructor() {
+    this.agentService = AgentService.getInstance();
+  }
+  
   /**
    * Create a task for an AI agent to process
    */
@@ -193,6 +200,104 @@ export class AIAgentService {
       return {
         success: false,
         error: error.message || 'Failed to generate course content'
+      };
+    }
+  }
+  
+  /**
+   * Generate personalized content for an employee
+   * This is a direct method that uses the enhanced agent service with Groq LLM
+   */
+  public async generateEmployeePersonalizedContent(
+    employeeId: string,
+    title: string,
+    description: string,
+    options: {
+      targetAudience?: 'beginner' | 'intermediate' | 'advanced';
+      duration?: 'short' | 'medium' | 'long';
+      learningObjectives?: string[];
+      includeQuizzes?: boolean;
+      includeAssignments?: boolean;
+      includeResources?: boolean;
+      moduleCount?: number;
+    } = {}
+  ): Promise<any> {
+    try {
+      // Check if employee exists
+      const { data: employeeData, error: employeeError } = await supabase
+        .from('hr_employees')
+        .select('id, name, email')
+        .eq('id', employeeId)
+        .single();
+        
+      if (employeeError || !employeeData) {
+        throw new Error(`Employee with ID ${employeeId} not found`);
+      }
+      
+      // Create a course generation request
+      const courseRequest: CourseGenerationRequest = {
+        title,
+        description,
+        targetAudience: options.targetAudience || 'intermediate',
+        duration: options.duration || 'medium',
+        learningObjectives: options.learningObjectives || [
+          `Understand the fundamentals of ${title}`,
+          `Apply ${title} concepts in practical scenarios`,
+          `Evaluate the effectiveness of ${title} approaches`
+        ],
+        includeQuizzes: options.includeQuizzes !== undefined ? options.includeQuizzes : true,
+        includeAssignments: options.includeAssignments !== undefined ? options.includeAssignments : true,
+        includeResources: options.includeResources !== undefined ? options.includeResources : true,
+        moduleCount: options.moduleCount || 5,
+        generationMode: 'complete',
+        personalization: {
+          adaptToLearningStyle: true,
+          difficultyLevel: 'adaptive',
+          paceAdjustment: 'moderate',
+          interestAreas: [],
+          priorKnowledge: {}
+        }
+      };
+      
+      // Initialize agent service and generate content
+      await this.agentService.initialize();
+      const generatedCourse = await this.agentService.generateEmployeePersonalizedContent(
+        employeeId,
+        courseRequest
+      );
+      
+      // Record the task in the database
+      const { data: taskData, error: taskError } = await supabase
+        .from('ai_agent_tasks')
+        .insert({
+          user_id: employeeId,
+          agent_type: 'content_creation',
+          task_type: 'generate_employee_course',
+          status: 'completed',
+          priority: 'high',
+          data: {
+            courseRequest,
+            generatedCourse
+          },
+          completed_at: new Date().toISOString()
+        })
+        .select('id')
+        .single();
+        
+      if (taskError) {
+        console.error('Failed to record task:', taskError);
+      }
+      
+      return {
+        success: true,
+        course: generatedCourse,
+        taskId: taskData?.id || null
+      };
+    } catch (error: any) {
+      console.error('Failed to generate personalized content:', error);
+      return {
+        success: false,
+        error: error.message || 'Failed to generate personalized content'
       };
     }
   }
