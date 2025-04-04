@@ -9,6 +9,9 @@
  * 2. Run: npx tsx src/scripts/test-educator-agent.ts
  */
 
+// Load environment variables from .env file
+import 'dotenv/config';
+
 import { AgentFactory } from '../agents/AgentFactory';
 import { ContentType, DifficultyLevel } from '../types/course.types';
 import { ContentCreatorAgent, ContentGenerationRequest } from '../agents/types';

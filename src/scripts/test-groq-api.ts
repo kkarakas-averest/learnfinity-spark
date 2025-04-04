@@ -9,6 +9,9 @@
  * 2. Run: npx tsx src/scripts/test-groq-api.ts
  */
 
+// Load environment variables from .env file
+import 'dotenv/config';
+
 import { GroqAPI } from '../lib/llm/groq-api';
 import { LLMService } from '../lib/llm/llm-service';
 import envConfig from '../lib/env-config';

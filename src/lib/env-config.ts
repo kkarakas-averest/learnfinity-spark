@@ -8,6 +8,28 @@
 // Import environment variables from .env file if in development
 // Note: Vite automatically loads .env files, so this section is not needed
 
+// Helper to safely access import.meta.env (works both in Vite and direct Node.js)
+const getEnv = (key: string, defaultValue: string = ''): string => {
+  // Check if running in Vite environment
+  if (typeof import.meta !== 'undefined' && import.meta.env) {
+    return (import.meta.env as any)[key] || defaultValue;
+  }
+  
+  // Fallback to process.env for Node.js scripts
+  return process.env[key] || defaultValue;
+};
+
+// Helper to get environment mode
+const getMode = (): 'development' | 'production' | 'test' => {
+  // First check Vite env
+  if (typeof import.meta !== 'undefined' && import.meta.env) {
+    return (import.meta.env.MODE as 'development' | 'production' | 'test') || 'development';
+  }
+  
+  // Otherwise use Node.js env
+  return (process.env.NODE_ENV as 'development' | 'production' | 'test') || 'development';
+};
+
 // Define the shape of our environment configuration
 interface EnvConfig {
   // Application configuration
@@ -38,26 +60,26 @@ interface EnvConfig {
  */
 export const envConfig: EnvConfig = {
   // Application configuration
-  appName: import.meta.env.VITE_APP_NAME || 'Learnfinity',
-  environment: (import.meta.env.MODE || 'development') as 'development' | 'production' | 'test',
-  isDevelopment: import.meta.env.MODE === 'development',
-  isProduction: import.meta.env.MODE === 'production',
-  isTest: import.meta.env.MODE === 'test',
-  debug: import.meta.env.VITE_DEBUG === 'true' || import.meta.env.MODE === 'development',
+  appName: getEnv('VITE_APP_NAME', 'Learnfinity'),
+  environment: getMode(),
+  isDevelopment: getMode() === 'development',
+  isProduction: getMode() === 'production',
+  isTest: getMode() === 'test',
+  debug: getEnv('VITE_DEBUG') === 'true' || getMode() === 'development',
   
   // API keys - read from environment variables
-  supabaseUrl: import.meta.env.VITE_SUPABASE_URL || '',
-  supabaseAnonKey: import.meta.env.VITE_SUPABASE_ANON_KEY || '',
-  groqApiKey: import.meta.env.VITE_GROQ_API_KEY || null,
+  supabaseUrl: getEnv('VITE_SUPABASE_URL', ''),
+  supabaseAnonKey: getEnv('VITE_SUPABASE_ANON_KEY', ''),
+  groqApiKey: getEnv('VITE_GROQ_API_KEY', '') || null,
   
   // Feature flags
-  enableLLM: import.meta.env.VITE_ENABLE_LLM !== 'false',
-  enableBatchProcessing: import.meta.env.VITE_ENABLE_BATCH_PROCESSING !== 'false',
-  enableNotifications: import.meta.env.VITE_ENABLE_NOTIFICATIONS !== 'false',
+  enableLLM: getEnv('VITE_ENABLE_LLM') !== 'false',
+  enableBatchProcessing: getEnv('VITE_ENABLE_BATCH_PROCESSING') !== 'false',
+  enableNotifications: getEnv('VITE_ENABLE_NOTIFICATIONS') !== 'false',
   
   // Performance settings
-  batchSize: parseInt(import.meta.env.VITE_BATCH_SIZE || '5', 10),
-  maxConcurrentRequests: parseInt(import.meta.env.VITE_MAX_CONCURRENT_REQUESTS || '3', 10),
+  batchSize: parseInt(getEnv('VITE_BATCH_SIZE', '5'), 10),
+  maxConcurrentRequests: parseInt(getEnv('VITE_MAX_CONCURRENT_REQUESTS', '3'), 10),
 };
 
 /**
