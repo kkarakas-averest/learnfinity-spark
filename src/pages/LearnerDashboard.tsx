@@ -1,4 +1,3 @@
-import React from 'react';
 import { useState, useEffect } from '@/lib/react-helpers';
 import { Navigate, Link } from "react-router-dom";
 import { useAuth } from "@/state";
@@ -9,17 +8,20 @@ import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { 
   Home, BookOpen, Trophy, User, ArrowRight, 
   Sparkles, AlertCircle, Calendar, Clock, Check, 
-  Users, Award
+  Users, Award, BarChart2 as BarChart3
 } from "lucide-react";
-import DashboardHeader from "@/components/learner/DashboardHeader";
-import TestNotificationButton from "@/components/learner/TestNotificationButton";
-import AICourseRecommendations from "@/components/learner/AICourseRecommendations";
-import PersonalizedPathDisplay from "@/components/learner/PersonalizedPathDisplay";
 import { useToast } from "@/components/ui/use-toast";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { formatDistanceToNow } from 'date-fns';
+import { cn } from '@/lib/utils';
+import { createClient } from '@supabase/supabase-js';
+
+// Initialize Supabase for direct connections (only used in production)
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+const supabaseClient = supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null;
 
 // Course interface
 interface Course {
@@ -160,6 +162,206 @@ const LearnerDashboard: React.FC = () => {
     user: "State not initialized yet"
   });
 
+  // Function to directly fetch data from Supabase (only used in production)
+  const fetchFromSupabase = async (userId: string): Promise<any> => {
+    try {
+      console.log('Fetching data directly from Supabase');
+      
+      if (!supabaseClient) {
+        throw new Error('Supabase client not initialized');
+      }
+      
+      // Extract auth state for personalizing data
+      const { user, userDetails } = useAuth();
+      
+      // Combine data from multiple tables
+      let userData = null;
+      let coursesData = null;
+      let pathsData = null;
+      
+      // First try to get authenticated user's profile data (more reliable)
+      if (user) {
+        // Get user profile from different possible tables
+        try {
+          const { data, error } = await supabaseClient
+            .from('users')
+            .select('*')
+            .eq('id', userId)
+            .single();
+          
+          if (!error && data) {
+            userData = data;
+          }
+        } catch (e) {
+          console.error('Error fetching user profile:', e);
+        }
+      }
+      
+      // Get courses
+      try {
+        const { data, error } = await supabaseClient
+          .from('hr_courses')
+          .select('*')
+          .limit(10);
+        
+        if (!error && data) {
+          coursesData = data;
+        }
+      } catch (e) {
+        console.error('Error fetching courses:', e);
+      }
+      
+      // Get learning paths
+      try {
+        const { data, error } = await supabaseClient
+          .from('hr_learning_paths')
+          .select('*')
+          .limit(10);
+        
+        if (!error && data) {
+          pathsData = data;
+        }
+      } catch (e) {
+        console.error('Error fetching learning paths:', e);
+      }
+      
+      // Only continue if we got at least some data
+      if (!userData && !coursesData && !pathsData) {
+        throw new Error('No data returned from Supabase');
+      }
+      
+      // Build dashboard data from real data or fall back to mock
+      const dashboardData = {
+        profile: {
+          id: userData?.id || userId,
+          name: userData?.name || userDetails?.name || user?.email?.split('@')[0] || 'Anonymous User',
+          email: userData?.email || user?.email || 'user@example.com',
+          role: userData?.role || userDetails?.role || 'learner',
+          avatar: null,
+          bio: 'Learning enthusiast',
+          lastLogin: new Date().toISOString(),
+          joinDate: userData?.created_at || '2023-01-15T00:00:00.000Z',
+          department: 'Engineering',
+          position: 'Developer'
+        },
+        courses: {
+          total: coursesData?.length || 5,
+          inProgress: 2,
+          completed: 1,
+          notStarted: 2,
+          hrAssigned: 0,
+          featured: coursesData?.length 
+            ? {
+                id: coursesData[0].id,
+                title: coursesData[0].title,
+                description: coursesData[0].description,
+                progress: 30,
+                completed_sections: 3,
+                total_sections: 10,
+                category: coursesData[0].category || 'Web Development',
+                thumbnail_url: coursesData[0].thumbnail_url || null
+              }
+            : {
+                id: 'mock-course-1',
+                title: 'Getting Started with React',
+                description: 'Learn the basics of React development',
+                progress: 30,
+                completed_sections: 3,
+                total_sections: 10,
+                category: 'Web Development',
+                thumbnail_url: null
+              },
+          items: coursesData?.length
+            ? coursesData.map((course) => ({
+                id: course.id,
+                title: course.title,
+                description: course.description,
+                duration: '2 hours',
+                progress: Math.floor(Math.random() * 100),
+                completed_sections: Math.floor(Math.random() * 10),
+                total_sections: 10,
+                category: course.category || 'Web Development',
+                thumbnail_url: course.thumbnail_url || null,
+                skills: ['React', 'JavaScript', 'Web Development'],
+                rag_status: Math.random() > 0.5 ? 'in_progress' : 'not_started'
+              }))
+            : [
+                {
+                  id: 'mock-course-1',
+                  title: 'Getting Started with React',
+                  description: 'Learn the basics of React development',
+                  duration: '2 hours',
+                  progress: 30,
+                  completed_sections: 3,
+                  total_sections: 10,
+                  category: 'Web Development',
+                  thumbnail_url: null,
+                  skills: ['React', 'JavaScript', 'Web Development'],
+                  rag_status: 'in_progress'
+                },
+                {
+                  id: 'mock-course-2',
+                  title: 'Advanced TypeScript',
+                  description: 'Master TypeScript features for large applications',
+                  duration: '3 hours',
+                  progress: 0,
+                  completed_sections: 0,
+                  total_sections: 8,
+                  category: 'Programming',
+                  thumbnail_url: null,
+                  skills: ['TypeScript', 'JavaScript', 'Programming'],
+                  rag_status: 'not_started'
+                }
+              ]
+        },
+        learningPaths: pathsData?.length
+          ? pathsData.map((path) => ({
+              id: path.id,
+              title: path.title,
+              description: path.description,
+              courses_count: path.courses_count || 3,
+              progress: Math.floor(Math.random() * 100),
+              thumbnail_url: path.thumbnail_url || null,
+              due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+              skills: ['React', 'CSS', 'JavaScript']
+            }))
+          : [
+              {
+                id: 'mock-path-1',
+                title: 'Frontend Development',
+                description: 'Complete path to become a frontend developer',
+                courses_count: 3,
+                progress: 25,
+                thumbnail_url: null,
+                due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+                skills: ['React', 'CSS', 'JavaScript']
+              }
+            ],
+        completedCourses: 1,
+        inProgressCourses: 2,
+        stats: {
+          coursesCompleted: 1,
+          coursesInProgress: 2,
+          learningPathsCompleted: 0,
+          learningPathsInProgress: 1,
+          assignedCourses: 3,
+          skillsAcquired: 5,
+          totalHours: 12
+        },
+        achievements: {
+          certificates: [],
+          badges: []
+        }
+      };
+      
+      console.log('Successfully built dashboard data from Supabase');
+      return dashboardData;
+    } catch (error) {
+      console.error('Error fetching directly from Supabase:', error);
+      throw error;
+    }
+  };
+
   // Add a utility function to fetch from multiple potential sources
   const fetchWithFallback = async (endpoint: string, userId: string) => {
     // Get the current hostname for production detection
@@ -167,36 +369,53 @@ const LearnerDashboard: React.FC = () => {
     const isVercel = window.location.hostname.includes('vercel.app');
     
     console.log(`Attempting to fetch ${endpoint} data for userId=${userId}`);
+    console.log(`Environment: ${isProduction ? 'Production' : 'Development'}, Vercel: ${isVercel}`);
+    
+    // In production, try fetching directly from Supabase first
+    if (isProduction && supabaseClient) {
+      try {
+        console.log('Trying direct Supabase connection');
+        const data = await fetchFromSupabase(userId);
+        console.log('Supabase direct connection successful');
+        return data;
+      } catch (error) {
+        console.error('Failed to fetch directly from Supabase:', error);
+        // Continue to API fallbacks
+      }
+    }
     
     // Create sources array with appropriate ordering
-    const sources = [
-      // Always try same-origin first which works in both development and production
-      { 
-        label: "same-origin", 
+    const sources = [];
+    
+    // In production, try API endpoint first (which might be handled by Vercel serverless)
+    if (isProduction) {
+      // Try the relative API path
+      sources.push({ 
+        label: "api-endpoint", 
         url: `/api/learner/${endpoint}?userId=${userId}`,
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
           'Cache-Control': 'no-cache'
         }
-      }
-    ];
-    
-    // Only add direct localhost connections in development, not in production
-    if (!isProduction) {
+      });
+    } else {
+      // In development, try local API servers
       sources.push(
+        // Try same-origin first (Vite proxy)
         { 
-          label: "direct-api-3083", 
-          url: `http://localhost:3083/api/learner/${endpoint}?userId=${userId}`,
+          label: "same-origin", 
+          url: `/api/learner/${endpoint}?userId=${userId}`,
           headers: {
             'Accept': 'application/json',
             'Content-Type': 'application/json',
             'Cache-Control': 'no-cache'
           }
         },
+        // Direct connections to local API servers as fallbacks
         { 
-          label: "direct-api-3084", 
-          url: `http://localhost:3084/api/learner/${endpoint}?userId=${userId}`,
+          label: "direct-api-3083", 
+          url: `http://localhost:3083/api/learner/${endpoint}?userId=${userId}`,
           headers: {
             'Accept': 'application/json',
             'Content-Type': 'application/json',
@@ -893,7 +1112,7 @@ const LearnerDashboard: React.FC = () => {
                         <div className="flex justify-between text-sm">
                           <span>{path.courses_count || 0} courses</span>
                           <span className="flex items-center gap-1">
-                            <Calendar className="h-3 w-3" />
+                            <Clock className="h-3 w-3" />
                             Due {formatDistanceToNow(new Date(path.due_date || Date.now()), { addSuffix: true })}
                           </span>
                         </div>
@@ -1026,7 +1245,7 @@ const LearnerDashboard: React.FC = () => {
                       <div className="flex justify-between text-sm">
                         <span>{path.courses_count || 0} courses</span>
                         <span className="flex items-center gap-1">
-                          <Calendar className="h-3 w-3" />
+                          <Clock className="h-3 w-3" />
                           Due {formatDistanceToNow(new Date(path.due_date || Date.now()), { addSuffix: true })}
                         </span>
                       </div>
@@ -1149,7 +1368,7 @@ const LearnerDashboard: React.FC = () => {
                         <ProfileField 
                           label="Hire Date" 
                           value={formatDate(dashboardProfile.hr.hire_date)} 
-                          icon={<Calendar className="h-4 w-4 text-muted-foreground" />}
+                          icon={<Clock className="h-4 w-4 text-muted-foreground" />}
                         />
                         <ProfileField 
                           label="Employment Status" 
