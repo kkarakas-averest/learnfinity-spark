@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FileText, Layers, Library, BookOpen, Users, Zap, Sparkles } from 'lucide-react';
+import CourseBuilderAIGenerator from '@/components/hr/CourseBuilderAIGenerator';
 import GroqTestButton from '@/components/hr/GroqTestButton';
 import DirectGroqTest from '@/components/hr/DirectGroqTest';
 
@@ -235,7 +236,17 @@ const CourseBuilderPage: React.FC = () => {
               </Card>
             </div>
             
-            <DirectGroqTest />
+            <div className="space-y-2">
+              <h3 className="text-lg font-semibold">Course Generator</h3>
+              <p className="text-sm text-gray-500 mb-2">Create full courses with personalized content based on target audience.</p>
+              <CourseBuilderAIGenerator />
+            </div>
+            
+            <div className="space-y-2">
+              <h3 className="text-lg font-semibold">Direct API Testing</h3>
+              <p className="text-sm text-gray-500 mb-2">Test the Groq API directly with custom prompts.</p>
+              <DirectGroqTest />
+            </div>
             
             <Card>
               <CardHeader>

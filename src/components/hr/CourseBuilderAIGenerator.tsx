@@ -46,58 +46,42 @@ const CourseBuilderAIGenerator: React.FC = () => {
     try {
       setIsGenerating(true);
       
-      // Call the API to generate the course - use the full URL format that works in production
-      const baseUrl = window.location.origin;
-      console.log('Calling API at:', `${baseUrl}/api/groq-generate`);
+      // Create more detailed system prompt for generating course content
+      const systemPrompt = `You are an expert curriculum designer and educator. 
+      Create a comprehensive, well-structured course on the requested topic.
+      The content should be engaging, educational, and tailored to the specified audience.`;
       
-      const response = await fetch(`${baseUrl}/api/groq-generate`, {
+      const userPrompt = `Create a detailed course on "${topic}" for ${targetAudience} audience with 
+      ${modules} modules, each containing ${sectionsPerModule} sections.
+      ${includeQuiz ? 'Include quizzes for each module.' : ''}
+      Format the content with HTML tags for rich text display.`;
+      
+      // Call Groq API directly from the browser
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': 'Bearer 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'
         },
         body: JSON.stringify({
-          topic,
-          targetAudience,
-          modules,
-          sectionsPerModule,
-          includeQuiz,
-          userId: '00000000-0000-0000-0000-000000000000', // Valid UUID format for a system user
-          customization: {
-            skillLevel,
-          },
-          groqApiKey: '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', // Add API key directly in the request
-        }),
+          model: 'llama3-70b-8192',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt }
+          ],
+          temperature: 0.7,
+          max_tokens: 2000
+        })
       });
       
-      let errorMessage = 'Failed to generate course';
-      
       if (!response.ok) {
-        console.error('API error response:', {
-          status: response.status,
-          statusText: response.statusText
-        });
-        
-        // Try to get the response as text first
         const errorText = await response.text();
-        
-        // Then try to parse it as JSON if possible
-        try {
-          const errorData = JSON.parse(errorText);
-          errorMessage = errorData.error || errorData.message || errorMessage;
-          if (errorData.details) {
-            errorMessage += `: ${errorData.details}`;
-          }
-        } catch (parseError) {
-          // If JSON parsing fails, use the text directly
-          console.error('Error response text:', errorText);
-          errorMessage = `${errorMessage}: ${response.status} - ${errorText.substring(0, 100)}...`;
-        }
-        
-        throw new Error(errorMessage);
+        console.error('Groq API error:', response.status, errorText);
+        throw new Error(`API error: ${response.status} - ${errorText}`);
       }
       
       const data = await response.json();
-      console.log('Success response from API:', data);
+      const content = data.choices[0].message.content;
       
       toast({
         title: 'Course generated successfully',
@@ -107,12 +91,9 @@ const CourseBuilderAIGenerator: React.FC = () => {
       // Show success alert with content preview
       toast({
         title: 'Content Preview',
-        description: data.content.substring(0, 100) + '...',
+        description: content.substring(0, 100) + '...',
         variant: 'default',
       });
-      
-      // Mock navigation - since our database integration isn't working on Vercel yet
-      // navigate(`/hr-dashboard/courses/${data.courseId}`);
       
       // Show more detailed success message
       setTimeout(() => {
