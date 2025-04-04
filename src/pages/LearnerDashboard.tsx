@@ -168,208 +168,195 @@ interface DashboardData {
   stats: Stats;
 }
 
+// Mock data helper for Supabase fallback
+const getMockData = (userId: string) => {
+  return {
+    profile: {
+      id: userId,
+      userId: userId,
+      name: "Dashboard User",
+      email: "dashboard@example.com",
+      bio: "Learning enthusiast",
+      title: "Software Developer",
+      department: "Engineering",
+      skills: ["JavaScript", "React", "Node.js"],
+      learningPreferences: {
+        preferredLearningStyle: "Visual",
+        preferredContentTypes: ["Video", "Interactive"],
+        learningGoals: ["Master React", "Learn TypeScript"]
+      },
+      onboardingCompleted: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      exists: true,
+      hr: {
+        id: "hr-" + userId,
+        hire_date: "2023-01-15",
+        status: "Active",
+        phone: "+1234567890",
+        manager: "Jane Manager",
+        manager_id: "manager-123",
+        department_id: "dept-eng",
+        position_id: "pos-dev"
+      }
+    },
+    courses: {
+      featured: {
+        id: "course-01",
+        title: "Advanced React Patterns",
+        description: "Learn advanced patterns in React development",
+        duration: 480,
+        progress: 65,
+        completedSections: 5,
+        totalSections: 8,
+        thumbnailUrl: "https://via.placeholder.com/300x200",
+        featured: true,
+        category: "Web Development",
+        skills: ["React", "JavaScript", "Frontend"],
+        ragStatus: "amber",
+        learningPathId: "path-01",
+        learningPathName: "Frontend Mastery"
+      },
+      items: [
+        {
+          id: "course-01",
+          title: "Advanced React Patterns",
+          description: "Learn advanced patterns in React development",
+          duration: 480,
+          progress: 65,
+          completedSections: 5,
+          totalSections: 8,
+          thumbnailUrl: "https://via.placeholder.com/300x200",
+          featured: true,
+          category: "Web Development",
+          skills: ["React", "JavaScript", "Frontend"],
+          ragStatus: "amber",
+          learningPathId: "path-01",
+          learningPathName: "Frontend Mastery"
+        },
+        {
+          id: "course-02",
+          title: "Node.js Microservices",
+          description: "Building scalable microservices with Node.js",
+          duration: 360,
+          progress: 30,
+          completedSections: 2,
+          totalSections: 6,
+          thumbnailUrl: "https://via.placeholder.com/300x200",
+          featured: false,
+          category: "Backend Development",
+          skills: ["Node.js", "Microservices", "API"],
+          ragStatus: "green",
+          learningPathId: "path-02",
+          learningPathName: "Backend Architecture"
+        }
+      ]
+    },
+    learningPaths: [
+      {
+        id: "path-01",
+        title: "Frontend Mastery",
+        description: "Become an expert in frontend development",
+        thumbnail_url: "https://via.placeholder.com/300x200",
+        category: "Web Development",
+        course_count: 3,
+        completed_courses: 1,
+        progress: 55,
+        path_type: "enrolled",
+        due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        assigned_date: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString()
+      }
+    ]
+  };
+};
+
 const LearnerDashboard: React.FC = () => {
   console.log("LearnerDashboard - Current state:", {
     loading: "State not initialized yet",
     user: "State not initialized yet"
   });
 
-  // Function to directly fetch data from Supabase (only used in production)
+  // Function to fetch directly from Supabase without using React context
   const fetchFromSupabase = async (userId: string): Promise<any> => {
+    if (!supabaseClient) {
+      throw new Error('Supabase client not initialized');
+    }
+
+    console.log('Fetching data directly from Supabase');
+    
     try {
-      console.log('Fetching data directly from Supabase');
-      
-      if (!supabaseClient) {
-        throw new Error('Supabase client not initialized');
-      }
-      
-      // Extract auth state for personalizing data
-      const { user, userDetails } = useAuth();
-      
-      // Combine data from multiple tables
-      let userData = null;
-      let coursesData = null;
-      let pathsData = null;
-      
-      // First try to get authenticated user's profile data (more reliable)
-      if (user) {
-        // Get user profile from different possible tables
-        try {
-          const { data, error } = await supabaseClient
-            .from('users')
-            .select('*')
-            .eq('id', userId)
-            .single();
+      // Get user profile
+      let userProfile = null;
+      try {
+        const { data, error } = await supabaseClient
+          .from('users')
+          .select('*')
+          .eq('id', userId)
+          .single();
           
-          if (!error && data) {
-            userData = data;
-          }
-        } catch (e) {
-          console.error('Error fetching user profile:', e);
-        }
+        if (error) throw error;
+        if (data) userProfile = data;
+      } catch (error) {
+        console.error('Error fetching user profile:', error);
       }
       
       // Get courses
+      let courses = [];
       try {
         const { data, error } = await supabaseClient
-          .from('hr_courses')
+          .from('courses')
           .select('*')
           .limit(10);
-        
-        if (!error && data) {
-          coursesData = data;
-        }
-      } catch (e) {
-        console.error('Error fetching courses:', e);
+          
+        if (error) throw error;
+        if (data) courses = data;
+      } catch (error) {
+        console.error('Error fetching courses:', error);
       }
       
       // Get learning paths
+      let learningPaths = [];
       try {
         const { data, error } = await supabaseClient
-          .from('hr_learning_paths')
+          .from('learning_paths')
           .select('*')
           .limit(10);
-        
-        if (!error && data) {
-          pathsData = data;
-        }
-      } catch (e) {
-        console.error('Error fetching learning paths:', e);
+          
+        if (error) throw error;
+        if (data) learningPaths = data;
+      } catch (error) {
+        console.error('Error fetching learning paths:', error);
       }
       
-      // Only continue if we got at least some data
-      if (!userData && !coursesData && !pathsData) {
-        throw new Error('No data returned from Supabase');
+      // If we have no data at all, throw an error to fall back to API
+      if (!userProfile && courses.length === 0 && learningPaths.length === 0) {
+        throw new Error('No data retrieved from Supabase');
       }
       
-      // Build dashboard data from real data or fall back to mock
-      const dashboardData = {
-        profile: {
-          id: userData?.id || userId,
-          name: userData?.name || userDetails?.name || user?.email?.split('@')[0] || 'Anonymous User',
-          email: userData?.email || user?.email || 'user@example.com',
-          role: userData?.role || userDetails?.role || 'learner',
-          avatar: null,
-          bio: 'Learning enthusiast',
-          lastLogin: new Date().toISOString(),
-          joinDate: userData?.created_at || '2023-01-15T00:00:00.000Z',
-          department: 'Engineering',
-          position: 'Developer'
-        },
+      // Build dashboard data from real data + mock fallbacks
+      const mockData = getMockData(userId);
+      
+      return {
+        profile: userProfile || mockData.profile,
         courses: {
-          total: coursesData?.length || 5,
-          inProgress: 2,
-          completed: 1,
-          notStarted: 2,
-          hrAssigned: 0,
-          featured: coursesData?.length 
-            ? {
-                id: coursesData[0].id,
-                title: coursesData[0].title,
-                description: coursesData[0].description,
-                progress: 30,
-                completed_sections: 3,
-                total_sections: 10,
-                category: coursesData[0].category || 'Web Development',
-                thumbnail_url: coursesData[0].thumbnail_url || null
-              }
-            : {
-                id: 'mock-course-1',
-                title: 'Getting Started with React',
-                description: 'Learn the basics of React development',
-                progress: 30,
-                completed_sections: 3,
-                total_sections: 10,
-                category: 'Web Development',
-                thumbnail_url: null
-              },
-          items: coursesData?.length
-            ? coursesData.map((course) => ({
-                id: course.id,
-                title: course.title,
-                description: course.description,
-                duration: '2 hours',
-                progress: Math.floor(Math.random() * 100),
-                completed_sections: Math.floor(Math.random() * 10),
-                total_sections: 10,
-                category: course.category || 'Web Development',
-                thumbnail_url: course.thumbnail_url || null,
-                skills: ['React', 'JavaScript', 'Web Development'],
-                rag_status: Math.random() > 0.5 ? 'in_progress' : 'not_started'
-              }))
-            : [
-                {
-                  id: 'mock-course-1',
-                  title: 'Getting Started with React',
-                  description: 'Learn the basics of React development',
-                  duration: '2 hours',
-                  progress: 30,
-                  completed_sections: 3,
-                  total_sections: 10,
-                  category: 'Web Development',
-                  thumbnail_url: null,
-                  skills: ['React', 'JavaScript', 'Web Development'],
-                  rag_status: 'in_progress'
-                },
-                {
-                  id: 'mock-course-2',
-                  title: 'Advanced TypeScript',
-                  description: 'Master TypeScript features for large applications',
-                  duration: '3 hours',
-                  progress: 0,
-                  completed_sections: 0,
-                  total_sections: 8,
-                  category: 'Programming',
-                  thumbnail_url: null,
-                  skills: ['TypeScript', 'JavaScript', 'Programming'],
-                  rag_status: 'not_started'
-                }
-              ]
+          total: courses.length || 5,
+          featured: courses[0] || mockData.courses.featured,
+          inProgress: Math.floor(courses.length / 2) || 2,
+          completed: Math.floor(courses.length / 3) || 1,
+          notStarted: courses.length - (Math.floor(courses.length / 2) + Math.floor(courses.length / 3)) || 2,
+          hrAssigned: Math.floor(courses.length / 4) || 0,
+          items: courses.length > 0 ? courses : mockData.courses.items
         },
-        learningPaths: pathsData?.length
-          ? pathsData.map((path) => ({
-              id: path.id,
-              title: path.title,
-              description: path.description,
-              courses_count: path.courses_count || 3,
-              progress: Math.floor(Math.random() * 100),
-              thumbnail_url: path.thumbnail_url || null,
-              due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-              skills: ['React', 'CSS', 'JavaScript']
-            }))
-          : [
-              {
-                id: 'mock-path-1',
-                title: 'Frontend Development',
-                description: 'Complete path to become a frontend developer',
-                courses_count: 3,
-                progress: 25,
-                thumbnail_url: null,
-                due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-                skills: ['React', 'CSS', 'JavaScript']
-              }
-            ],
-        completedCourses: 1,
-        inProgressCourses: 2,
+        learningPaths: learningPaths.length > 0 ? learningPaths : mockData.learningPaths,
         stats: {
-          coursesCompleted: 1,
-          coursesInProgress: 2,
+          coursesCompleted: Math.floor(courses.length / 3) || 1,
           learningPathsCompleted: 0,
-          learningPathsInProgress: 1,
-          assignedCourses: 3,
-          skillsAcquired: 5,
-          totalHours: 12
-        },
-        achievements: {
-          certificates: [],
-          badges: []
+          assignedCourses: Math.floor(courses.length / 4) || 0,
+          skillsAcquired: 3
         }
       };
-      
-      console.log('Successfully built dashboard data from Supabase');
-      return dashboardData;
     } catch (error) {
-      console.error('Error fetching directly from Supabase:', error);
+      console.error('Error in fetchFromSupabase:', error);
       throw error;
     }
   };
