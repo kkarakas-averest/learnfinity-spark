@@ -1,6 +1,7 @@
 import { supabase, getSupabase } from '@/lib/supabase';
 import { AgentFactory } from '@/agents/AgentFactory';
 import { ContentGenerationRequest } from '@/agents/types';
+import { getEmployeeDataForPersonalization } from '@/lib/api/hr/employee-data';
 
 // Define interfaces for course content
 export interface CourseResource {
@@ -470,29 +471,23 @@ class CourseContentService {
         level = courseData.level || level;
       }
 
-      // Fetch user profile and preferences for personalization
+      // Fetch user profile and employee data for personalization
       const { data: userProfile, error: profileError } = await supabase
         .from('learner_profiles')
         .select('*')
         .eq('user_id', userId)
         .single();
         
-      // Get employee data if available
-      const { data: employeeData, error: employeeError } = await supabase
-        .from('employees')
-        .select('*')
-        .eq('user_id', userId)
-        .single();
+      // Get employee data using our specialized function
+      const employeeData = await getEmployeeDataForPersonalization(userId);
       
       // Create a user profile for personalization
       const learnerProfile = {
         id: userId,
-        name: employeeData?.first_name 
-          ? `${employeeData.first_name} ${employeeData.last_name}` 
-          : 'Learner',
-        role: employeeData?.title || userProfile?.title || 'Employee',
+        name: employeeData?.name || 'Learner',
+        role: employeeData?.position || userProfile?.title || 'Employee',
         department: employeeData?.department || userProfile?.department,
-        preferences: userProfile?.preferences || {
+        preferences: userProfile?.preferences || employeeData?.learning_preferences || {
           preferred_learning_style: 'visual',
           preferred_content_types: ['text', 'video'],
           learning_goals: ['skill development']
@@ -534,7 +529,12 @@ class CourseContentService {
           title,
           level,
           learningObjectives: contentOutline.learningObjectives
-        }
+        },
+        employeeContext: employeeData ? {
+          hire_date: employeeData.hire_date,
+          department: employeeData.department,
+          position: employeeData.position
+        } : null
       };
 
       // Create a new AI course content record
