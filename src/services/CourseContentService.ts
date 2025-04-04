@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { supabase, getSupabase } from '@/lib/supabase';
 import { AgentFactory } from '@/agents/AgentFactory';
 import { ContentGenerationRequest } from '@/agents/types';
 
@@ -1237,6 +1237,204 @@ class CourseContentService {
 
     } catch (error) {
       console.error('Error updating course progress:', error);
+    }
+  }
+
+  /**
+   * Save AI-generated content to the database
+   */
+  private async saveGeneratedContent(
+    courseId: string,
+    userId: string,
+    content: any,
+    personalizationParams?: any
+  ): Promise<string | null> {
+    try {
+      const supabase = getSupabase();
+      
+      // Insert the main content record
+      const { data: contentRecord, error: contentError } = await supabase
+        .from('ai_generated_course_content')
+        .insert({
+          course_id: courseId,
+          title: content.title || `Generated content for ${courseId}`,
+          content: JSON.stringify(content), // Store the full content as JSON
+          created_by: userId,
+          personalization_params: personalizationParams || {}
+        })
+        .select('id')
+        .single();
+      
+      if (contentError) {
+        console.error('Error saving AI-generated content:', contentError);
+        return null;
+      }
+      
+      const contentId = contentRecord.id;
+      
+      // Save individual sections if present
+      if (content.sections && Array.isArray(content.sections)) {
+        for (let i = 0; i < content.sections.length; i++) {
+          const section = content.sections[i];
+          const { error: sectionError } = await supabase
+            .from('course_content_sections')
+            .insert({
+              content_id: contentId,
+              title: section.title,
+              module_id: `module-${Math.floor(i / 3) + 1}`, // Group sections into modules (3 sections per module)
+              section_id: `section-${i + 1}`,
+              content: section.content,
+              order_index: i
+            });
+          
+          if (sectionError) {
+            console.error(`Error saving section ${i}:`, sectionError);
+          }
+        }
+      }
+      
+      // Save quizzes if present
+      if (content.quiz) {
+        const { error: quizError } = await supabase
+          .from('course_module_quizzes')
+          .insert({
+            content_id: contentId,
+            module_id: 'module-assessment',
+            quiz_data: content.quiz
+          });
+        
+        if (quizError) {
+          console.error('Error saving quiz:', quizError);
+        }
+      }
+      
+      console.log(`Successfully saved AI-generated content with ID: ${contentId}`);
+      return contentId;
+    } catch (error) {
+      console.error('Error in saveGeneratedContent:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get the most recent AI-generated content for a course
+   */
+  private async getLatestGeneratedContent(
+    courseId: string,
+    userId: string
+  ): Promise<any | null> {
+    try {
+      const supabase = getSupabase();
+      
+      // Get the latest content record
+      const { data: contentRecord, error: contentError } = await supabase
+        .from('ai_generated_course_content')
+        .select('id, title, content, created_at')
+        .eq('course_id', courseId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+      
+      if (contentError || !contentRecord) {
+        console.log('No existing AI content found, generating new content');
+        return null;
+      }
+      
+      console.log(`Found existing AI content: ${contentRecord.id}`);
+      return contentRecord.content;
+    } catch (error) {
+      console.error('Error in getLatestGeneratedContent:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Create or get learner profile
+   */
+  private async getOrCreateLearnerProfile(userId: string): Promise<any> {
+    try {
+      const supabase = getSupabase();
+      
+      // Check if profile exists
+      const { data: existingProfile, error: profileError } = await supabase
+        .from('learner_profiles')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+      
+      if (!profileError && existingProfile) {
+        return existingProfile;
+      }
+      
+      // Get user details to create a profile
+      const { data: userDetails, error: userError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', userId)
+        .single();
+      
+      if (userError) {
+        console.error('Error fetching user details:', userError);
+        return null;
+      }
+      
+      // Get employee details if available
+      const { data: employee, error: employeeError } = await supabase
+        .from('employees')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+      
+      // Create a new profile
+      const newProfile = {
+        user_id: userId,
+        learning_style: 'visual', // Default
+        preferred_content_type: 'text', // Default
+        preferred_difficulty: userDetails?.role === 'beginner' ? 'beginner' : 'intermediate',
+        skill_level: userDetails?.role === 'beginner' ? 'beginner' : 'intermediate',
+        learning_preferences: {
+          includeExamples: true,
+          includeQuizzes: true,
+          contentFormat: 'mixed'
+        } as any // Use any type to allow additional properties
+      };
+      
+      // If employee data exists, enhance the profile
+      if (!employeeError && employee) {
+        newProfile.learning_preferences = {
+          ...newProfile.learning_preferences,
+          role: employee.role,
+          department: employee.department,
+          jobTitle: employee.job_title
+        } as any; // Use any type for flexibility
+      }
+      
+      // Save the new profile
+      const { data: insertedProfile, error: insertError } = await supabase
+        .from('learner_profiles')
+        .insert(newProfile)
+        .select()
+        .single();
+      
+      if (insertError) {
+        console.error('Error creating learner profile:', insertError);
+        return newProfile; // Return unsaved profile as fallback
+      }
+      
+      return insertedProfile;
+    } catch (error) {
+      console.error('Error in getOrCreateLearnerProfile:', error);
+      return {
+        learning_style: 'visual',
+        preferred_content_type: 'text',
+        preferred_difficulty: 'intermediate',
+        skill_level: 'intermediate',
+        learning_preferences: {
+          includeExamples: true,
+          includeQuizzes: true,
+          contentFormat: 'mixed'
+        }
+      };
     }
   }
 }
