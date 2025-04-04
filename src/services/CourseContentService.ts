@@ -1,4 +1,6 @@
 import { supabase } from '@/lib/supabase';
+import { AgentFactory } from '@/agents/AgentFactory';
+import { ContentGenerationRequest } from '@/agents/types';
 
 // Define interfaces for course content
 export interface CourseResource {
@@ -305,288 +307,713 @@ class CourseContentService {
   /**
    * Generate mock course content for development and testing
    */
-  private generateMockCourseContent(
+  private async generateMockCourseContent(
     courseId: string, 
     userId: string, 
     courseData?: any, 
     enrollmentData?: any
-  ): Course {
-    // Determine course type from ID pattern
-    let title = 'Course';
-    let description = 'Course description';
-    let level = 'All Levels';
-    
-    if (courseId.startsWith('comm-skills-')) {
-      title = 'Communication Skills for Professionals';
-      description = 'Develop effective communication skills for professional environments';
-      level = 'Intermediate';
-    } else if (courseId.startsWith('data-python-')) {
-      title = 'Data Analysis with Python';
-      description = 'Learn data analysis and visualization techniques using Python';
-      level = 'Beginner';
-    } else if (courseId.startsWith('leadership-')) {
-      title = 'Leadership Essentials';
-      description = 'Core leadership skills for emerging leaders';
-      level = 'Advanced';
+  ): Promise<Course> {
+    // Try to use AI content generation when available
+    try {
+      const aiContent = await this.generateAIPersonalizedContent(courseId, userId, courseData, enrollmentData);
+      if (aiContent) {
+        console.log('Using AI-generated course content');
+        return aiContent;
+      }
+    } catch (error) {
+      console.error('Error generating AI personalized content:', error);
+      console.log('Falling back to template-based mock content');
     }
-    
-    // Use provided data if available
-    if (courseData) {
-      title = courseData.title || title;
-      description = courseData.description || description;
-      level = courseData.level || level;
+
+    // Fallback to template-based content
+    // ... existing code ...
+  }
+
+  /**
+   * Generate AI personalized content for the course
+   */
+  private async generateAIPersonalizedContent(
+    courseId: string,
+    userId: string,
+    courseData?: any,
+    enrollmentData?: any
+  ): Promise<Course | null> {
+    try {
+      // Determine course type and base details
+      let title = 'Course';
+      let description = 'Course description';
+      let level = 'All Levels';
+      
+      if (courseId.startsWith('comm-skills-')) {
+        title = 'Communication Skills for Professionals';
+        description = 'Develop effective communication skills for professional environments';
+        level = 'Intermediate';
+      } else if (courseId.startsWith('data-python-')) {
+        title = 'Data Analysis with Python';
+        description = 'Learn data analysis and visualization techniques using Python';
+        level = 'Beginner';
+      } else if (courseId.startsWith('leadership-')) {
+        title = 'Leadership Essentials';
+        description = 'Core leadership skills for emerging leaders';
+        level = 'Advanced';
+      }
+      
+      // Use provided data if available
+      if (courseData) {
+        title = courseData.title || title;
+        description = courseData.description || description;
+        level = courseData.level || level;
+      }
+
+      // Fetch user profile and preferences for personalization
+      const { data: userProfile, error: profileError } = await supabase
+        .from('learner_profiles')
+        .select('*, learning_preferences')
+        .eq('user_id', userId)
+        .single();
+        
+      // Get employee data if available
+      const { data: employeeData, error: employeeError } = await supabase
+        .from('employees')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+      
+      // Create a user profile for personalization
+      const learnerProfile = {
+        id: userId,
+        name: employeeData?.first_name 
+          ? `${employeeData.first_name} ${employeeData.last_name}` 
+          : 'Learner',
+        role: employeeData?.title || 'Employee',
+        department: employeeData?.department,
+        preferences: userProfile?.learning_preferences || {
+          preferred_learning_style: 'visual',
+          preferred_content_types: ['text', 'video'],
+          learning_goals: ['skill development']
+        }
+      };
+
+      // Initialize the agent factory
+      const agentFactory = AgentFactory.getInstance();
+      
+      // Create an educator agent
+      const educatorAgent = agentFactory.createAgent('educator') as any;
+      
+      // Content outline based on course type
+      const contentOutline = this.createContentOutlineForCourse(title, courseId);
+      
+      // Generate personalized content for the course
+      const contentRequest: any = {
+        contentType: 'course',
+        topic: title,
+        targetAudience: {
+          skillLevel: level.toLowerCase(),
+          role: learnerProfile.role,
+          department: learnerProfile.department
+        },
+        learningObjectives: contentOutline.learningObjectives,
+        keywords: contentOutline.keywords,
+        includeExamples: true,
+        includeQuizQuestions: true
+      };
+
+      // Generate content for each module
+      const moduleGenerationPromises = contentOutline.modules.map(async (moduleOutline: any) => {
+        // Create a module-specific content request
+        const moduleRequest: ContentGenerationRequest = {
+          ...contentRequest,
+          topic: moduleOutline.title,
+          learningObjectives: moduleOutline.objectives
+        };
+
+        try {
+          // Generate content for this module
+          const generatedContent = await educatorAgent.generateContentForRequest(moduleRequest);
+          
+          // Transform the generated content into the required format
+          const sections = moduleOutline.sections.map((sectionOutline: any, index: number) => {
+            // Get content from the generated content or use default
+            let sectionContent = '';
+            if (generatedContent.mainContent && generatedContent.mainContent.length > 0) {
+              // If there are sections in the generated content, use them
+              if (generatedContent.sections && generatedContent.sections.length > index) {
+                sectionContent = `<div class="prose max-w-none">${generatedContent.sections[index].content}</div>`;
+              } else {
+                // Otherwise split the main content into parts
+                const contentParts = generatedContent.mainContent.split('\n\n');
+                const partIndex = index % contentParts.length;
+                sectionContent = `<div class="prose max-w-none">${contentParts[partIndex]}</div>`;
+              }
+            } else {
+              // Fallback content
+              sectionContent = `<div class="prose max-w-none">
+                <h2>${sectionOutline.title}</h2>
+                <p>This section covers key concepts related to ${sectionOutline.title.toLowerCase()}.</p>
+              </div>`;
+            }
+
+            return {
+              id: `${courseId}-${moduleOutline.id}-section-${index + 1}`,
+              title: sectionOutline.title,
+              content: sectionContent,
+              contentType: sectionOutline.type || 'text',
+              orderIndex: index + 1,
+              duration: sectionOutline.duration || 20,
+              isCompleted: false
+            };
+          });
+
+          // Create the course module
+          return {
+            id: `${courseId}-${moduleOutline.id}`,
+            title: moduleOutline.title,
+            description: moduleOutline.description,
+            orderIndex: moduleOutline.orderIndex,
+            duration: moduleOutline.sections.reduce((total: number, s: any) => total + (s.duration || 20), 0),
+            isCompleted: false,
+            sections,
+            resources: moduleOutline.resources || []
+          };
+        } catch (error) {
+          console.error(`Error generating content for module ${moduleOutline.title}:`, error);
+          // Return a default module if content generation fails
+          return {
+            id: `${courseId}-${moduleOutline.id}`,
+            title: moduleOutline.title,
+            description: moduleOutline.description,
+            orderIndex: moduleOutline.orderIndex,
+            duration: moduleOutline.sections.reduce((total: number, s: any) => total + (s.duration || 20), 0),
+            isCompleted: false,
+            sections: moduleOutline.sections.map((sectionOutline: any, index: number) => ({
+              id: `${courseId}-${moduleOutline.id}-section-${index + 1}`,
+              title: sectionOutline.title,
+              content: `<div class="prose max-w-none">
+                <h2>${sectionOutline.title}</h2>
+                <p>This section covers key concepts related to ${sectionOutline.title.toLowerCase()}.</p>
+              </div>`,
+              contentType: sectionOutline.type || 'text',
+              orderIndex: index + 1,
+              duration: sectionOutline.duration || 20,
+              isCompleted: false
+            })),
+            resources: moduleOutline.resources || []
+          };
+        }
+      });
+
+      // Wait for all module generation to complete
+      const modules = await Promise.all(moduleGenerationPromises);
+
+      // Create the course object
+      const course: Course = {
+        id: courseId,
+        title: title,
+        description: description,
+        coverImage: courseData?.cover_image || null,
+        level: level as 'Beginner' | 'Intermediate' | 'Advanced' | 'All Levels',
+        duration: enrollmentData?.course?.estimated_duration ? `${enrollmentData.course.estimated_duration} hours` : '4.5 hours',
+        progress: enrollmentData?.progress || 0,
+        ragStatus: (enrollmentData?.rag_status || 'amber').toLowerCase() as 'red' | 'amber' | 'green',
+        enrolledDate: enrollmentData?.enrolled_date || new Date().toISOString(),
+        lastAccessed: enrollmentData?.last_accessed || new Date().toISOString(),
+        dueDate: enrollmentData?.due_date || null,
+        instructor: enrollmentData?.course?.instructor || 'Course Instructor',
+        modules
+      };
+
+      return course;
+    } catch (error) {
+      console.error('Error in AI content generation:', error);
+      return null;
     }
-    
-    // Generate modules with sections
-    const modules: CourseModule[] = [];
-    
-    // Module 1: Introduction
-    const introModule: CourseModule = {
-      id: `${courseId}-module-1`,
-      title: 'Introduction and Overview',
-      description: 'Get started with the basics and understand key concepts.',
-      orderIndex: 1,
-      duration: 60,
-      isCompleted: false,
-      resources: [
-        {
-          id: `${courseId}-resource-1`,
-          title: 'Course Handbook',
-          type: 'pdf',
-          url: '#',
-          description: 'A comprehensive guide to this course',
-          createdAt: new Date().toISOString()
-        }
+  }
+
+  /**
+   * Create a content outline for a specific course type
+   */
+  private createContentOutlineForCourse(title: string, courseId: string): any {
+    // Base outline
+    const baseOutline = {
+      title,
+      learningObjectives: [
+        'Understand core concepts and principles',
+        'Apply knowledge to practical scenarios',
+        'Develop professional expertise'
       ],
-      sections: [
-        {
-          id: `${courseId}-section-1-1`,
-          title: 'Course Introduction',
-          content: `<div class="prose max-w-none">
-            <h2>Welcome to ${title}</h2>
-            <p>This course will help you master key concepts and skills in ${description.toLowerCase()}. Through a combination of interactive content, practical exercises, and assessments, you'll build your expertise and confidence.</p>
-            <h3>Learning Objectives</h3>
-            <ul>
-              <li>Understand fundamental principles</li>
-              <li>Apply concepts to real-world scenarios</li>
-              <li>Develop practical skills that enhance your career</li>
-            </ul>
-            <p>Let's begin our learning journey!</p>
-          </div>`,
-          contentType: 'text',
-          orderIndex: 1,
-          duration: 15,
-          isCompleted: false
-        },
-        {
-          id: `${courseId}-section-1-2`,
-          title: 'Key Concepts Overview',
-          content: `<div class="prose max-w-none">
-            <h2>Essential Concepts</h2>
-            <p>Before diving deep into practical applications, it's important to understand the core concepts that form the foundation of this course.</p>
-            <p>We'll explore these ideas in detail throughout the modules, but here's a quick overview:</p>
-            <ul>
-              <li><strong>Concept 1:</strong> Understanding the fundamentals</li>
-              <li><strong>Concept 2:</strong> Building on basic principles</li>
-              <li><strong>Concept 3:</strong> Advanced applications</li>
-            </ul>
-            <p>These concepts will be reinforced through practical exercises and real-world examples.</p>
-          </div>`,
-          contentType: 'text',
-          orderIndex: 2,
-          duration: 20,
-          isCompleted: false
-        }
-      ]
-    };
-    
-    // Module 2: Core Content
-    const coreModule: CourseModule = {
-      id: `${courseId}-module-2`,
-      title: 'Core Principles',
-      description: 'Explore the essential principles and practical applications.',
-      orderIndex: 2,
-      duration: 90,
-      isCompleted: false,
-      resources: [
-        {
-          id: `${courseId}-resource-2`,
-          title: 'Supplementary Reading',
-          type: 'link',
-          url: '#',
-          description: 'Additional resources to deepen your understanding',
-          createdAt: new Date().toISOString()
-        }
-      ],
-      sections: [
-        {
-          id: `${courseId}-section-2-1`,
-          title: 'Principle One',
-          content: `<div class="prose max-w-none">
-            <h2>First Core Principle</h2>
-            <p>This section explores the first fundamental principle in detail. Understanding this concept is crucial for mastering the subject matter.</p>
-            <h3>Key Points</h3>
-            <ul>
-              <li>Important aspect #1 of this principle</li>
-              <li>Important aspect #2 of this principle</li>
-              <li>How this connects to real-world applications</li>
-            </ul>
-            <p>By the end of this section, you should be able to explain this principle in your own words and recognize its application in various contexts.</p>
-          </div>`,
-          contentType: 'text',
-          orderIndex: 1,
-          duration: 30,
-          isCompleted: false
-        },
-        {
-          id: `${courseId}-section-2-2`,
-          title: 'Principle Two',
-          content: `<div class="prose max-w-none">
-            <h2>Second Core Principle</h2>
-            <p>Building on what we learned in the previous section, we'll now explore the second core principle.</p>
-            <p>This principle extends our understanding and provides a framework for more complex applications.</p>
-            <h3>Practical Application</h3>
-            <p>Let's examine how this principle works in practice:</p>
-            <ol>
-              <li>Step 1: Identify the context</li>
-              <li>Step 2: Apply the principle</li>
-              <li>Step 3: Evaluate the outcome</li>
-            </ol>
-            <p>Practice applying this principle in different scenarios to reinforce your understanding.</p>
-          </div>`,
-          contentType: 'text',
-          orderIndex: 2,
-          duration: 30,
-          isCompleted: false
-        },
-        {
-          id: `${courseId}-section-2-3`,
-          title: 'Video Demonstration',
-          content: `<div class="prose max-w-none">
-            <h2>Visual Learning</h2>
-            <p>Sometimes concepts are easier to understand when demonstrated visually. The following video shows the practical application of what we've discussed so far.</p>
-            <div class="aspect-video bg-slate-100 rounded-md flex items-center justify-center my-4">
-              <p class="text-slate-500">Video demonstration would be embedded here</p>
-            </div>
-            <p>After watching the video, try to identify the key principles being applied and how they contribute to the overall outcome.</p>
-          </div>`,
-          contentType: 'video',
-          orderIndex: 3,
-          duration: 30,
-          isCompleted: false
-        }
-      ]
-    };
-    
-    // Module 3: Advanced Topics
-    const advancedModule: CourseModule = {
-      id: `${courseId}-module-3`,
-      title: 'Advanced Applications',
-      description: 'Take your skills to the next level with advanced techniques and applications.',
-      orderIndex: 3,
-      duration: 120,
-      isCompleted: false,
-      resources: [
-        {
-          id: `${courseId}-resource-3`,
-          title: 'Case Studies',
-          type: 'file',
-          url: '#',
-          description: 'Real-world examples and solutions',
-          createdAt: new Date().toISOString()
-        }
-      ],
-      sections: [
-        {
-          id: `${courseId}-section-3-1`,
-          title: 'Advanced Application 1',
-          content: `<div class="prose max-w-none">
-            <h2>Taking It to the Next Level</h2>
-            <p>Now that you have a solid grasp of the fundamental principles, we can explore more advanced applications.</p>
-            <p>This section introduces techniques that build upon what you've already learned but add complexity and sophistication.</p>
-            <h3>Advanced Technique Overview</h3>
-            <p>The following techniques require a strong foundation in the core principles:</p>
-            <ul>
-              <li><strong>Technique A:</strong> Extending basic concepts to complex scenarios</li>
-              <li><strong>Technique B:</strong> Combining multiple principles for comprehensive solutions</li>
-              <li><strong>Technique C:</strong> Optimizing approaches for efficiency and effectiveness</li>
-            </ul>
-            <p>We'll explore each of these in depth, with practical examples and exercises.</p>
-          </div>`,
-          contentType: 'text',
-          orderIndex: 1,
-          duration: 40,
-          isCompleted: false
-        },
-        {
-          id: `${courseId}-section-3-2`,
-          title: 'Case Study Analysis',
-          content: `<div class="prose max-w-none">
-            <h2>Learning from Real Examples</h2>
-            <p>One of the best ways to deepen your understanding is to analyze real-world cases where these principles have been applied successfully (or unsuccessfully).</p>
-            <p>In this section, we'll examine a case study that illustrates the application of what we've learned so far.</p>
-            <h3>Case Study: [Example Scenario]</h3>
-            <p><strong>Background:</strong> Brief description of the scenario and context.</p>
-            <p><strong>Challenge:</strong> What problems needed to be addressed?</p>
-            <p><strong>Solution Approach:</strong> How were the principles applied?</p>
-            <p><strong>Outcome:</strong> What results were achieved?</p>
-            <p><strong>Lessons Learned:</strong> Key takeaways from this case.</p>
-            <p>As you review this case, consider how you might apply similar approaches to challenges in your own context.</p>
-          </div>`,
-          contentType: 'text',
-          orderIndex: 2,
-          duration: 40,
-          isCompleted: false
-        },
-        {
-          id: `${courseId}-section-3-3`,
-          title: 'Practice Assessment',
-          content: `<div class="prose max-w-none">
-            <h2>Test Your Knowledge</h2>
-            <p>Now it's time to put your understanding to the test with a series of questions and exercises.</p>
-            <p>This assessment will help you identify areas where you're strong and areas that might need further review.</p>
-            <div class="bg-slate-50 p-4 rounded-md my-4">
-              <h3 class="mb-2">Sample Question 1</h3>
-              <p>In what situation would you apply Principle A instead of Principle B?</p>
-              <ul class="mt-2">
-                <li>A. When dealing with [specific scenario]</li>
-                <li>B. When the goal is to [specific outcome]</li>
-                <li>C. When resources are limited and [specific constraint]</li>
-                <li>D. All of the above</li>
-              </ul>
-              <p class="mt-2 text-sm text-slate-500">Select the best answer and check your understanding.</p>
-            </div>
-            <p>Complete the full assessment in your own time, and don't hesitate to revisit earlier sections if you need to refresh your understanding.</p>
-          </div>`,
-          contentType: 'quiz',
-          orderIndex: 3,
-          duration: 40,
-          isCompleted: false
-        }
-      ]
-    };
-    
-    // Add modules to the course
-    modules.push(introModule, coreModule, advancedModule);
-    
-    // Create the course object
-    const course: Course = {
-      id: courseId,
-      title: title,
-      description: description,
-      coverImage: courseData?.cover_image || null,
-      level: level as 'Beginner' | 'Intermediate' | 'Advanced' | 'All Levels',
-      duration: enrollmentData?.course?.estimated_duration ? `${enrollmentData.course.estimated_duration} hours` : '4.5 hours',
-      progress: enrollmentData?.progress || 0,
-      ragStatus: (enrollmentData?.rag_status || 'amber').toLowerCase() as 'red' | 'amber' | 'green',
-      enrolledDate: enrollmentData?.enrolled_date || new Date().toISOString(),
-      lastAccessed: enrollmentData?.last_accessed || new Date().toISOString(),
-      dueDate: enrollmentData?.due_date || null,
-      instructor: enrollmentData?.course?.instructor || 'Course Instructor',
-      modules
+      keywords: ['learning', 'professional development'],
+      modules: []
     };
 
-    return course;
+    // Communication Skills course
+    if (courseId.startsWith('comm-skills-')) {
+      return {
+        ...baseOutline,
+        learningObjectives: [
+          'Understand the principles of effective communication',
+          'Develop active listening skills',
+          'Master verbal and nonverbal communication techniques',
+          'Apply communication strategies in professional settings'
+        ],
+        keywords: ['communication', 'active listening', 'presentation', 'interpersonal skills', 'professional communication'],
+        modules: [
+          {
+            id: 'module-1',
+            title: 'Fundamentals of Professional Communication',
+            description: 'Understanding the core principles and importance of effective communication in professional environments.',
+            orderIndex: 1,
+            sections: [
+              { 
+                title: 'The Communication Process', 
+                type: 'text',
+                duration: 15 
+              },
+              { 
+                title: 'Barriers to Effective Communication', 
+                type: 'text',
+                duration: 20 
+              },
+              { 
+                title: 'Communication Styles Assessment', 
+                type: 'interactive',
+                duration: 25 
+              }
+            ],
+            resources: [
+              {
+                id: `${courseId}-resource-1`,
+                title: 'Communication Framework Handbook',
+                type: 'pdf',
+                url: '#',
+                description: 'A guide to understanding different communication models',
+                createdAt: new Date().toISOString()
+              }
+            ]
+          },
+          {
+            id: 'module-2',
+            title: 'Verbal and Non-Verbal Communication',
+            description: 'Mastering the art of clear verbal communication and understanding body language.',
+            orderIndex: 2,
+            sections: [
+              { 
+                title: 'Powerful Language Techniques', 
+                type: 'text',
+                duration: 20 
+              },
+              { 
+                title: 'Reading and Using Body Language', 
+                type: 'video',
+                duration: 25 
+              },
+              { 
+                title: 'Voice Modulation and Tone', 
+                type: 'text',
+                duration: 15 
+              }
+            ],
+            resources: [
+              {
+                id: `${courseId}-resource-2`,
+                title: 'Body Language in Business Settings',
+                type: 'video',
+                url: '#',
+                description: 'Expert analysis of effective non-verbal communication',
+                createdAt: new Date().toISOString()
+              }
+            ]
+          },
+          {
+            id: 'module-3',
+            title: 'Effective Workplace Communication',
+            description: 'Applying communication skills in professional contexts for better outcomes.',
+            orderIndex: 3,
+            sections: [
+              { 
+                title: 'Email and Written Communication', 
+                type: 'text',
+                duration: 20 
+              },
+              { 
+                title: 'Presentation Skills Mastery', 
+                type: 'text',
+                duration: 30 
+              },
+              { 
+                title: 'Difficult Conversations', 
+                type: 'text',
+                duration: 25 
+              },
+              { 
+                title: 'Communication Skills Assessment', 
+                type: 'quiz',
+                duration: 20 
+              }
+            ],
+            resources: [
+              {
+                id: `${courseId}-resource-3`,
+                title: 'Email Templates for Professionals',
+                type: 'file',
+                url: '#',
+                description: 'Ready-to-use templates for common business scenarios',
+                createdAt: new Date().toISOString()
+              }
+            ]
+          }
+        ]
+      };
+    } 
+    // Data Analysis with Python course
+    else if (courseId.startsWith('data-python-')) {
+      return {
+        ...baseOutline,
+        learningObjectives: [
+          'Understand Python fundamentals for data analysis',
+          'Master key data manipulation libraries (NumPy, Pandas)',
+          'Create effective data visualizations',
+          'Apply statistical analysis techniques to real datasets'
+        ],
+        keywords: ['python', 'data analysis', 'pandas', 'numpy', 'visualization', 'statistics'],
+        modules: [
+          {
+            id: 'module-1',
+            title: 'Python Fundamentals for Data Analysis',
+            description: 'Core Python concepts essential for data analysis work.',
+            orderIndex: 1,
+            sections: [
+              { 
+                title: 'Python Data Structures for Analysis', 
+                type: 'text',
+                duration: 25 
+              },
+              { 
+                title: 'Working with Files and Data Sources', 
+                type: 'text',
+                duration: 20 
+              },
+              { 
+                title: 'Python Functions for Data Manipulation', 
+                type: 'text',
+                duration: 30 
+              }
+            ],
+            resources: [
+              {
+                id: `${courseId}-resource-1`,
+                title: 'Python Cheat Sheet for Data Analysis',
+                type: 'pdf',
+                url: '#',
+                description: 'Quick reference for Python data functions',
+                createdAt: new Date().toISOString()
+              }
+            ]
+          },
+          {
+            id: 'module-2',
+            title: 'Data Manipulation with NumPy and Pandas',
+            description: 'Using Python libraries to clean, transform, and analyze data effectively.',
+            orderIndex: 2,
+            sections: [
+              { 
+                title: 'NumPy Arrays and Operations', 
+                type: 'text',
+                duration: 30 
+              },
+              { 
+                title: 'Pandas DataFrames and Series', 
+                type: 'text',
+                duration: 35 
+              },
+              { 
+                title: 'Data Cleaning Techniques', 
+                type: 'text',
+                duration: 25 
+              },
+              { 
+                title: 'Practical Data Manipulation Exercise', 
+                type: 'interactive',
+                duration: 40 
+              }
+            ],
+            resources: [
+              {
+                id: `${courseId}-resource-2`,
+                title: 'Sample Datasets',
+                type: 'file',
+                url: '#',
+                description: 'Practice datasets for exercises',
+                createdAt: new Date().toISOString()
+              }
+            ]
+          },
+          {
+            id: 'module-3',
+            title: 'Data Visualization and Analysis',
+            description: 'Creating meaningful visualizations and drawing insights from data.',
+            orderIndex: 3,
+            sections: [
+              { 
+                title: 'Visualization with Matplotlib and Seaborn', 
+                type: 'text',
+                duration: 35 
+              },
+              { 
+                title: 'Statistical Analysis Fundamentals', 
+                type: 'text',
+                duration: 30 
+              },
+              { 
+                title: 'Creating Interactive Dashboards', 
+                type: 'video',
+                duration: 25 
+              },
+              { 
+                title: 'Final Project: Data Analysis Report', 
+                type: 'interactive',
+                duration: 45 
+              }
+            ],
+            resources: [
+              {
+                id: `${courseId}-resource-3`,
+                title: 'Visualization Best Practices',
+                type: 'link',
+                url: '#',
+                description: 'Guide to creating effective data visualizations',
+                createdAt: new Date().toISOString()
+              }
+            ]
+          }
+        ]
+      };
+    } 
+    // Leadership course
+    else if (courseId.startsWith('leadership-')) {
+      return {
+        ...baseOutline,
+        learningObjectives: [
+          'Understand core leadership principles and styles',
+          'Develop effective team management techniques',
+          'Master strategic decision-making processes',
+          'Build emotional intelligence and interpersonal skills'
+        ],
+        keywords: ['leadership', 'management', 'team building', 'strategic thinking', 'emotional intelligence'],
+        modules: [
+          {
+            id: 'module-1',
+            title: 'Leadership Foundations',
+            description: 'Understanding the core principles and theories of effective leadership.',
+            orderIndex: 1,
+            sections: [
+              { 
+                title: 'Leadership Styles and Their Impact', 
+                type: 'text',
+                duration: 25 
+              },
+              { 
+                title: 'Traits of Effective Leaders', 
+                type: 'text',
+                duration: 20 
+              },
+              { 
+                title: 'Leadership Self-Assessment', 
+                type: 'interactive',
+                duration: 30 
+              }
+            ],
+            resources: [
+              {
+                id: `${courseId}-resource-1`,
+                title: 'Leadership Models Overview',
+                type: 'pdf',
+                url: '#',
+                description: 'Comprehensive guide to leadership theories',
+                createdAt: new Date().toISOString()
+              }
+            ]
+          },
+          {
+            id: 'module-2',
+            title: 'Team Leadership and Management',
+            description: 'Building and managing high-performing teams through effective leadership.',
+            orderIndex: 2,
+            sections: [
+              { 
+                title: 'Building High-Performance Teams', 
+                type: 'text',
+                duration: 30 
+              },
+              { 
+                title: 'Effective Delegation and Empowerment', 
+                type: 'text',
+                duration: 25 
+              },
+              { 
+                title: 'Managing Team Dynamics and Conflict', 
+                type: 'text',
+                duration: 30 
+              },
+              { 
+                title: 'Team Leadership Case Study', 
+                type: 'interactive',
+                duration: 35 
+              }
+            ],
+            resources: [
+              {
+                id: `${courseId}-resource-2`,
+                title: 'Team Performance Assessment Tool',
+                type: 'link',
+                url: '#',
+                description: 'Interactive tool for evaluating team effectiveness',
+                createdAt: new Date().toISOString()
+              }
+            ]
+          },
+          {
+            id: 'module-3',
+            title: 'Strategic Leadership and Decision Making',
+            description: 'Developing strategic thinking and effective decision-making capabilities.',
+            orderIndex: 3,
+            sections: [
+              { 
+                title: 'Strategic Vision and Planning', 
+                type: 'text',
+                duration: 30 
+              },
+              { 
+                title: 'Critical Decision-Making Frameworks', 
+                type: 'text',
+                duration: 25 
+              },
+              { 
+                title: 'Leading Organizational Change', 
+                type: 'video',
+                duration: 35 
+              },
+              { 
+                title: 'Leadership Capstone Challenge', 
+                type: 'quiz',
+                duration: 40 
+              }
+            ],
+            resources: [
+              {
+                id: `${courseId}-resource-3`,
+                title: 'Decision-Making Models',
+                type: 'file',
+                url: '#',
+                description: 'Templates for strategic decision-making processes',
+                createdAt: new Date().toISOString()
+              }
+            ]
+          }
+        ]
+      };
+    } 
+    // Default generic course
+    else {
+      return {
+        ...baseOutline,
+        modules: [
+          {
+            id: 'module-1',
+            title: 'Introduction and Overview',
+            description: 'Get started with the basics and understand key concepts.',
+            orderIndex: 1,
+            sections: [
+              { 
+                title: 'Course Introduction', 
+                type: 'text',
+                duration: 15 
+              },
+              { 
+                title: 'Key Concepts Overview', 
+                type: 'text',
+                duration: 20 
+              }
+            ],
+            resources: [
+              {
+                id: `${courseId}-resource-1`,
+                title: 'Course Handbook',
+                type: 'pdf',
+                url: '#',
+                description: 'A comprehensive guide to this course',
+                createdAt: new Date().toISOString()
+              }
+            ]
+          },
+          {
+            id: 'module-2',
+            title: 'Core Principles',
+            description: 'Explore the essential principles and practical applications.',
+            orderIndex: 2,
+            sections: [
+              { 
+                title: 'Principle One', 
+                type: 'text',
+                duration: 30 
+              },
+              { 
+                title: 'Principle Two', 
+                type: 'text',
+                duration: 30 
+              },
+              { 
+                title: 'Video Demonstration', 
+                type: 'video',
+                duration: 30 
+              }
+            ],
+            resources: [
+              {
+                id: `${courseId}-resource-2`,
+                title: 'Supplementary Reading',
+                type: 'link',
+                url: '#',
+                description: 'Additional resources to deepen your understanding',
+                createdAt: new Date().toISOString()
+              }
+            ]
+          },
+          {
+            id: 'module-3',
+            title: 'Advanced Applications',
+            description: 'Take your skills to the next level with advanced techniques and applications.',
+            orderIndex: 3,
+            sections: [
+              { 
+                title: 'Advanced Application 1', 
+                type: 'text',
+                duration: 40 
+              },
+              { 
+                title: 'Case Study Analysis', 
+                type: 'text',
+                duration: 40 
+              },
+              { 
+                title: 'Practice Assessment', 
+                type: 'quiz',
+                duration: 40 
+              }
+            ],
+            resources: [
+              {
+                id: `${courseId}-resource-3`,
+                title: 'Case Studies',
+                type: 'file',
+                url: '#',
+                description: 'Real-world examples and solutions',
+                createdAt: new Date().toISOString()
+              }
+            ]
+          }
+        ]
+      };
+    }
   }
 
   /**
