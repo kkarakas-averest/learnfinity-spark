@@ -46,8 +46,9 @@ const CourseBuilderAIGenerator: React.FC = () => {
     try {
       setIsGenerating(true);
       
-      // Call the API to generate the course
-      const response = await fetch('/api/courses/generate-with-groq', {
+      // Call the API to generate the course - use the full URL format that works in production
+      const baseUrl = window.location.origin;
+      const response = await fetch(`${baseUrl}/api/courses/generate-with-groq`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -58,7 +59,7 @@ const CourseBuilderAIGenerator: React.FC = () => {
           modules,
           sectionsPerModule,
           includeQuiz,
-          userId: 'hr-user', // Use a fixed ID for HR users for now
+          userId: '00000000-0000-0000-0000-000000000000', // Valid UUID format for a system user
           customization: {
             skillLevel,
           },

@@ -1,6 +1,7 @@
-import { NextResponse, NextRequest } from 'next/server';
-import { generateCourseWithGroq } from '@/lib/groq';
-import { getSupabase } from '@/lib/supabase';
+// Adapter for the Next.js App Router API route to work with Vercel's current configuration
+
+import { generateCourseWithGroq } from '../../src/lib/groq.js';
+import { getSupabase } from '../../src/lib/supabase.js';
 import { z } from 'zod';
 
 // Define validation schema for request
@@ -10,7 +11,7 @@ const requestSchema = z.object({
   modules: z.number().min(1).max(5).optional(),
   sectionsPerModule: z.number().min(1).max(5).optional(),
   includeQuiz: z.boolean().optional(),
-  userId: z.string(), // Accept any string ID for flexibility
+  userId: z.string(), // Accept any string ID
   customization: z.object({
     skillLevel: z.string().optional(),
     learningStyle: z.string().optional(),
@@ -18,18 +19,22 @@ const requestSchema = z.object({
   }).optional()
 });
 
-export async function POST(req: NextRequest) {
+export default async function handler(req, res) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed. Use POST.' });
+  }
+
   try {
     // Parse request body
-    const body = await req.json();
+    const body = req.body;
     
     // Validate the request
     const validationResult = requestSchema.safeParse(body);
     if (!validationResult.success) {
-      return NextResponse.json(
-        { error: 'Invalid request data', details: validationResult.error.format() },
-        { status: 400 }
-      );
+      return res.status(400).json({ 
+        error: 'Invalid request data', 
+        details: validationResult.error.format() 
+      });
     }
     
     const { 
@@ -77,10 +82,7 @@ export async function POST(req: NextRequest) {
     
     if (courseError) {
       console.error('Error creating course:', courseError);
-      return NextResponse.json(
-        { error: 'Failed to create course record' },
-        { status: 500 }
-      );
+      return res.status(500).json({ error: 'Failed to create course record' });
     }
     
     // 2. Create enrollment for the user
@@ -119,10 +121,7 @@ export async function POST(req: NextRequest) {
     
     if (aiContentError) {
       console.error('Error saving AI content:', aiContentError);
-      return NextResponse.json(
-        { error: 'Failed to save AI-generated content' },
-        { status: 500 }
-      );
+      return res.status(500).json({ error: 'Failed to save AI-generated content' });
     }
     
     // 4. Create modules and sections
@@ -213,22 +212,21 @@ export async function POST(req: NextRequest) {
       }
     }
     
-    return NextResponse.json({
+    return res.status(200).json({
       success: true,
       message: 'Course generated and saved successfully',
       courseId,
       title: courseData.title,
       description: courseData.description,
       modules: courseData.modules.length,
-      sections: courseData.modules.reduce((total: number, module: any) => total + module.sections.length, 0),
+      sections: courseData.modules.reduce((total, module) => total + module.sections.length, 0),
       quizzes: courseData.quizzes?.length || 0
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error generating course with GroqAPI:', error);
     
-    return NextResponse.json(
-      { error: error.message || 'Failed to generate course content' },
-      { status: 500 }
-    );
+    return res.status(500).json({
+      error: error.message || 'Failed to generate course content'
+    });
   }
 } 
