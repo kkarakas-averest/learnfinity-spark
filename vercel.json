@@ -1,16 +1,16 @@
 {
   "version": 2,
-  "public": false,
+  "buildCommand": "pnpm run vercel-build",
+  "outputDirectory": "dist",
+  "installCommand": "pnpm install",
   "github": {
     "enabled": true,
-    "silent": false,
-    "autoJobCancelation": true
+    "silent": false
   },
   "builds": [
     {
       "src": "package.json",
-      "use": "@vercel/static-build",
-      "config": { "distDir": "dist" }
+      "use": "@vercel/node"
     },
     {
       "src": "api/**/*.js",
@@ -18,17 +18,24 @@
     }
   ],
   "routes": [
-    { "handle": "filesystem" },
-    { "src": "/api/(.*)", "dest": "/api/$1" },
-    { "src": "/(.*)", "dest": "/index.html" }
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/"
+    }
   ],
-  "buildCommand": "pnpm run vercel-build",
   "env": {
-    "VITE_SUPABASE_URL": "@supabase_url",
-    "VITE_SUPABASE_ANON_KEY": "@supabase_anon_key",
-    "VITE_SUPABASE_SERVICE_KEY": "@supabase_service_key",
-    "SUPABASE_URL": "@supabase_url",
-    "SUPABASE_ANON_KEY": "@supabase_anon_key",
-    "SUPABASE_SERVICE_KEY": "@supabase_service_key"
+    "VITE_SUPABASE_URL": "${VITE_SUPABASE_URL}",
+    "VITE_SUPABASE_ANON_KEY": "${VITE_SUPABASE_ANON_KEY}",
+    "VITE_SUPABASE_SERVICE_KEY": "${VITE_SUPABASE_SERVICE_KEY}",
+    "SUPABASE_URL": "${VITE_SUPABASE_URL}",
+    "SUPABASE_ANON_KEY": "${VITE_SUPABASE_ANON_KEY}",
+    "SUPABASE_SERVICE_KEY": "${VITE_SUPABASE_SERVICE_KEY}",
+    "NODE_ENV": "production",
+    "VERCEL_DEPLOYMENT": "true",
+    "DEPLOYMENT_TIMESTAMP": "2025-04-04-force-deploy"
   }
 } 

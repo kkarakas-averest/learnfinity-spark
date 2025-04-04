@@ -192,3 +192,47 @@ See `/src/components/notifications/README.md` for detailed documentation.
 This project is licensed under the MIT License - see the LICENSE file for details.
 
 <!-- Latest deployment trigger: 2025-04-04 -->
+
+# Learnfinity Spark
+
+Learning Management System platform.
+
+## Deployment Status
+
+Latest deployment: 2025-04-04-force-deploy
+
+This deployment includes critical fixes for:
+- Supabase direct connection with table existence checks
+- API endpoint handling with improved error recovery
+- Environment variable handling for Vercel deployments
+
+## Local Development
+
+```bash
+# Install dependencies
+pnpm install
+
+# Start the development server
+pnpm run dev
+
+# Build for production
+pnpm run build
+```
+
+## Environment Variables
+
+Make sure to set up the following environment variables:
+
+```
+VITE_SUPABASE_URL=your_supabase_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+VITE_SUPABASE_SERVICE_KEY=your_supabase_service_role_key
+```
+
+## API Server
+
+For local development with the API server:
+
+```bash
+pnpm run dev:cors-server
+```
