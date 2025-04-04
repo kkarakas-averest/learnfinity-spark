@@ -222,7 +222,42 @@ export default async function handler(req, res) {
         const supabase = createClient(supabaseUrl, supabaseKey);
         
         // Attempt to query real data
-        // This is simplified - in a real scenario, you'd make multiple queries to build the response
+        // First, let's check which tables actually exist
+        let availableTables = [];
+        try {
+          // Get list of tables
+          console.log(`API (Vercel): Checking available tables`);
+          const { data: tableData } = await supabase
+            .from('_metadata')
+            .select('*')
+            .limit(1)
+            .catch(e => {
+              console.log(`API (Vercel): Metadata query failed, using direct queries to check tables`);
+              return { data: null };
+            });
+            
+          // If metadata check fails, check existence of common tables directly
+          const tablesCheck = [
+            supabase.from('users').select('count').limit(1),
+            supabase.from('courses').select('count').limit(1),
+            supabase.from('learning_paths').select('count').limit(1)
+          ];
+          
+          const results = await Promise.allSettled(tablesCheck);
+          
+          // Get available tables based on successful queries
+          availableTables = [
+            results[0].status === 'fulfilled' && !results[0].value.error ? 'users' : null,
+            results[1].status === 'fulfilled' && !results[1].value.error ? 'courses' : null,
+            results[2].status === 'fulfilled' && !results[2].value.error ? 'learning_paths' : null
+          ].filter(Boolean);
+          
+          console.log(`API (Vercel): Available tables: ${availableTables.join(', ')}`);
+        } catch (error) {
+          console.error(`API (Vercel): Table check error: ${error.message}`);
+        }
+        
+        // Get user profile
         const { data: userProfile, error: profileError } = await supabase
           .from('users')
           .select('*')
@@ -235,20 +270,97 @@ export default async function handler(req, res) {
           dashboardData = generateMockDashboardData(userId);
         } else {
           // If profile is found, fetch additional data (courses, learning paths)
-          // This would be expanded in a real implementation
           console.log(`API (Vercel): Found user profile for ${userId}`);
           
-          // For demonstration, still use mock data but integrate real user info
+          // Get courses from the appropriate table
+          let courses = [];
+          if (availableTables.includes('courses')) {
+            try {
+              const { data: coursesData, error: coursesError } = await supabase
+                .from('courses')
+                .select('*')
+                .limit(10);
+                
+              if (!coursesError && coursesData) {
+                courses = coursesData.map(course => ({
+                  id: course.id,
+                  title: course.title || 'Untitled Course',
+                  description: course.description || 'No description available',
+                  duration: course.duration || 240,
+                  progress: course.progress || Math.floor(Math.random() * 100),
+                  completedSections: course.completed_sections || Math.floor(Math.random() * 5),
+                  totalSections: course.total_sections || 10,
+                  thumbnailUrl: course.thumbnail_url || "https://via.placeholder.com/300x200",
+                  featured: !!course.featured,
+                  category: course.category || "Development",
+                  skills: course.skills || ["Programming"],
+                  ragStatus: course.rag_status || "amber",
+                  learningPathId: course.learning_path_id || "path-01",
+                  learningPathName: course.learning_path_name || "Development Path"
+                }));
+                console.log(`API (Vercel): Found ${courses.length} courses`);
+              }
+            } catch (error) {
+              console.error(`API (Vercel): Error fetching courses: ${error.message}`);
+            }
+          }
+          
+          // Get learning paths from the appropriate table
+          let learningPaths = [];
+          if (availableTables.includes('learning_paths')) {
+            try {
+              const { data: pathsData, error: pathsError } = await supabase
+                .from('learning_paths')
+                .select('*')
+                .limit(10);
+                
+              if (!pathsError && pathsData) {
+                learningPaths = pathsData.map(path => ({
+                  id: path.id,
+                  title: path.title || 'Untitled Path',
+                  description: path.description || 'No description available',
+                  thumbnail_url: path.thumbnail_url || "https://via.placeholder.com/300x200",
+                  category: path.category || "Development",
+                  course_count: path.course_count || 3,
+                  completed_courses: path.completed_courses || 1,
+                  progress: path.progress || Math.floor(Math.random() * 100),
+                  path_type: path.path_type || "enrolled",
+                  due_date: path.due_date || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+                  assigned_date: path.assigned_date || new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString()
+                }));
+                console.log(`API (Vercel): Found ${learningPaths.length} learning paths`);
+              }
+            } catch (error) {
+              console.error(`API (Vercel): Error fetching learning paths: ${error.message}`);
+            }
+          }
+          
+          // For demonstration, combine real user data with courses/paths (or mock if none found)
           const mockData = generateMockDashboardData(userId);
           
-          // Merge real user profile data with mock data
+          // Merge real user profile data with available real data and mock data for missing parts
           dashboardData = {
-            ...mockData,
             profile: {
               ...mockData.profile,
               id: userProfile.id || userId,
               name: userProfile.name || mockData.profile.name,
               email: userProfile.email || mockData.profile.email,
+            },
+            courses: {
+              total: courses.length || mockData.courses.total,
+              featured: courses.length > 0 ? courses[0] : mockData.courses.featured,
+              inProgress: Math.floor((courses.length || 5) / 2),
+              completed: Math.floor((courses.length || 5) / 3),
+              notStarted: (courses.length || 5) - (Math.floor((courses.length || 5) / 2) + Math.floor((courses.length || 5) / 3)),
+              hrAssigned: Math.floor((courses.length || 5) / 4),
+              items: courses.length > 0 ? courses : mockData.courses.items
+            },
+            learningPaths: learningPaths.length > 0 ? learningPaths : mockData.learningPaths,
+            stats: {
+              coursesCompleted: Math.floor((courses.length || 5) / 3),
+              learningPathsCompleted: 0,
+              assignedCourses: Math.floor((courses.length || 5) / 4),
+              skillsAcquired: 3
             }
           };
         }
