@@ -409,6 +409,41 @@ class CourseContentService {
     enrollmentData?: any
   ): Promise<Course | null> {
     try {
+      // Check if we already have personalized content for this user and course
+      const { data: existingContent, error: contentError } = await supabase
+        .from('ai_course_content')
+        .select('*')
+        .eq('course_id', courseId)
+        .eq('created_for_user_id', userId)
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      // If we have existing active content, use it
+      if (existingContent && !contentError) {
+        console.log(`Found existing personalized content for course ${courseId} and user ${userId}`);
+        
+        // Retrieve the sections for this content
+        const { data: contentSections, error: sectionsError } = await supabase
+          .from('ai_course_content_sections')
+          .select('*')
+          .eq('content_id', existingContent.id)
+          .order('order_index', { ascending: true });
+          
+        if (contentSections && !sectionsError) {
+          return this.assemblePersonalizedCourse(
+            courseId, 
+            existingContent, 
+            contentSections, 
+            courseData, 
+            enrollmentData
+          );
+        }
+      }
+      
+      console.log(`Generating new personalized content for course ${courseId} and user ${userId}`);
+      
       // Determine course type and base details
       let title = 'Course';
       let description = 'Course description';
@@ -438,7 +473,7 @@ class CourseContentService {
       // Fetch user profile and preferences for personalization
       const { data: userProfile, error: profileError } = await supabase
         .from('learner_profiles')
-        .select('*, learning_preferences')
+        .select('*')
         .eq('user_id', userId)
         .single();
         
@@ -455,9 +490,9 @@ class CourseContentService {
         name: employeeData?.first_name 
           ? `${employeeData.first_name} ${employeeData.last_name}` 
           : 'Learner',
-        role: employeeData?.title || 'Employee',
-        department: employeeData?.department,
-        preferences: userProfile?.learning_preferences || {
+        role: employeeData?.title || userProfile?.title || 'Employee',
+        department: employeeData?.department || userProfile?.department,
+        preferences: userProfile?.preferences || {
           preferred_learning_style: 'visual',
           preferred_content_types: ['text', 'video'],
           learning_goals: ['skill development']
@@ -488,6 +523,45 @@ class CourseContentService {
         includeQuizQuestions: true
       };
 
+      // Create personalization context to store with the content
+      const personalizationContext = {
+        userProfile: {
+          role: learnerProfile.role,
+          department: learnerProfile.department,
+          preferences: learnerProfile.preferences
+        },
+        courseContext: {
+          title,
+          level,
+          learningObjectives: contentOutline.learningObjectives
+        }
+      };
+
+      // Create a new AI course content record
+      const { data: newContentRecord, error: newContentError } = await supabase
+        .from('ai_course_content')
+        .insert({
+          course_id: courseId,
+          version: `v1-${Date.now()}`,
+          created_for_user_id: userId,
+          metadata: {
+            title,
+            description,
+            level
+          },
+          personalization_context: personalizationContext,
+          is_active: true
+        })
+        .select()
+        .single();
+        
+      if (newContentError) {
+        console.error('Error creating AI course content record:', newContentError);
+        throw new Error('Failed to create content record');
+      }
+      
+      const contentId = newContentRecord.id;
+
       // Generate content for each module
       const moduleGenerationPromises = contentOutline.modules.map(async (moduleOutline: any) => {
         // Create a module-specific content request
@@ -501,36 +575,84 @@ class CourseContentService {
           // Generate content for this module
           const generatedContent = await educatorAgent.generateContentForRequest(moduleRequest);
           
-          // Transform the generated content into the required format
-          const sections = moduleOutline.sections.map((sectionOutline: any, index: number) => {
+          // Transform the generated content into the required format and save sections
+          const sectionPromises = moduleOutline.sections.map(async (sectionOutline: any, index: number) => {
             // Get content from the generated content or use default
             let sectionContent = '';
+            let sectionHtml = '';
+            
             // Check if generatedContent exists and has the expected properties
             if (generatedContent && generatedContent.mainContent && generatedContent.mainContent.length > 0) {
               // If there are sections in the generated content, use them
               if (generatedContent.sections && generatedContent.sections.length > index) {
-                sectionContent = `<div class="prose max-w-none">${generatedContent.sections[index].content}</div>`;
+                sectionContent = generatedContent.sections[index].content;
+                sectionHtml = `<div class="prose max-w-none">${sectionContent}</div>`;
               } else {
                 // Otherwise split the main content into parts
                 const contentParts = generatedContent.mainContent.split('\n\n');
                 const partIndex = index % contentParts.length;
-                sectionContent = `<div class="prose max-w-none">${contentParts[partIndex]}</div>`;
+                sectionContent = contentParts[partIndex];
+                sectionHtml = `<div class="prose max-w-none">${sectionContent}</div>`;
               }
             } else {
               // Fallback content with more detailed information
-              sectionContent = this.generateMockSectionContent(moduleOutline.title, sectionOutline.title);
+              sectionHtml = this.generateMockSectionContent(moduleOutline.title, sectionOutline.title);
+              sectionContent = sectionHtml.replace(/<\/?[^>]+(>|$)/g, ""); // Strip HTML
+            }
+            
+            // Save the section to the database
+            const { data: sectionRecord, error: sectionError } = await supabase
+              .from('ai_course_content_sections')
+              .insert({
+                content_id: contentId,
+                module_id: moduleOutline.id,
+                section_id: `${moduleOutline.id}-section-${index + 1}`,
+                title: sectionOutline.title,
+                content: sectionHtml,
+                order_index: index
+              })
+              .select()
+              .single();
+              
+            if (sectionError) {
+              console.error(`Error saving section ${sectionOutline.title}:`, sectionError);
             }
 
             return {
               id: `${courseId}-${moduleOutline.id}-section-${index + 1}`,
               title: sectionOutline.title,
-              content: sectionContent,
+              content: sectionHtml,
               contentType: sectionOutline.type || 'text',
               orderIndex: index + 1,
               duration: sectionOutline.duration || 20,
               isCompleted: false
             };
           });
+
+          // Wait for all sections to be processed
+          const sections = await Promise.all(sectionPromises);
+
+          // Save quiz questions if available
+          if (generatedContent && generatedContent.quiz && generatedContent.quiz.questions) {
+            const quizQuestions = generatedContent.quiz.questions;
+            
+            for (const question of quizQuestions) {
+              const { error: questionError } = await supabase
+                .from('ai_course_quiz_questions')
+                .insert({
+                  content_id: contentId,
+                  module_id: moduleOutline.id,
+                  question: question.question,
+                  options: question.options || [],
+                  correct_answer: question.correctAnswer,
+                  explanation: question.explanation
+                });
+                
+              if (questionError) {
+                console.error(`Error saving quiz question:`, questionError);
+              }
+            }
+          }
 
           // Create the course module
           return {
@@ -592,6 +714,75 @@ class CourseContentService {
       console.error('Error in AI content generation:', error);
       return null;
     }
+  }
+  
+  /**
+   * Assemble a course object from stored personalized content
+   */
+  private assemblePersonalizedCourse(
+    courseId: string,
+    contentRecord: any,
+    contentSections: any[],
+    courseData?: any,
+    enrollmentData?: any
+  ): Course {
+    // Group sections by module
+    const sectionsByModule = contentSections.reduce((grouped: any, section: any) => {
+      if (!grouped[section.module_id]) {
+        grouped[section.module_id] = [];
+      }
+      grouped[section.module_id].push(section);
+      return grouped;
+    }, {});
+    
+    // Get course metadata from content record
+    const metadata = contentRecord.metadata || {};
+    
+    // Create modules from grouped sections
+    const modules = Object.entries(sectionsByModule).map(([moduleId, moduleSections]: [string, any[]], moduleIndex) => {
+      // Sort sections by order_index
+      const sortedSections = [...moduleSections].sort((a, b) => a.order_index - b.order_index);
+      
+      // Create section objects
+      const sections = sortedSections.map((section, sectionIndex) => ({
+        id: section.section_id || `${courseId}-${moduleId}-section-${sectionIndex + 1}`,
+        title: section.title,
+        content: section.content,
+        contentType: 'text' as 'text' | 'video' | 'quiz' | 'interactive',
+        orderIndex: section.order_index || sectionIndex + 1,
+        duration: 20,
+        isCompleted: false
+      }));
+      
+      // Create module object
+      return {
+        id: `${courseId}-${moduleId}`,
+        title: moduleId.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+        description: `Module ${moduleIndex + 1} of the course`,
+        orderIndex: moduleIndex + 1,
+        duration: sections.length * 20,
+        isCompleted: false,
+        sections,
+        resources: []
+      };
+    });
+    
+    // Create the course object
+    return {
+      id: courseId,
+      title: metadata.title || 'Personalized Course',
+      description: metadata.description || 'A personalized learning experience',
+      coverImage: courseData?.cover_image || null,
+      level: metadata.level as 'Beginner' | 'Intermediate' | 'Advanced' | 'All Levels' || 'All Levels',
+      duration: enrollmentData?.course?.estimated_duration ? `${enrollmentData.course.estimated_duration} hours` : `${modules.length * 1.5} hours`,
+      progress: enrollmentData?.progress || 0,
+      ragStatus: (enrollmentData?.rag_status || 'amber').toLowerCase() as 'red' | 'amber' | 'green',
+      enrolledDate: enrollmentData?.enrolled_date || contentRecord.created_at || new Date().toISOString(),
+      lastAccessed: enrollmentData?.last_accessed || new Date().toISOString(),
+      dueDate: enrollmentData?.due_date || null,
+      instructor: enrollmentData?.course?.instructor || 'Course Instructor',
+      modules
+    };
   }
 
   /**
