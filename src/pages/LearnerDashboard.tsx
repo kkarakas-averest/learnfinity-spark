@@ -164,12 +164,13 @@ const LearnerDashboard: React.FC = () => {
   const fetchWithFallback = async (endpoint: string, userId: string) => {
     // Get the current hostname for production detection
     const isProduction = window.location.hostname !== 'localhost';
+    const isVercel = window.location.hostname.includes('vercel.app');
     
     console.log(`Attempting to fetch ${endpoint} data for userId=${userId}`);
     
     // Create sources array with appropriate ordering
     const sources = [
-      // Always try same-origin first since we fixed the proxy
+      // Always try same-origin first which works in both development and production
       { 
         label: "same-origin", 
         url: `/api/learner/${endpoint}?userId=${userId}`,
@@ -181,7 +182,7 @@ const LearnerDashboard: React.FC = () => {
       }
     ];
     
-    // In development mode, add direct API connections as fallbacks
+    // Only add direct localhost connections in development, not in production
     if (!isProduction) {
       sources.push(
         { 
