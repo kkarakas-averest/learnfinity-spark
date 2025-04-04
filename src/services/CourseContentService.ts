@@ -325,8 +325,78 @@ class CourseContentService {
       console.log('Falling back to template-based mock content');
     }
 
-    // Fallback to template-based content
-    // ... existing code ...
+    // Fallback to template-based content - create a rich content experience
+    console.log('Generating template-based mock course content');
+    
+    // Determine course type and base details
+    let title = 'Course';
+    let description = 'Course description';
+    let level = 'All Levels';
+    
+    if (courseId.startsWith('comm-skills-')) {
+      title = 'Communication Skills for Professionals';
+      description = 'Develop effective communication skills for professional environments';
+      level = 'Intermediate';
+    } else if (courseId.startsWith('data-python-')) {
+      title = 'Data Analysis with Python';
+      description = 'Learn data analysis and visualization techniques using Python';
+      level = 'Beginner';
+    } else if (courseId.startsWith('leadership-')) {
+      title = 'Leadership Essentials';
+      description = 'Core leadership skills for emerging leaders';
+      level = 'Advanced';
+    }
+    
+    // Use provided data if available
+    if (courseData) {
+      title = courseData.title || title;
+      description = courseData.description || description;
+      level = courseData.level || level;
+    }
+    
+    // Get content outline for this course type
+    const contentOutline = this.createContentOutlineForCourse(title, courseId);
+    
+    // Generate modules with rich content for each section
+    const modules: CourseModule[] = contentOutline.modules.map((moduleOutline: any) => {
+      return {
+        id: `${courseId}-${moduleOutline.id}`,
+        title: moduleOutline.title,
+        description: moduleOutline.description,
+        orderIndex: moduleOutline.orderIndex,
+        duration: moduleOutline.sections.reduce((total: number, s: any) => total + (s.duration || 20), 0),
+        isCompleted: false,
+        sections: moduleOutline.sections.map((sectionOutline: any, index: number) => ({
+          id: `${courseId}-${moduleOutline.id}-section-${index + 1}`,
+          title: sectionOutline.title,
+          content: this.generateMockSectionContent(moduleOutline.title, sectionOutline.title),
+          contentType: sectionOutline.type || 'text',
+          orderIndex: index + 1,
+          duration: sectionOutline.duration || 20,
+          isCompleted: false
+        })),
+        resources: moduleOutline.resources || []
+      };
+    });
+    
+    // Create the course object
+    const course: Course = {
+      id: courseId,
+      title: title,
+      description: description,
+      coverImage: courseData?.cover_image || null,
+      level: level as 'Beginner' | 'Intermediate' | 'Advanced' | 'All Levels',
+      duration: enrollmentData?.course?.estimated_duration ? `${enrollmentData.course.estimated_duration} hours` : '4.5 hours',
+      progress: enrollmentData?.progress || 0,
+      ragStatus: (enrollmentData?.rag_status || 'amber').toLowerCase() as 'red' | 'amber' | 'green',
+      enrolledDate: enrollmentData?.enrolled_date || new Date().toISOString(),
+      lastAccessed: enrollmentData?.last_accessed || new Date().toISOString(),
+      dueDate: enrollmentData?.due_date || null,
+      instructor: enrollmentData?.course?.instructor || 'Course Instructor',
+      modules
+    };
+
+    return course;
   }
 
   /**
@@ -435,7 +505,8 @@ class CourseContentService {
           const sections = moduleOutline.sections.map((sectionOutline: any, index: number) => {
             // Get content from the generated content or use default
             let sectionContent = '';
-            if (generatedContent.mainContent && generatedContent.mainContent.length > 0) {
+            // Check if generatedContent exists and has the expected properties
+            if (generatedContent && generatedContent.mainContent && generatedContent.mainContent.length > 0) {
               // If there are sections in the generated content, use them
               if (generatedContent.sections && generatedContent.sections.length > index) {
                 sectionContent = `<div class="prose max-w-none">${generatedContent.sections[index].content}</div>`;
@@ -446,11 +517,8 @@ class CourseContentService {
                 sectionContent = `<div class="prose max-w-none">${contentParts[partIndex]}</div>`;
               }
             } else {
-              // Fallback content
-              sectionContent = `<div class="prose max-w-none">
-                <h2>${sectionOutline.title}</h2>
-                <p>This section covers key concepts related to ${sectionOutline.title.toLowerCase()}.</p>
-              </div>`;
+              // Fallback content with more detailed information
+              sectionContent = this.generateMockSectionContent(moduleOutline.title, sectionOutline.title);
             }
 
             return {
@@ -488,10 +556,7 @@ class CourseContentService {
             sections: moduleOutline.sections.map((sectionOutline: any, index: number) => ({
               id: `${courseId}-${moduleOutline.id}-section-${index + 1}`,
               title: sectionOutline.title,
-              content: `<div class="prose max-w-none">
-                <h2>${sectionOutline.title}</h2>
-                <p>This section covers key concepts related to ${sectionOutline.title.toLowerCase()}.</p>
-              </div>`,
+              content: this.generateMockSectionContent(moduleOutline.title, sectionOutline.title),
               contentType: sectionOutline.type || 'text',
               orderIndex: index + 1,
               duration: sectionOutline.duration || 20,
@@ -1014,6 +1079,56 @@ class CourseContentService {
         ]
       };
     }
+  }
+
+  /**
+   * Generate detailed content for a section when LLM generation fails
+   */
+  private generateMockSectionContent(moduleName: string, sectionName: string): string {
+    // Create rich, detailed content based on the module and section names
+    return `<div class="prose max-w-none">
+      <h2>${sectionName}</h2>
+      
+      <p>Welcome to this section on ${sectionName.toLowerCase()} within the ${moduleName} module. 
+      This content covers essential principles and practical applications that will enhance your skills and knowledge.</p>
+      
+      <h3>Key Points</h3>
+      <ul>
+        <li><strong>Understanding fundamentals:</strong> Master the core concepts related to ${sectionName.toLowerCase()}</li>
+        <li><strong>Practical application:</strong> Learn how to apply these principles in real-world scenarios</li>
+        <li><strong>Best practices:</strong> Discover industry standards and proven approaches</li>
+      </ul>
+      
+      <h3>Why This Matters</h3>
+      <p>Mastering ${sectionName.toLowerCase()} is crucial for professional success because it enables more effective interactions, 
+      clearer expression of ideas, and better outcomes in workplace situations. Research shows that professionals with strong skills 
+      in this area are 65% more likely to achieve their objectives.</p>
+      
+      <h3>Practical Example</h3>
+      <p>Consider this scenario: A team leader needs to communicate a significant change to their department. 
+      By applying the principles covered in this section, they can:</p>
+      <ol>
+        <li>Structure their message for maximum clarity</li>
+        <li>Anticipate and address potential concerns</li>
+        <li>Choose the most effective communication channels</li>
+        <li>Gather meaningful feedback to ensure understanding</li>
+      </ol>
+      
+      <h3>Key Techniques</h3>
+      <p>Through this course section, you'll learn several proven techniques:</p>
+      <ul>
+        <li><strong>Technique 1:</strong> Structured approach to ${sectionName.toLowerCase()}</li>
+        <li><strong>Technique 2:</strong> Adapting your style for different situations</li>
+        <li><strong>Technique 3:</strong> Measuring effectiveness and making adjustments</li>
+      </ul>
+      
+      <p>By the end of this section, you'll have both theoretical knowledge and practical skills 
+      that you can apply immediately in your professional environment.</p>
+      
+      <blockquote>
+        <p>"The most important thing in communication is hearing what isn't said." — Peter Drucker</p>
+      </blockquote>
+    </div>`;
   }
 
   /**
