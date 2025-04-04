@@ -8,6 +8,8 @@
 // Import environment variables from .env file if in development
 // Note: Vite automatically loads .env files, so this section is not needed
 
+import { GROQ_API_KEY } from './env';
+
 // Helper to safely access import.meta.env (works both in Vite and direct Node.js)
 const getEnv = (key: string, defaultValue: string = ''): string => {
   // Check if running in Vite environment
@@ -15,9 +17,21 @@ const getEnv = (key: string, defaultValue: string = ''): string => {
     return (import.meta.env as any)[key] || defaultValue;
   }
   
+  // Check for direct environment variables from env.js
+  if (key === 'VITE_GROQ_API_KEY') {
+    return GROQ_API_KEY || defaultValue;
+  }
+  
   // Fallback to process.env for Node.js scripts
   return process.env[key] || defaultValue;
 };
+
+// *** Debug/Development Helper: Log environment variables to check what is available ***
+if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+  if (typeof import.meta !== 'undefined' && import.meta.env) {
+    console.log('Available Vite Environment Variables:', import.meta.env);
+  }
+}
 
 // Helper to get environment mode
 const getMode = (): 'development' | 'production' | 'test' => {

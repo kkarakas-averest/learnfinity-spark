@@ -2,6 +2,7 @@ import { GroqAPI } from './groq-api';
 import { MockLLMProvider } from './mock-provider';
 import { defaultLLMConfig, fallbackLLMConfig, LLMConfig, systemPrompts } from './config';
 import envConfig, { isApiConfigured, isFeatureEnabled } from '../env-config';
+import { GROQ_API_KEY } from '../env';
 import type { SystemPromptType } from './types';
 
 // Define a common interface that all LLM providers will implement
@@ -48,6 +49,17 @@ export class LLMService {
     // Update with environment config
     if (envConfig.groqApiKey) {
       this.config.apiKey = envConfig.groqApiKey;
+      if (envConfig.debug) {
+        console.log(`Loaded Groq API key from environment: ${this.config.apiKey.substring(0, 4)}...${this.config.apiKey.substring(this.config.apiKey.length - 4)} (${this.config.apiKey.length} chars)`);
+      }
+    } else if (GROQ_API_KEY) {
+      // Fallback to direct API key from env.js
+      this.config.apiKey = GROQ_API_KEY;
+      if (envConfig.debug) {
+        console.log(`Loaded Groq API key from direct import: ${this.config.apiKey.substring(0, 4)}...${this.config.apiKey.substring(this.config.apiKey.length - 4)} (${this.config.apiKey.length} chars)`);
+      }
+    } else if (envConfig.debug) {
+      console.warn('No Groq API key found in environment variables');
     }
     
     // Only use LLM if the feature flag is enabled
