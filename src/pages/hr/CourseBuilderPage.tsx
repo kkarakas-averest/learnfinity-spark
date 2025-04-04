@@ -4,8 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FileText, Layers, Library, BookOpen, Users, Zap, Sparkles } from 'lucide-react';
-import CourseBuilderAIGenerator from '@/components/hr/CourseBuilderAIGenerator';
 import GroqTestButton from '@/components/hr/GroqTestButton';
+import DirectGroqTest from '@/components/hr/DirectGroqTest';
 
 /**
  * CourseBuilderPage serves as a hub for HR administrators to create and manage
@@ -235,7 +235,7 @@ const CourseBuilderPage: React.FC = () => {
               </Card>
             </div>
             
-            <CourseBuilderAIGenerator />
+            <DirectGroqTest />
             
             <Card>
               <CardHeader>
