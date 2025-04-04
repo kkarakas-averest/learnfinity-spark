@@ -28,7 +28,7 @@ export default defineConfig(({ mode }) => ({
         rewrite: (path) => {
           // Check if this is an API request
           if (path.startsWith('/api/')) {
-            console.log(`[Rewrite] API path: ${path} - forwarding to API server`);
+            console.log(`[Rewrite] No rewrite for ${path} - direct API access`);
             // Keep the path as is for API requests
             return path;
           } else {
@@ -81,7 +81,7 @@ export default defineConfig(({ mode }) => ({
               res.writeHead(200, {
                 'Access-Control-Allow-Origin': '*',
                 'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-                'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
+                'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With, Accept',
                 'Access-Control-Max-Age': '86400'
               });
               res.end();
@@ -118,7 +118,12 @@ export default defineConfig(({ mode }) => ({
                 if (!res.headersSent) {
                   console.warn(`[Proxy] Converting HTML response to JSON error. First 100 chars: ${body.substring(0, 100)}`);
                   
-                  res.writeHead(statusCode === 200 ? 500 : statusCode, { 'Content-Type': 'application/json' });
+                  res.writeHead(statusCode === 200 ? 500 : statusCode, { 
+                    'Content-Type': 'application/json',
+                    'Access-Control-Allow-Origin': '*',
+                    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+                    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With, Accept'
+                  });
                   res.end(JSON.stringify({
                     error: 'API Server Error',
                     message: `Received non-JSON response from API: ${body.substring(0, 100)}...`,

@@ -307,7 +307,7 @@ const LearnerDashboard: React.FC = () => {
           // Set appropriate credentials mode
           credentials: source.label === 'same-origin' ? 'same-origin' : 'omit',
           // Shorter timeout to fail faster for non-working sources
-          signal: AbortSignal.timeout(3000) 
+          signal: AbortSignal.timeout(5000) 
         });
         
         console.log(`${source.label} response status: ${response.status}`);
@@ -322,10 +322,33 @@ const LearnerDashboard: React.FC = () => {
           throw new Error(`${source.label} API error: ${response.status} ${response.statusText}`);
         }
         
+        // Check for correct content type
         if (!contentType || !contentType.includes('application/json')) {
-          const responseText = await response.text();
-          console.error(`${source.label} response is not JSON. First 100 chars: ${responseText.substring(0, 100)}`);
-          throw new Error(`${source.label}: Expected JSON response but got ${contentType}`);
+          try {
+            // Try parsing as JSON anyway in case the content type header is wrong
+            const text = await response.text();
+            console.error(`${source.label} response content-type is not JSON: ${contentType}`);
+            console.error(`Response text (first 100 chars): ${text.substring(0, 100)}`);
+            
+            // Try parsing text as JSON as a last resort
+            try {
+              const parsedData = JSON.parse(text);
+              console.log(`Successfully parsed response as JSON despite incorrect content-type`);
+              
+              // Personalize the data with real user info if available
+              if (user && userDetails && parsedData.profile) {
+                parsedData.profile.email = user.email || parsedData.profile.email;
+                parsedData.profile.name = userDetails.name || user.email || parsedData.profile.name;
+              }
+              
+              return parsedData;
+            } catch (parseError) {
+              // If it's not valid JSON, throw the original error
+              throw new Error(`${source.label}: Expected JSON response but got ${contentType}`);
+            }
+          } catch (textError) {
+            throw new Error(`${source.label}: Expected JSON response but got ${contentType}`);
+          }
         }
         
         const data = await response.json();

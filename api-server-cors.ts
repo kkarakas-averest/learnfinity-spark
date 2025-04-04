@@ -23,6 +23,15 @@ const app = express();
 // Parse PORT as a number to fix type issues
 const PORT = typeof process.env.PORT === 'string' ? parseInt(process.env.PORT, 10) : 3083;
 
+// Debug environment variables (without showing full keys)
+console.log('\nEnvironment variable check:');
+console.log(`SUPABASE_URL: ${process.env.SUPABASE_URL ? 'Found ✅' : 'Missing ❌'}`);
+console.log(`SUPABASE_ANON_KEY: ${process.env.SUPABASE_ANON_KEY ? 'Found ✅' : 'Missing ❌'}`);
+console.log(`SUPABASE_SERVICE_KEY: ${process.env.SUPABASE_SERVICE_KEY ? 'Found ✅' : 'Missing ❌'}`);
+console.log(`VITE_SUPABASE_URL: ${process.env.VITE_SUPABASE_URL ? 'Found ✅' : 'Missing ❌'}`);
+console.log(`VITE_SUPABASE_ANON_KEY: ${process.env.VITE_SUPABASE_ANON_KEY ? 'Found ✅' : 'Missing ❌'}`);
+console.log(`VITE_SUPABASE_SERVICE_KEY: ${process.env.VITE_SUPABASE_SERVICE_KEY ? 'Found ✅' : 'Missing ❌'}\n`);
+
 // CORS Configuration - Allow all origins, including localhost with any port
 const corsOptions = {
   origin: function(origin, callback) {
@@ -65,7 +74,7 @@ const supabaseKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_A
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY || process.env.VITE_SUPABASE_SERVICE_KEY || '';
 
 // Log what we found without exposing the full keys (security measure)
-console.log(`Using Supabase URL: ${supabaseUrl ? supabaseUrl.substring(0, 15) + '...' : 'Missing URL'}`);
+console.log(`Using Supabase URL: ${supabaseUrl ? 'Found ✅' : 'Missing ❌'}`);
 console.log(`Using Supabase key: ${supabaseKey ? 'Key found' : 'Key missing'}`);
 console.log(`Using Supabase service key: ${supabaseServiceKey ? 'Key found' : 'Key missing'}`);
 
@@ -75,11 +84,23 @@ let supabaseAdmin: SupabaseClient | null = null;
 try {
   if (supabaseUrl && supabaseKey) {
     console.log('Initializing Supabase client with anon key');
-    supabase = createClient(supabaseUrl, supabaseKey);
+    supabase = createClient(supabaseUrl, supabaseKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: true,
+        detectSessionInUrl: false
+      }
+    });
     
     if (supabaseServiceKey) {
       console.log('Initializing Supabase admin client with service role key');
-      supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+      supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+          detectSessionInUrl: false
+        }
+      });
     } else {
       console.warn('No service role key found, using anon key for admin operations (reduced functionality)');
       supabaseAdmin = supabase;

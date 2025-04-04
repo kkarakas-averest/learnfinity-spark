@@ -7,7 +7,7 @@
     "dev": "vite",
     "dev:server": "node --loader ts-node/esm api-server.ts",
     "dev:simple-server": "npx tsx api-server-simple.ts",
-    "dev:cors-server": "dotenv -e .env npx tsx api-server-cors.ts",
+    "dev:cors-server": "cross-env NODE_ENV=development dotenv -e .env npx tsx api-server-cors.ts",
     "dev:with-api": "concurrently \"pnpm run dev\" \"pnpm run dev:cors-server\"",
     "build": "tsc && vite build",
     "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0",

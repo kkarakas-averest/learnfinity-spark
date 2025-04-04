@@ -38,3 +38,4 @@ dist-ssr
 *-secret.js
 *password*.txt
 .vite/
+.vite/
