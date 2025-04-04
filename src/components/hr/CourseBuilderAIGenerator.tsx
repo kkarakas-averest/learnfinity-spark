@@ -48,9 +48,9 @@ const CourseBuilderAIGenerator: React.FC = () => {
       
       // Call the API to generate the course - use the full URL format that works in production
       const baseUrl = window.location.origin;
-      console.log('Calling API at:', `${baseUrl}/api/courses/generate-with-groq`);
+      console.log('Calling API at:', `${baseUrl}/api/groq-generate`);
       
-      const response = await fetch(`${baseUrl}/api/courses/generate-with-groq`, {
+      const response = await fetch(`${baseUrl}/api/groq-generate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -76,21 +76,23 @@ const CourseBuilderAIGenerator: React.FC = () => {
           statusText: response.statusText
         });
         
-        // Try to parse error as JSON first
+        // Try to get the response as text first
+        const errorText = await response.text();
+        
+        // Then try to parse it as JSON if possible
         try {
-          const errorData = await response.json();
+          const errorData = JSON.parse(errorText);
           errorMessage = errorData.error || errorData.message || errorMessage;
           if (errorData.details) {
             errorMessage += `: ${errorData.details}`;
           }
-          throw new Error(errorMessage);
         } catch (parseError) {
-          // If JSON parsing fails, try to get text
-          const errorText = await response.text();
+          // If JSON parsing fails, use the text directly
           console.error('Error response text:', errorText);
           errorMessage = `${errorMessage}: ${response.status} - ${errorText.substring(0, 100)}...`;
-          throw new Error(errorMessage);
         }
+        
+        throw new Error(errorMessage);
       }
       
       const data = await response.json();
@@ -98,11 +100,27 @@ const CourseBuilderAIGenerator: React.FC = () => {
       
       toast({
         title: 'Course generated successfully',
-        description: `Created "${data.title}" with ${data.modules} modules and ${data.sections} sections.`,
+        description: `Created "${topic}" course for ${targetAudience}.`,
       });
       
-      // Navigate to view the generated course
-      navigate(`/hr-dashboard/courses/${data.courseId}`);
+      // Show success alert with content preview
+      toast({
+        title: 'Content Preview',
+        description: data.content.substring(0, 100) + '...',
+        variant: 'default',
+      });
+      
+      // Mock navigation - since our database integration isn't working on Vercel yet
+      // navigate(`/hr-dashboard/courses/${data.courseId}`);
+      
+      // Show more detailed success message
+      setTimeout(() => {
+        toast({
+          title: 'Generation Complete',
+          description: 'The course was generated successfully but database storage is not yet available in the production environment.',
+          variant: 'default',
+        });
+      }, 1000);
     } catch (error) {
       console.error('Error generating course:', error);
       toast({

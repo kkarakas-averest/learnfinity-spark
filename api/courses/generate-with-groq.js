@@ -70,9 +70,25 @@ export default async function handler(req, res) {
     
     // Check GROQ API key
     if (!process.env.GROQ_API_KEY) {
-      console.error('GROQ_API_KEY is not configured');
-      return res.status(500).json({ error: 'GROQ API is not configured on the server' });
+      console.error('GROQ_API_KEY is not configured in process.env');
+      
+      // Print all available environment variables (excluding sensitive values)
+      const safeEnvVars = Object.keys(process.env)
+        .filter(key => !key.toLowerCase().includes('key') && !key.toLowerCase().includes('secret') && !key.toLowerCase().includes('token'))
+        .reduce((obj, key) => {
+          obj[key] = process.env[key];
+          return obj;
+        }, {});
+      
+      console.log('Available environment variables:', safeEnvVars);
+      
+      return res.status(500).json({ 
+        error: 'GROQ API is not configured on the server',
+        details: 'The GROQ_API_KEY environment variable is missing'
+      });
     }
+    
+    console.log('GROQ_API_KEY found with prefix:', process.env.GROQ_API_KEY.substring(0, 5) + '...');
     
     // Generate course content using GroqAPI
     let courseData;
