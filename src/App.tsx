@@ -37,6 +37,7 @@ import EmployeeProfilePage from "./pages/hr/EmployeeProfilePage";
 
 // Import learner components
 import CourseView from "./components/learner/CourseView";
+import CourseViewPage from "./pages/course/CourseViewPage";
 
 // Import Course Builder components
 import CourseTemplates from "./components/admin/course-builder/CourseTemplates";
@@ -230,7 +231,17 @@ function App() {
           <Route path="/courses" element={<Courses />} />
           <Route path="/courses/:id" element={<CourseDetail />} />
           
-          {/* Learner Course View Route */}
+          {/* Learner Course View Route - New standardized route */}
+          <Route 
+            path="/learner/courses/view/:id" 
+            element={
+              <ProtectedRouteMigrated allowedRoles={["learner", "mentor", "hr", "superadmin"]}>
+                <CourseViewPage />
+              </ProtectedRouteMigrated>
+            } 
+          />
+          
+          {/* Legacy Course View Route - Keep for backward compatibility */}
           <Route 
             path="/learning/course/:courseId" 
             element={

@@ -16,7 +16,7 @@ export const ROUTES = {
   EMPLOYEE_ONBOARDING: '/hr/employee/onboarding',
   EMPLOYEE_DETAILS: (id: string) => `/hr/employee/${id}`,
   EMPLOYEE_EDIT: (id: string) => `/hr/employee/${id}/edit`,
-  COURSE_VIEW: '/course/:id/view',
+  COURSE_VIEW: '/learner/courses/view/:id',
   COURSE_DETAILS: (id: string) => `/course/${id}`,
   COURSE_LIST: '/courses',
   COURSE_CREATE: '/course/create',
@@ -34,6 +34,6 @@ export const ROUTES = {
 export const buildRoute = {
   HR_DASHBOARD_EMPLOYEES_VIEW: (id: string) => `/hr-dashboard/employees/${id}`,
   HR_DASHBOARD_EMPLOYEES_EDIT: (id: string) => `/hr-dashboard/employees/${id}/edit`,
-  COURSE_VIEW: (id: string) => `/course/${id}/view`,
+  COURSE_VIEW: (id: string) => `/learner/courses/view/${id}`,
   COURSE_DETAILS: (id: string) => `/course/${id}`,
 };

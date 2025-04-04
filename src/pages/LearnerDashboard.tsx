@@ -1,5 +1,5 @@
 import { useState, useEffect } from '@/lib/react-helpers';
-import { Navigate, Link } from "react-router-dom";
+import { Navigate, Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/state";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
@@ -934,8 +934,13 @@ const LearnerDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
-  // Remove the separate userId state, use user.id directly where needed
-  // const userId = '6e2c2548-c04a-419b-a17c-c2feb6a3d9c6'; // Removed mock ID
+  // Add a navigation function for course view
+  const navigate = useNavigate();
+  
+  const handleContinueCourse = (courseId: string) => {
+    // Navigate to the standardized course view route
+    navigate(`/learner/courses/view/${courseId}`);
+  };
 
   useEffect(() => {
     // Ensure user ID exists before fetching
@@ -1337,7 +1342,11 @@ const LearnerDashboard: React.FC = () => {
                       </div>
                       <Progress value={dashboardCourses.featured.progress} className="h-2" />
                     </div>
-                    <Button>Continue Course</Button>
+                    <div className="flex flex-col md:flex-row gap-4 mt-4">
+                      <Button 
+                        onClick={() => handleContinueCourse(dashboardCourses.featured.id)}
+                      >Continue Course</Button>
+                    </div>
                   </div>
                 </div>
               </CardContent>
@@ -1492,7 +1501,10 @@ const LearnerDashboard: React.FC = () => {
                           </div>
                           <Progress value={course.progress} className="h-2" />
                         </div>
-                        <Button className="mt-2">{course.progress > 0 ? 'Continue' : 'Start'} Course</Button>
+                        <Button 
+                          className="mt-2"
+                          onClick={() => handleContinueCourse(course.id)}
+                        >{course.progress > 0 ? 'Continue' : 'Start'} Course</Button>
                       </div>
                     </div>
                   </Card>

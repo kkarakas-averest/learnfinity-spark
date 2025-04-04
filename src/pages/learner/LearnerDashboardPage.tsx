@@ -277,7 +277,7 @@ const LearnerDashboardPage: React.FC = () => {
   };
   
   const handleContinueCourse = (courseId: string) => {
-    navigate(`/course/${courseId}`);
+    navigate(`/learner/courses/view/${courseId}`);
   };
   
   const handleViewLearningPath = (pathId: string) => {
@@ -444,7 +444,7 @@ const LearnerDashboardPage: React.FC = () => {
                       </div>
                     </CardContent>
                     <CardFooter>
-                      <Button onClick={() => navigate(`/course/${course.id}`)}>
+                      <Button onClick={() => handleContinueCourse(course.id)}>
                         Continue Learning
                         <ArrowRight className="ml-2 h-4 w-4" />
                       </Button>
@@ -654,7 +654,7 @@ const LearnerDashboardPage: React.FC = () => {
                           </div>
                         </CardContent>
                         <CardFooter>
-                          <Button size="sm" onClick={() => navigate(`/course/${course.id}`)}>
+                          <Button size="sm" onClick={() => handleContinueCourse(course.id)}>
                             {course.progress > 0 ? 'Continue' : 'Start'} Course
                           </Button>
                         </CardFooter>
