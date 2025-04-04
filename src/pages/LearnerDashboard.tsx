@@ -18,10 +18,22 @@ import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { createClient } from '@supabase/supabase-js';
 
-// Initialize Supabase for direct connections (only used in production)
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
-const supabaseClient = supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null;
+// Initialize Supabase client for direct connection if needed
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+let supabaseClient = null;
+
+// Only create client if we have the credentials
+if (supabaseUrl && supabaseAnonKey) {
+  try {
+    supabaseClient = createClient(supabaseUrl, supabaseAnonKey);
+    console.log('Supabase client initialized for direct connection');
+  } catch (err) {
+    console.error('Failed to initialize Supabase client:', err);
+  }
+} else {
+  console.log('Missing Supabase credentials, direct connection disabled');
+}
 
 // Course interface
 interface Course {

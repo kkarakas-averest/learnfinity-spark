@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "notes": "IMPORTANT: For Vercel deployment, add these environment variables in Vercel project settings: VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, VITE_SUPABASE_SERVICE_KEY",
   "scripts": {
     "dev": "vite",
     "dev:server": "node --loader ts-node/esm api-server.ts",
