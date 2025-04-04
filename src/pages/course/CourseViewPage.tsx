@@ -34,29 +34,62 @@ const CourseViewPage: React.FC = () => {
           navigate('/login');
           return;
         }
-        
-        // Check if the user is enrolled in this course
-        const { data: enrollment, error } = await supabase
+
+        // First, check if the user is enrolled in this course via regular enrollment
+        const { data: enrollment, error: enrollmentError } = await supabase
           .from('course_enrollments')
           .select('id')
           .eq('course_id', id)
           .eq('user_id', session.user.id)
           .single();
         
-        if (error) {
-          if (error.code === 'PGRST116') { // No enrollment found
-            toast({
-              title: "Not enrolled",
-              description: "You need to enroll in this course first",
-              variant: "destructive"
-            });
-            navigate('/learner/courses');
-            return;
-          }
-          throw error;
+        // If regular enrollment exists, grant access
+        if (!enrollmentError && enrollment) {
+          setHasAccess(true);
+          setLoading(false);
+          return;
         }
-        
-        setHasAccess(true);
+
+        // If regular enrollment check failed with a different error than "not found", log it
+        if (enrollmentError && enrollmentError.code !== 'PGRST116') {
+          console.error('Error checking course enrollment:', enrollmentError);
+        }
+
+        // Next, check if the course is HR-assigned to this user
+        const { data: hrEnrollment, error: hrError } = await supabase
+          .from('hr_course_enrollments')
+          .select('id')
+          .eq('course_id', id)
+          .eq('employee_id', session.user.id)
+          .single();
+
+        if (!hrError && hrEnrollment) {
+          setHasAccess(true);
+          setLoading(false);
+          return;
+        }
+
+        // For development/testing - if the course ID is from mock data, grant access
+        // This is because mock data courses (like comm-skills-01) won't be in the database
+        if (id.startsWith('comm-skills-') || id.startsWith('data-python-') || id.startsWith('leadership-')) {
+          console.log('Granting access to mock course:', id);
+          setHasAccess(true);
+          setLoading(false);
+          return;
+        }
+
+        // If neither enrollment type was found, deny access
+        if ((enrollmentError && enrollmentError.code === 'PGRST116') || 
+            (hrError && hrError.code === 'PGRST116')) {
+          toast({
+            title: "Not enrolled",
+            description: "You need to enroll in this course first",
+            variant: "destructive"
+          });
+          setHasAccess(false);
+        } else {
+          throw new Error('Failed to verify course access');
+        }
       } catch (error) {
         console.error('Error checking course access:', error);
         toast({
@@ -64,6 +97,7 @@ const CourseViewPage: React.FC = () => {
           description: "Failed to verify course access",
           variant: "destructive"
         });
+        setHasAccess(false);
       } finally {
         setLoading(false);
       }
