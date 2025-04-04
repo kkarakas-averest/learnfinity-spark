@@ -65,6 +65,7 @@ const CourseBuilderAIGenerator: React.FC = () => {
           customization: {
             skillLevel,
           },
+          groqApiKey: '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', // Add API key directly in the request
         }),
       });
       

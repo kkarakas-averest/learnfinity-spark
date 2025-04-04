@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FileText, Layers, Library, BookOpen, Users, Zap, Sparkles } from 'lucide-react';
 import CourseBuilderAIGenerator from '@/components/hr/CourseBuilderAIGenerator';
+import GroqTestButton from '@/components/hr/GroqTestButton';
 
 /**
  * CourseBuilderPage serves as a hub for HR administrators to create and manage
@@ -223,10 +224,13 @@ const CourseBuilderPage: React.FC = () => {
                     Simply provide a topic and target audience, and our AI will generate a complete
                     course with modules, detailed content, and assessments. 
                   </p>
-                  <p className="text-sm text-gray-500">
-                    The content is stored in our database and can be accessed, edited, and assigned to employees
-                    just like any other course in the system.
-                  </p>
+                  <div className="flex justify-between items-center">
+                    <p className="text-sm text-gray-500">
+                      The content is stored in our database and can be accessed, edited, and assigned to employees
+                      just like any other course in the system.
+                    </p>
+                    <GroqTestButton />
+                  </div>
                 </CardContent>
               </Card>
             </div>
