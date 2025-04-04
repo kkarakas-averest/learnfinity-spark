@@ -28,7 +28,8 @@ export class GroqAPI implements LLMProvider {
    * Check if the API is properly configured
    */
   public isConfigured(): boolean {
-    return !!this.apiKey;
+    // Check if the API key is present and has valid format (starts with gsk_)
+    return Boolean(this.apiKey) && this.apiKey.startsWith('gsk_') && this.apiKey.length > 20;
   }
 
   /**
