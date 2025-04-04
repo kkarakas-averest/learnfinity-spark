@@ -1,7 +1,20 @@
-import { env } from '@/env.mjs';
-
 // GroqAPI integration utility
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
+
+// Environment variables - access both browser and server environments
+const getEnv = () => {
+  // Check for browser environment
+  if (typeof window !== 'undefined' && (window as any).env) {
+    return (window as any).env;
+  }
+  
+  // Check for Node.js environment
+  if (typeof process !== 'undefined' && process.env) {
+    return process.env;
+  }
+  
+  return {};
+};
 
 /**
  * Send a request to GroqAPI for content generation
@@ -13,10 +26,15 @@ export async function generateCourseWithGroq(
   sectionsPerModule: number = 3,
   includeQuiz: boolean = true
 ): Promise<any> {
-  const apiKey = env.GROQ_API_KEY;
+  console.log('GroqAPI function called with params:', { topic, targetAudience, modules, sectionsPerModule, includeQuiz });
+  
+  const apiKey = getEnv().GROQ_API_KEY || process.env.GROQ_API_KEY;
   
   if (!apiKey) {
+    console.error('GROQ_API_KEY is missing in environment variables');
     throw new Error('GROQ_API_KEY is not configured');
+  } else {
+    console.log('GROQ_API_KEY found:', apiKey.substring(0, 5) + '...');
   }
 
   // Create a structured prompt for course generation
@@ -78,8 +96,11 @@ export async function generateCourseWithGroq(
   
   Ensure all content is professionally written and educational.`;
 
+  console.log('Preparing to call GroqAPI with prompts');
+
   try {
     // Call GroqAPI with the structured prompt
+    console.log('Sending request to GroqAPI...');
     const response = await fetch(GROQ_API_URL, {
       method: 'POST',
       headers: {
@@ -98,33 +119,60 @@ export async function generateCourseWithGroq(
     });
 
     if (!response.ok) {
-      const errorData = await response.text();
-      throw new Error(`GroqAPI request failed: ${response.status} ${errorData}`);
+      const errorText = await response.text();
+      console.error('GroqAPI error response:', {
+        status: response.status,
+        statusText: response.statusText,
+        body: errorText
+      });
+      throw new Error(`GroqAPI request failed: ${response.status} ${errorText}`);
     }
 
+    console.log('GroqAPI response received with status:', response.status);
     const data = await response.json();
+    console.log('GroqAPI response data received:', { 
+      choices: data.choices?.length,
+      model: data.model,
+      usage: data.usage
+    });
     
     // Parse the generated content
     try {
       // Extract the content from the response
       const generatedContent = data.choices[0].message.content;
+      console.log('Generated content received, length:', generatedContent.length);
       
       // Find the JSON object in the text
       const jsonMatch = generatedContent.match(/\{[\s\S]*\}/);
       
       if (jsonMatch) {
-        const courseData = JSON.parse(jsonMatch[0]);
-        return courseData;
+        console.log('JSON match found, attempting to parse');
+        try {
+          const courseData = JSON.parse(jsonMatch[0]);
+          console.log('Successfully parsed course data:', {
+            title: courseData.title,
+            moduleCount: courseData.modules?.length,
+            objectivesCount: courseData.learningObjectives?.length
+          });
+          return courseData;
+        } catch (jsonError) {
+          console.error('JSON parse error:', jsonError);
+          console.log('Problem JSON snippet (first 100 chars):', jsonMatch[0].substring(0, 100));
+          throw new Error('Failed to parse JSON structure - invalid JSON format');
+        }
       } else {
-        throw new Error('Failed to parse JSON from GroqAPI response');
+        console.error('No JSON match found in content');
+        console.log('Content (first 100 chars):', generatedContent.substring(0, 100));
+        throw new Error('Failed to extract JSON from GroqAPI response - no JSON object found');
       }
     } catch (parseError) {
       console.error('Error parsing GroqAPI response:', parseError);
-      console.log('Raw GroqAPI response:', data.choices[0].message.content);
-      throw new Error('Failed to parse course data from GroqAPI');
+      console.log('Raw GroqAPI response (first 100 chars):', 
+        data.choices[0].message.content.substring(0, 100));
+      throw new Error('Failed to parse course data from GroqAPI: ' + parseError.message);
     }
   } catch (error) {
-    console.error('Error calling GroqAPI:', error);
+    console.error('Error in GroqAPI call:', error);
     throw error;
   }
 } 

@@ -48,6 +48,8 @@ const CourseBuilderAIGenerator: React.FC = () => {
       
       // Call the API to generate the course - use the full URL format that works in production
       const baseUrl = window.location.origin;
+      console.log('Calling API at:', `${baseUrl}/api/courses/generate-with-groq`);
+      
       const response = await fetch(`${baseUrl}/api/courses/generate-with-groq`, {
         method: 'POST',
         headers: {
@@ -66,12 +68,33 @@ const CourseBuilderAIGenerator: React.FC = () => {
         }),
       });
       
+      let errorMessage = 'Failed to generate course';
+      
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to generate course');
+        console.error('API error response:', {
+          status: response.status,
+          statusText: response.statusText
+        });
+        
+        // Try to parse error as JSON first
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorData.message || errorMessage;
+          if (errorData.details) {
+            errorMessage += `: ${errorData.details}`;
+          }
+          throw new Error(errorMessage);
+        } catch (parseError) {
+          // If JSON parsing fails, try to get text
+          const errorText = await response.text();
+          console.error('Error response text:', errorText);
+          errorMessage = `${errorMessage}: ${response.status} - ${errorText.substring(0, 100)}...`;
+          throw new Error(errorMessage);
+        }
       }
       
       const data = await response.json();
+      console.log('Success response from API:', data);
       
       toast({
         title: 'Course generated successfully',
