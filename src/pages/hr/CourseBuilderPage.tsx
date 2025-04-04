@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FileText, Layers, Library, BookOpen, Users, Zap } from 'lucide-react';
+import { FileText, Layers, Library, BookOpen, Users, Zap, Sparkles } from 'lucide-react';
+import CourseBuilderAIGenerator from '@/components/hr/CourseBuilderAIGenerator';
 
 /**
  * CourseBuilderPage serves as a hub for HR administrators to create and manage
@@ -22,9 +23,10 @@ const CourseBuilderPage: React.FC = () => {
       </div>
 
       <Tabs defaultValue="overview" className="space-y-8">
-        <TabsList className="grid grid-cols-3 w-full max-w-md">
+        <TabsList className="grid grid-cols-4 w-full max-w-md">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="tools">Builder Tools</TabsTrigger>
+          <TabsTrigger value="ai">AI Builder</TabsTrigger>
           <TabsTrigger value="interventions">Interventions</TabsTrigger>
         </TabsList>
 
@@ -197,6 +199,85 @@ const CourseBuilderPage: React.FC = () => {
                   Create Course
                 </Button>
               </CardFooter>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* NEW: AI Builder Tab */}
+        <TabsContent value="ai" className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="md:col-span-2 mb-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <Sparkles className="h-5 w-5 text-purple-500 mr-2" />
+                    AI Course Builder
+                  </CardTitle>
+                  <CardDescription>
+                    Generate complete courses using AI
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-gray-500 mb-4">
+                    Our AI Course Builder can instantly create comprehensive courses on any topic.
+                    Simply provide a topic and target audience, and our AI will generate a complete
+                    course with modules, detailed content, and assessments. 
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    The content is stored in our database and can be accessed, edited, and assigned to employees
+                    just like any other course in the system.
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+            
+            <CourseBuilderAIGenerator />
+            
+            <Card>
+              <CardHeader>
+                <CardTitle>AI Generation Features</CardTitle>
+                <CardDescription>What our AI can create</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-3">
+                  <li className="flex items-start">
+                    <div className="bg-purple-100 p-1.5 rounded-full mr-3 mt-0.5">
+                      <Sparkles className="h-3.5 w-3.5 text-purple-700" />
+                    </div>
+                    <div>
+                      <p className="font-medium">Complete Courses</p>
+                      <p className="text-sm text-gray-500">Full course structure with modules and sections</p>
+                    </div>
+                  </li>
+                  <li className="flex items-start">
+                    <div className="bg-purple-100 p-1.5 rounded-full mr-3 mt-0.5">
+                      <Sparkles className="h-3.5 w-3.5 text-purple-700" />
+                    </div>
+                    <div>
+                      <p className="font-medium">Rich Content</p>
+                      <p className="text-sm text-gray-500">Detailed educational content with examples</p>
+                    </div>
+                  </li>
+                  <li className="flex items-start">
+                    <div className="bg-purple-100 p-1.5 rounded-full mr-3 mt-0.5">
+                      <Sparkles className="h-3.5 w-3.5 text-purple-700" />
+                    </div>
+                    <div>
+                      <p className="font-medium">Assessments</p>
+                      <p className="text-sm text-gray-500">Quizzes to test understanding</p>
+                    </div>
+                  </li>
+                  <li className="flex items-start">
+                    <div className="bg-purple-100 p-1.5 rounded-full mr-3 mt-0.5">
+                      <Sparkles className="h-3.5 w-3.5 text-purple-700" />
+                    </div>
+                    <div>
+                      <p className="font-medium">Audience Targeting</p>
+                      <p className="text-sm text-gray-500">Content tailored to specific roles and skill levels</p>
+                    </div>
+                  </li>
+                </ul>
+              </CardContent>
             </Card>
           </div>
         </TabsContent>
