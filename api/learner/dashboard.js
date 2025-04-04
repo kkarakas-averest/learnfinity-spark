@@ -208,10 +208,12 @@ export default async function handler(req, res) {
     console.log(`API (Vercel): Processing request for user ${userId}`);
     const supabase = createClient(supabaseUrl, supabaseKey);
     
-    // Check which tables actually exist
+    // First, let's check which tables actually exist
     let availableTables = [];
     try {
-      // Test some common table names
+      console.log(`API (Vercel): Checking available tables`);
+      
+      // Test some common table names directly
       const tableCheckPromises = [
         supabase.from('users').select('count').limit(1),
         supabase.from('courses').select('count').limit(1),
@@ -231,7 +233,7 @@ export default async function handler(req, res) {
       console.error(`API (Vercel): Table check error: ${error.message}`);
     }
     
-    // Get user profile
+    // Get user profile from users table
     let userProfile = null;
     let dashboardData = null;
     
@@ -245,7 +247,15 @@ export default async function handler(req, res) {
       if (profileError) {
         console.log(`API (Vercel): Error fetching profile: ${profileError.message}`);
       } else if (profileData) {
-        userProfile = profileData;
+        userProfile = {
+          id: profileData.id,
+          name: profileData.name || profileData.email,
+          email: profileData.email,
+          role: profileData.role || 'learner',
+          created_at: profileData.created_at,
+          department: profileData.department || null,
+          title: profileData.title || null
+        };
         console.log(`API (Vercel): Found user profile for ${userId}`);
       }
     }
@@ -256,16 +266,17 @@ export default async function handler(req, res) {
       return res.status(200).json(dashboardData);
     }
     
-    // Get courses from appropriate table
+    // Get courses with multiple attempts
     let courses = [];
     if (availableTables.includes('courses')) {
       try {
+        // First attempt: get all courses
         const { data: coursesData, error: coursesError } = await supabase
           .from('courses')
           .select('*')
           .limit(10);
           
-        if (!coursesError && coursesData) {
+        if (!coursesError && coursesData && coursesData.length > 0) {
           courses = coursesData.map(course => ({
             id: course.id,
             title: course.title || 'Untitled Course',
@@ -274,7 +285,7 @@ export default async function handler(req, res) {
             progress: course.progress || Math.floor(Math.random() * 100),
             completedSections: course.completed_sections || Math.floor(Math.random() * 5),
             totalSections: course.total_sections || 10,
-            thumbnailUrl: course.thumbnail_url || "https://via.placeholder.com/300x200",
+            thumbnailUrl: course.thumbnail_url || "https://placehold.co/300x200",
             featured: !!course.featured,
             category: course.category || "Development",
             skills: course.skills || ["Programming"],
@@ -283,10 +294,51 @@ export default async function handler(req, res) {
             learningPathName: course.learning_path_name || "Development Path"
           }));
           console.log(`API (Vercel): Found ${courses.length} courses`);
+        } else {
+          // Second attempt: try with user_id
+          const { data: userCoursesData, error: userCoursesError } = await supabase
+            .from('courses')
+            .select('*')
+            .eq('user_id', userId)
+            .limit(10);
+            
+          if (!userCoursesError && userCoursesData && userCoursesData.length > 0) {
+            courses = userCoursesData.map(course => ({
+              id: course.id,
+              title: course.title || 'Untitled Course',
+              description: course.description || 'No description available',
+              duration: course.duration || 240,
+              progress: course.progress || Math.floor(Math.random() * 100),
+              completedSections: course.completed_sections || Math.floor(Math.random() * 5),
+              totalSections: course.total_sections || 10,
+              thumbnailUrl: course.thumbnail_url || "https://placehold.co/300x200",
+              featured: !!course.featured,
+              category: course.category || "Development",
+              skills: course.skills || ["Programming"],
+              ragStatus: course.rag_status || "amber",
+              learningPathId: course.learning_path_id || "path-01",
+              learningPathName: course.learning_path_name || "Development Path"
+            }));
+            console.log(`API (Vercel): Found ${courses.length} courses for user ${userId}`);
+          } else {
+            // Try getting the table structure for debugging
+            const { data: courseColumns, error: columnsError } = await supabase
+              .from('courses')
+              .select('*')
+              .limit(1);
+              
+            if (!columnsError && courseColumns && courseColumns.length > 0) {
+              console.log(`API (Vercel): Courses table structure: ${JSON.stringify(Object.keys(courseColumns[0]))}`);
+            } else {
+              console.log(`API (Vercel): Error getting courses table structure: ${columnsError?.message}`);
+            }
+          }
         }
       } catch (error) {
         console.error(`API (Vercel): Error fetching courses: ${error.message}`);
       }
+    } else {
+      console.log(`API (Vercel): Courses table not available`);
     }
     
     // Get learning paths
@@ -298,12 +350,12 @@ export default async function handler(req, res) {
           .select('*')
           .limit(10);
           
-        if (!pathsError && pathsData) {
+        if (!pathsError && pathsData && pathsData.length > 0) {
           learningPaths = pathsData.map(path => ({
             id: path.id,
             title: path.title || 'Untitled Path',
             description: path.description || 'No description available',
-            thumbnail_url: path.thumbnail_url || "https://via.placeholder.com/300x200",
+            thumbnail_url: path.thumbnail_url || "https://placehold.co/300x200",
             category: path.category || "Development",
             course_count: path.course_count || 3,
             completed_courses: path.completed_courses || 1,
@@ -313,6 +365,8 @@ export default async function handler(req, res) {
             assigned_date: path.assigned_date || new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString()
           }));
           console.log(`API (Vercel): Found ${learningPaths.length} learning paths`);
+        } else {
+          console.log(`API (Vercel): No learning paths found or error: ${pathsError?.message}`);
         }
       } catch (error) {
         console.error(`API (Vercel): Error fetching learning paths: ${error.message}`);
@@ -339,6 +393,7 @@ export default async function handler(req, res) {
         id: userProfile.id || userId,
         name: userProfile.name || mockData.profile.name,
         email: userProfile.email || mockData.profile.email,
+        role: userProfile.role || mockData.profile.role,
       },
       courses: {
         total: courses.length || mockData.courses.total,
@@ -352,9 +407,10 @@ export default async function handler(req, res) {
       learningPaths: learningPaths.length > 0 ? learningPaths : mockData.learningPaths,
       stats: {
         coursesCompleted: Math.floor((courses.length || 5) / 3),
-        learningPathsCompleted: 0,
+        learningPathsCompleted: Math.floor((learningPaths.length || 3) / 3),
         assignedCourses: Math.floor((courses.length || 5) / 4),
-        skillsAcquired: 3
+        skillsAcquired: courses.length > 0 ? 
+          [...new Set(courses.flatMap(c => c.skills || []))].length : 3
       }
     };
     

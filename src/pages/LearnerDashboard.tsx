@@ -300,7 +300,6 @@ const LearnerDashboard: React.FC = () => {
       
       // Test some common table names
       const tableCheckPromises = [
-        supabase.from('profiles').select('count').limit(1),
         supabase.from('users').select('count').limit(1),
         supabase.from('courses').select('count').limit(1),
         supabase.from('learning_paths').select('count').limit(1)
@@ -308,28 +307,14 @@ const LearnerDashboard: React.FC = () => {
       
       const results = await Promise.allSettled(tableCheckPromises);
       
-      if (results[0].status === 'fulfilled' && !results[0].value.error) availableTables.push('profiles');
-      if (results[1].status === 'fulfilled' && !results[1].value.error) availableTables.push('users');
-      if (results[2].status === 'fulfilled' && !results[2].value.error) availableTables.push('courses');
-      if (results[3].status === 'fulfilled' && !results[3].value.error) availableTables.push('learning_paths');
+      if (results[0].status === 'fulfilled' && !results[0].value.error) availableTables.push('users');
+      if (results[1].status === 'fulfilled' && !results[1].value.error) availableTables.push('courses');
+      if (results[2].status === 'fulfilled' && !results[2].value.error) availableTables.push('learning_paths');
       
       console.log(`Available tables: ${availableTables.join(', ')}`);
       
-      // Try to get user profile from any available table
-      if (availableTables.includes('profiles')) {
-        const { data: profileData, error: profileError } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('userId', userId)
-          .single();
-          
-        if (!profileError && profileData) {
-          userProfile = profileData;
-          foundProfile = true;
-        }
-      }
-      
-      if (!foundProfile && availableTables.includes('users')) {
+      // Try to get user profile from users table - we know this exists from logs
+      if (availableTables.includes('users')) {
         const { data: userData, error: userError } = await supabase
           .from('users')
           .select('*')
@@ -342,20 +327,17 @@ const LearnerDashboard: React.FC = () => {
             userId: userData.id,
             name: userData.name || userData.email,
             email: userData.email,
-            bio: null,
-            title: null,
-            department: null,
-            skills: [],
-            learningPreferences: {
-              preferredLearningStyle: null,
-              preferredContentTypes: [],
-              learningGoals: []
-            },
-            onboardingCompleted: false,
-            createdAt: userData.created_at,
+            role: userData.role || 'learner',
+            department: userData.department || null,
+            title: userData.title || null,
+            bio: userData.bio || null,
+            createdAt: userData.created_at || new Date().toISOString(),
             updatedAt: null
           };
           foundProfile = true;
+          console.log('Found user profile from users table');
+        } else {
+          console.log('Error fetching user profile from users table:', userError?.message);
         }
       }
       
@@ -365,79 +347,120 @@ const LearnerDashboard: React.FC = () => {
         userProfile = mockData.profile;
       }
       
-      // Get courses if available
+      // Get courses if available - retry with different query approaches
       let courses: any[] = [];
       if (availableTables.includes('courses')) {
-        const { data: coursesData, error: coursesError } = await supabase
-          .from('courses')
-          .select('*')
-          .limit(10);
-          
-        if (!coursesError && coursesData && coursesData.length > 0) {
-          courses = coursesData.map((course: any) => ({
-            id: course.id,
-            title: course.title || 'Untitled Course',
-            description: course.description || 'No description available',
-            duration: course.duration || 240,
-            progress: course.progress || Math.floor(Math.random() * 100),
-            completedSections: course.completed_sections || Math.floor(Math.random() * 5),
-            totalSections: course.total_sections || 10,
-            thumbnailUrl: course.thumbnail_url || "https://via.placeholder.com/300x200",
-            featured: !!course.featured,
-            category: course.category || "Development",
-            skills: course.skills || ["Programming"],
-            ragStatus: course.rag_status || "amber",
-            learningPathId: course.learning_path_id || "path-01",
-            learningPathName: course.learning_path_name || "Development Path"
-          }));
-          
-          console.log(`Found ${courses.length} real courses`);
-        } else {
-          console.log('No courses found or error accessing courses table');
+        try {
+          // First attempt: simple select all
+          const { data: coursesData, error: coursesError } = await supabase
+            .from('courses')
+            .select('*')
+            .limit(10);
+            
+          if (!coursesError && coursesData && coursesData.length > 0) {
+            console.log(`Found ${coursesData.length} courses`);
+            courses = coursesData.map((course: any) => ({
+              id: course.id,
+              title: course.title || 'Untitled Course',
+              description: course.description || 'No description available',
+              duration: course.duration || 240,
+              progress: course.progress || Math.floor(Math.random() * 100),
+              completedSections: course.completed_sections || Math.floor(Math.random() * 5),
+              totalSections: course.total_sections || 10,
+              thumbnailUrl: course.thumbnail_url || "https://placehold.co/300x200",
+              featured: !!course.featured,
+              category: course.category || "Development",
+              skills: course.skills || ["Programming"],
+              ragStatus: course.rag_status || "amber",
+              learningPathId: course.learning_path_id || "path-01",
+              learningPathName: course.learning_path_name || "Development Path"
+            }));
+          } else {
+            // Second attempt: try with user_id filter
+            const { data: userCoursesData, error: userCoursesError } = await supabase
+              .from('courses')
+              .select('*')
+              .eq('user_id', userId)
+              .limit(10);
+              
+            if (!userCoursesError && userCoursesData && userCoursesData.length > 0) {
+              console.log(`Found ${userCoursesData.length} courses for user ${userId}`);
+              courses = userCoursesData.map((course: any) => ({
+                id: course.id,
+                title: course.title || 'Untitled Course',
+                description: course.description || 'No description available',
+                duration: course.duration || 240,
+                progress: course.progress || Math.floor(Math.random() * 100),
+                completedSections: course.completed_sections || Math.floor(Math.random() * 5),
+                totalSections: course.total_sections || 10,
+                thumbnailUrl: course.thumbnail_url || "https://placehold.co/300x200",
+                featured: !!course.featured,
+                category: course.category || "Development",
+                skills: course.skills || ["Programming"],
+                ragStatus: course.rag_status || "amber",
+                learningPathId: course.learning_path_id || "path-01",
+                learningPathName: course.learning_path_name || "Development Path"
+              }));
+            } else {
+              // Log error for debugging
+              console.log('No courses found or error accessing courses table');
+              console.log('Error details:', userCoursesError);
+              
+              // Try to get the courses table structure
+              const { data: courseColumns, error: columnsError } = await supabase
+                .from('courses')
+                .select('*')
+                .limit(1);
+                
+              if (!columnsError && courseColumns) {
+                console.log('Courses table structure:', Object.keys(courseColumns[0]));
+              } else {
+                console.log('Could not retrieve courses table structure:', columnsError);
+              }
+            }
+          }
+        } catch (error: any) {
+          console.error('Error fetching courses:', error.message);
         }
+      } else {
+        console.log('Courses table not available');
       }
       
-      // Get learning paths if available
+      // Get learning paths
       let learningPaths: any[] = [];
       if (availableTables.includes('learning_paths')) {
-        const { data: pathsData, error: pathsError } = await supabase
-          .from('learning_paths')
-          .select('*')
-          .limit(10);
-          
-        if (!pathsError && pathsData && pathsData.length > 0) {
-          learningPaths = pathsData.map((path: any) => ({
-            id: path.id,
-            title: path.title || 'Untitled Path',
-            description: path.description || 'No description available',
-            thumbnail_url: path.thumbnail_url || "https://via.placeholder.com/300x200",
-            category: path.category || "Development",
-            course_count: path.course_count || 3,
-            completed_courses: path.completed_courses || 1,
-            progress: path.progress || Math.floor(Math.random() * 100),
-            path_type: path.path_type || "enrolled",
-            due_date: path.due_date || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-            assigned_date: path.assigned_date || new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString()
-          }));
-          
-          console.log(`Found ${learningPaths.length} real learning paths`);
-        } else {
-          console.log('No learning paths found or error accessing learning_paths table');
+        try {
+          const { data: pathsData, error: pathsError } = await supabase
+            .from('learning_paths')
+            .select('*')
+            .limit(10);
+            
+          if (!pathsError && pathsData && pathsData.length > 0) {
+            learningPaths = pathsData.map((path: any) => ({
+              id: path.id,
+              title: path.title || 'Untitled Path',
+              description: path.description || 'No description available',
+              thumbnail_url: path.thumbnail_url || "https://placehold.co/300x200",
+              category: path.category || "Development",
+              course_count: path.course_count || 3,
+              completed_courses: path.completed_courses || 1,
+              progress: path.progress || Math.floor(Math.random() * 100),
+              path_type: path.path_type || "enrolled",
+              due_date: path.due_date || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+              assigned_date: path.assigned_date || new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString()
+            }));
+            console.log(`Found ${learningPaths.length} real learning paths`);
+          } else {
+            console.log('No learning paths found or error:', pathsError);
+          }
+        } catch (error: any) {
+          console.error('Error fetching learning paths:', error.message);
         }
-      }
-      
-      // Get HR table data (without failing if they don't exist)
-      try {
-        const { data: hrData } = await supabase.rpc('check_hr_tables_exist');
-        if (hrData) {
-          console.log('HR tables exist');
-        }
-      } catch (error) {
-        console.log('HR tables check failed or RPC not available');
       }
       
       // If we don't have enough real data, use mock data
       const mockData = getMockData(userId);
+      
       if (courses.length === 0) {
         courses = mockData.courses.items;
         console.log('Using mock course data');
@@ -450,7 +473,7 @@ const LearnerDashboard: React.FC = () => {
       
       // Build dashboard data object
       const dashboardData = {
-        profile: userProfile,
+        profile: userProfile || mockData.profile,
         courses: {
           total: courses.length,
           featured: courses[0],
