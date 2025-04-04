@@ -8,7 +8,8 @@ import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { 
   Home, BookOpen, Trophy, User, ArrowRight, 
   Sparkles, AlertCircle, Calendar, Clock, Check, 
-  Users, Award, BarChart2 as BarChart3, FileText, Layers
+  Users, Award, BarChart2 as BarChart3, FileText, Layers,
+  Mail
 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { Progress } from "@/components/ui/progress";
@@ -1611,26 +1612,45 @@ const LearnerDashboard: React.FC = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                       <h4 className="text-sm font-medium mb-2">Personal Information</h4>
-                      <div className="space-y-2">
-                        <ProfileField label="Email" value={dashboardProfile.email} />
-                        <ProfileField label="Phone" value={dashboardProfile.phone || 'Not provided'} />
-                        <ProfileField label="Department" value={dashboardProfile.department || 'Not specified'} />
-                        <ProfileField label="Member Since" value={formatDate(dashboardProfile.createdAt)} />
+                      <div className="space-y-3">
+                        <ProfileField label="Email" value={dashboardProfile.email} icon={<Mail className="h-4 w-4 text-muted-foreground" />} />
+                        <ProfileField 
+                          label="Phone" 
+                          value={dashboardProfile.hr?.phone || dashboardProfile.phone || 'Not provided'} 
+                          icon={<Mail className="h-4 w-4 text-muted-foreground" />}
+                        />
+                        <ProfileField 
+                          label="Department" 
+                          value={dashboardProfile.hr?.department || dashboardProfile.department || 'Not specified'} 
+                          icon={<Mail className="h-4 w-4 text-muted-foreground" />}
+                        />
+                        <ProfileField 
+                          label="Position" 
+                          value={dashboardProfile.hr?.position || dashboardProfile.title || 'Not specified'} 
+                          icon={<Mail className="h-4 w-4 text-muted-foreground" />}
+                        />
+                        <ProfileField 
+                          label="Member Since" 
+                          value={formatDate(dashboardProfile.createdAt)} 
+                          icon={<Mail className="h-4 w-4 text-muted-foreground" />}
+                        />
                       </div>
                     </div>
                     
                     <div>
                       <h4 className="text-sm font-medium mb-2">Learning Preferences</h4>
-                      <div className="space-y-2">
+                      <div className="space-y-3">
                         <ProfileField 
                           label="Preferred Learning Style" 
                           value={dashboardProfile.learningPreferences?.preferredLearningStyle || 'Not specified'} 
+                          icon={<Mail className="h-4 w-4 text-muted-foreground" />}
                         />
                         <ProfileField 
                           label="Preferred Content Types" 
                           value={dashboardProfile.learningPreferences?.preferredContentTypes?.length > 0 
                             ? dashboardProfile.learningPreferences.preferredContentTypes.join(', ') 
                             : 'Not specified'} 
+                          icon={<Mail className="h-4 w-4 text-muted-foreground" />}
                         />
                       </div>
                     </div>
@@ -1647,29 +1667,39 @@ const LearnerDashboard: React.FC = () => {
                   {dashboardProfile.hr && (
                     <div className="mt-6 border-t pt-6">
                       <div className="flex items-center gap-2 mb-4">
-                        <User className="h-5 w-5" />
+                        <Mail className="h-5 w-5 text-primary" />
                         <h4 className="text-base font-medium">HR Information</h4>
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <ProfileField 
                           label="Hire Date" 
                           value={formatDate(dashboardProfile.hr.hire_date)} 
-                          icon={<Clock className="h-4 w-4 text-muted-foreground" />}
+                          icon={<Mail className="h-4 w-4 text-muted-foreground" />}
                         />
                         <ProfileField 
                           label="Employment Status" 
                           value={dashboardProfile.hr.status || 'Active'} 
+                          icon={<Mail className="h-4 w-4 text-muted-foreground" />}
                         />
                         {dashboardProfile.hr.manager && (
                           <ProfileField 
                             label="Manager" 
                             value={dashboardProfile.hr.manager} 
+                            icon={<Mail className="h-4 w-4 text-muted-foreground" />}
                           />
                         )}
-                        {dashboardProfile.department && (
+                        {dashboardProfile.hr.department && (
                           <ProfileField 
                             label="Department" 
-                            value={dashboardProfile.department} 
+                            value={dashboardProfile.hr.department} 
+                            icon={<Mail className="h-4 w-4 text-muted-foreground" />}
+                          />
+                        )}
+                        {dashboardProfile.hr.position && (
+                          <ProfileField 
+                            label="Position" 
+                            value={dashboardProfile.hr.position} 
+                            icon={<Mail className="h-4 w-4 text-muted-foreground" />}
                           />
                         )}
                       </div>
