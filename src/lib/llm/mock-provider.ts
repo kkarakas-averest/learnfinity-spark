@@ -87,7 +87,7 @@ export class MockLLMProvider implements LLMProvider {
     } else if (prompt.includes('intervention') || prompt.includes('recommendation')) {
       response = this.getMockIntervention();
     } else if (prompt.includes('content')) {
-      response = this.getMockContent();
+      response = this.getEducationalContent(prompt);
     } else {
       response = this.getGenericResponse();
     }
@@ -296,6 +296,75 @@ ${randomStatus === 'RED'
         }
       ]
     }, null, 2);
+  }
+  
+  /**
+   * Create a properly structured educational content response
+   * Specifically for course sections and educational content
+   */
+  private getEducationalContent(prompt: string): string {
+    // Parse topic from prompt
+    const topicMatch = prompt.match(/Topic:\s*([^\n]+)/);
+    const topic = topicMatch ? topicMatch[1].trim() : 'Course Topic';
+    
+    // Determine if this is a course content request
+    const isCourseContent = prompt.toLowerCase().includes('educational content') || 
+                           prompt.toLowerCase().includes('learning content') ||
+                           prompt.toLowerCase().includes('course');
+    
+    if (isCourseContent) {
+      // Create structured content with sections for educational content
+      return JSON.stringify({
+        mainContent: `# ${topic}\n\nThis is the main content for ${topic}. It contains comprehensive information about the subject matter.`,
+        sections: [
+          {
+            title: "Introduction",
+            content: `<h2>Introduction to ${topic}</h2><p>This section introduces the fundamental concepts of ${topic} and establishes the groundwork for deeper understanding.</p><ul><li>Key concept 1</li><li>Key concept 2</li><li>Key concept 3</li></ul>`
+          },
+          {
+            title: "Core Principles",
+            content: `<h2>Core Principles of ${topic}</h2><p>This section covers the essential principles that form the foundation of ${topic}.</p><p>These principles are applicable across various scenarios and contexts.</p>`
+          },
+          {
+            title: "Practical Applications",
+            content: `<h2>Practical Applications of ${topic}</h2><p>This section demonstrates how to apply the concepts of ${topic} in real-world situations.</p><p>Case studies and examples illustrate the practical value of these concepts.</p>`
+          },
+          {
+            title: "Advanced Concepts",
+            content: `<h2>Advanced Concepts in ${topic}</h2><p>This section explores more sophisticated aspects of ${topic} for those who have mastered the basics.</p><p>Advanced techniques and strategies are discussed in detail.</p>`
+          },
+          {
+            title: "Summary and Next Steps",
+            content: `<h2>Summary and Next Steps</h2><p>This section summarizes the key points covered in ${topic} and suggests further areas of study.</p><p>Recommended resources and practice exercises are provided.</p>`
+          }
+        ],
+        quiz: {
+          questions: [
+            {
+              question: `What is the primary focus of ${topic}?`,
+              options: ["Option A", "Option B", "Option C", "Option D"],
+              correctAnswer: 1,
+              explanation: "Explanation for the correct answer"
+            },
+            {
+              question: `How can ${topic} be applied in a professional setting?`,
+              options: ["Option A", "Option B", "Option C", "Option D"],
+              correctAnswer: 2,
+              explanation: "Explanation for the correct answer"
+            },
+            {
+              question: `What are the key principles of ${topic}?`,
+              options: ["Option A", "Option B", "Option C", "Option D"],
+              correctAnswer: 0,
+              explanation: "Explanation for the correct answer"
+            }
+          ]
+        }
+      });
+    }
+    
+    // Default to the regular mock content response
+    return this.getMockContent();
   }
   
   private getGenericResponse(): string {
