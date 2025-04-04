@@ -10,7 +10,10 @@
   "builds": [
     {
       "src": "package.json",
-      "use": "@vercel/node"
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "dist"
+      }
     },
     {
       "src": "api/**/*.js",
@@ -18,14 +21,9 @@
     }
   ],
   "routes": [
-    {
-      "src": "/api/(.*)",
-      "dest": "/api/$1"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/"
-    }
+    { "handle": "filesystem" },
+    { "src": "/api/(.*)", "dest": "/api/$1.js" },
+    { "src": "/(.*)", "dest": "/index.html" }
   ],
   "env": {
     "VITE_SUPABASE_URL": "${VITE_SUPABASE_URL}",
@@ -36,6 +34,6 @@
     "SUPABASE_SERVICE_KEY": "${VITE_SUPABASE_SERVICE_KEY}",
     "NODE_ENV": "production",
     "VERCEL_DEPLOYMENT": "true",
-    "DEPLOYMENT_TIMESTAMP": "2025-04-04-force-deploy"
+    "DEPLOYMENT_TIMESTAMP": "2025-04-04-force-deploy-2"
   }
 } 
