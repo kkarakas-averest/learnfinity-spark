@@ -17,6 +17,8 @@
     "dev:all": "concurrently \"npm run dev\" \"npm run api\"",
     "build:dev": "vite build --mode development",
     "serve": "node serve.js",
+    "deploy": "vercel --prod",
+    "deploy:preview": "vercel",
     "test:watch": "NODE_OPTIONS=--experimental-vm-modules jest --watch",
     "test:agents": "node src/agents/testing/run-agent-tests.js",
     "db:create-exec-sql": "PGPASSWORD=$SUPABASE_DB_PASSWORD psql -h $SUPABASE_DB_HOST -p $SUPABASE_DB_PORT -d $SUPABASE_DB_NAME -U $SUPABASE_DB_USER -f src/db/create-exec-sql-function.sql",

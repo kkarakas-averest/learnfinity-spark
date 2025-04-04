@@ -1,14 +1,21 @@
 {
   "version": 2,
-  "routes": [
+  "public": false,
+  "github": {
+    "enabled": true,
+    "silent": false
+  },
+  "builds": [
     {
-      "src": "/api/(.*)",
-      "dest": "/api/$1"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/index.html"
+      "src": "package.json",
+      "use": "@vercel/static-build",
+      "config": { "distDir": "dist" }
     }
+  ],
+  "routes": [
+    { "handle": "filesystem" },
+    { "src": "/api/(.*)", "dest": "/api/$1" },
+    { "src": "/(.*)", "dest": "/index.html" }
   ],
   "env": {
     "SUPABASE_URL": "@supabase_url",

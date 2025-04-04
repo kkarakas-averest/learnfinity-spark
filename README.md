@@ -190,3 +190,5 @@ See `/src/components/notifications/README.md` for detailed documentation.
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
+
+<!-- Latest deployment trigger: 2025-04-04 -->
