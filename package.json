@@ -11,7 +11,7 @@
     "dev:cors-server": "cross-env NODE_ENV=development dotenv -e .env npx tsx api-server-cors.ts",
     "dev:with-api": "concurrently \"pnpm run dev\" \"pnpm run dev:cors-server\"",
     "build": "NODE_ENV=production tsc && vite build",
-    "vercel-build": "DEPLOYMENT_TIMESTAMP=$(date +%Y%m%d%H%M%S) vite build && cp -r api dist/",
+    "vercel-build": "NODE_ENV=production tsc && vite build && echo 'API routes ready for Vercel deployment'",
     "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
     "test": "vitest",
