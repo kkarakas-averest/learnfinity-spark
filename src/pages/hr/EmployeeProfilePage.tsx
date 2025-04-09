@@ -980,9 +980,9 @@ const EmployeeProfilePage: React.FC = () => {
               <CardHeader>
                 <CardTitle>Recent Activity</CardTitle>
                 <CardDescription>
-                  {activities.length ? 
-                    `${activities.length} recent activities` : 
-                    'No activities recorded yet'}
+                  {activities && activities.length > 0 
+                    ? `${activities.length} recent activities` 
+                    : 'No activities recorded yet'}
                 </CardDescription>
               </CardHeader>
               <CardContent>
