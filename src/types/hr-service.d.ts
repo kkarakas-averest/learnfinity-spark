@@ -47,7 +47,7 @@ declare module '@/services/hrEmployeeService' {
     createEmployee(employeeData: any): Promise<{ id: string; error?: { message: string } }>;
     updateEmployee(id: string, employeeData: any): Promise<{ success: boolean; error?: any }>;
     deleteEmployee(id: string): Promise<{ success: boolean; error?: any }>;
-    uploadEmployeeResume(id: string, file: File): Promise<{ error: any }>;
+    uploadEmployeeResume(id: string, file: File): Promise<SupabaseResponse<{ resumeUrl: string }>>;
     resetEmployeePassword(email: string): Promise<{ success: boolean; newPassword?: string; error?: { message: string } }>;
     updateEmployeePassword(email: string, password: string): Promise<{ success: boolean; error?: { message: string } }>;
     createEmployeeFromJSON(employeeJSON: any): Promise<{ success: boolean }>;

@@ -536,33 +536,44 @@ const EmployeeProfilePage: React.FC = () => {
     }
   };
 
-  const uploadResumeFile = async (): Promise<string | null> => {
-    if (!resumeFile) return null;
-    
-    try {
-      const fileExt = resumeFile.name.split('.').pop();
-      const filePath = `resumes/${extractedId}-${Date.now()}.${fileExt}`;
-      
-      const { data, error } = await supabase.storage
-        .from('employee-files')
-        .upload(filePath, resumeFile);
-        
-      if (error) throw error;
-      
-      // Get the public URL
-      const { data: urlData } = supabase.storage
-        .from('employee-files')
-        .getPublicUrl(filePath);
-        
-      return urlData.publicUrl;
-    } catch (error) {
-      console.error('Error uploading resume:', error);
+  const uploadResumeFile = async () => {
+    if (!resumeFile || !extractedId) {
       toast({
-        variant: 'destructive',
-        title: 'Upload Failed',
-        description: 'Could not upload resume file. Please try again.'
+        variant: "destructive",
+        title: "Error",
+        description: "Resume file or employee ID is missing",
       });
-      return null;
+      return;
+    }
+
+    try {
+      const response = await hrEmployeeService.uploadEmployeeResume(extractedId, resumeFile);
+      
+      if (response.error) {
+        console.error("Error uploading resume:", response.error);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to upload resume",
+        });
+      } else {
+        toast({
+          title: "Success",
+          description: "Resume uploaded successfully",
+        });
+        
+        // Update the resume URL in the profile data
+        if (response.data?.resumeUrl) {
+          setEmployee(prev => ({ ...prev, resume_url: response.data.resumeUrl }));
+        }
+      }
+    } catch (error) {
+      console.error("Error uploading resume:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to upload resume",
+      });
     }
   };
 
@@ -606,13 +617,26 @@ const EmployeeProfilePage: React.FC = () => {
         profileImageUrl = await uploadProfileImage();
       }
       
-      // Upload resume file if changed
-      let resumeFileUrl = null;
+      // Upload resume file if changed and prepare update data
+      let updateData = {
+        name: editFormData.name,
+        email: editFormData.email,
+        phone: editFormData.phone,
+        department_id: editFormData.department_id,
+        position_id: editFormData.position_id,
+        hire_date: editFormData.hire_date,
+        status: editFormData.status,
+        ...(profileImageUrl && { profile_image_url: profileImageUrl })
+      };
+      
       if (resumeFile) {
-        resumeFileUrl = await uploadResumeFile();
+        // Upload the CV file first
+        await uploadResumeFile();
         
-        // If resume uploaded successfully, generate a profile summary
-        if (resumeFileUrl) {
+        // Fetch the updated employee data to get the new CV URL
+        const { data: updatedEmployee } = await hrEmployeeService.getEmployee(extractedId);
+        
+        if (updatedEmployee && 'cv_file_url' in updatedEmployee && updatedEmployee.cv_file_url) {
           // Call the API to process the CV and generate a summary
           const response = await fetch('/api/hr/employees/process-cv', {
             method: 'POST',
@@ -621,7 +645,7 @@ const EmployeeProfilePage: React.FC = () => {
             },
             body: JSON.stringify({
               employeeId: extractedId,
-              cvUrl: resumeFileUrl
+              cvUrl: updatedEmployee.cv_file_url
             })
           });
           
@@ -630,19 +654,6 @@ const EmployeeProfilePage: React.FC = () => {
           }
         }
       }
-      
-      // Prepare data for update
-      const updateData = {
-        name: editFormData.name,
-        email: editFormData.email,
-        phone: editFormData.phone,
-        department_id: editFormData.department_id,
-        position_id: editFormData.position_id,
-        hire_date: editFormData.hire_date,
-        status: editFormData.status,
-        ...(profileImageUrl && { profile_image_url: profileImageUrl }),
-        ...(resumeFileUrl && { cv_file_url: resumeFileUrl })
-      };
       
       console.log("Updating employee with data:", updateData);
       
@@ -1148,6 +1159,38 @@ const EmployeeProfilePage: React.FC = () => {
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+              
+              {/* CV/Resume Upload Section */}
+              <div className="space-y-2 col-span-full mt-6">
+                <Label htmlFor="resume_file">Resume/CV</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="resume_file"
+                    type="file"
+                    accept=".pdf,.doc,.docx"
+                    onChange={handleResumeFileChange}
+                    className="hidden"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => document.getElementById('resume_file')?.click()}
+                    className="flex items-center gap-2"
+                  >
+                    <Upload className="h-4 w-4" />
+                    Upload Resume/CV
+                  </Button>
+                  {resumeFileName && (
+                    <span className="text-sm text-gray-600 truncate max-w-[200px]">
+                      {resumeFileName}
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-gray-500">
+                  Upload a resume or CV to automatically generate a profile summary.
+                  Supported formats: PDF, DOC, DOCX.
+                </p>
               </div>
             </div>
             
