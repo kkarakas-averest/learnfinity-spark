@@ -34,20 +34,8 @@ export function useResumeHandler(employeeId: string | null) {
     try {
       console.log(`Uploading resume for employee: ${employeeId}`);
       
-      // Check if we're in production
-      const isProduction = window.location.hostname !== 'localhost';
-      
-      // Skip direct client-side upload in production for now
-      let uploadResult;
-      if (isProduction) {
-        console.log("Production environment, using mock URL for reliability");
-        // Skip both client and server attempts on production
-        const mockUrl = createMockResumeUrl(resumeFile.name);
-        uploadResult = { success: true, url: mockUrl };
-      } else {
-        // In development, try direct upload first
-        uploadResult = await uploadResumeFile(resumeFile, employeeId);
-      }
+      // Now that RLS policies are fixed, try direct upload first in both environments
+      const uploadResult = await uploadResumeFile(resumeFile, employeeId);
       
       if (uploadResult.success && uploadResult.url) {
         console.log("Resume upload successful. URL:", uploadResult.url);
@@ -71,41 +59,10 @@ export function useResumeHandler(employeeId: string | null) {
           });
         }
         
-        // Update UI
-        try {
-          // Try to update the employee record directly
-          const { error: updateError } = await supabase
-            .from('hr_employees')
-            .update({
-              cv_file_url: uploadResult.url,
-              resume_url: uploadResult.url,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', employeeId);
-            
-          if (updateError) {
-            console.warn("Error updating employee record:", updateError);
-          }
-        } catch (updateError) {
-          console.warn("Exception updating employee record:", updateError);
-        }
-        
         return { success: true, url: uploadResult.url };
       }
       
-      // If production mock already worked, we shouldn't reach here
-      if (isProduction) {
-        // This should not happen in production since we're using mock URLs
-        console.error("Unexpected error in production upload process");
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Failed to create mock resume entry"
-        });
-        return { success: false };
-      }
-      
-      // For development: if direct upload failed, try API upload
+      // If direct upload failed, try API upload
       console.log("Direct upload failed, trying via server API");
       const apiResult = await uploadResumeViaAPI(resumeFile, employeeId);
       
@@ -124,8 +81,8 @@ export function useResumeHandler(employeeId: string | null) {
         return { success: true, url: apiResult.url };
       }
       
-      // If all fails, use mock URL (for development)
-      console.warn("All upload attempts failed, using mock URL");
+      // If all else fails, only now use mock URL as last resort
+      console.warn("All upload attempts failed, using mock URL as last resort");
       const mockUrl = createMockResumeUrl(resumeFile.name);
       
       try {
@@ -165,7 +122,7 @@ export function useResumeHandler(employeeId: string | null) {
       toast({
         variant: "info",
         title: "Using mock URL",
-        description: "Upload failed, using simulated URL for testing"
+        description: "Real uploads failed, using simulated URL for testing. Please contact support."
       });
       
       return { success: true, url: mockUrl };
@@ -199,16 +156,64 @@ export function useResumeHandler(employeeId: string | null) {
     
     // Check if it's a mock URL
     if (url.includes('/mock-uploads/')) {
-      window.open(url, '_blank', 'noopener,noreferrer');
+      // Handle mock URLs - show a more helpful message
       toast({
         variant: "warning",
         title: "Demo Mode",
-        description: "This is a mock resume URL for demonstration purposes."
+        description: "This is a mock resume URL. Please upload a real resume to view it."
       });
+      
+      // Try to get a real resume URL from the employee data as a fallback
+      if (employeeId) {
+        try {
+          const { data, error } = await supabase
+            .from('hr_employees')
+            .select('cv_file_url, resume_url')
+            .eq('id', employeeId)
+            .single();
+          
+          if (!error && data) {
+            // Look for a real URL that isn't the mock one we just tried
+            const realUrl = [data.cv_file_url, data.resume_url].find(u => 
+              u && !u.includes('/mock-uploads/') && u !== url
+            );
+            
+            if (realUrl) {
+              console.log("Found alternative resume URL:", realUrl);
+              window.open(realUrl, '_blank', 'noopener,noreferrer');
+              return;
+            }
+          }
+        } catch (e) {
+          console.error("Error fetching alternative resume URL:", e);
+        }
+      }
+      
       return;
     }
     
-    // For real URLs, just open directly
+    // For Supabase URLs, verify if the file exists
+    if (url.includes('storage.googleapis.com') || url.includes('supabase.co/storage')) {
+      try {
+        // Try fetching headers to check if file exists
+        const response = await fetch(url, { method: 'HEAD' });
+        
+        if (!response.ok) {
+          console.error("Resume file not found:", response.status);
+          toast({
+            variant: "destructive",
+            title: "File Not Found",
+            description: "The resume file could not be accessed. It may have been deleted."
+          });
+          return;
+        }
+      } catch (error) {
+        console.error("Error checking resume file:", error);
+        // Continue anyway, browser will handle errors
+      }
+    }
+    
+    // For real URLs, open directly
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 

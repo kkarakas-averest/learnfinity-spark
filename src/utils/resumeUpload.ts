@@ -51,21 +51,15 @@ export async function uploadResumeFile(
     // Check if we're in production
     const isProduction = window.location.hostname !== 'localhost';
     
-    // For now, in production, skip both client and server-side uploads and go straight to mock URL
-    // This is a temporary solution until the API routes are fixed on the Vercel deployment
-    if (isProduction) {
-      console.log("Production environment detected. Using mock URL for reliability until API routes are fixed.");
-      return createAndUseMockResumeUrl(file, employeeId);
-    }
+    // In both production and development, try direct upload first now that bucket policies are fixed
+    console.log(`${isProduction ? "Production" : "Development"} environment, attempting direct bucket upload with policies`);
     
-    // For development, try the direct upload first
-    console.log("Development environment, attempting direct upload");
-    
-    // First ensure bucket exists
+    // First ensure bucket exists - this should now work with the SQL policies we added
     const { success: bucketSuccess, error: bucketError } = await ensureEmployeeFilesBucket();
     
     if (!bucketSuccess) {
-      return { success: false, error: `Failed to ensure bucket exists: ${bucketError}` };
+      console.warn(`Bucket check failed: ${bucketError}`);
+      // Continue anyway, as the bucket might exist already
     }
     
     // Generate a unique filename
@@ -84,7 +78,13 @@ export async function uploadResumeFile(
     
     if (uploadError) {
       console.error("Error uploading file:", uploadError);
-      return { success: false, error: uploadError.message };
+      // Fall through to next attempt
+      if (isProduction) {
+        // Try server-side upload if we're still having RLS issues
+        return uploadResumeViaAPI(file, employeeId);
+      } else {
+        return { success: false, error: uploadError.message };
+      }
     }
     
     // Get public URL
@@ -111,6 +111,8 @@ export async function uploadResumeFile(
         error: `File uploaded but employee record not updated: ${updateError.message}`
       };
     }
+    
+    console.log("Resume uploaded successfully. URL:", urlData.publicUrl);
     
     return { success: true, url: urlData.publicUrl };
   } catch (error) {
