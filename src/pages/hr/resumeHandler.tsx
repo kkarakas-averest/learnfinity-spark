@@ -3,6 +3,7 @@ import { toast } from '@/components/ui/use-toast';
 import { uploadResumeFile, uploadResumeViaAPI, createMockResumeUrl } from '@/utils/resumeUpload';
 import { supabase } from '@/lib/supabase';
 import { GROQ_API_KEY } from '@/lib/env';
+import { extractTextFromPdf } from '@/lib/pdf/pdfExtractor';
 
 /**
  * Hook for handling resume upload and viewing in employee profiles
@@ -72,86 +73,39 @@ export function useResumeHandler(employeeId: string | null) {
         }
       }
       
-      // Check if we're in production
-      const isProduction = window.location.hostname !== 'localhost';
-      console.log(`Environment: ${isProduction ? 'Production' : 'Development'}`);
-      
+      // Extract text from PDF directly in the browser
+      console.log("Extracting PDF text directly in the browser");
       let pdfContent = "";
       
-      if (!isProduction) {
-        // In development, try to extract text from PDF using the API
-        console.log("Attempting to extract text from PDF URL in development environment:", cvUrl);
+      try {
+        const extractionResult = await extractTextFromPdf(cvUrl);
         
-        // Use the server API to extract the PDF text since client-side can't handle PDFs well
-        console.log("Calling extract-pdf-text API to get PDF content");
-        
-        // Get the base URL for the current environment
-        const baseUrl = window.location.origin;
-        console.log(`Using base URL for API calls: ${baseUrl}`);
-        
-        try {
-          const extractionResponse = await fetch(`${baseUrl}/api/hr/extract-pdf-text`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ pdfUrl: cvUrl })
-          });
-          
-          if (!extractionResponse.ok) {
-            const error = await extractionResponse.json().catch(() => ({ error: extractionResponse.statusText }));
-            console.error("PDF text extraction API failed:", error);
-            console.log("PDF extraction response status:", extractionResponse.status);
-            console.log("PDF extraction error details:", error);
-            throw new Error(`Failed to extract PDF text: ${error.details || extractionResponse.statusText}`);
-          }
-          
-          const extractionResult = await extractionResponse.json();
+        if (!extractionResult.success) {
+          console.error("PDF extraction failed:", extractionResult.metadata?.error);
+          pdfContent = "PDF text extraction failed. Please analyze based on the employee name, position, and department information provided.";
+        } else {
           pdfContent = extractionResult.text;
-          
-          if (!pdfContent || pdfContent.trim() === '') {
-            console.error("No text content extracted from PDF");
-            throw new Error('No text content could be extracted from the PDF');
-          }
-          
           console.log(`Successfully extracted ${pdfContent.length} characters from PDF`);
-          console.log(`PDF metadata: Pages=${extractionResult.metadata?.numPages}`);
+          console.log(`PDF metadata:`, extractionResult.metadata);
           console.log(`PDF content preview: "${pdfContent.substring(0, 150)}..."`);
-        } catch (extractionError) {
-          console.error("Error extracting PDF text:", extractionError);
-          // In development, we'll let this error propagate
-          throw extractionError;
         }
-      } else {
-        // In production, since PDF extraction API isn't available,
-        // we'll just inform the LLM about the PDF URL and let it try to analyze without actual text
-        console.log("In production environment, skipping PDF text extraction");
-        pdfContent = "PDF text extraction not available in production environment. Please analyze based on the employee name, position, and department information provided.";
+      } catch (extractionError) {
+        console.error("Error extracting PDF text:", extractionError);
+        pdfContent = "PDF text extraction error. Please analyze based on the employee name, position, and department information provided.";
       }
       
-      // Prepare the prompt, either with extracted PDF content or just URL reference
+      // Prepare prompt with the extracted PDF content
       console.log("Preparing structured prompt for Groq API");
       
-      const promptIntro = isProduction
-        ? `You are an expert HR professional analyzing a resume/CV to create a DETAILED and PERSONALIZED profile summary.
-        
-        NOTE: PDF text extraction was not available for this analysis. You'll need to make a best-effort assessment based on the employee metadata below.
-        
-        RESUME URL: ${cvUrl} (URL only, content not available)
-        EMPLOYEE NAME: ${employeeName}
-        POSITION: ${positionName}
-        DEPARTMENT: ${departmentName}`
-        : `You are an expert HR professional analyzing a resume/CV to create a DETAILED and PERSONALIZED profile summary.
+      const structuredPrompt = `
+        You are an expert HR professional analyzing a resume/CV to create a DETAILED and PERSONALIZED profile summary.
         
         CV CONTENT:
         ${pdfContent}
         
         EMPLOYEE NAME: ${employeeName}
         POSITION: ${positionName}
-        DEPARTMENT: ${departmentName}`;
-      
-      const structuredPrompt = `
-        ${promptIntro}
+        DEPARTMENT: ${departmentName}
         
         Task: Analyze this CV and extract SPECIFIC personal and professional information. Your analysis should be personalized based on the actual content of the resume, not generic. Format your response as a JSON object with the following structure:
         
@@ -345,10 +299,6 @@ export function useResumeHandler(employeeId: string | null) {
     setProcessing(true);
     
     try {
-      // Check if we're in development or production
-      const isProduction = window.location.hostname !== 'localhost';
-      console.log(`Environment: ${isProduction ? 'Production' : 'Development'}`);
-      
       // First get the employee data to get the name
       const { data: employee, error: employeeError } = await supabase
         .from('hr_employees')
@@ -376,7 +326,7 @@ export function useResumeHandler(employeeId: string | null) {
       if (GROQ_API_KEY) {
         console.log('Groq API key found, attempting direct API call');
         try {
-          // Call Groq API directly regardless of environment
+          // Call Groq API directly
           console.log("Starting Groq API direct call flow");
           profileData = await callGroqForCvAnalysis(
             cvUrl, 
@@ -403,27 +353,21 @@ export function useResumeHandler(employeeId: string | null) {
           console.error("Error with direct Groq API call:", groqError);
           console.log("Groq API error details:", groqError.message);
           
-          if (isProduction) {
-            // In production, fall back to mock data
-            console.log("FALLBACK: Using mock data in production due to Groq API error");
-            profileData = await createMockProfileData(
-              cvUrl, 
-              employee.name, 
-              employee.department_id, 
-              employee.position_id,
-              departmentName,
-              positionTitle
-            );
-            console.log("Created mock profile data in production fallback");
-          } else {
-            // In development, try the API route
-            console.log("In development, falling back to API route after Groq direct call failed");
-            throw groqError; // Let it fall through to the API route attempt
-          }
+          // Fall back to mock data if Groq API call fails
+          console.log("FALLBACK: Using mock data due to Groq API error");
+          profileData = await createMockProfileData(
+            cvUrl, 
+            employee.name, 
+            employee.department_id, 
+            employee.position_id,
+            departmentName,
+            positionTitle
+          );
+          console.log("Created mock profile data as fallback");
         }
-      } else if (isProduction) {
-        // No Groq API key and in production, use mock data
-        console.log("FALLBACK: No Groq API key available in production, using mock data");
+      } else {
+        // No Groq API key, use mock data
+        console.log("FALLBACK: No Groq API key available, using mock data");
         profileData = await createMockProfileData(
           cvUrl, 
           employee.name, 
@@ -432,51 +376,7 @@ export function useResumeHandler(employeeId: string | null) {
           departmentName,
           positionTitle
         );
-        console.log("Created mock profile data due to missing Groq API key in production");
-      } else {
-        // In development with no Groq API key, try the API route
-        console.log("No Groq API key in development, trying server API route");
-        
-        // Call the API to process the CV
-        const apiUrl = `${window.location.origin}/api/hr/employees/process-cv`;
-        
-        console.log(`Calling CV processing API: ${apiUrl}`);
-        console.log(`API payload: employeeId=${employeeId}, cvUrl=${cvUrl}`);
-        
-        const response = await fetch(apiUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            employeeId,
-            cvUrl
-          })
-        });
-        
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({ 
-            error: `Server returned ${response.status}: ${response.statusText}` 
-          }));
-          console.error('Failed to process CV via API:', errorData);
-          console.log('API processing error status:', response.status);
-          console.log('API processing error details:', errorData);
-          throw new Error(`API processing failed: ${errorData.error || 'Unknown error'}`);
-        }
-        
-        const result = await response.json();
-        console.log('CV processing API result success:', result.success);
-        console.log('CV processing API data source:', result.data?.source);
-        
-        // Use the result data or create mock data as fallback
-        if (result.data) {
-          console.log('Using API-processed profile data');
-          profileData = result.data;
-        } else {
-          console.log('FALLBACK: API returned no data, creating mock profile data');
-          profileData = await createMockProfileData(cvUrl, employee.name, employee.department_id, employee.position_id);
-          console.log('Created mock profile data due to API returning no data');
-        }
+        console.log("Created mock profile data due to missing Groq API key");
       }
       
       // Log the final profile data details
