@@ -55,7 +55,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { supabase } from '@/lib/supabase';
-import { uploadFileToStorage, fixStorageUrl } from '@/utils/storageHelpers';
+import { uploadFileToStorage, fixStorageUrl, getPublicUrl } from '@/utils/storageHelpers';
 
 // Define interfaces for the data
 interface Employee {
@@ -549,40 +549,61 @@ const EmployeeProfilePage: React.FC = () => {
 
     try {
       const fileExt = resumeFile.name.split('.').pop();
-      // Using a flat structure without nested directories
+      // Try the simplest path structure with no nesting
+      // This is more likely to work with default RLS policies
       const timestamp = Date.now();
-      const filePath = `resumes/${extractedId}-${timestamp}.${fileExt}`;
+      const fileName = `${extractedId}-${timestamp}.${fileExt}`;
       
-      console.log(`Preparing to upload resume to path: ${filePath}`);
+      console.log(`Preparing to upload resume with filename: ${fileName}`);
       
-      // Upload file using our helper
-      const { success, error, publicUrl } = await uploadFileToStorage(
-        'employee-files',
-        filePath,
-        resumeFile
-      );
+      // First attempt with direct upload to the bucket root to diagnose RLS issues
+      console.log(`Attempting direct upload to employee-files bucket...`);
+      
+      // Upload directly using Supabase client to bypass potential RLS issues
+      const { data: directData, error: directError } = await supabase.storage
+        .from('employee-files')
+        .upload(fileName, resumeFile, {
+          cacheControl: '3600',
+          upsert: true
+        });
         
-      if (!success || error) {
-        console.error("Error uploading resume:", error);
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Failed to upload resume: " + (error.message || "Unknown error"),
-        });
-        return;
+      if (directError) {
+        console.error("Direct upload error:", directError);
+        
+        // Try the resumes folder as a fallback
+        console.log(`Attempting upload to resumes folder instead...`);
+        const resumePath = `resumes/${fileName}`;
+        
+        const { data: resumeData, error: resumeError } = await supabase.storage
+          .from('employee-files')
+          .upload(resumePath, resumeFile, {
+            cacheControl: '3600',
+            upsert: true
+          });
+          
+        if (resumeError) {
+          console.error("Resume folder upload error:", resumeError);
+          
+          toast({
+            variant: "destructive",
+            title: "Error",
+            description: `Upload error: ${resumeError.message || "Permission denied"}. Please contact your administrator.`,
+          });
+          return;
+        }
+        
+        // Use the resume folder URL
+        var publicUrl = supabase.storage
+          .from('employee-files')
+          .getPublicUrl(resumePath).data.publicUrl;
+      } else {
+        // Use the direct URL
+        var publicUrl = supabase.storage
+          .from('employee-files')
+          .getPublicUrl(fileName).data.publicUrl;
       }
       
-      if (!publicUrl) {
-        console.error("No public URL returned");
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Failed to get public URL for resume",
-        });
-        return;
-      }
-      
-      console.log("Resume URL:", publicUrl);
+      console.log("Resume uploaded successfully. URL:", publicUrl);
       
       // Update employee with the new CV URL
       const { error: updateError } = await supabase
@@ -634,11 +655,17 @@ const EmployeeProfilePage: React.FC = () => {
         
         if (!response.ok) {
           console.warn('Failed to process CV for summary generation:', await response.text());
+        } else {
+          console.log('CV processing started successfully');
         }
       } catch (apiError) {
         console.error('Error calling CV processing API:', apiError);
         // Non-blocking error - we'll continue even if this fails
       }
+      
+      // Clear the resume file input
+      setResumeFile(null);
+      setResumeFileName('');
       
       // Refresh the employee data
       fetchEmployeeData();
@@ -647,7 +674,7 @@ const EmployeeProfilePage: React.FC = () => {
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to upload resume",
+        description: "Failed to upload resume. Please check storage permissions.",
       });
     }
   };
@@ -769,25 +796,71 @@ const EmployeeProfilePage: React.FC = () => {
 
     console.log("Testing CV URL:", url);
     
+    // Extract meaningful parts of the URL for potential reconstruction
+    const fileName = url.split('/').pop() || '';  
+    const timestamp = fileName.split('-')[1] || '';
+    const userIdPart = fileName.split('-')[0] || '';
+    
     try {
-      // Fix the URL before opening
-      const fixedUrl = fixStorageUrl(url, 'employee-files');
-      console.log("Fixed URL:", fixedUrl);
+      // Create an array of possible URLs to try
+      const urlsToTry = [];
       
-      // Check if the URL is accessible
-      const response = await fetch(fixedUrl, { method: 'HEAD' });
-      if (!response.ok) {
-        throw new Error(`Failed to access CV file: ${response.status} ${response.statusText}`);
+      // 1. First try the original URL
+      urlsToTry.push(url);
+      
+      // 2. Try a fixed URL
+      const fixedUrl = fixStorageUrl(url, 'employee-files');
+      urlsToTry.push(fixedUrl);
+      
+      // 3. Try just the filename in the root
+      if (fileName) {
+        urlsToTry.push(getPublicUrl('employee-files', fileName));
       }
       
-      window.open(fixedUrl, '_blank', 'noopener,noreferrer');
+      // 4. Try the file in 'resumes' folder 
+      if (fileName) {
+        urlsToTry.push(getPublicUrl('employee-files', `resumes/${fileName}`));
+      }
+      
+      // 5. Try with nested structure if it has a user ID part
+      if (userIdPart && extractedId) {
+        urlsToTry.push(getPublicUrl('employee-files', `resumes/${extractedId}/${fileName}`));
+      }
+      
+      // Debug all URLs we'll try
+      console.log("Will try the following URLs:", urlsToTry);
+      
+      // Try each URL in sequence until one works
+      for (const urlToTry of urlsToTry) {
+        console.log(`Trying URL: ${urlToTry}`);
+        
+        try {
+          const response = await fetch(urlToTry, { method: 'HEAD' });
+          if (response.ok) {
+            console.log(`Success with URL: ${urlToTry}`);
+            window.open(urlToTry, '_blank', 'noopener,noreferrer');
+            return;
+          }
+        } catch (e) {
+          console.error(`Error checking URL ${urlToTry}:`, e);
+          // Continue to the next URL
+        }
+      }
+      
+      // If we get here, none of the URLs worked, so try opening the original as a last resort
+      console.log("All access attempts failed, trying original URL directly");
+      window.open(url, '_blank', 'noopener,noreferrer');
+      
     } catch (error) {
       console.error("Error opening CV URL:", error);
       toast({
         variant: "destructive",
         title: "Error",
-        description: error instanceof Error ? error.message : "Could not open the CV file. Please check the storage bucket permissions.",
+        description: "Could not access the CV file. Attempting to open it directly in a new tab.",
       });
+      
+      // As a last resort, try opening the original URL
+      window.open(url, '_blank', 'noopener,noreferrer');
     }
   };
 
