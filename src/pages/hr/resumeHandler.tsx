@@ -33,6 +33,10 @@ export function useResumeHandler(employeeId: string | null) {
     positionName: string = "Unknown"
   ): Promise<any> => {
     try {
+      console.log('----------- GROQ DIRECT CALL START -----------');
+      console.log(`CV URL: ${cvUrl}`);
+      console.log(`Employee: ${employeeName}, Department: ${departmentName}, Position: ${positionName}`);
+      
       // If department and position names are not provided, try to look them up
       if ((departmentId || positionId) && (departmentName === "Unknown" || positionName === "Unknown")) {
         try {
@@ -46,6 +50,7 @@ export function useResumeHandler(employeeId: string | null) {
               
             if (deptData) {
               departmentName = deptData.name;
+              console.log(`Retrieved department name: ${departmentName}`);
             }
           }
           
@@ -59,6 +64,7 @@ export function useResumeHandler(employeeId: string | null) {
               
             if (posData) {
               positionName = posData.title;
+              console.log(`Retrieved position name: ${positionName}`);
             }
           }
         } catch (e) {
@@ -70,6 +76,7 @@ export function useResumeHandler(employeeId: string | null) {
       console.log("Attempting to extract text from PDF URL:", cvUrl);
       
       // Use the server API to extract the PDF text since client-side can't handle PDFs well
+      console.log("Calling extract-pdf-text API to get PDF content");
       const extractionResponse = await fetch('/api/hr/extract-pdf-text', {
         method: 'POST',
         headers: {
@@ -80,6 +87,9 @@ export function useResumeHandler(employeeId: string | null) {
       
       if (!extractionResponse.ok) {
         const error = await extractionResponse.json();
+        console.error("PDF text extraction API failed:", error);
+        console.log("PDF extraction response status:", extractionResponse.status);
+        console.log("PDF extraction error details:", error);
         throw new Error(`Failed to extract PDF text: ${error.details || extractionResponse.statusText}`);
       }
       
@@ -87,12 +97,16 @@ export function useResumeHandler(employeeId: string | null) {
       const pdfContent = extractionResult.text;
       
       if (!pdfContent || pdfContent.trim() === '') {
+        console.error("No text content extracted from PDF");
         throw new Error('No text content could be extracted from the PDF');
       }
       
       console.log(`Successfully extracted ${pdfContent.length} characters from PDF`);
+      console.log(`PDF metadata: Pages=${extractionResult.metadata?.numPages}`);
+      console.log(`PDF content preview: "${pdfContent.substring(0, 150)}..."`);
       
       // Prepare the prompt with the actual PDF content
+      console.log("Preparing structured prompt for Groq API with extracted PDF content");
       const structuredPrompt = `
         You are an expert HR professional analyzing a resume/CV to create a DETAILED and PERSONALIZED profile summary.
         
@@ -155,11 +169,14 @@ export function useResumeHandler(employeeId: string | null) {
       
       // Make the API call to Groq
       console.log("Calling Groq API directly for CV analysis");
+      console.log(`Using model: llama3-8b-8192, temperature: 0.2, max_tokens: 2000`);
+      
       let retries = 2;
       let response;
       
       while (retries >= 0) {
         try {
+          console.log(`Groq API attempt ${2-retries+1} of 3`);
           response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
             method: 'POST',
             headers: {
@@ -178,7 +195,12 @@ export function useResumeHandler(employeeId: string | null) {
           });
           
           // If success, break out of retry loop
-          if (response.ok) break;
+          if (response.ok) {
+            console.log("Groq API responded successfully");
+            break;
+          }
+          
+          console.error(`Groq API responded with error status: ${response.status}`);
           
           // If error is not retriable, also break
           if (response.status !== 429 && response.status !== 500 && response.status !== 503) break;
@@ -192,6 +214,7 @@ export function useResumeHandler(employeeId: string | null) {
           }
         } catch (fetchError) {
           console.error("Network error calling Groq API:", fetchError);
+          console.log("Fetch error details:", fetchError.message);
           retries--;
           if (retries < 0) throw fetchError;
           await new Promise(resolve => setTimeout(resolve, 1000));
@@ -201,33 +224,71 @@ export function useResumeHandler(employeeId: string | null) {
       if (!response || !response.ok) {
         const errorData = response ? await response.json().catch(() => ({})) : {};
         console.error("Groq API error:", errorData);
+        console.log("Groq API error status:", response?.status);
+        console.log("Groq API error details:", errorData?.error?.message || "Unknown error");
         throw new Error(`Groq API error (${response?.status}): ${errorData.error?.message || 'Unknown error'}`);
       }
       
       const result = await response.json();
+      console.log("Received response from Groq API");
+      console.log("Response metadata:", {
+        model: result.model,
+        usage: result.usage,
+        choices: result.choices?.length || 0
+      });
+      
       const content = result.choices[0]?.message?.content;
       
       if (!content) {
+        console.error("No content returned from Groq API");
         throw new Error("No content returned from Groq API");
       }
+      
+      console.log("Content received, length:", content.length);
+      console.log("Content preview:", content.substring(0, 150) + "...");
       
       // Parse JSON response
       try {
         // First try direct JSON parsing
-        return JSON.parse(content);
+        console.log("Attempting to parse Groq response as JSON");
+        const parsedData = JSON.parse(content);
+        console.log("Successfully parsed response JSON directly");
+        console.log("Parsed data keys:", Object.keys(parsedData));
+        console.log("Skills found:", parsedData.skills?.length || 0);
+        console.log("Experience entries:", parsedData.experience?.length || 0);
+        console.log('----------- GROQ DIRECT CALL COMPLETE -----------');
+        return parsedData;
       } catch (jsonError) {
         console.error("Error parsing Groq response as JSON:", jsonError);
+        console.log("JSON parse error details:", jsonError.message);
         
         // Try to extract JSON using regex as a fallback
+        console.log("Attempting to extract JSON using regex");
         const jsonMatch = content.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
-          return JSON.parse(jsonMatch[0]);
+          try {
+            const parsedData = JSON.parse(jsonMatch[0]);
+            console.log("Successfully parsed JSON using regex extraction");
+            console.log("Parsed data keys:", Object.keys(parsedData));
+            console.log("Skills found:", parsedData.skills?.length || 0);
+            console.log("Experience entries:", parsedData.experience?.length || 0);
+            console.log('----------- GROQ DIRECT CALL COMPLETE -----------');
+            return parsedData;
+          } catch (e) {
+            console.error("Error parsing extracted JSON match:", e);
+            console.log("Extracted match:", jsonMatch[0].substring(0, 150) + "...");
+            throw new Error("Failed to parse Groq response as JSON even after regex extraction");
+          }
         } else {
+          console.error("No JSON object pattern found in response");
+          console.log("Response content:", content);
           throw new Error("Failed to parse Groq response as JSON");
         }
       }
     } catch (error) {
-      console.error("Error calling Groq API:", error);
+      console.error("Error in callGroqForCvAnalysis:", error);
+      console.log("Error details:", error.message);
+      console.log('----------- GROQ DIRECT CALL FAILED -----------');
       throw error;
     }
   };
@@ -241,11 +302,16 @@ export function useResumeHandler(employeeId: string | null) {
       return false;
     }
 
+    console.log('----------- CV PROCESSING START -----------');
+    console.log(`Processing CV for employee ${employeeId}`);
+    console.log(`CV URL: ${cvUrl}`);
+    
     setProcessing(true);
     
     try {
       // Check if we're in development or production
       const isProduction = window.location.hostname !== 'localhost';
+      console.log(`Environment: ${isProduction ? 'Production' : 'Development'}`);
       
       // First get the employee data to get the name
       const { data: employee, error: employeeError } = await supabase
@@ -266,14 +332,16 @@ export function useResumeHandler(employeeId: string | null) {
       // Extract department and position names
       const departmentName = employee.hr_departments?.name || 'Unknown';
       const positionTitle = employee.hr_positions?.title || 'Unknown';
+      console.log(`Employee: ${employee.name}, Department: ${departmentName}, Position: ${positionTitle}`);
       
       let profileData;
       
       // Check if Groq API key is available
       if (GROQ_API_KEY) {
+        console.log('Groq API key found, attempting direct API call');
         try {
           // Call Groq API directly regardless of environment
-          console.log("Groq API key found, using direct API call");
+          console.log("Starting Groq API direct call flow");
           profileData = await callGroqForCvAnalysis(
             cvUrl, 
             employee.name, 
@@ -291,13 +359,17 @@ export function useResumeHandler(employeeId: string | null) {
             model: 'llama3-8b-8192'
           };
           
-          console.log("Successfully extracted profile data using Groq:", profileData);
+          console.log("Successfully extracted profile data using Groq direct call");
+          console.log("Profile data source:", profileData.source);
+          console.log("Skills extracted:", profileData.skills?.length || 0);
+          console.log("Experience entries:", profileData.experience?.length || 0);
         } catch (groqError) {
           console.error("Error with direct Groq API call:", groqError);
+          console.log("Groq API error details:", groqError.message);
           
           if (isProduction) {
             // In production, fall back to mock data
-            console.log("Falling back to mock data in production");
+            console.log("FALLBACK: Using mock data in production due to Groq API error");
             profileData = await createMockProfileData(
               cvUrl, 
               employee.name, 
@@ -306,15 +378,16 @@ export function useResumeHandler(employeeId: string | null) {
               departmentName,
               positionTitle
             );
+            console.log("Created mock profile data in production fallback");
           } else {
             // In development, try the API route
-            console.log("In development, falling back to API route");
+            console.log("In development, falling back to API route after Groq direct call failed");
             throw groqError; // Let it fall through to the API route attempt
           }
         }
       } else if (isProduction) {
         // No Groq API key and in production, use mock data
-        console.log("No Groq API key available in production, using mock data");
+        console.log("FALLBACK: No Groq API key available in production, using mock data");
         profileData = await createMockProfileData(
           cvUrl, 
           employee.name, 
@@ -323,14 +396,17 @@ export function useResumeHandler(employeeId: string | null) {
           departmentName,
           positionTitle
         );
+        console.log("Created mock profile data due to missing Groq API key in production");
       } else {
         // In development with no Groq API key, try the API route
-        console.log("No Groq API key in development, trying API route");
+        console.log("No Groq API key in development, trying server API route");
         
         // Call the API to process the CV
         const apiUrl = '/api/hr/employees/process-cv';
         
-        console.log(`Calling CV processing API for ${employeeId} with URL ${cvUrl}`);
+        console.log(`Calling CV processing API: ${apiUrl}`);
+        console.log(`API payload: employeeId=${employeeId}, cvUrl=${cvUrl}`);
+        
         const response = await fetch(apiUrl, {
           method: 'POST',
           headers: {
@@ -347,17 +423,35 @@ export function useResumeHandler(employeeId: string | null) {
             error: `Server returned ${response.status}: ${response.statusText}` 
           }));
           console.error('Failed to process CV via API:', errorData);
+          console.log('API processing error status:', response.status);
+          console.log('API processing error details:', errorData);
           throw new Error(`API processing failed: ${errorData.error || 'Unknown error'}`);
         }
         
         const result = await response.json();
-        console.log('CV processing API result:', result);
+        console.log('CV processing API result success:', result.success);
+        console.log('CV processing API data source:', result.data?.source);
         
         // Use the result data or create mock data as fallback
-        profileData = result.data || await createMockProfileData(cvUrl, employee.name, employee.department_id, employee.position_id);
+        if (result.data) {
+          console.log('Using API-processed profile data');
+          profileData = result.data;
+        } else {
+          console.log('FALLBACK: API returned no data, creating mock profile data');
+          profileData = await createMockProfileData(cvUrl, employee.name, employee.department_id, employee.position_id);
+          console.log('Created mock profile data due to API returning no data');
+        }
       }
       
+      // Log the final profile data details
+      console.log("Final profile data source:", profileData.source);
+      console.log("Final profile data model:", profileData.model);
+      console.log("Extracted data summary length:", profileData.summary?.length || 0);
+      console.log("Skills count:", profileData.skills?.length || 0);
+      console.log("Experience entries:", profileData.experience?.length || 0);
+      
       // Update the database with the profile data
+      console.log("Updating database with profile data");
       const { error: updateError } = await supabase
         .from('hr_employees')
         .update({
@@ -376,14 +470,18 @@ export function useResumeHandler(employeeId: string | null) {
         return false;
       }
       
+      console.log("Database updated successfully with profile data");
       toast({
         title: "Profile Data Generated",
         description: "CV processed and profile data extracted successfully."
       });
       
+      console.log('----------- CV PROCESSING COMPLETE -----------');
       return true;
     } catch (error) {
       console.error('Error processing CV:', error);
+      console.log('Error details:', error.message);
+      console.log('FALLBACK: Creating fallback mock data after error');
       
       // Create and save fallback mock data
       try {
@@ -400,6 +498,7 @@ export function useResumeHandler(employeeId: string | null) {
             
           const departmentName = employee?.hr_departments?.name || 'Unknown';
           const positionTitle = employee?.hr_positions?.title || 'Unknown';
+          console.log(`Creating mock data for: ${employee?.name}, Dept: ${departmentName}, Position: ${positionTitle}`);
             
           const mockData = await createMockProfileData(
             cvUrl, 
@@ -410,6 +509,9 @@ export function useResumeHandler(employeeId: string | null) {
             positionTitle
           );
           
+          console.log("Created mock fallback profile data after error");
+          console.log("Writing mock data to database");
+          
           await supabase
             .from('hr_employees')
             .update({
@@ -418,6 +520,7 @@ export function useResumeHandler(employeeId: string | null) {
             })
             .eq('id', employeeId);
             
+          console.log("Mock data saved to database successfully");
           toast({
             variant: "warning",
             title: "Fallback Profile Created",
@@ -428,6 +531,7 @@ export function useResumeHandler(employeeId: string | null) {
         }
       } catch (fallbackError) {
         console.error('Error creating fallback profile:', fallbackError);
+        console.log('Fallback error details:', fallbackError.message);
       }
       
       toast({
@@ -436,6 +540,7 @@ export function useResumeHandler(employeeId: string | null) {
         description: "An error occurred while processing the CV for profile data."
       });
       
+      console.log('----------- CV PROCESSING FAILED -----------');
       return false;
     } finally {
       setProcessing(false);
