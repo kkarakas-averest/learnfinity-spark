@@ -72,55 +72,86 @@ export function useResumeHandler(employeeId: string | null) {
         }
       }
       
-      // First, we need to fetch and extract the text from the PDF to provide to the LLM
-      console.log("Attempting to extract text from PDF URL:", cvUrl);
+      // Check if we're in production
+      const isProduction = window.location.hostname !== 'localhost';
+      console.log(`Environment: ${isProduction ? 'Production' : 'Development'}`);
       
-      // Use the server API to extract the PDF text since client-side can't handle PDFs well
-      console.log("Calling extract-pdf-text API to get PDF content");
+      let pdfContent = "";
       
-      // Get the base URL for the current environment
-      const baseUrl = window.location.origin;
-      console.log(`Using base URL for API calls: ${baseUrl}`);
-      
-      const extractionResponse = await fetch(`${baseUrl}/api/hr/extract-pdf-text`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ pdfUrl: cvUrl })
-      });
-      
-      if (!extractionResponse.ok) {
-        const error = await extractionResponse.json();
-        console.error("PDF text extraction API failed:", error);
-        console.log("PDF extraction response status:", extractionResponse.status);
-        console.log("PDF extraction error details:", error);
-        throw new Error(`Failed to extract PDF text: ${error.details || extractionResponse.statusText}`);
+      if (!isProduction) {
+        // In development, try to extract text from PDF using the API
+        console.log("Attempting to extract text from PDF URL in development environment:", cvUrl);
+        
+        // Use the server API to extract the PDF text since client-side can't handle PDFs well
+        console.log("Calling extract-pdf-text API to get PDF content");
+        
+        // Get the base URL for the current environment
+        const baseUrl = window.location.origin;
+        console.log(`Using base URL for API calls: ${baseUrl}`);
+        
+        try {
+          const extractionResponse = await fetch(`${baseUrl}/api/hr/extract-pdf-text`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ pdfUrl: cvUrl })
+          });
+          
+          if (!extractionResponse.ok) {
+            const error = await extractionResponse.json().catch(() => ({ error: extractionResponse.statusText }));
+            console.error("PDF text extraction API failed:", error);
+            console.log("PDF extraction response status:", extractionResponse.status);
+            console.log("PDF extraction error details:", error);
+            throw new Error(`Failed to extract PDF text: ${error.details || extractionResponse.statusText}`);
+          }
+          
+          const extractionResult = await extractionResponse.json();
+          pdfContent = extractionResult.text;
+          
+          if (!pdfContent || pdfContent.trim() === '') {
+            console.error("No text content extracted from PDF");
+            throw new Error('No text content could be extracted from the PDF');
+          }
+          
+          console.log(`Successfully extracted ${pdfContent.length} characters from PDF`);
+          console.log(`PDF metadata: Pages=${extractionResult.metadata?.numPages}`);
+          console.log(`PDF content preview: "${pdfContent.substring(0, 150)}..."`);
+        } catch (extractionError) {
+          console.error("Error extracting PDF text:", extractionError);
+          // In development, we'll let this error propagate
+          throw extractionError;
+        }
+      } else {
+        // In production, since PDF extraction API isn't available,
+        // we'll just inform the LLM about the PDF URL and let it try to analyze without actual text
+        console.log("In production environment, skipping PDF text extraction");
+        pdfContent = "PDF text extraction not available in production environment. Please analyze based on the employee name, position, and department information provided.";
       }
       
-      const extractionResult = await extractionResponse.json();
-      const pdfContent = extractionResult.text;
+      // Prepare the prompt, either with extracted PDF content or just URL reference
+      console.log("Preparing structured prompt for Groq API");
       
-      if (!pdfContent || pdfContent.trim() === '') {
-        console.error("No text content extracted from PDF");
-        throw new Error('No text content could be extracted from the PDF');
-      }
-      
-      console.log(`Successfully extracted ${pdfContent.length} characters from PDF`);
-      console.log(`PDF metadata: Pages=${extractionResult.metadata?.numPages}`);
-      console.log(`PDF content preview: "${pdfContent.substring(0, 150)}..."`);
-      
-      // Prepare the prompt with the actual PDF content
-      console.log("Preparing structured prompt for Groq API with extracted PDF content");
-      const structuredPrompt = `
-        You are an expert HR professional analyzing a resume/CV to create a DETAILED and PERSONALIZED profile summary.
+      const promptIntro = isProduction
+        ? `You are an expert HR professional analyzing a resume/CV to create a DETAILED and PERSONALIZED profile summary.
+        
+        NOTE: PDF text extraction was not available for this analysis. You'll need to make a best-effort assessment based on the employee metadata below.
+        
+        RESUME URL: ${cvUrl} (URL only, content not available)
+        EMPLOYEE NAME: ${employeeName}
+        POSITION: ${positionName}
+        DEPARTMENT: ${departmentName}`
+        : `You are an expert HR professional analyzing a resume/CV to create a DETAILED and PERSONALIZED profile summary.
         
         CV CONTENT:
         ${pdfContent}
         
         EMPLOYEE NAME: ${employeeName}
         POSITION: ${positionName}
-        DEPARTMENT: ${departmentName}
+        DEPARTMENT: ${departmentName}`;
+      
+      const structuredPrompt = `
+        ${promptIntro}
         
         Task: Analyze this CV and extract SPECIFIC personal and professional information. Your analysis should be personalized based on the actual content of the resume, not generic. Format your response as a JSON object with the following structure:
         
