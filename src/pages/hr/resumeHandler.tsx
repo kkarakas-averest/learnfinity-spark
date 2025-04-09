@@ -3,7 +3,6 @@ import { toast } from '@/components/ui/use-toast';
 import { uploadResumeFile, uploadResumeViaAPI, createMockResumeUrl } from '@/utils/resumeUpload';
 import { supabase } from '@/lib/supabase';
 import { GROQ_API_KEY } from '@/lib/env';
-import { extractTextFromPdf } from '@/lib/pdf/pdfExtractor';
 
 /**
  * Hook for handling resume upload and viewing in employee profiles
@@ -73,27 +72,41 @@ export function useResumeHandler(employeeId: string | null) {
         }
       }
       
-      // Extract text from PDF directly in the browser
-      console.log("Extracting PDF text directly in the browser");
+      // Extract text from PDF using the server-side API route
+      console.log("Extracting PDF text via server-side API...");
       let pdfContent = "";
+      let pdfMetadata = {};
       
       try {
-        const extractionResult = await extractTextFromPdf(cvUrl);
+        const extractionResponse = await fetch('/api/hr/extract-pdf', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ pdfUrl: cvUrl })
+        });
         
-        if (!extractionResult.success) {
-          console.error("PDF extraction failed:", extractionResult.metadata?.error);
+        if (!extractionResponse.ok) {
+          const errorData = await extractionResponse.json().catch(() => ({}));
+          throw new Error(`PDF extraction API failed: ${extractionResponse.status} - ${errorData.error || 'Unknown error'}`);
+        }
+        
+        const extractionResult = await extractionResponse.json();
+        
+        if (!extractionResult.success || !extractionResult.text) {
+          console.error("Server-side PDF extraction failed:", extractionResult.error);
           pdfContent = "PDF text extraction failed. Please analyze based on the employee name, position, and department information provided.";
         } else {
           pdfContent = extractionResult.text;
-          console.log(`Successfully extracted ${pdfContent.length} characters from PDF`);
-          console.log(`PDF metadata:`, extractionResult.metadata);
+          pdfMetadata = extractionResult.metadata || {};
+          console.log(`Successfully extracted ${pdfContent.length} characters via API`);
+          console.log(`PDF metadata via API:`, pdfMetadata);
           console.log(`PDF content preview: "${pdfContent.substring(0, 150)}..."`);
           
           // Truncate content if it's too large to prevent Groq API errors
-          const MAX_CONTENT_LENGTH = 8000; // Increase slightly from 6000
+          const MAX_CONTENT_LENGTH = 8000; // Keep increased limit
           if (pdfContent.length > MAX_CONTENT_LENGTH) {
             console.log(`PDF content too large (${pdfContent.length} chars), truncating to ${MAX_CONTENT_LENGTH} chars`);
-            // Take first 80% from beginning and last 20% from end for better context
             const firstPortion = Math.floor(MAX_CONTENT_LENGTH * 0.8);
             const lastPortion = MAX_CONTENT_LENGTH - firstPortion;
             pdfContent = pdfContent.substring(0, firstPortion) + 
@@ -102,9 +115,9 @@ export function useResumeHandler(employeeId: string | null) {
             console.log(`Truncated content length: ${pdfContent.length} chars`);
           }
         }
-      } catch (extractionError) {
-        console.error("Error extracting PDF text:", extractionError);
-        pdfContent = "PDF text extraction error. Please analyze based on the employee name, position, and department information provided.";
+      } catch (extractionApiError) {
+        console.error("Error calling PDF extraction API:", extractionApiError);
+        pdfContent = "Error calling PDF text extraction service. Please analyze based on the employee name, position, and department information provided.";
       }
       
       // Prepare prompt with the extracted PDF content
