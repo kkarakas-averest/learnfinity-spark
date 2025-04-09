@@ -90,7 +90,7 @@ export function useResumeHandler(employeeId: string | null) {
           console.log(`PDF content preview: "${pdfContent.substring(0, 150)}..."`);
           
           // Truncate content if it's too large to prevent Groq API errors
-          const MAX_CONTENT_LENGTH = 6000; // Reduced size to fit within Groq limits
+          const MAX_CONTENT_LENGTH = 8000; // Increase slightly from 6000
           if (pdfContent.length > MAX_CONTENT_LENGTH) {
             console.log(`PDF content too large (${pdfContent.length} chars), truncating to ${MAX_CONTENT_LENGTH} chars`);
             // Take first 80% from beginning and last 20% from end for better context

@@ -99,179 +99,66 @@ export async function extractTextFromPdf(pdfUrl: string): Promise<PDFExtractionR
  */
 async function extractTextFromBuffer(buffer: ArrayBuffer): Promise<PDFExtractionResult> {
   try {
-    // Convert buffer to string - this won't extract all text, but can get some basic content from text-based PDFs
     const uint8Array = new Uint8Array(buffer);
-    
-    // Find text sections in the PDF by looking for text markers
-    // This is a simple approach that works for many text-based PDFs
     let pdfText = "";
     let pageCount = 0;
     let title = "";
     let author = "";
-    
-    // Convert to string preserving only ASCII text for readability
+
+    // Simplified text conversion - focus on printable ASCII and basic structure
     let textContent = "";
     for (let i = 0; i < uint8Array.length; i++) {
-      // Only include ASCII printable characters
-      if (uint8Array[i] >= 32 && uint8Array[i] <= 126) {
-        textContent += String.fromCharCode(uint8Array[i]);
-      } else if (uint8Array[i] === 10 || uint8Array[i] === 13) {
-        // Include newlines/line feeds
+      const charCode = uint8Array[i];
+      // Include printable ASCII characters (space to ~)
+      if (charCode >= 32 && charCode <= 126) {
+        textContent += String.fromCharCode(charCode);
+      } else if (charCode === 10 || charCode === 13) {
+        // Preserve line breaks
         textContent += "\n";
       }
     }
-    
-    // Try to identify text sections using multiple patterns
-    
-    // Method 1: Extract text between parentheses (common in PDF text objects)
+
+    // Use a simpler regex to find potential text blocks within PDF structures
+    // This looks for text enclosed in parentheses, often used for text objects
     const textRegex = /\(([^)]+)\)/g;
     let match;
-    
-    // Extract all text in parentheses which often contains actual text content in PDFs
+    let extractedParenthesesText = "";
     while ((match = textRegex.exec(textContent)) !== null) {
-      // Only include if the matched text is likely meaningful (more than a few characters)
-      if (match[1].length > 3) {
-        pdfText += match[1] + " ";
+      // Basic check to avoid very short/irrelevant matches
+      if (match[1] && match[1].trim().length > 2) {
+        extractedParenthesesText += match[1].trim() + "\n"; 
       }
     }
-    
-    // Method 2: Look for common PDF text patterns
-    const textBlockRegex = /BT\s*([^]*?)\s*ET/g;
-    let textBlocks = "";
-    let blockMatch;
-    
-    while ((blockMatch = textBlockRegex.exec(textContent)) !== null) {
-      if (blockMatch[1]) {
-        textBlocks += blockMatch[1] + "\n";
-      }
+
+    // Prioritize the text extracted from parentheses if substantial
+    // Otherwise, fall back to the basic ASCII conversion
+    if (extractedParenthesesText.length > textContent.length * 0.1 || extractedParenthesesText.length > 500) { // If extracted text seems significant
+      pdfText = extractedParenthesesText;
+      console.log("Using text extracted from PDF parentheses markers.");
+    } else {
+      pdfText = textContent;
+      console.log("Using basic ASCII text conversion as primary source.");
     }
-    
-    // Method 3: Look for common resume keywords to extract relevant sections
-    const resumeKeywords = [
-      "experience", "education", "skills", "profile", "summary", 
-      "work history", "employment", "qualification", "professional",
-      "certification", "project", "contact", "reference", "language", 
-      "linkedin", "email", "phone", "address", "objective",
-      "job", "position", "background", "knowledge", "expertise",
-      "proficient", "degree", "university", "college", "school",
-      "diploma", "specialist", "manager", "director", "lead",
-      "senior", "junior", "year", "technical", "software",
-      "developed", "implemented", "managed", "responsible",
-      "achievements", "accomplishments", "improved"
-    ];
-    
-    let keywordMatches = "";
-    
-    resumeKeywords.forEach(keyword => {
-      // Look for the keyword with more context around it
-      const keywordRegex = new RegExp(`[^\\n\\r]{0,100}${keyword}[^\\n\\r]{0,150}`, "gi");
-      let keywordMatch;
-      
-      while ((keywordMatch = keywordRegex.exec(textContent)) !== null) {
-        keywordMatches += keywordMatch[0] + "\n\n";
-      }
-    });
-    
-    // Method 4: Look for email addresses, phone numbers, and URLs
-    const contactInfoPatterns = [
-      /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g,  // Email
-      /\b(?:\+\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b/g,  // Phone
-      /\bhttps?:\/\/[^\s]+\b/g  // URL
-    ];
-    
-    let contactInfo = "";
-    contactInfoPatterns.forEach(pattern => {
-      let infoMatch;
-      while ((infoMatch = pattern.exec(textContent)) !== null) {
-        contactInfo += "Contact: " + infoMatch[0] + "\n";
-      }
-    });
-    
-    // Method 5: Look for common CV section headers and extract content after them
-    const sectionHeaders = [
-      "EXPERIENCE", "EDUCATION", "SKILLS", "PROFILE", "WORK HISTORY",
-      "PROFESSIONAL EXPERIENCE", "TECHNICAL SKILLS", "CERTIFICATIONS"
-    ];
-    
-    let sectionContent = "";
-    sectionHeaders.forEach(header => {
-      // Case insensitive search for section headers with content after
-      const sectionRegex = new RegExp(`${header}[\\s:]*([^]*?)(?=(${sectionHeaders.join('|')})|$)`, 'i');
-      const sectionMatch = textContent.match(sectionRegex);
-      
-      if (sectionMatch && sectionMatch[1]) {
-        sectionContent += `\n\n### ${header} ###\n${sectionMatch[1].trim()}\n`;
-      }
-    });
-    
-    // Combine all extraction methods, prioritizing structured sections
-    let finalText = "";
-    
-    // Add section content first if we found any
-    if (sectionContent.length > 200) {
-      finalText += sectionContent;
-    }
-    
-    // Add text from parentheses extraction
-    if (pdfText.length > 0) {
-      finalText += (finalText ? "\n\n" : "") + pdfText;
-    }
-    
-    // Add text block content if substantial
-    if (textBlocks.length > 200) {
-      finalText += (finalText ? "\n\n" : "") + textBlocks;
-    }
-    
-    // Add keyword matches if we need more content
-    if (keywordMatches.length > 0 && finalText.length < 2000) {
-      finalText += (finalText ? "\n\n" : "") + keywordMatches;
-    }
-    
-    // Always include contact information if found
-    if (contactInfo.length > 0) {
-      finalText = contactInfo + (finalText ? "\n\n" : "") + finalText;
-    }
-    
-    // If we still don't have good content, use raw text as a last resort
-    if (finalText.length < 500) {
-      finalText = textContent;
-    }
-    
-    // Try to extract page count based on common patterns
+
+    // Try to extract metadata (less critical but useful)
     const pageMatch = textContent.match(/\/Type\s*\/Page/g);
-    if (pageMatch) {
-      pageCount = pageMatch.length;
-    }
-    
-    // Try to extract title
+    pageCount = pageMatch ? pageMatch.length : 0;
     const titleMatch = textContent.match(/\/Title\s*\(([^)]+)\)/);
-    if (titleMatch && titleMatch[1]) {
-      title = titleMatch[1];
-    }
-    
-    // Try to extract author
+    title = titleMatch && titleMatch[1] ? titleMatch[1] : "";
     const authorMatch = textContent.match(/\/Author\s*\(([^)]+)\)/);
-    if (authorMatch && authorMatch[1]) {
-      author = authorMatch[1];
-    }
-    
+    author = authorMatch && authorMatch[1] ? authorMatch[1] : "";
+
     return {
       success: true,
-      text: finalText || textContent,
-      metadata: {
-        pageCount,
-        title,
-        author
-      }
+      text: pdfText,
+      metadata: { pageCount, title, author }
     };
   } catch (error) {
     console.error("Error in PDF text extraction:", error);
     return {
       success: false,
       text: "",
-      metadata: {
-        error: error instanceof Error ? error.message : String(error)
-      }
+      metadata: { error: error instanceof Error ? error.message : String(error) }
     };
   }
 }
@@ -283,57 +170,12 @@ async function extractTextFromBuffer(buffer: ArrayBuffer): Promise<PDFExtraction
  * @returns Cleaned text
  */
 function cleanPdfText(text: string): string {
-  // First pass - basic cleaning
-  let cleaned = text
-    .replace(/\r\n/g, '\n')          // Normalize line breaks
-    .replace(/\s+/g, ' ')            // Collapse multiple whitespace
-    .replace(/\n{3,}/g, '\n\n')      // Replace 3+ newlines with just 2
-    .replace(/[^\x20-\x7E\n]/g, '')  // Remove non-printable ASCII characters
-    .replace(/\\[rnt]/g, ' ')        // Replace escaped characters with space
-    .replace(/\\\(/g, '(')           // Replace escaped parentheses
-    .replace(/\\\)/g, ')')
-    .replace(/\\u[0-9a-fA-F]{4}/g, ' ') // Replace unicode escape sequences
-    .trim();
-  
-  // Second pass - improve CV structure
-  // Add section markers to help LLM identify sections
-  const sectionMarkers = [
-    'EDUCATION', 'EXPERIENCE', 'EMPLOYMENT', 'SKILLS', 'LANGUAGES', 
-    'CERTIFICATIONS', 'ACHIEVEMENTS', 'PROJECTS', 'SUMMARY', 'PROFILE',
-    'WORK HISTORY', 'PROFESSIONAL EXPERIENCE', 'QUALIFICATIONS', 'TECHNICAL SKILLS'
-  ];
-  
-  // Highlight potential section headers
-  let structuredText = cleaned;
-  sectionMarkers.forEach(marker => {
-    // Look for case insensitive matches that are likely section headers
-    const regex = new RegExp(`(^|\\n|\\s)(${marker}|${marker.toLowerCase()}|${marker.charAt(0) + marker.slice(1).toLowerCase()})(\\s|:|\\n|$)`, 'g');
-    structuredText = structuredText.replace(regex, (match, p1, p2, p3) => {
-      // Preserve original casing but add formatting markers
-      return `${p1}### ${p2.toUpperCase()} ###${p3}`;
-    });
-  });
-  
-  // Look for patterns that might represent dates and emphasize them
-  const datePatterns = [
-    // MM/YYYY - MM/YYYY format
-    /(\d{1,2}\/\d{4})\s*-\s*(\d{1,2}\/\d{4}|\bpresent\b|\bcurrent\b)/gi,
-    // Month Year - Month Year format
-    /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]* \d{4}\s*-\s*(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]* \d{4}|\bpresent\b|\bcurrent\b/gi,
-    // YYYY - YYYY format
-    /\b(19|20)\d{2}\s*-\s*(19|20)\d{2}|\bpresent\b|\bcurrent\b/gi
-  ];
-  
-  datePatterns.forEach(pattern => {
-    structuredText = structuredText.replace(pattern, match => `[ ${match} ]`);
-  });
-  
-  // Enhance bullet points to improve list identification
-  structuredText = structuredText
-    .replace(/([•\-\*]\s*)/g, '\n• ')  // Standardize bullet points
-    .replace(/\n{3,}/g, '\n\n')        // Clean up excess newlines again
-    .replace(/\s{2,}/g, ' ')           // Remove duplicate spaces
-    .trim();
-  
-  return structuredText;
+  // Simplified cleaning: focus on whitespace and basic normalization
+  return text
+    .replace(/\r\n/g, '\n')        // Normalize line breaks
+    .replace(/\n{3,}/g, '\n\n')    // Collapse excessive newlines
+    .replace(/\s{2,}/g, ' ')       // Collapse multiple spaces/tabs into single space
+    .replace(/[^\x20-\x7E\n]/g, '') // Remove non-printable ASCII chars (excluding newline)
+    .replace(/•/g, '* ')          // Standardize bullets
+    .trim();                     // Trim leading/trailing whitespace
 } 
