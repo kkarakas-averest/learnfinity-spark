@@ -548,42 +548,181 @@ const EmployeeProfilePage: React.FC = () => {
     }
 
     try {
-      const fileExt = resumeFile.name.split('.').pop();
-      const timestamp = Date.now();
+      // First, try to get the authenticated user info to understand our permissions
+      const { 
+        data: { user },
+        error: userError
+      } = await supabase.auth.getUser();
       
-      // CRITICAL: The RLS policy requires the path to start with the employee ID
-      // Format: {employeeId}/{filename}
-      const fileName = `${timestamp}_${Math.random().toString(36).substring(2, 8)}_${resumeFile.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
-      const filePath = `${extractedId}/${fileName}`;
-      
-      console.log(`Preparing to upload resume to path: ${filePath} (compliant with RLS policy)`);
-      
-      // Upload directly using Supabase client
-      const { data, error } = await supabase.storage
-        .from('employee-files')
-        .upload(filePath, resumeFile, {
-          cacheControl: '3600',
-          upsert: true
-        });
-        
-      if (error) {
-        console.error("Upload error:", error);
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: `Upload error: ${error.message || "Permission denied"}. Please check permissions.`,
-        });
-        return;
+      if (userError) {
+        console.error("Auth error:", userError);
       }
       
-      // Get the public URL for the uploaded file
-      const { data: urlData } = supabase.storage
-        .from('employee-files')
-        .getPublicUrl(filePath);
+      console.log("Current authenticated user:", user?.id);
       
-      const publicUrl = urlData.publicUrl;
-      console.log("Resume uploaded successfully. URL:", publicUrl);
+      // Create the file with a unique name
+      const timestamp = Date.now();
+      const randomString = Math.random().toString(36).substring(2, 8);
+      const safeFileName = resumeFile.name.replace(/[^a-zA-Z0-9.]/g, '_');
+      const fileName = `${timestamp}_${randomString}_${safeFileName}`;
       
+      // DETERMINE THE CORRECT PATH
+      // Try different path structures based on the RLS policy
+      
+      // Try uploading to /resumes/{employeeId}/{fileName}
+      const filePath1 = `resumes/${extractedId}/${fileName}`;
+      console.log("Attempting upload with path structure 1:", filePath1);
+      
+      try {
+        const { data: uploadData1, error: uploadError1 } = await supabase.storage
+          .from('employee-files')
+          .upload(filePath1, resumeFile, {
+            cacheControl: '3600',
+            upsert: true
+          });
+          
+        if (!uploadError1) {
+          // Success with this path
+          console.log("Upload successful with path:", filePath1);
+          
+          // Get the public URL
+          const { data: urlData } = supabase.storage
+            .from('employee-files')
+            .getPublicUrl(filePath1);
+          
+          const publicUrl = urlData.publicUrl;
+          
+          // Continue with database update
+          await handleSuccessfulUpload(publicUrl);
+          return;
+        } else {
+          console.log("Path 1 error:", uploadError1.message);
+        }
+      } catch (error) {
+        console.error("Path 1 exception:", error);
+      }
+      
+      // Try alternative path: /{employeeId}/resumes/{fileName}
+      const filePath2 = `${extractedId}/resumes/${fileName}`;
+      console.log("Attempting upload with path structure 2:", filePath2);
+      
+      try {
+        const { data: uploadData2, error: uploadError2 } = await supabase.storage
+          .from('employee-files')
+          .upload(filePath2, resumeFile, {
+            cacheControl: '3600',
+            upsert: true
+          });
+          
+        if (!uploadError2) {
+          // Success with this path
+          console.log("Upload successful with path:", filePath2);
+          
+          // Get the public URL
+          const { data: urlData } = supabase.storage
+            .from('employee-files')
+            .getPublicUrl(filePath2);
+          
+          const publicUrl = urlData.publicUrl;
+          
+          // Continue with database update
+          await handleSuccessfulUpload(publicUrl);
+          return;
+        } else {
+          console.log("Path 2 error:", uploadError2.message);
+        }
+      } catch (error) {
+        console.error("Path 2 exception:", error);
+      }
+      
+      // Try direct employee ID path: /{employeeId}/{fileName}
+      const filePath3 = `${extractedId}/${fileName}`;
+      console.log("Attempting upload with path structure 3:", filePath3);
+      
+      try {
+        const { data: uploadData3, error: uploadError3 } = await supabase.storage
+          .from('employee-files')
+          .upload(filePath3, resumeFile, {
+            cacheControl: '3600',
+            upsert: true
+          });
+          
+        if (!uploadError3) {
+          // Success with this path
+          console.log("Upload successful with path:", filePath3);
+          
+          // Get the public URL
+          const { data: urlData } = supabase.storage
+            .from('employee-files')
+            .getPublicUrl(filePath3);
+          
+          const publicUrl = urlData.publicUrl;
+          
+          // Continue with database update
+          await handleSuccessfulUpload(publicUrl);
+          return;
+        } else {
+          console.log("Path 3 error:", uploadError3.message);
+        }
+      } catch (error) {
+        console.error("Path 3 exception:", error);
+      }
+      
+      // If all path attempts failed, try one more approach using the user ID from auth
+      if (user?.id) {
+        const filePath4 = `${user.id}/${fileName}`;
+        console.log("Attempting upload with authenticated user ID path:", filePath4);
+        
+        try {
+          const { data: uploadData4, error: uploadError4 } = await supabase.storage
+            .from('employee-files')
+            .upload(filePath4, resumeFile, {
+              cacheControl: '3600',
+              upsert: true
+            });
+            
+          if (!uploadError4) {
+            // Success with this path
+            console.log("Upload successful with path:", filePath4);
+            
+            // Get the public URL
+            const { data: urlData } = supabase.storage
+              .from('employee-files')
+              .getPublicUrl(filePath4);
+            
+            const publicUrl = urlData.publicUrl;
+            
+            // Continue with database update
+            await handleSuccessfulUpload(publicUrl);
+            return;
+          } else {
+            console.log("Path 4 error:", uploadError4.message);
+          }
+        } catch (error) {
+          console.error("Path 4 exception:", error);
+        }
+      }
+      
+      // If we made it here, all attempts failed
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to upload resume due to permission issues. Please contact your administrator.",
+      });
+      
+    } catch (error) {
+      console.error("Error in resume upload process:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to upload resume. Please try again later.",
+      });
+    }
+  };
+
+  // Helper function to handle post-upload actions
+  const handleSuccessfulUpload = async (publicUrl: string) => {
+    try {
       // Update employee with the new CV URL
       const { error: updateError } = await supabase
         .from('hr_employees')
@@ -599,7 +738,7 @@ const EmployeeProfilePage: React.FC = () => {
         toast({
           variant: "destructive",
           title: "Error",
-          description: "Failed to update employee record with resume URL",
+          description: "Resume uploaded but failed to update employee record.",
         });
         return;
       }
@@ -648,11 +787,11 @@ const EmployeeProfilePage: React.FC = () => {
       // Refresh the employee data
       fetchEmployeeData();
     } catch (error) {
-      console.error("Error uploading resume:", error);
+      console.error("Error in handleSuccessfulUpload:", error);
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to upload resume. Please check storage permissions.",
+        description: "An error occurred while processing the upload.",
       });
     }
   };
@@ -775,7 +914,7 @@ const EmployeeProfilePage: React.FC = () => {
     console.log("Testing CV URL:", url);
     
     try {
-      // First, check if direct access works
+      // First check direct URL access
       try {
         const directResponse = await fetch(url, { method: 'HEAD' });
         if (directResponse.ok) {
@@ -784,82 +923,110 @@ const EmployeeProfilePage: React.FC = () => {
           return;
         }
       } catch (error) {
-        console.log("Direct access failed, trying alternatives");
+        console.log("Direct URL access failed, trying alternatives");
       }
       
-      // Parse URL to understand its components
-      const urlObj = new URL(url);
-      const pathParts = urlObj.pathname.split('/');
-      
-      // Extract components from the path
-      let bucketName = '';
-      let filePath = '';
-      
-      // Handle various URL patterns
-      if (pathParts.includes('public')) {
-        // Format: /storage/v1/object/public/{bucketName}/{filePath}
-        const publicIndex = pathParts.indexOf('public');
-        if (publicIndex >= 0 && pathParts.length > publicIndex + 1) {
-          bucketName = pathParts[publicIndex + 1];
-          filePath = pathParts.slice(publicIndex + 2).join('/');
-        }
+      // Get authenticated user info
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError) {
+        console.warn("Auth error when trying to get user:", userError);
       }
       
-      console.log(`Parsed URL - Bucket: ${bucketName}, Path: ${filePath}`);
+      // Extract file name from the URL
+      const urlParts = url.split('/');
+      const fileName = urlParts[urlParts.length - 1];
       
-      // Create an array of possible URLs to try based on RLS policy understanding
-      const urlsToTry = [];
+      console.log("Extracted fileName:", fileName);
       
-      // 1. Try with the employee ID as the first folder (compliant with RLS)
-      if (extractedId && filePath) {
-        // Format: {employeeId}/{fileName}
-        const fileName = filePath.split('/').pop() || '';
-        urlsToTry.push(getPublicUrl(bucketName || 'employee-files', `${extractedId}/${fileName}`));
+      // Create an array of possible paths to try
+      const pathsToTry = [];
+      
+      // Try variant 1: /resumes/{employeeId}/{fileName}
+      if (extractedId && fileName) {
+        pathsToTry.push(`resumes/${extractedId}/${fileName}`);
       }
       
-      // 2. Try a direct access to the original path
-      if (bucketName && filePath) {
-        urlsToTry.push(getPublicUrl(bucketName, filePath));
+      // Try variant 2: /{employeeId}/resumes/{fileName}
+      if (extractedId && fileName) {
+        pathsToTry.push(`${extractedId}/resumes/${fileName}`);
       }
       
-      // 3. Try a file name only approach
-      const fileName = url.split('/').pop() || '';
-      if (fileName) {
-        urlsToTry.push(getPublicUrl('employee-files', fileName));
+      // Try variant 3: /{employeeId}/{fileName}
+      if (extractedId && fileName) {
+        pathsToTry.push(`${extractedId}/${fileName}`);
       }
       
-      // Debug all URLs we'll try
-      console.log("Will try the following URLs:", urlsToTry);
+      // Try variant 4: /{userId}/{fileName} (if we have user authentication)
+      if (user?.id && fileName) {
+        pathsToTry.push(`${user.id}/${fileName}`);
+      }
       
-      // Try each URL in sequence until one works
-      for (const urlToTry of urlsToTry) {
-        console.log(`Trying URL: ${urlToTry}`);
-        
+      console.log("Trying the following paths:", pathsToTry);
+      
+      // Try each path
+      for (const path of pathsToTry) {
         try {
-          const response = await fetch(urlToTry, { method: 'HEAD' });
+          // Get the public URL for this path
+          const { data: urlData } = supabase.storage
+            .from('employee-files')
+            .getPublicUrl(path);
+          
+          const publicUrl = urlData.publicUrl;
+          console.log(`Testing path: ${path} -> URL: ${publicUrl}`);
+          
+          // Check if accessible
+          const response = await fetch(publicUrl, { method: 'HEAD' });
           if (response.ok) {
-            console.log(`Success with URL: ${urlToTry}`);
-            window.open(urlToTry, '_blank', 'noopener,noreferrer');
+            console.log(`Success with path: ${path}`);
+            window.open(publicUrl, '_blank', 'noopener,noreferrer');
             return;
           }
-        } catch (e) {
-          console.error(`Error checking URL ${urlToTry}:`, e);
-          // Continue to the next URL
+        } catch (error) {
+          console.log(`Error with path ${path}:`, error);
         }
       }
       
-      // If we get here, none of the URLs worked, ask user to try redownloading
-      console.log("All access attempts failed, attempting original URL as last resort");
+      // If we're here, we couldn't access the file by any of the paths
+      console.warn("All path attempts failed to access the file");
       
+      // Try a signed URL as a last resort
+      try {
+        console.log("Attempting to create a signed URL...");
+        
+        // Extract filename and try common path patterns
+        const signedUrlPaths = [];
+        if (extractedId) {
+          signedUrlPaths.push(`${extractedId}/${fileName}`);
+          signedUrlPaths.push(`resumes/${extractedId}/${fileName}`);
+        }
+        
+        for (const path of signedUrlPaths) {
+          try {
+            const { data: signedData, error: signedError } = await supabase.storage
+              .from('employee-files')
+              .createSignedUrl(path, 60); // 60 seconds expiry
+              
+            if (signedData && !signedError) {
+              console.log("Created signed URL:", signedData.signedUrl);
+              window.open(signedData.signedUrl, '_blank', 'noopener,noreferrer');
+              return;
+            }
+          } catch (signedUrlError) {
+            console.warn(`Error creating signed URL for path ${path}:`, signedUrlError);
+          }
+        }
+      } catch (signedUrlError) {
+        console.warn("Error creating signed URL:", signedUrlError);
+      }
+      
+      // As a last resort, try opening the original URL
       toast({
         variant: "warning",
         title: "File Access Issue",
         description: "Having trouble accessing this file. You may need to reupload it.",
       });
       
-      // Still try opening the URL as a last resort
       window.open(url, '_blank', 'noopener,noreferrer');
-      
     } catch (error) {
       console.error("Error opening CV URL:", error);
       toast({
