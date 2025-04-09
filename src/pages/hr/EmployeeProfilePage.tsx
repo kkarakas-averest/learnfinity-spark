@@ -549,60 +549,39 @@ const EmployeeProfilePage: React.FC = () => {
 
     try {
       const fileExt = resumeFile.name.split('.').pop();
-      // Try the simplest path structure with no nesting
-      // This is more likely to work with default RLS policies
       const timestamp = Date.now();
-      const fileName = `${extractedId}-${timestamp}.${fileExt}`;
       
-      console.log(`Preparing to upload resume with filename: ${fileName}`);
+      // CRITICAL: The RLS policy requires the path to start with the employee ID
+      // Format: {employeeId}/{filename}
+      const fileName = `${timestamp}_${Math.random().toString(36).substring(2, 8)}_${resumeFile.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
+      const filePath = `${extractedId}/${fileName}`;
       
-      // First attempt with direct upload to the bucket root to diagnose RLS issues
-      console.log(`Attempting direct upload to employee-files bucket...`);
+      console.log(`Preparing to upload resume to path: ${filePath} (compliant with RLS policy)`);
       
-      // Upload directly using Supabase client to bypass potential RLS issues
-      const { data: directData, error: directError } = await supabase.storage
+      // Upload directly using Supabase client
+      const { data, error } = await supabase.storage
         .from('employee-files')
-        .upload(fileName, resumeFile, {
+        .upload(filePath, resumeFile, {
           cacheControl: '3600',
           upsert: true
         });
         
-      if (directError) {
-        console.error("Direct upload error:", directError);
-        
-        // Try the resumes folder as a fallback
-        console.log(`Attempting upload to resumes folder instead...`);
-        const resumePath = `resumes/${fileName}`;
-        
-        const { data: resumeData, error: resumeError } = await supabase.storage
-          .from('employee-files')
-          .upload(resumePath, resumeFile, {
-            cacheControl: '3600',
-            upsert: true
-          });
-          
-        if (resumeError) {
-          console.error("Resume folder upload error:", resumeError);
-          
-          toast({
-            variant: "destructive",
-            title: "Error",
-            description: `Upload error: ${resumeError.message || "Permission denied"}. Please contact your administrator.`,
-          });
-          return;
-        }
-        
-        // Use the resume folder URL
-        var publicUrl = supabase.storage
-          .from('employee-files')
-          .getPublicUrl(resumePath).data.publicUrl;
-      } else {
-        // Use the direct URL
-        var publicUrl = supabase.storage
-          .from('employee-files')
-          .getPublicUrl(fileName).data.publicUrl;
+      if (error) {
+        console.error("Upload error:", error);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: `Upload error: ${error.message || "Permission denied"}. Please check permissions.`,
+        });
+        return;
       }
       
+      // Get the public URL for the uploaded file
+      const { data: urlData } = supabase.storage
+        .from('employee-files')
+        .getPublicUrl(filePath);
+      
+      const publicUrl = urlData.publicUrl;
       console.log("Resume uploaded successfully. URL:", publicUrl);
       
       // Update employee with the new CV URL
@@ -660,7 +639,6 @@ const EmployeeProfilePage: React.FC = () => {
         }
       } catch (apiError) {
         console.error('Error calling CV processing API:', apiError);
-        // Non-blocking error - we'll continue even if this fails
       }
       
       // Clear the resume file input
@@ -796,35 +774,58 @@ const EmployeeProfilePage: React.FC = () => {
 
     console.log("Testing CV URL:", url);
     
-    // Extract meaningful parts of the URL for potential reconstruction
-    const fileName = url.split('/').pop() || '';  
-    const timestamp = fileName.split('-')[1] || '';
-    const userIdPart = fileName.split('-')[0] || '';
-    
     try {
-      // Create an array of possible URLs to try
+      // First, check if direct access works
+      try {
+        const directResponse = await fetch(url, { method: 'HEAD' });
+        if (directResponse.ok) {
+          window.open(url, '_blank', 'noopener,noreferrer');
+          console.log("Direct URL access successful");
+          return;
+        }
+      } catch (error) {
+        console.log("Direct access failed, trying alternatives");
+      }
+      
+      // Parse URL to understand its components
+      const urlObj = new URL(url);
+      const pathParts = urlObj.pathname.split('/');
+      
+      // Extract components from the path
+      let bucketName = '';
+      let filePath = '';
+      
+      // Handle various URL patterns
+      if (pathParts.includes('public')) {
+        // Format: /storage/v1/object/public/{bucketName}/{filePath}
+        const publicIndex = pathParts.indexOf('public');
+        if (publicIndex >= 0 && pathParts.length > publicIndex + 1) {
+          bucketName = pathParts[publicIndex + 1];
+          filePath = pathParts.slice(publicIndex + 2).join('/');
+        }
+      }
+      
+      console.log(`Parsed URL - Bucket: ${bucketName}, Path: ${filePath}`);
+      
+      // Create an array of possible URLs to try based on RLS policy understanding
       const urlsToTry = [];
       
-      // 1. First try the original URL
-      urlsToTry.push(url);
+      // 1. Try with the employee ID as the first folder (compliant with RLS)
+      if (extractedId && filePath) {
+        // Format: {employeeId}/{fileName}
+        const fileName = filePath.split('/').pop() || '';
+        urlsToTry.push(getPublicUrl(bucketName || 'employee-files', `${extractedId}/${fileName}`));
+      }
       
-      // 2. Try a fixed URL
-      const fixedUrl = fixStorageUrl(url, 'employee-files');
-      urlsToTry.push(fixedUrl);
+      // 2. Try a direct access to the original path
+      if (bucketName && filePath) {
+        urlsToTry.push(getPublicUrl(bucketName, filePath));
+      }
       
-      // 3. Try just the filename in the root
+      // 3. Try a file name only approach
+      const fileName = url.split('/').pop() || '';
       if (fileName) {
         urlsToTry.push(getPublicUrl('employee-files', fileName));
-      }
-      
-      // 4. Try the file in 'resumes' folder 
-      if (fileName) {
-        urlsToTry.push(getPublicUrl('employee-files', `resumes/${fileName}`));
-      }
-      
-      // 5. Try with nested structure if it has a user ID part
-      if (userIdPart && extractedId) {
-        urlsToTry.push(getPublicUrl('employee-files', `resumes/${extractedId}/${fileName}`));
       }
       
       // Debug all URLs we'll try
@@ -847,8 +848,16 @@ const EmployeeProfilePage: React.FC = () => {
         }
       }
       
-      // If we get here, none of the URLs worked, so try opening the original as a last resort
-      console.log("All access attempts failed, trying original URL directly");
+      // If we get here, none of the URLs worked, ask user to try redownloading
+      console.log("All access attempts failed, attempting original URL as last resort");
+      
+      toast({
+        variant: "warning",
+        title: "File Access Issue",
+        description: "Having trouble accessing this file. You may need to reupload it.",
+      });
+      
+      // Still try opening the URL as a last resort
       window.open(url, '_blank', 'noopener,noreferrer');
       
     } catch (error) {
@@ -856,11 +865,8 @@ const EmployeeProfilePage: React.FC = () => {
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Could not access the CV file. Attempting to open it directly in a new tab.",
+        description: "Could not access the file. Please try uploading a new resume.",
       });
-      
-      // As a last resort, try opening the original URL
-      window.open(url, '_blank', 'noopener,noreferrer');
     }
   };
 
