@@ -56,6 +56,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { supabase } from '@/lib/supabase';
 import { uploadFileToStorage, fixStorageUrl, getPublicUrl } from '@/utils/storageHelpers';
+import { useResumeHandler } from './resumeHandler';
 
 // Define interfaces for the data
 interface Employee {
@@ -156,9 +157,18 @@ const EmployeeProfilePage: React.FC = () => {
   const [completedCourses, setCompletedCourses] = useState(0);
   const [inProgressCourses, setInProgressCourses] = useState(0);
   const [notStartedCourses, setNotStartedCourses] = useState(0);
-  const [resumeFile, setResumeFile] = useState<File | null>(null);
-  const [resumeFileName, setResumeFileName] = useState<string>('');
+  const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
   
+  // Add this right after where the component gets the ID
+  const {
+    resumeFile,
+    resumeFileName,
+    uploading,
+    handleResumeFileChange,
+    uploadResume,
+    viewResume
+  } = useResumeHandler(extractedId);
+
   useEffect(() => {
     const loadEmployeeData = async () => {
       if (!extractedId) return;
@@ -397,7 +407,7 @@ const EmployeeProfilePage: React.FC = () => {
     }
     
     if (employee?.cv_file_url) {
-      setResumeFileName(employee.cv_file_url.split('/').pop() || 'Resume');
+      const fileName = employee.cv_file_url.split('/').pop() || 'Resume';
     }
     
     // Fetch departments if needed
@@ -529,221 +539,8 @@ const EmployeeProfilePage: React.FC = () => {
     }
   };
 
-  const handleResumeFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      setResumeFile(file);
-      setResumeFileName(file.name);
-    }
-  };
-
-  const uploadResumeFile = async () => {
-    if (!resumeFile || !extractedId) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Resume file or employee ID is missing",
-      });
-      return;
-    }
-
-    try {
-      // Generate a unique filename
-      const timestamp = Date.now();
-      const randomString = Math.random().toString(36).substring(2, 8);
-      const safeFileName = resumeFile.name.replace(/[^a-zA-Z0-9.]/g, '_');
-      
-      // Try the most basic approach possible - direct upload to a simple path
-      // No employee ID in the path to avoid RLS issues
-      const filePath = `${timestamp}-${randomString}-${safeFileName}`;
-      
-      console.log(`Uploading resume with filename: ${filePath}`);
-      
-      // Check if bucket exists
-      try {
-        const { data: buckets } = await supabase.storage.listBuckets();
-        console.log("Available buckets:", buckets);
-      } catch (e) {
-        console.error("Error listing buckets:", e);
-      }
-      
-      // Try direct upload
-      const { data, error } = await supabase.storage
-        .from('employee-files')
-        .upload(filePath, resumeFile);
-      
-      if (error) {
-        console.error("Error uploading file:", error);
-        
-        // If this fails, try to use the Upload endpoint directly
-        const formData = new FormData();
-        formData.append('file', resumeFile);
-        
-        // Use our frontend URL to create a mock URL for now
-        const mockUploadUrl = window.location.origin + '/mock-uploads/' + filePath;
-        
-        toast({
-          variant: "info",
-          title: "Using mock URL",
-          description: "Upload failed, using simulated URL for testing"
-        });
-        
-        // Update employee record with mock CV URL
-        const { error: updateError } = await supabase
-          .from('hr_employees')
-          .update({
-            cv_file_url: mockUploadUrl,
-            resume_url: mockUploadUrl,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', extractedId);
-        
-        if (updateError) {
-          console.error("Error updating employee record:", updateError);
-          toast({
-            variant: "destructive",
-            title: "Error",
-            description: "Unable to update employee record with resume URL"
-          });
-          return;
-        }
-        
-        // Update UI
-        setEmployee(prev => {
-          if (!prev) return null;
-          return { 
-            ...prev, 
-            cv_file_url: mockUploadUrl,
-            resume_url: mockUploadUrl
-          };
-        });
-        
-        // Clear inputs
-        setResumeFile(null);
-        setResumeFileName('');
-        
-        toast({
-          title: "Success",
-          description: "Resume record updated with mock URL for testing"
-        });
-        
-        return;
-      }
-      
-      // If upload successful, get the public URL
-      const { data: publicUrlData } = supabase.storage
-        .from('employee-files')
-        .getPublicUrl(filePath);
-      
-      const publicUrl = publicUrlData.publicUrl;
-      console.log("Resume uploaded successfully. URL:", publicUrl);
-      
-      // Update employee record with CV URL
-      const { error: updateError } = await supabase
-        .from('hr_employees')
-        .update({
-          cv_file_url: publicUrl,
-          resume_url: publicUrl,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', extractedId);
-      
-      if (updateError) {
-        console.error("Error updating employee record:", updateError);
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Resume uploaded but failed to update employee record"
-        });
-        return;
-      }
-      
-      toast({
-        title: "Success",
-        description: "Resume uploaded successfully",
-      });
-      
-      // Update the UI
-      setEmployee(prev => {
-        if (!prev) return null;
-        return { 
-          ...prev, 
-          cv_file_url: publicUrl,
-          resume_url: publicUrl
-        };
-      });
-      
-      // Call the API to process the CV and generate a summary
-      try {
-        const response = await fetch('/api/hr/employees/process-cv', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            employeeId: extractedId,
-            cvUrl: publicUrl
-          })
-        });
-        
-        if (!response.ok) {
-          console.warn('Failed to process CV for summary generation:', await response.text());
-        } else {
-          console.log('CV processing started successfully');
-        }
-      } catch (apiError) {
-        console.error('Error calling CV processing API:', apiError);
-      }
-      
-      // Clear the resume file input
-      setResumeFile(null);
-      setResumeFileName('');
-      
-      // Refresh the employee data
-      fetchEmployeeData();
-    } catch (error) {
-      console.error("Error in resume upload process:", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to upload resume. Please try again later.",
-      });
-    }
-  };
-
   const testAndOpenCvLink = async (url: string) => {
-    if (!url) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "No resume URL available",
-      });
-      return;
-    }
-
-    console.log("Attempting to open resume URL:", url);
-    
-    // Check if it's a mock URL
-    if (url.includes('/mock-uploads/')) {
-      toast({
-        variant: "warning",
-        title: "Demo Mode",
-        description: "This is a mock resume URL for demonstration purposes."
-      });
-      return;
-    }
-    
-    // Simple direct approach - just open the URL
-    try {
-      window.open(url, '_blank', 'noopener,noreferrer');
-    } catch (error) {
-      console.error("Error opening URL:", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Could not open the file. The URL may be invalid."
-      });
-    }
+    await viewResume(url);
   };
 
   const fetchEmployeeData = async () => {
@@ -786,7 +583,7 @@ const EmployeeProfilePage: React.FC = () => {
         profileImageUrl = await uploadProfileImage();
       }
       
-      // Upload resume file if changed and prepare update data
+      // Prepare update data
       let updateData = {
         name: editFormData.name,
         email: editFormData.email,
@@ -798,33 +595,16 @@ const EmployeeProfilePage: React.FC = () => {
         ...(profileImageUrl && { profile_image_url: profileImageUrl })
       };
       
+      console.log("Updating employee with data:", updateData);
+      
+      // Upload resume file if changed
+      let resumeUrl;
       if (resumeFile) {
-        // Upload the CV file first
-        await uploadResumeFile();
-        
-        // Fetch the updated employee data to get the new CV URL
-        const { data: updatedEmployee } = await hrEmployeeService.getEmployee(extractedId);
-        
-        if (updatedEmployee && 'cv_file_url' in updatedEmployee && updatedEmployee.cv_file_url) {
-          // Call the API to process the CV and generate a summary
-          const response = await fetch('/api/hr/employees/process-cv', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              employeeId: extractedId,
-              cvUrl: updatedEmployee.cv_file_url
-            })
-          });
-          
-          if (!response.ok) {
-            console.warn('Failed to process CV for summary generation');
-          }
+        const uploadResult = await uploadResume();
+        if (uploadResult.success && uploadResult.url) {
+          resumeUrl = uploadResult.url;
         }
       }
-      
-      console.log("Updating employee with data:", updateData);
       
       // Update employee
       const { success, error } = await hrEmployeeService.updateEmployee(extractedId, updateData);
@@ -1011,7 +791,7 @@ const EmployeeProfilePage: React.FC = () => {
                           variant="ghost" 
                           size="sm" 
                           className="h-auto p-0 text-xs text-blue-600"
-                          onClick={uploadResumeFile}
+                          onClick={uploadResume}
                         >
                           Save
                         </Button>
@@ -1134,8 +914,8 @@ const EmployeeProfilePage: React.FC = () => {
                 <CardTitle>Recent Activity</CardTitle>
                 <CardDescription>
                   {activities.length > 0 
-                    ? `${activities.length} recent activities` 
-                    : 'No activity recorded yet'}
+                    ? `${activities.length} recent activities`
+                    : 'No activities recorded yet'}
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -1162,9 +942,9 @@ const EmployeeProfilePage: React.FC = () => {
                             </div>
                             <div className="text-xs text-gray-400">
                               {formatDate(activity.timestamp)}
-          </div>
-        </div>
-      </div>
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     ))}
                   </div>

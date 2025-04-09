@@ -1,77 +1,107 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { writeFile } from 'fs/promises';
-import { join } from 'path';
-import { mkdir } from 'fs/promises';
-import { v4 as uuidv4 } from 'uuid';
-import * as os from 'os';
 
-// Create a Supabase client with service role credentials to bypass RLS
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.SUPABASE_SERVICE_ROLE_KEY || '',
-  {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  }
-);
+// Supabase client initialization with admin key for storage operations
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY;
 
 export async function POST(request: NextRequest) {
   try {
+    if (!supabaseUrl || !supabaseKey) {
+      return NextResponse.json(
+        { error: 'Supabase configuration missing' }, 
+        { status: 500 }
+      );
+    }
+
+    // Initialize Supabase client with admin privileges
+    const supabase = createClient(supabaseUrl, supabaseKey, {
+      auth: { persistSession: false }
+    });
+
+    // Parse multipart form data
     const formData = await request.formData();
-    const employeeId = formData.get('employeeId') as string;
     const file = formData.get('file') as File;
+    const employeeId = formData.get('employeeId') as string;
 
-    if (!employeeId) {
-      return NextResponse.json({ error: 'Employee ID is required' }, { status: 400 });
+    if (!file || !employeeId) {
+      return NextResponse.json(
+        { error: 'Missing file or employee ID' }, 
+        { status: 400 }
+      );
     }
 
-    if (!file) {
-      return NextResponse.json({ error: 'No file uploaded' }, { status: 400 });
-    }
-
-    // Create a temporary directory to store the file
-    const tempDir = join(os.tmpdir(), 'resume-uploads');
-    await mkdir(tempDir, { recursive: true });
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-    
-    // Create a temporary file
-    const tempFilePath = join(tempDir, `${uuidv4()}-${file.name}`);
-    await writeFile(tempFilePath, buffer);
-
-    // Generate a unique file name
+    // Generate a unique filename
     const timestamp = Date.now();
     const randomString = Math.random().toString(36).substring(2, 8);
     const safeFileName = file.name.replace(/[^a-zA-Z0-9.]/g, '_');
-    const fileName = `${timestamp}_${randomString}_${safeFileName}`;
+    const filePath = `resumes/${employeeId}/${timestamp}_${randomString}_${safeFileName}`;
     
-    // Create path with employee ID as the first folder (required by RLS)
-    const filePath = `${employeeId}/resumes/${fileName}`;
-    
-    // Upload to Supabase Storage using admin client (bypasses RLS)
-    const { data, error } = await supabaseAdmin.storage
+    // Convert File to Buffer for Supabase storage
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    // Upload to Supabase Storage
+    const { data, error } = await supabase.storage
       .from('employee-files')
       .upload(filePath, buffer, {
-        contentType: file.type || 'application/octet-stream',
+        contentType: file.type,
         cacheControl: '3600',
-        upsert: false,
+        upsert: true
       });
 
     if (error) {
-      console.error('Error uploading file:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      // If the error is about the bucket not existing, try to create it
+      if (error.message.includes('bucket') && error.message.includes('not found')) {
+        try {
+          const { error: bucketError } = await supabase.storage.createBucket('employee-files', {
+            public: true,
+            fileSizeLimit: 10485760, // 10MB
+          });
+
+          if (bucketError) {
+            return NextResponse.json(
+              { error: `Failed to create bucket: ${bucketError.message}` }, 
+              { status: 500 }
+            );
+          }
+
+          // Try upload again after creating bucket
+          const { data: retryData, error: retryError } = await supabase.storage
+            .from('employee-files')
+            .upload(filePath, buffer, {
+              contentType: file.type,
+              cacheControl: '3600',
+              upsert: true
+            });
+
+          if (retryError) {
+            return NextResponse.json(
+              { error: `Upload failed after bucket creation: ${retryError.message}` }, 
+              { status: 500 }
+            );
+          }
+        } catch (e) {
+          return NextResponse.json(
+            { error: `Failed to create bucket: ${e instanceof Error ? e.message : String(e)}` }, 
+            { status: 500 }
+          );
+        }
+      } else {
+        return NextResponse.json(
+          { error: `Upload failed: ${error.message}` }, 
+          { status: 500 }
+        );
+      }
     }
 
     // Get public URL
-    const { data: urlData } = supabaseAdmin.storage
+    const { data: urlData } = supabase.storage
       .from('employee-files')
       .getPublicUrl(filePath);
 
     // Update employee record with CV URL
-    const { error: updateError } = await supabaseAdmin
+    const { error: updateError } = await supabase
       .from('hr_employees')
       .update({ 
         cv_file_url: urlData.publicUrl,
@@ -82,15 +112,23 @@ export async function POST(request: NextRequest) {
 
     if (updateError) {
       console.error('Error updating employee record:', updateError);
-      return NextResponse.json({ error: updateError.message }, { status: 500 });
+      // Still return success since the file was uploaded
+      return NextResponse.json({ 
+        success: true, 
+        url: urlData.publicUrl,
+        warning: 'File uploaded but employee record not updated'
+      });
     }
 
     return NextResponse.json({ 
       success: true, 
       url: urlData.publicUrl 
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error processing resume upload:', error);
-    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Unknown error' }, 
+      { status: 500 }
+    );
   }
 } 
