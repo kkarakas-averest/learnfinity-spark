@@ -1,12 +1,12 @@
-import { NextResponse, NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { AgentFactory } from '@/agents/AgentFactory';
 import { fixStorageUrl, checkStorageUrl } from '@/utils/storageHelpers';
 import { LLMService } from '@/lib/llm/llm-service';
+import { extractTextFromPdfUrl, extractKeyInformation } from '@/lib/server/pdfProcessor';
 
 /**
- * API endpoint to process an employee's CV and generate a profile summary
- * POST /api/hr/employees/process-cv
+ * API endpoint for processing CVs and extracting profile data
  */
 export async function POST(req: NextRequest) {
   try {
@@ -171,11 +171,29 @@ export async function POST(req: NextRequest) {
     // If LLM service is properly configured, use Groq directly
     console.log("Using Groq LLM for CV processing");
     
+    // First, extract the text from the PDF
+    console.log(`Extracting text from PDF: ${fixedCvUrl}`);
+    const pdfResult = await extractTextFromPdfUrl(fixedCvUrl);
+    
+    if (!pdfResult.text || pdfResult.text.trim() === '') {
+      console.error(`Failed to extract text from PDF: ${pdfResult.metadata.error || 'Unknown error'}`);
+      return NextResponse.json(
+        { error: 'Failed to extract text from PDF', details: pdfResult.metadata.error }, 
+        { status: 500 }
+      );
+    }
+    
+    // Process the extracted text to remove excessive whitespace and normalize
+    const processedText = extractKeyInformation(pdfResult.text);
+    console.log(`Extracted ${processedText.length} characters from PDF (${pdfResult.numPages} pages)`);
+    
     // Create a more structured prompt for better extraction
     const structuredPrompt = `
       You are an expert HR professional analyzing a resume/CV to create a DETAILED and PERSONALIZED profile summary.
       
-      RESUME URL: ${fixedCvUrl}
+      CV CONTENT:
+      ${processedText}
+      
       EMPLOYEE NAME: ${employee.name}
       POSITION: ${positionTitle}
       DEPARTMENT: ${departmentName}
@@ -223,8 +241,6 @@ export async function POST(req: NextRequest) {
       6. For skills, include both technical and soft skills exactly as mentioned in the CV.
       7. Ensure education details are complete with institution names, exact degree titles, and years.
       8. Include only genuine certifications actually mentioned in the document.
-      
-      Even if you cannot access the actual PDF, make the most detailed inference possible from the filename, position, and department information.
     `;
     
     try {
@@ -281,24 +297,24 @@ export async function POST(req: NextRequest) {
         );
       }
       
-      // Create a record of the CV extraction
+      // Store a record of the successful extraction
       await supabase
         .from('hr_employee_cv_extractions')
         .insert({
           employee_id: employeeId,
           original_file_url: fixedCvUrl,
-          extracted_data: extractedData,
-          extraction_status: 'completed'
-        })
-        .select();
+          extraction_status: 'success',
+          extracted_data: extractedData
+        });
       
-      return NextResponse.json({
-        success: true,
-        message: 'CV processed and profile data extracted',
-        data: extractedData
+      // Return success response with the extracted data
+      return NextResponse.json({ 
+        success: true, 
+        data: extractedData,
+        message: 'Profile data generated successfully'
       });
-    } catch (llmError: any) {
-      console.error('Error processing CV with Groq:', llmError);
+    } catch (error: any) {
+      console.error('Error in CV processing:', error);
       
       // Store a record of the failed attempt
       await supabase
@@ -307,18 +323,18 @@ export async function POST(req: NextRequest) {
           employee_id: employeeId,
           original_file_url: fixedCvUrl,
           extraction_status: 'failed',
-          extracted_data: { error: llmError.message }
+          extracted_data: { error: error.message }
         });
       
       return NextResponse.json(
-        { error: 'Failed to process CV with Groq', details: llmError.message }, 
+        { error: 'Failed to process CV', details: error.message }, 
         { status: 500 }
       );
     }
   } catch (error: any) {
-    console.error('Error processing CV:', error);
+    console.error('Unexpected error in CV processing API:', error);
     return NextResponse.json(
-      { error: 'Failed to process CV', details: error.message }, 
+      { error: 'Unexpected error', details: error.message }, 
       { status: 500 }
     );
   }

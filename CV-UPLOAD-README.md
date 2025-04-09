@@ -50,13 +50,32 @@ CREATE TABLE IF NOT EXISTS hr_employee_cv_extractions (
 1. **CV Processing API**
    - New endpoint: `POST /api/hr/employees/process-cv`
    - Takes employee ID and CV URL
-   - Uses AI to analyze the CV and generate a 250-word professional profile summary
+   - Extracts text from the PDF document
+   - Uses AI to analyze the CV text and generate a 250-word professional profile summary
    - Stores the summary in the employee record
 
-2. **Enhanced Content Generation API**
-   - Updated endpoint: `POST /api/hr/courses/generate-content`
-   - Now incorporates the CV-based profile summary for deeper personalization
-   - Creates course content specifically tailored to the employee's background
+2. **PDF Text Extraction API**
+   - New endpoint: `POST /api/hr/extract-pdf-text`
+   - Takes a PDF URL and extracts the text content
+   - Used by the client-side CV processing to get text from PDFs before analysis
+
+### PDF Processing
+
+The system now includes PDF text extraction capabilities:
+
+1. **PDF Text Extraction**
+   - Server-side processing of PDF documents
+   - Extracts raw text content from uploaded PDFs
+   - Cleans and normalizes the text for better AI analysis
+
+2. **AI Processing**
+   - Sends the extracted PDF text to the LLM (Groq)
+   - The LLM analyzes the actual CV content rather than generating mock data
+   - Extracts structured information including summary, skills, education, experience
+
+3. **Fallback Mechanism**
+   - If PDF extraction fails, falls back to mock data
+   - If LLM processing fails, creates generic profile data based on position and department
 
 ## How It Works
 

@@ -2,6 +2,7 @@ import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
+import { nodePolyfills } from 'vite-plugin-node-polyfills';
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
@@ -161,6 +162,15 @@ export default defineConfig(({ mode }) => {
         // Enable JSX compatibility for better TypeScript support
         tsDecorators: true,
       }),
+      // Add Node.js polyfills for browser
+      nodePolyfills({
+        // Include specific polyfills needed for pdf-parse and node-fetch
+        include: ['buffer', 'stream', 'util', 'process', 'path'],
+        globals: {
+          process: true,
+          Buffer: true,
+        },
+      }),
       mode === 'development' &&
       componentTagger(),
     ].filter(Boolean),
@@ -185,7 +195,9 @@ export default defineConfig(({ mode }) => {
       include: [
         'react', 
         'react-dom',
-        'react-router-dom'
+        'react-router-dom',
+        'pdf-parse',
+        'node-fetch',
       ],
       // Force re-optimization on server restart
       force: true

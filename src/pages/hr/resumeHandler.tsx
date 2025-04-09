@@ -66,11 +66,39 @@ export function useResumeHandler(employeeId: string | null) {
         }
       }
       
-      // Prepare the prompt
+      // First, we need to fetch and extract the text from the PDF to provide to the LLM
+      console.log("Attempting to extract text from PDF URL:", cvUrl);
+      
+      // Use the server API to extract the PDF text since client-side can't handle PDFs well
+      const extractionResponse = await fetch('/api/hr/extract-pdf-text', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ pdfUrl: cvUrl })
+      });
+      
+      if (!extractionResponse.ok) {
+        const error = await extractionResponse.json();
+        throw new Error(`Failed to extract PDF text: ${error.details || extractionResponse.statusText}`);
+      }
+      
+      const extractionResult = await extractionResponse.json();
+      const pdfContent = extractionResult.text;
+      
+      if (!pdfContent || pdfContent.trim() === '') {
+        throw new Error('No text content could be extracted from the PDF');
+      }
+      
+      console.log(`Successfully extracted ${pdfContent.length} characters from PDF`);
+      
+      // Prepare the prompt with the actual PDF content
       const structuredPrompt = `
         You are an expert HR professional analyzing a resume/CV to create a DETAILED and PERSONALIZED profile summary.
         
-        RESUME URL: ${cvUrl}
+        CV CONTENT:
+        ${pdfContent}
+        
         EMPLOYEE NAME: ${employeeName}
         POSITION: ${positionName}
         DEPARTMENT: ${departmentName}
@@ -118,8 +146,6 @@ export function useResumeHandler(employeeId: string | null) {
         6. For skills, include both technical and soft skills exactly as mentioned in the CV.
         7. Ensure education details are complete with institution names, exact degree titles, and years.
         8. Include only genuine certifications actually mentioned in the document.
-        
-        Even if you cannot access the actual PDF, make the most detailed inference possible from the filename, position, and department information.
         
         Format your response as JSON only with NO explanations, NO comments, and NO additional text before or after the JSON.
       `;
