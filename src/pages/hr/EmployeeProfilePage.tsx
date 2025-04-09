@@ -98,6 +98,14 @@ interface Employee {
     languages?: string[];
     keyAchievements?: string[];
     professionalInterests?: string[];
+    personalInsights?: {
+      yearsOfExperience?: string;
+      industries?: string[];
+      toolsAndTechnologies?: string[];
+      projectManagement?: string[];
+      softSkills?: string[];
+      publications?: string[];
+    };
   } | string;
 }
 
@@ -156,6 +164,7 @@ const EmployeeProfilePage: React.FC = () => {
   const [isMessageModalOpen, setIsMessageModalOpen] = useState<boolean>(false);
   const [assignDialogOpen, setAssignDialogOpen] = useState<boolean>(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [cvProfileDialogOpen, setCvProfileDialogOpen] = useState(false);
   const [editFormData, setEditFormData] = useState({
     name: '',
     email: '',
@@ -795,16 +804,119 @@ const EmployeeProfilePage: React.FC = () => {
                         </div>
                       )}
                       
+                      {/* Display education if available */}
+                      {typeof employee.cv_extracted_data === 'object' && 
+                       employee.cv_extracted_data.education && 
+                       employee.cv_extracted_data.education.length > 0 && (
+                        <div className="mt-2">
+                          <h4 className="text-xs font-medium text-gray-700 mb-1">Education</h4>
+                          <div className="text-xs text-gray-600">
+                            <span className="font-medium">{employee.cv_extracted_data.education[0].degree}</span>
+                            {employee.cv_extracted_data.education[0].institution && (
+                              <span> from {employee.cv_extracted_data.education[0].institution}</span>
+                            )}
+                            {employee.cv_extracted_data.education[0].year && (
+                              <span> ({employee.cv_extracted_data.education[0].year})</span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Display certifications if available */}
+                      {typeof employee.cv_extracted_data === 'object' && 
+                       employee.cv_extracted_data.certifications && 
+                       employee.cv_extracted_data.certifications.length > 0 && (
+                        <div className="mt-2">
+                          <h4 className="text-xs font-medium text-gray-700 mb-1">Certifications</h4>
+                          <div className="flex flex-wrap gap-1">
+                            {employee.cv_extracted_data.certifications.map((cert, index) => (
+                              <span key={index} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                                {cert}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Display languages if available */}
+                      {typeof employee.cv_extracted_data === 'object' && 
+                       employee.cv_extracted_data.languages && 
+                       employee.cv_extracted_data.languages.length > 0 && (
+                        <div className="mt-2">
+                          <h4 className="text-xs font-medium text-gray-700 mb-1">Languages</h4>
+                          <div className="flex flex-wrap gap-1">
+                            {employee.cv_extracted_data.languages.map((lang, index) => (
+                              <span key={index} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800">
+                                {lang}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Display personal insights if available */}
+                      {typeof employee.cv_extracted_data === 'object' && 
+                       employee.cv_extracted_data.personalInsights && (
+                        <div className="mt-3 pt-3 border-t border-dashed border-gray-200">
+                          <h4 className="text-xs font-medium text-gray-700 mb-2">Professional Insights</h4>
+                          
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            {employee.cv_extracted_data.personalInsights.yearsOfExperience && (
+                              <div>
+                                <span className="text-gray-500">Experience:</span>
+                                <span className="ml-1 font-medium">{employee.cv_extracted_data.personalInsights.yearsOfExperience}</span>
+                              </div>
+                            )}
+                            
+                            {employee.cv_extracted_data.personalInsights.industries && 
+                             employee.cv_extracted_data.personalInsights.industries.length > 0 && (
+                              <div>
+                                <span className="text-gray-500">Industries:</span>
+                                <span className="ml-1 font-medium">{employee.cv_extracted_data.personalInsights.industries.slice(0, 2).join(", ")}</span>
+                              </div>
+                            )}
+                            
+                            {employee.cv_extracted_data.personalInsights.toolsAndTechnologies && 
+                             employee.cv_extracted_data.personalInsights.toolsAndTechnologies.length > 0 && (
+                              <div className="col-span-2">
+                                <span className="text-gray-500">Tools & Technologies:</span>
+                                <span className="ml-1 font-medium">{employee.cv_extracted_data.personalInsights.toolsAndTechnologies.slice(0, 3).join(", ")}</span>
+                                {employee.cv_extracted_data.personalInsights.toolsAndTechnologies.length > 3 && 
+                                  <span className="text-gray-400"> +{employee.cv_extracted_data.personalInsights.toolsAndTechnologies.length - 3} more</span>}
+                              </div>
+                            )}
+                            
+                            {employee.cv_extracted_data.personalInsights.softSkills && 
+                             employee.cv_extracted_data.personalInsights.softSkills.length > 0 && (
+                              <div className="col-span-2">
+                                <span className="text-gray-500">Soft Skills:</span>
+                                <span className="ml-1 font-medium">{employee.cv_extracted_data.personalInsights.softSkills.join(", ")}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      
                       {/* Show metadata about the extraction */}
                       {typeof employee.cv_extracted_data === 'object' && employee.cv_extracted_data.extraction_date && (
-                        <div className="mt-3 text-xs text-gray-400 flex items-center">
-                          <span>Generated: {new Date(employee.cv_extracted_data.extraction_date).toLocaleDateString()}</span>
-                          {employee.cv_extracted_data.source && (
-                            <span className="ml-1">via {employee.cv_extracted_data.source}</span>
-                          )}
-                          {employee.cv_extracted_data.model && (
-                            <span className="ml-1">using {employee.cv_extracted_data.model}</span>
-                          )}
+                        <div className="mt-3 text-xs text-gray-400 flex flex-wrap items-center justify-between">
+                          <div>
+                            <span>Generated: {new Date(employee.cv_extracted_data.extraction_date).toLocaleDateString()}</span>
+                            {employee.cv_extracted_data.source && (
+                              <span className="ml-1">via {employee.cv_extracted_data.source}</span>
+                            )}
+                            {employee.cv_extracted_data.model && (
+                              <span className="ml-1">using {employee.cv_extracted_data.model}</span>
+                            )}
+                          </div>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="text-xs text-blue-600 p-0"
+                            onClick={() => setCvProfileDialogOpen(true)}
+                          >
+                            View Full CV Profile
+                          </Button>
                         </div>
                       )}
                     </div>
@@ -980,13 +1092,13 @@ const EmployeeProfilePage: React.FC = () => {
               <CardHeader>
                 <CardTitle>Recent Activity</CardTitle>
                 <CardDescription>
-                  {activities && activities.length > 0 
+                  {(activities && activities.length > 0) 
                     ? `${activities.length} recent activities` 
                     : 'No activities recorded yet'}
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {activities.length ? (
+                {(activities && activities.length > 0) ? (
                   <div className="space-y-4">
                     {activities.map((activity, index) => (
                       <div key={index} className="flex border-b pb-3 last:border-b-0">
@@ -1252,6 +1364,234 @@ const EmployeeProfilePage: React.FC = () => {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* CV Profile Dialog */}
+      <Dialog open={cvProfileDialogOpen} onOpenChange={setCvProfileDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>CV Profile: {employee?.name}</DialogTitle>
+            <DialogDescription>
+              Detailed information extracted from the employee's CV
+            </DialogDescription>
+          </DialogHeader>
+          
+          {typeof employee?.cv_extracted_data === 'object' ? (
+            <div className="space-y-6 py-4">
+              {/* Summary Section */}
+              <div>
+                <h3 className="text-lg font-semibold mb-2">Professional Summary</h3>
+                <div className="bg-gray-50 p-4 rounded-md border">
+                  <p className="text-sm">{employee.cv_extracted_data.summary}</p>
+                </div>
+              </div>
+              
+              {/* Skills Section */}
+              {employee.cv_extracted_data.skills && employee.cv_extracted_data.skills.length > 0 && (
+                <div>
+                  <h3 className="text-lg font-semibold mb-2">Skills & Competencies</h3>
+                  <div className="bg-gray-50 p-4 rounded-md border">
+                    <div className="flex flex-wrap gap-2">
+                      {employee.cv_extracted_data.skills.map((skill, index) => (
+                        <span key={index} className="inline-flex items-center px-2.5 py-1 rounded text-sm font-medium bg-blue-100 text-blue-800">
+                          {skill}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {/* Experience Section */}
+              {employee.cv_extracted_data.experience && employee.cv_extracted_data.experience.length > 0 && (
+                <div>
+                  <h3 className="text-lg font-semibold mb-2">Professional Experience</h3>
+                  <div className="space-y-4">
+                    {employee.cv_extracted_data.experience.map((exp, index) => (
+                      <div key={index} className="bg-gray-50 p-4 rounded-md border">
+                        <div className="flex flex-wrap justify-between mb-2">
+                          <h4 className="font-medium text-gray-900">{exp.title}</h4>
+                          {exp.duration && (
+                            <span className="text-sm text-gray-600">{exp.duration}</span>
+                          )}
+                        </div>
+                        {exp.company && (
+                          <p className="text-sm text-gray-700 mb-2">{exp.company}</p>
+                        )}
+                        {exp.highlights && exp.highlights.length > 0 && (
+                          <ul className="list-disc list-inside space-y-1 text-sm text-gray-600">
+                            {exp.highlights.map((highlight, hIndex) => (
+                              <li key={hIndex}>{highlight}</li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Education Section */}
+              {employee.cv_extracted_data.education && employee.cv_extracted_data.education.length > 0 && (
+                <div>
+                  <h3 className="text-lg font-semibold mb-2">Education</h3>
+                  <div className="space-y-4">
+                    {employee.cv_extracted_data.education.map((edu, index) => (
+                      <div key={index} className="bg-gray-50 p-4 rounded-md border">
+                        <div className="flex flex-wrap justify-between mb-1">
+                          <h4 className="font-medium text-gray-900">{edu.degree}</h4>
+                          {edu.year && (
+                            <span className="text-sm text-gray-600">{edu.year}</span>
+                          )}
+                        </div>
+                        {edu.institution && (
+                          <p className="text-sm text-gray-700">{edu.institution}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Certifications Section */}
+              {employee.cv_extracted_data.certifications && employee.cv_extracted_data.certifications.length > 0 && (
+                <div>
+                  <h3 className="text-lg font-semibold mb-2">Certifications</h3>
+                  <div className="bg-gray-50 p-4 rounded-md border">
+                    <ul className="list-disc list-inside space-y-1 text-sm text-gray-600">
+                      {employee.cv_extracted_data.certifications.map((cert, index) => (
+                        <li key={index}>{cert}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              )}
+              
+              {/* Languages Section */}
+              {employee.cv_extracted_data.languages && employee.cv_extracted_data.languages.length > 0 && (
+                <div>
+                  <h3 className="text-lg font-semibold mb-2">Languages</h3>
+                  <div className="bg-gray-50 p-4 rounded-md border">
+                    <div className="flex flex-wrap gap-2">
+                      {employee.cv_extracted_data.languages.map((lang, index) => (
+                        <span key={index} className="inline-flex items-center px-2.5 py-1 rounded text-sm font-medium bg-purple-100 text-purple-800">
+                          {lang}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {/* Personal Insights Section */}
+              {employee.cv_extracted_data.personalInsights && (
+                <div>
+                  <h3 className="text-lg font-semibold mb-2">Professional Insights</h3>
+                  <div className="bg-gray-50 p-4 rounded-md border">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {employee.cv_extracted_data.personalInsights.yearsOfExperience && (
+                        <div>
+                          <h4 className="text-sm font-medium text-gray-700">Years of Experience</h4>
+                          <p className="text-sm">{employee.cv_extracted_data.personalInsights.yearsOfExperience}</p>
+                        </div>
+                      )}
+                      
+                      {employee.cv_extracted_data.personalInsights.industries && employee.cv_extracted_data.personalInsights.industries.length > 0 && (
+                        <div>
+                          <h4 className="text-sm font-medium text-gray-700">Industries</h4>
+                          <p className="text-sm">{employee.cv_extracted_data.personalInsights.industries.join(", ")}</p>
+                        </div>
+                      )}
+                      
+                      {employee.cv_extracted_data.personalInsights.toolsAndTechnologies && employee.cv_extracted_data.personalInsights.toolsAndTechnologies.length > 0 && (
+                        <div>
+                          <h4 className="text-sm font-medium text-gray-700">Tools & Technologies</h4>
+                          <p className="text-sm">{employee.cv_extracted_data.personalInsights.toolsAndTechnologies.join(", ")}</p>
+                        </div>
+                      )}
+                      
+                      {employee.cv_extracted_data.personalInsights.projectManagement && employee.cv_extracted_data.personalInsights.projectManagement.length > 0 && (
+                        <div>
+                          <h4 className="text-sm font-medium text-gray-700">Project Management</h4>
+                          <p className="text-sm">{employee.cv_extracted_data.personalInsights.projectManagement.join(", ")}</p>
+                        </div>
+                      )}
+                      
+                      {employee.cv_extracted_data.personalInsights.softSkills && employee.cv_extracted_data.personalInsights.softSkills.length > 0 && (
+                        <div>
+                          <h4 className="text-sm font-medium text-gray-700">Soft Skills</h4>
+                          <p className="text-sm">{employee.cv_extracted_data.personalInsights.softSkills.join(", ")}</p>
+                        </div>
+                      )}
+                      
+                      {employee.cv_extracted_data.personalInsights.publications && employee.cv_extracted_data.personalInsights.publications.length > 0 && (
+                        <div className="col-span-2">
+                          <h4 className="text-sm font-medium text-gray-700">Publications</h4>
+                          <ul className="list-disc list-inside space-y-1 text-sm text-gray-600">
+                            {employee.cv_extracted_data.personalInsights.publications.map((pub, index) => (
+                              <li key={index}>{pub}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {/* Key Achievements Section */}
+              {employee.cv_extracted_data.keyAchievements && employee.cv_extracted_data.keyAchievements.length > 0 && (
+                <div>
+                  <h3 className="text-lg font-semibold mb-2">Key Achievements</h3>
+                  <div className="bg-gray-50 p-4 rounded-md border">
+                    <ul className="list-disc list-inside space-y-1 text-sm text-gray-600">
+                      {employee.cv_extracted_data.keyAchievements.map((achievement, index) => (
+                        <li key={index}>{achievement}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              )}
+              
+              {/* Professional Interests Section */}
+              {employee.cv_extracted_data.professionalInterests && employee.cv_extracted_data.professionalInterests.length > 0 && (
+                <div>
+                  <h3 className="text-lg font-semibold mb-2">Professional Interests</h3>
+                  <div className="bg-gray-50 p-4 rounded-md border">
+                    <div className="flex flex-wrap gap-2">
+                      {employee.cv_extracted_data.professionalInterests.map((interest, index) => (
+                        <span key={index} className="inline-flex items-center px-2.5 py-1 rounded text-sm font-medium bg-amber-100 text-amber-800">
+                          {interest}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {/* Metadata */}
+              {employee.cv_extracted_data.extraction_date && (
+                <div className="pt-4 border-t text-xs text-gray-500">
+                  <p>Generated on {new Date(employee.cv_extracted_data.extraction_date).toLocaleString()}</p>
+                  {employee.cv_extracted_data.source && (
+                    <p>Source: {employee.cv_extracted_data.source}</p>
+                  )}
+                  {employee.cv_extracted_data.model && (
+                    <p>Model: {employee.cv_extracted_data.model}</p>
+                  )}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="py-4 text-center text-gray-500">No detailed CV data available</div>
+          )}
+          
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button type="button">Close</Button>
+            </DialogClose>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
