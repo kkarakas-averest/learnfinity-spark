@@ -121,7 +121,9 @@ async function extractTextFromBuffer(buffer: ArrayBuffer): Promise<PDFExtraction
       }
     }
     
-    // Try to identify text sections by using PDF markers
+    // Try to identify text sections using multiple patterns
+    
+    // Method 1: Extract text between parentheses (common in PDF text objects)
     const textRegex = /\(([^)]+)\)/g;
     let match;
     
@@ -131,6 +133,53 @@ async function extractTextFromBuffer(buffer: ArrayBuffer): Promise<PDFExtraction
       if (match[1].length > 3) {
         pdfText += match[1] + " ";
       }
+    }
+    
+    // Method 2: Look for common PDF text patterns
+    const textBlockRegex = /BT\s*([^]*?)\s*ET/g;
+    let textBlocks = "";
+    let blockMatch;
+    
+    while ((blockMatch = textBlockRegex.exec(textContent)) !== null) {
+      if (blockMatch[1]) {
+        textBlocks += blockMatch[1] + "\n";
+      }
+    }
+    
+    // Method 3: Look for common resume keywords to extract relevant sections
+    const resumeKeywords = [
+      "experience", "education", "skills", "profile", "summary", 
+      "work history", "employment", "qualification", "professional",
+      "certification", "project", "contact", "reference", "language", 
+      "linkedin", "email", "phone", "address", "objective"
+    ];
+    
+    let keywordMatches = "";
+    
+    resumeKeywords.forEach(keyword => {
+      const keywordRegex = new RegExp(`[^\\n\\r]{0,50}${keyword}[^\\n\\r]{0,100}`, "gi");
+      let keywordMatch;
+      
+      while ((keywordMatch = keywordRegex.exec(textContent)) !== null) {
+        keywordMatches += keywordMatch[0] + "\n";
+      }
+    });
+    
+    // Combine all extraction methods, with preference to the most structured data
+    let finalText = pdfText;
+    
+    // If we didn't get much from the primary method, add from secondary methods
+    if (pdfText.length < 1000 && textBlocks.length > pdfText.length) {
+      finalText += "\n\n" + textBlocks;
+    }
+    
+    if (finalText.length < 1000 && keywordMatches.length > 0) {
+      finalText += "\n\n" + keywordMatches;
+    }
+    
+    // If we still don't have good content, fall back to the raw text as a last resort
+    if (finalText.length < 500) {
+      finalText = textContent;
     }
     
     // Try to extract page count based on common patterns
@@ -153,7 +202,7 @@ async function extractTextFromBuffer(buffer: ArrayBuffer): Promise<PDFExtraction
     
     return {
       success: true,
-      text: pdfText || textContent,
+      text: finalText || textContent,
       metadata: {
         pageCount,
         title,
@@ -180,8 +229,14 @@ async function extractTextFromBuffer(buffer: ArrayBuffer): Promise<PDFExtraction
  */
 function cleanPdfText(text: string): string {
   return text
-    .replace(/\r\n/g, '\n') // Normalize line breaks
-    .replace(/\s+/g, ' ')   // Collapse multiple whitespace
-    .replace(/\n{3,}/g, '\n\n') // Replace 3+ newlines with just 2
+    .replace(/\r\n/g, '\n')          // Normalize line breaks
+    .replace(/\s+/g, ' ')            // Collapse multiple whitespace
+    .replace(/\n{3,}/g, '\n\n')      // Replace 3+ newlines with just 2
+    .replace(/[^\x20-\x7E\n]/g, '')  // Remove non-printable ASCII characters
+    .replace(/\\[rnt]/g, ' ')        // Replace escaped characters with space
+    .replace(/\\\(/g, '(')           // Replace escaped parentheses
+    .replace(/\\\)/g, ')')
+    .replace(/\\u[0-9a-fA-F]{4}/g, ' ') // Replace unicode escape sequences
+    .replace(/\s{2,}/g, ' ')         // Remove duplicate spaces
     .trim();
 } 

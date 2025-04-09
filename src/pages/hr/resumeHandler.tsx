@@ -111,7 +111,7 @@ export function useResumeHandler(employeeId: string | null) {
       console.log("Preparing structured prompt for Groq API");
       
       const structuredPrompt = `
-        You are analyzing a resume to create a profile summary.
+        You are an expert resume analyzer. Your task is to thoroughly extract information from this resume/CV.
         
         CV CONTENT:
         ${pdfContent}
@@ -120,46 +120,51 @@ export function useResumeHandler(employeeId: string | null) {
         POSITION: ${positionName}
         DEPARTMENT: ${departmentName}
         
-        Extract information into JSON with:
+        Extract SPECIFIC and DETAILED information from the CV and structure it in this JSON format:
         {
-          "summary": "250-word professional profile based on actual career history",
-          "skills": ["skill1", "skill2", ...],
+          "summary": "Detailed professional profile highlighting actual experience, skills, and achievements",
+          "skills": ["Specific skill 1", "Specific skill 2", ...],
           "experience": [
             {
-              "title": "Job Title",
-              "company": "Company Name",
-              "duration": "Duration",
-              "highlights": ["Achievement 1", "Achievement 2"]
+              "title": "Exact job title from CV",
+              "company": "Company name from CV",
+              "duration": "Specific time period",
+              "highlights": ["Specific accomplishment 1", "Specific accomplishment 2"]
             }
           ],
           "education": [
             {
-              "degree": "Degree",
-              "institution": "Institution",
-              "year": "Year"
+              "degree": "Specific degree title",
+              "institution": "Specific institution name",
+              "year": "Graduation year"
             }
           ],
-          "certifications": ["Certification1", ...],
-          "languages": ["Language1", ...],
-          "keyAchievements": ["Achievement1", ...],
+          "certifications": ["Specific certification 1", "Specific certification 2"],
+          "languages": ["Language 1 and proficiency level", "Language 2 and proficiency level"],
+          "keyAchievements": ["Specific notable achievement 1", "Specific notable achievement 2"],
           "personalInsights": {
-            "yearsOfExperience": "Years",
-            "industries": ["Industry1", ...],
-            "toolsAndTechnologies": ["Tool1", ...],
-            "softSkills": ["Skill1", ...]
+            "yearsOfExperience": "Total years of experience",
+            "industries": ["Specific industry 1", "Specific industry 2"],
+            "toolsAndTechnologies": ["Specific tool/technology 1", "Specific tool/technology 2"],
+            "softSkills": ["Specific soft skill 1", "Specific soft skill 2"]
           }
         }
         
-        IMPORTANT: Only include information actually in the CV. If not available, use empty arrays or "Not specified".
-        Respond with ONLY the JSON object.
+        IMPORTANT GUIDELINES:
+        1. NEVER use "Not specified" when actual information is present in the CV.
+        2. Look carefully through the entire CV content to find all relevant information.
+        3. Extract EXACT information from the CV rather than making general statements.
+        4. If information truly isn't available, use empty arrays [] or null values.
+        5. Focus on extracting factual information present in the document. 
+        6. Do not add explanatory text to your response, only return the JSON object.
       `;
 
       // Create system message
-      const systemMessage = "Extract structured profile information from resumes as JSON only. Be concise.";
+      const systemMessage = "You are an expert resume analyzer that extracts detailed and accurate information from CVs. Return a properly formatted JSON object with specific information found in the document. Do not include any text before or after the JSON.";
       
       // Make the API call to Groq
       console.log("Calling Groq API directly for CV analysis");
-      console.log(`Using model: llama3-8b-8192, temperature: 0.2, max_tokens: 1500`);
+      console.log(`Using model: llama3-8b-8192, temperature: 0.1, max_tokens: 2000`);
       
       let retries = 2;
       let response;
@@ -179,8 +184,8 @@ export function useResumeHandler(employeeId: string | null) {
                 { role: 'system', content: systemMessage },
                 { role: 'user', content: structuredPrompt }
               ],
-              temperature: 0.2,
-              max_tokens: 1500
+              temperature: 0.1,
+              max_tokens: 2000
             })
           });
           
@@ -241,39 +246,116 @@ export function useResumeHandler(employeeId: string | null) {
       try {
         // First try direct JSON parsing
         console.log("Attempting to parse Groq response as JSON");
-        const parsedData = JSON.parse(content);
-        console.log("Successfully parsed response JSON directly");
+        let parsedData;
+        
+        try {
+          parsedData = JSON.parse(content);
+          console.log("Successfully parsed response JSON directly");
+        } catch (directJsonError) {
+          console.log("Direct JSON parsing failed, trying to extract JSON from text");
+          
+          // Try to extract JSON using regex patterns
+          console.log("Attempting to extract JSON using regex");
+          
+          // First try most common pattern: JSON object inside the response
+          const jsonMatch = content.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            try {
+              parsedData = JSON.parse(jsonMatch[0]);
+              console.log("Successfully parsed JSON using basic regex extraction");
+            } catch (basicRegexError) {
+              console.error("Basic regex extraction failed:", basicRegexError.message);
+              
+              // Try stricter pattern: find JSON-like content with balanced braces
+              console.log("Trying advanced JSON extraction with balanced braces");
+              const jsonStart = content.indexOf('{');
+              if (jsonStart !== -1) {
+                let braceCount = 0;
+                let jsonEnd = -1;
+                
+                for (let i = jsonStart; i < content.length; i++) {
+                  if (content[i] === '{') braceCount++;
+                  if (content[i] === '}') braceCount--;
+                  
+                  if (braceCount === 0) {
+                    jsonEnd = i + 1;
+                    break;
+                  }
+                }
+                
+                if (jsonEnd !== -1) {
+                  const jsonString = content.substring(jsonStart, jsonEnd);
+                  try {
+                    parsedData = JSON.parse(jsonString);
+                    console.log("Successfully parsed JSON using balanced brace extraction");
+                  } catch (advancedError) {
+                    console.error("Advanced JSON extraction failed:", advancedError.message);
+                    throw new Error("Could not parse response as valid JSON");
+                  }
+                }
+              }
+            }
+          }
+          
+          // If still no parsed data, try to extract fields manually as a last resort
+          if (!parsedData) {
+            console.log("Attempting manual field extraction as last resort");
+            
+            // Create a basic structure with empty values
+            parsedData = {
+              summary: "",
+              skills: [],
+              experience: [],
+              education: [],
+              certifications: [],
+              languages: [],
+              keyAchievements: [],
+              personalInsights: {
+                yearsOfExperience: "",
+                industries: [],
+                toolsAndTechnologies: [],
+                softSkills: []
+              }
+            };
+            
+            // Extract summary - look for content between "summary" and the next field
+            const summaryMatch = content.match(/"summary"[:\s]+"([^"]+)"/);
+            if (summaryMatch) parsedData.summary = summaryMatch[1];
+            
+            // Try to extract arrays by looking for bracket patterns
+            const skillsMatch = content.match(/"skills"[:\s]+\[(.*?)\]/s);
+            if (skillsMatch) {
+              const skillsStr = skillsMatch[1];
+              parsedData.skills = skillsStr.match(/"([^"]+)"/g)?.map(s => s.replace(/"/g, '')) || [];
+            }
+            
+            console.log("Manual extraction produced partial data");
+          }
+        }
+        
+        if (!parsedData) {
+          throw new Error("Failed to parse response content as JSON");
+        }
+        
+        // Validate that the parsed data has the expected structure
+        console.log("Validating parsed data structure");
+        
+        if (!parsedData.summary) parsedData.summary = "Professional profile could not be extracted";
+        if (!Array.isArray(parsedData.skills)) parsedData.skills = [];
+        if (!Array.isArray(parsedData.experience)) parsedData.experience = [];
+        if (!Array.isArray(parsedData.education)) parsedData.education = [];
+        if (!parsedData.personalInsights) parsedData.personalInsights = {};
+        
         console.log("Parsed data keys:", Object.keys(parsedData));
         console.log("Skills found:", parsedData.skills?.length || 0);
         console.log("Experience entries:", parsedData.experience?.length || 0);
         console.log('----------- GROQ DIRECT CALL COMPLETE -----------');
         return parsedData;
-      } catch (jsonError) {
-        console.error("Error parsing Groq response as JSON:", jsonError);
-        console.log("JSON parse error details:", jsonError.message);
-        
-        // Try to extract JSON using regex as a fallback
-        console.log("Attempting to extract JSON using regex");
-        const jsonMatch = content.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          try {
-            const parsedData = JSON.parse(jsonMatch[0]);
-            console.log("Successfully parsed JSON using regex extraction");
-            console.log("Parsed data keys:", Object.keys(parsedData));
-            console.log("Skills found:", parsedData.skills?.length || 0);
-            console.log("Experience entries:", parsedData.experience?.length || 0);
-            console.log('----------- GROQ DIRECT CALL COMPLETE -----------');
-            return parsedData;
-          } catch (e) {
-            console.error("Error parsing extracted JSON match:", e);
-            console.log("Extracted match:", jsonMatch[0].substring(0, 150) + "...");
-            throw new Error("Failed to parse Groq response as JSON even after regex extraction");
-          }
-        } else {
-          console.error("No JSON object pattern found in response");
-          console.log("Response content:", content);
-          throw new Error("Failed to parse Groq response as JSON");
-        }
+      } catch (error) {
+        console.error("All JSON parsing attempts failed:", error);
+        console.log("Full response content:", content);
+        console.log('----------- GROQ DIRECT CALL FAILED -----------');
+        throw new Error(`Failed to parse Groq response: ${error.message}`);
       }
     } catch (error) {
       console.error("Error in callGroqForCvAnalysis:", error);
