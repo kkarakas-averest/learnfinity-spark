@@ -10,12 +10,78 @@ export function useResumeHandler(employeeId: string | null) {
   const [resumeFile, setResumeFile] = React.useState<File | null>(null);
   const [resumeFileName, setResumeFileName] = React.useState<string>('');
   const [uploading, setUploading] = React.useState<boolean>(false);
+  const [processing, setProcessing] = React.useState<boolean>(false);
 
   const handleResumeFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       setResumeFile(file);
       setResumeFileName(file.name);
+    }
+  };
+
+  /**
+   * Process a CV using the API to extract profile data
+   */
+  const processCV = async (cvUrl: string): Promise<boolean> => {
+    if (!employeeId || !cvUrl) {
+      console.warn('Cannot process CV without employeeId and cvUrl');
+      return false;
+    }
+
+    setProcessing(true);
+    
+    try {
+      console.log(`Calling CV processing API for ${employeeId} with URL ${cvUrl}`);
+      
+      // Call the API to process the CV
+      const response = await fetch('/api/hr/employees/process-cv', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          employeeId,
+          cvUrl
+        })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Failed to process CV:', errorData);
+        
+        // Only show a warning, not an error, as this is just an enhancement
+        toast({
+          variant: "warning",
+          title: "CV Processing",
+          description: "The CV was uploaded but could not be processed for profile data."
+        });
+        
+        return false;
+      }
+      
+      const result = await response.json();
+      console.log('CV processing result:', result);
+      
+      toast({
+        title: "CV Processing",
+        description: "CV processed and profile data extracted successfully."
+      });
+      
+      return true;
+    } catch (error) {
+      console.error('Error processing CV:', error);
+      
+      // Only show a warning as this is an enhancement
+      toast({
+        variant: "warning",
+        title: "CV Processing",
+        description: "An error occurred while processing the CV for profile data."
+      });
+      
+      return false;
+    } finally {
+      setProcessing(false);
     }
   };
 
@@ -58,6 +124,11 @@ export function useResumeHandler(employeeId: string | null) {
             description: uploadResult.error,
           });
         }
+
+        // Process the CV to extract profile data
+        processCV(uploadResult.url).catch(error => {
+          console.error("Error in CV processing after upload:", error);
+        });
         
         return { success: true, url: uploadResult.url };
       }
@@ -76,6 +147,11 @@ export function useResumeHandler(employeeId: string | null) {
         toast({
           title: "Success",
           description: "Resume uploaded successfully via server",
+        });
+
+        // Process the CV to extract profile data
+        processCV(apiResult.url).catch(error => {
+          console.error("Error in CV processing after API upload:", error);
         });
         
         return { success: true, url: apiResult.url };
@@ -221,8 +297,10 @@ export function useResumeHandler(employeeId: string | null) {
     resumeFile,
     resumeFileName,
     uploading,
+    processing,
     handleResumeFileChange,
     uploadResume,
-    viewResume
+    viewResume,
+    processCV
   };
 } 

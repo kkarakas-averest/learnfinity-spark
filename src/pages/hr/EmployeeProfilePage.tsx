@@ -81,6 +81,23 @@ interface Employee {
     summary?: string;
     extraction_date?: string;
     source?: string;
+    model?: string;
+    skills?: string[];
+    experience?: {
+      title: string;
+      company?: string;
+      duration?: string;
+      highlights?: string[];
+    }[];
+    education?: {
+      degree?: string;
+      institution?: string;
+      year?: string;
+    }[];
+    certifications?: string[];
+    languages?: string[];
+    keyAchievements?: string[];
+    professionalInterests?: string[];
   } | string;
 }
 
@@ -733,13 +750,63 @@ const EmployeeProfilePage: React.FC = () => {
                       <h3 className="text-sm font-medium text-gray-900 mb-2">
                         Profile Summary
                       </h3>
-                      <p className="text-sm text-gray-600">
+                      <p className="text-sm text-gray-600 mb-3">
                         {typeof employee.cv_extracted_data === 'object' && employee.cv_extracted_data.summary
                           ? employee.cv_extracted_data.summary
                           : typeof employee.cv_extracted_data === 'string'
                             ? employee.cv_extracted_data
                             : 'No profile summary available.'}
                       </p>
+                      
+                      {/* Display skills if available */}
+                      {typeof employee.cv_extracted_data === 'object' && employee.cv_extracted_data.skills && employee.cv_extracted_data.skills.length > 0 && (
+                        <div className="mt-2">
+                          <h4 className="text-xs font-medium text-gray-700 mb-1">Key Skills</h4>
+                          <div className="flex flex-wrap gap-1">
+                            {employee.cv_extracted_data.skills.slice(0, 5).map((skill, index) => (
+                              <span key={index} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                                {skill}
+                              </span>
+                            ))}
+                            {employee.cv_extracted_data.skills.length > 5 && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">
+                                +{employee.cv_extracted_data.skills.length - 5} more
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Display latest experience if available */}
+                      {typeof employee.cv_extracted_data === 'object' && 
+                       employee.cv_extracted_data.experience && 
+                       employee.cv_extracted_data.experience.length > 0 && (
+                        <div className="mt-2">
+                          <h4 className="text-xs font-medium text-gray-700 mb-1">Experience</h4>
+                          <div className="text-xs text-gray-600">
+                            <span className="font-medium">{employee.cv_extracted_data.experience[0].title}</span>
+                            {employee.cv_extracted_data.experience[0].company && (
+                              <span> at {employee.cv_extracted_data.experience[0].company}</span>
+                            )}
+                            {employee.cv_extracted_data.experience[0].duration && (
+                              <span> ({employee.cv_extracted_data.experience[0].duration})</span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Show metadata about the extraction */}
+                      {typeof employee.cv_extracted_data === 'object' && employee.cv_extracted_data.extraction_date && (
+                        <div className="mt-3 text-xs text-gray-400 flex items-center">
+                          <span>Generated: {new Date(employee.cv_extracted_data.extraction_date).toLocaleDateString()}</span>
+                          {employee.cv_extracted_data.source && (
+                            <span className="ml-1">via {employee.cv_extracted_data.source}</span>
+                          )}
+                          {employee.cv_extracted_data.model && (
+                            <span className="ml-1">using {employee.cv_extracted_data.model}</span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
