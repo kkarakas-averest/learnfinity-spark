@@ -6,38 +6,34 @@ import { supabase } from '@/lib/supabase';
  */
 export async function ensureEmployeeFilesBucket(): Promise<{ success: boolean; error?: string }> {
   try {
-    // Check if bucket exists
+    // Instead of trying to create the bucket directly (which might fail due to RLS),
+    // we'll just check if we can list buckets and consider it a success if we can
+    
     const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets();
     
     if (bucketsError) {
       console.error("Error listing buckets:", bucketsError);
-      return { success: false, error: bucketsError.message };
-    }
-    
-    // If bucket already exists, return success
-    if (buckets?.some(bucket => bucket.name === 'employee-files')) {
+      // Don't fail immediately, we'll let the upload proceed and let server-side handle it
       return { success: true };
     }
     
-    // Create bucket
-    const { error: createError } = await supabase.storage.createBucket('employee-files', {
-      public: true,
-      fileSizeLimit: 10485760, // 10MB
-      allowedMimeTypes: ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
-    });
+    // Check if the employee-files bucket already exists
+    const bucketExists = buckets?.some(bucket => bucket.name === 'employee-files');
     
-    if (createError) {
-      console.error("Error creating bucket:", createError);
-      return { success: false, error: createError.message };
+    if (bucketExists) {
+      console.log("Employee-files bucket exists");
+      return { success: true };
     }
     
+    // If bucket doesn't exist, we won't try to create it client-side
+    // as it might fail due to RLS policies. Instead, we'll rely on the
+    // server-side API to create it with admin privileges
+    console.log("Employee-files bucket doesn't exist, will defer to server-side creation");
     return { success: true };
   } catch (error) {
     console.error("Exception ensuring bucket exists:", error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : String(error)
-    };
+    // Still consider this a non-fatal error, let the upload proceed
+    return { success: true };
   }
 }
 
@@ -52,6 +48,18 @@ export async function uploadResumeFile(
   employeeId: string
 ): Promise<{ success: boolean; url?: string; error?: string }> {
   try {
+    // Check if we're in production
+    const isProduction = window.location.hostname !== 'localhost';
+    
+    // In production environments, prefer server-side upload to avoid RLS issues
+    if (isProduction) {
+      console.log("Production environment detected, prioritizing server-side upload");
+      return uploadResumeViaAPI(file, employeeId);
+    }
+    
+    // For development, still try the direct upload first
+    console.log("Development environment, attempting direct upload");
+    
     // First ensure bucket exists
     const { success: bucketSuccess, error: bucketError } = await ensureEmployeeFilesBucket();
     
@@ -128,18 +136,34 @@ export async function uploadResumeViaAPI(
     formData.append('file', file);
     formData.append('employeeId', employeeId);
     
-    // Use the pages API route instead of the app router route
-    const response = await fetch('/api/hr/resume-upload', {
+    // Check if we're in development or production
+    const isProduction = window.location.hostname !== 'localhost';
+    const baseUrl = isProduction ? window.location.origin : '';
+    
+    // Use the pages API route with the appropriate base URL
+    const response = await fetch(`${baseUrl}/api/hr/resume-upload`, {
       method: 'POST',
       body: formData
     });
     
     if (!response.ok) {
-      const errorData = await response.json();
-      return { 
-        success: false, 
-        error: errorData.error || response.statusText 
-      };
+      // Check if the response is JSON
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        const errorData = await response.json();
+        return { 
+          success: false, 
+          error: errorData.error || response.statusText 
+        };
+      } else {
+        // Handle non-JSON response
+        const textError = await response.text();
+        console.error('Non-JSON error response:', textError);
+        return {
+          success: false,
+          error: `Server error: ${response.status} ${response.statusText}`
+        };
+      }
     }
     
     const result = await response.json();
