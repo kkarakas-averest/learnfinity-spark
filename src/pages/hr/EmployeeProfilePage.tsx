@@ -549,8 +549,11 @@ const EmployeeProfilePage: React.FC = () => {
 
     try {
       const fileExt = resumeFile.name.split('.').pop();
-      // Changed: Create directory structure with employeeId
-      const filePath = `resumes/${extractedId}/${extractedId}-${Date.now()}.${fileExt}`;
+      // Using a flat structure without nested directories
+      const timestamp = Date.now();
+      const filePath = `resumes/${extractedId}-${timestamp}.${fileExt}`;
+      
+      console.log(`Preparing to upload resume to path: ${filePath}`);
       
       // Upload file using our helper
       const { success, error, publicUrl } = await uploadFileToStorage(
@@ -564,7 +567,7 @@ const EmployeeProfilePage: React.FC = () => {
         toast({
           variant: "destructive",
           title: "Error",
-          description: "Failed to upload resume: " + error.message,
+          description: "Failed to upload resume: " + (error.message || "Unknown error"),
         });
         return;
       }
@@ -607,26 +610,34 @@ const EmployeeProfilePage: React.FC = () => {
       });
       
       // Update the UI
-      setEmployee(prev => ({ 
-        ...prev, 
-        cv_file_url: publicUrl,
-        resume_url: publicUrl 
-      }));
-      
-      // Call the API to process the CV and generate a summary
-      const response = await fetch('/api/hr/employees/process-cv', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          employeeId: extractedId,
-          cvUrl: publicUrl
-        })
+      setEmployee(prev => {
+        if (!prev) return null;
+        return { 
+          ...prev, 
+          cv_file_url: publicUrl,
+          resume_url: publicUrl 
+        };
       });
       
-      if (!response.ok) {
-        console.warn('Failed to process CV for summary generation');
+      // Call the API to process the CV and generate a summary
+      try {
+        const response = await fetch('/api/hr/employees/process-cv', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            employeeId: extractedId,
+            cvUrl: publicUrl
+          })
+        });
+        
+        if (!response.ok) {
+          console.warn('Failed to process CV for summary generation:', await response.text());
+        }
+      } catch (apiError) {
+        console.error('Error calling CV processing API:', apiError);
+        // Non-blocking error - we'll continue even if this fails
       }
       
       // Refresh the employee data
@@ -747,6 +758,15 @@ const EmployeeProfilePage: React.FC = () => {
   };
 
   const testAndOpenCvLink = async (url: string) => {
+    if (!url) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "No resume URL available",
+      });
+      return;
+    }
+
     console.log("Testing CV URL:", url);
     
     try {
@@ -886,7 +906,7 @@ const EmployeeProfilePage: React.FC = () => {
               </div>
 
               <div>
-                {employee?.cv_file_url && (
+                {(employee?.cv_file_url || employee?.resume_url) && (
                   <div className="flex items-center">
                     <FileText className="h-4 w-4 mr-2 text-gray-500" />
                     <span className="text-sm text-gray-500">Resume:</span>
@@ -894,7 +914,7 @@ const EmployeeProfilePage: React.FC = () => {
                       href="#"
                       onClick={(e) => {
                         e.preventDefault();
-                        testAndOpenCvLink(employee.cv_file_url as string);
+                        testAndOpenCvLink(employee?.cv_file_url || employee?.resume_url || '');
                       }}
                       className="ml-2 text-blue-600 hover:underline"
                     >
@@ -902,6 +922,43 @@ const EmployeeProfilePage: React.FC = () => {
                     </a>
                   </div>
                 )}
+                
+                <div className="flex items-center mt-2">
+                  <Upload className="h-4 w-4 mr-2 text-gray-500" />
+                  <span className="text-sm text-gray-500">Resume:</span>
+                  <div className="ml-2">
+                    <Input
+                      id="quick_resume_upload"
+                      type="file"
+                      accept=".pdf,.doc,.docx"
+                      onChange={handleResumeFileChange}
+                      className="hidden"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-auto py-0 text-blue-600 hover:text-blue-800"
+                      onClick={() => document.getElementById('quick_resume_upload')?.click()}
+                    >
+                      {(employee?.cv_file_url || employee?.resume_url) ? 'Update Resume' : 'Upload Resume'}
+                    </Button>
+                    {resumeFileName && (
+                      <div className="flex items-center mt-1">
+                        <span className="text-xs text-gray-600 mr-2">{resumeFileName}</span>
+                        <Button 
+                          type="button" 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-auto p-0 text-xs text-blue-600"
+                          onClick={uploadResumeFile}
+                        >
+                          Save
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </div>
 
                 <div className="flex items-center mt-3">
                   <Clock className="h-4 w-4 mr-2 text-gray-500" />

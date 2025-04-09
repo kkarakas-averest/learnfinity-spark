@@ -27,18 +27,10 @@ export async function uploadFileToStorage(
     // Normalize the path to ensure it doesn't start with a slash
     const normalizedPath = path.startsWith('/') ? path.substring(1) : path;
     
-    // Make sure directory exists (for nested paths)
-    if (normalizedPath.includes('/')) {
-      const dirPath = normalizedPath.substring(0, normalizedPath.lastIndexOf('/'));
-      // Attempt to create directory - this is mostly a no-op if it exists
-      try {
-        await supabase.storage
-          .from(bucket)
-          .createSignedUrl(dirPath, 1); // Just a check to see if directory exists
-      } catch (error) {
-        console.log('Directory check failed, but proceeding with upload:', error);
-      }
-    }
+    // In Supabase Storage, we don't need to create directories explicitly
+    // They're automatically created when files are uploaded
+    
+    console.log(`Uploading file to ${bucket}/${normalizedPath}`);
     
     // Upload the file
     const { data, error } = await supabase.storage
@@ -49,6 +41,7 @@ export async function uploadFileToStorage(
       });
       
     if (error) {
+      console.error(`Upload error: ${error.message}`, error);
       return { success: false, error };
     }
     
@@ -56,9 +49,12 @@ export async function uploadFileToStorage(
     const { data: urlData } = supabase.storage
       .from(bucket)
       .getPublicUrl(normalizedPath);
-      
+    
+    console.log(`File uploaded successfully. Public URL: ${urlData.publicUrl}`);
+    
     return { success: true, publicUrl: urlData.publicUrl };
   } catch (error) {
+    console.error('Unexpected error in uploadFileToStorage:', error);
     return { success: false, error };
   }
 }
