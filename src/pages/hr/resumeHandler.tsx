@@ -111,7 +111,7 @@ export function useResumeHandler(employeeId: string | null) {
       console.log("Preparing structured prompt for Groq API");
       
       const structuredPrompt = `
-        You are an expert resume analyzer. Your task is to thoroughly extract information from this resume/CV.
+        You are an expert HR recruiter and resume analyzer with years of experience extracting meaningful information from CVs and resumes.
         
         CV CONTENT:
         ${pdfContent}
@@ -120,51 +120,95 @@ export function useResumeHandler(employeeId: string | null) {
         POSITION: ${positionName}
         DEPARTMENT: ${departmentName}
         
-        Extract SPECIFIC and DETAILED information from the CV and structure it in this JSON format:
+        Your task is to carefully analyze this CV and extract specific, detailed information about the candidate.
+        Read through all the content thoroughly to find relevant details about their work history, education, skills, and achievements.
+        
+        EXTRACTION INSTRUCTIONS:
+        1. Extract ONLY actual information present in the CV - never make assumptions or generate generic content
+        2. Look for specific company names, job titles, time periods, skills, and accomplishments
+        3. If a section has no information in the CV, use empty arrays [] rather than "Not specified"
+        4. Pay special attention to dates, locations, technical skills, and quantifiable achievements
+        5. Include exact phrases and terminology used in the CV whenever possible
+        
+        Format your response as this JSON structure:
         {
-          "summary": "Detailed professional profile highlighting actual experience, skills, and achievements",
-          "skills": ["Specific skill 1", "Specific skill 2", ...],
+          "summary": "A detailed professional profile based on the candidate's actual experience. Include specific years of experience, industry focus, key roles, and notable achievements. Minimum 100 words.",
+          
+          "skills": [
+            "Skill 1 exactly as mentioned in CV",
+            "Skill 2 exactly as mentioned in CV",
+            "Technical skill with any proficiency level mentioned"
+          ],
+          
           "experience": [
             {
               "title": "Exact job title from CV",
-              "company": "Company name from CV",
-              "duration": "Specific time period",
-              "highlights": ["Specific accomplishment 1", "Specific accomplishment 2"]
+              "company": "Exact company name from CV",
+              "duration": "Specific time period (e.g., 'Jan 2018 - Present')",
+              "highlights": [
+                "Specific accomplishment or responsibility with metrics if available",
+                "Another specific duty or achievement from the CV"
+              ]
             }
           ],
+          
           "education": [
             {
-              "degree": "Specific degree title",
-              "institution": "Specific institution name",
-              "year": "Graduation year"
+              "degree": "Exact degree name and field from CV",
+              "institution": "Exact institution name from CV",
+              "year": "Graduation year or date range from CV"
             }
           ],
-          "certifications": ["Specific certification 1", "Specific certification 2"],
-          "languages": ["Language 1 and proficiency level", "Language 2 and proficiency level"],
-          "keyAchievements": ["Specific notable achievement 1", "Specific notable achievement 2"],
+          
+          "certifications": [
+            "Exact certification name and date if available",
+            "Another certification exactly as mentioned in CV"
+          ],
+          
+          "languages": [
+            "Language with proficiency level as mentioned in CV"
+          ],
+          
+          "keyAchievements": [
+            "Notable achievement explicitly mentioned in CV",
+            "Award, recognition, or significant project outcome"
+          ],
+          
           "personalInsights": {
-            "yearsOfExperience": "Total years of experience",
-            "industries": ["Specific industry 1", "Specific industry 2"],
-            "toolsAndTechnologies": ["Specific tool/technology 1", "Specific tool/technology 2"],
-            "softSkills": ["Specific soft skill 1", "Specific soft skill 2"]
+            "yearsOfExperience": "Total years based on work history in CV",
+            "industries": [
+              "Specific industry mentioned or evident from work history",
+              "Another relevant industry from the CV"
+            ],
+            "toolsAndTechnologies": [
+              "Specific tool, software, or technology mentioned in CV",
+              "Another technical tool extracted from CV"
+            ],
+            "softSkills": [
+              "Soft skill explicitly mentioned in CV",
+              "Leadership style or interpersonal skill from CV"
+            ]
           }
         }
         
-        IMPORTANT GUIDELINES:
-        1. NEVER use "Not specified" when actual information is present in the CV.
-        2. Look carefully through the entire CV content to find all relevant information.
-        3. Extract EXACT information from the CV rather than making general statements.
-        4. If information truly isn't available, use empty arrays [] or null values.
-        5. Focus on extracting factual information present in the document. 
-        6. Do not add explanatory text to your response, only return the JSON object.
+        IMPORTANT:
+        - ONLY extract information that is explicitly stated in the CV
+        - DO NOT invent or assume information that isn't present
+        - If a field truly has no information, use [] for arrays or null for strings
+        - Focus on ACCURACY over completeness
+        - Your response must be ONLY the JSON object with no additional text before or after
       `;
 
       // Create system message
-      const systemMessage = "You are an expert resume analyzer that extracts detailed and accurate information from CVs. Return a properly formatted JSON object with specific information found in the document. Do not include any text before or after the JSON.";
+      const systemMessage = `You are an AI specialized in precise information extraction from resumes and CVs. 
+Your task is to extract specific details from the provided document and format them into a structured JSON object.
+Focus ONLY on extracting information that is explicitly present in the document - never invent details.
+If certain information is not available, use empty arrays or null values rather than placeholders.
+Your response must contain ONLY a properly formatted JSON object with no explanatory text before or after.`;
       
       // Make the API call to Groq
       console.log("Calling Groq API directly for CV analysis");
-      console.log(`Using model: llama3-8b-8192, temperature: 0.1, max_tokens: 2000`);
+      console.log(`Using model: llama3-70b-8192, temperature: 0.0, max_tokens: 2000`);
       
       let retries = 2;
       let response;
@@ -179,12 +223,12 @@ export function useResumeHandler(employeeId: string | null) {
               'Authorization': `Bearer ${GROQ_API_KEY}`
             },
             body: JSON.stringify({
-              model: 'llama3-8b-8192',
+              model: 'llama3-70b-8192',
               messages: [
                 { role: 'system', content: systemMessage },
                 { role: 'user', content: structuredPrompt }
               ],
-              temperature: 0.1,
+              temperature: 0.0,
               max_tokens: 2000
             })
           });
@@ -424,7 +468,7 @@ export function useResumeHandler(employeeId: string | null) {
             ...profileData,
             extraction_date: new Date().toISOString(),
             source: 'groq_llm_direct',
-            model: 'llama3-8b-8192'
+            model: 'llama3-70b-8192'
           };
           
           console.log("Successfully extracted profile data using Groq direct call");

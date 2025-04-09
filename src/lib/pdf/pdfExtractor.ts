@@ -151,33 +151,88 @@ async function extractTextFromBuffer(buffer: ArrayBuffer): Promise<PDFExtraction
       "experience", "education", "skills", "profile", "summary", 
       "work history", "employment", "qualification", "professional",
       "certification", "project", "contact", "reference", "language", 
-      "linkedin", "email", "phone", "address", "objective"
+      "linkedin", "email", "phone", "address", "objective",
+      "job", "position", "background", "knowledge", "expertise",
+      "proficient", "degree", "university", "college", "school",
+      "diploma", "specialist", "manager", "director", "lead",
+      "senior", "junior", "year", "technical", "software",
+      "developed", "implemented", "managed", "responsible",
+      "achievements", "accomplishments", "improved"
     ];
     
     let keywordMatches = "";
     
     resumeKeywords.forEach(keyword => {
-      const keywordRegex = new RegExp(`[^\\n\\r]{0,50}${keyword}[^\\n\\r]{0,100}`, "gi");
+      // Look for the keyword with more context around it
+      const keywordRegex = new RegExp(`[^\\n\\r]{0,100}${keyword}[^\\n\\r]{0,150}`, "gi");
       let keywordMatch;
       
       while ((keywordMatch = keywordRegex.exec(textContent)) !== null) {
-        keywordMatches += keywordMatch[0] + "\n";
+        keywordMatches += keywordMatch[0] + "\n\n";
       }
     });
     
-    // Combine all extraction methods, with preference to the most structured data
-    let finalText = pdfText;
+    // Method 4: Look for email addresses, phone numbers, and URLs
+    const contactInfoPatterns = [
+      /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g,  // Email
+      /\b(?:\+\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b/g,  // Phone
+      /\bhttps?:\/\/[^\s]+\b/g  // URL
+    ];
     
-    // If we didn't get much from the primary method, add from secondary methods
-    if (pdfText.length < 1000 && textBlocks.length > pdfText.length) {
-      finalText += "\n\n" + textBlocks;
+    let contactInfo = "";
+    contactInfoPatterns.forEach(pattern => {
+      let infoMatch;
+      while ((infoMatch = pattern.exec(textContent)) !== null) {
+        contactInfo += "Contact: " + infoMatch[0] + "\n";
+      }
+    });
+    
+    // Method 5: Look for common CV section headers and extract content after them
+    const sectionHeaders = [
+      "EXPERIENCE", "EDUCATION", "SKILLS", "PROFILE", "WORK HISTORY",
+      "PROFESSIONAL EXPERIENCE", "TECHNICAL SKILLS", "CERTIFICATIONS"
+    ];
+    
+    let sectionContent = "";
+    sectionHeaders.forEach(header => {
+      // Case insensitive search for section headers with content after
+      const sectionRegex = new RegExp(`${header}[\\s:]*([^]*?)(?=(${sectionHeaders.join('|')})|$)`, 'i');
+      const sectionMatch = textContent.match(sectionRegex);
+      
+      if (sectionMatch && sectionMatch[1]) {
+        sectionContent += `\n\n### ${header} ###\n${sectionMatch[1].trim()}\n`;
+      }
+    });
+    
+    // Combine all extraction methods, prioritizing structured sections
+    let finalText = "";
+    
+    // Add section content first if we found any
+    if (sectionContent.length > 200) {
+      finalText += sectionContent;
     }
     
-    if (finalText.length < 1000 && keywordMatches.length > 0) {
-      finalText += "\n\n" + keywordMatches;
+    // Add text from parentheses extraction
+    if (pdfText.length > 0) {
+      finalText += (finalText ? "\n\n" : "") + pdfText;
     }
     
-    // If we still don't have good content, fall back to the raw text as a last resort
+    // Add text block content if substantial
+    if (textBlocks.length > 200) {
+      finalText += (finalText ? "\n\n" : "") + textBlocks;
+    }
+    
+    // Add keyword matches if we need more content
+    if (keywordMatches.length > 0 && finalText.length < 2000) {
+      finalText += (finalText ? "\n\n" : "") + keywordMatches;
+    }
+    
+    // Always include contact information if found
+    if (contactInfo.length > 0) {
+      finalText = contactInfo + (finalText ? "\n\n" : "") + finalText;
+    }
+    
+    // If we still don't have good content, use raw text as a last resort
     if (finalText.length < 500) {
       finalText = textContent;
     }
@@ -228,7 +283,8 @@ async function extractTextFromBuffer(buffer: ArrayBuffer): Promise<PDFExtraction
  * @returns Cleaned text
  */
 function cleanPdfText(text: string): string {
-  return text
+  // First pass - basic cleaning
+  let cleaned = text
     .replace(/\r\n/g, '\n')          // Normalize line breaks
     .replace(/\s+/g, ' ')            // Collapse multiple whitespace
     .replace(/\n{3,}/g, '\n\n')      // Replace 3+ newlines with just 2
@@ -237,6 +293,47 @@ function cleanPdfText(text: string): string {
     .replace(/\\\(/g, '(')           // Replace escaped parentheses
     .replace(/\\\)/g, ')')
     .replace(/\\u[0-9a-fA-F]{4}/g, ' ') // Replace unicode escape sequences
-    .replace(/\s{2,}/g, ' ')         // Remove duplicate spaces
     .trim();
+  
+  // Second pass - improve CV structure
+  // Add section markers to help LLM identify sections
+  const sectionMarkers = [
+    'EDUCATION', 'EXPERIENCE', 'EMPLOYMENT', 'SKILLS', 'LANGUAGES', 
+    'CERTIFICATIONS', 'ACHIEVEMENTS', 'PROJECTS', 'SUMMARY', 'PROFILE',
+    'WORK HISTORY', 'PROFESSIONAL EXPERIENCE', 'QUALIFICATIONS', 'TECHNICAL SKILLS'
+  ];
+  
+  // Highlight potential section headers
+  let structuredText = cleaned;
+  sectionMarkers.forEach(marker => {
+    // Look for case insensitive matches that are likely section headers
+    const regex = new RegExp(`(^|\\n|\\s)(${marker}|${marker.toLowerCase()}|${marker.charAt(0) + marker.slice(1).toLowerCase()})(\\s|:|\\n|$)`, 'g');
+    structuredText = structuredText.replace(regex, (match, p1, p2, p3) => {
+      // Preserve original casing but add formatting markers
+      return `${p1}### ${p2.toUpperCase()} ###${p3}`;
+    });
+  });
+  
+  // Look for patterns that might represent dates and emphasize them
+  const datePatterns = [
+    // MM/YYYY - MM/YYYY format
+    /(\d{1,2}\/\d{4})\s*-\s*(\d{1,2}\/\d{4}|\bpresent\b|\bcurrent\b)/gi,
+    // Month Year - Month Year format
+    /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]* \d{4}\s*-\s*(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]* \d{4}|\bpresent\b|\bcurrent\b/gi,
+    // YYYY - YYYY format
+    /\b(19|20)\d{2}\s*-\s*(19|20)\d{2}|\bpresent\b|\bcurrent\b/gi
+  ];
+  
+  datePatterns.forEach(pattern => {
+    structuredText = structuredText.replace(pattern, match => `[ ${match} ]`);
+  });
+  
+  // Enhance bullet points to improve list identification
+  structuredText = structuredText
+    .replace(/([•\-\*]\s*)/g, '\n• ')  // Standardize bullet points
+    .replace(/\n{3,}/g, '\n\n')        // Clean up excess newlines again
+    .replace(/\s{2,}/g, ' ')           // Remove duplicate spaces
+    .trim();
+  
+  return structuredText;
 } 
