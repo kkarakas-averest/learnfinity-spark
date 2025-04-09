@@ -913,13 +913,13 @@ const EmployeeProfilePage: React.FC = () => {
               <CardHeader>
                 <CardTitle>Recent Activity</CardTitle>
                 <CardDescription>
-                  {activities.length > 0 
-                    ? `${activities.length} recent activities`
+                  {activities.length 
+                    ? `${activities.length} recent activities` 
                     : 'No activities recorded yet'}
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {activities.length > 0 ? (
+                {activities.length ? (
                   <div className="space-y-4">
                     {activities.map((activity, index) => (
                       <div key={index} className="flex border-b pb-3 last:border-b-0">
