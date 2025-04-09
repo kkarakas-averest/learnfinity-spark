@@ -751,13 +751,19 @@ const EmployeeProfilePage: React.FC = () => {
       const fixedUrl = fixStorageUrl(url, 'employee-files');
       console.log("Fixed URL:", fixedUrl);
       
+      // Check if the URL is accessible
+      const response = await fetch(fixedUrl, { method: 'HEAD' });
+      if (!response.ok) {
+        throw new Error(`Failed to access CV file: ${response.status} ${response.statusText}`);
+      }
+      
       window.open(fixedUrl, '_blank', 'noopener,noreferrer');
     } catch (error) {
       console.error("Error opening CV URL:", error);
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Could not open the CV file. Please check the storage bucket permissions.",
+        description: error instanceof Error ? error.message : "Could not open the CV file. Please check the storage bucket permissions.",
       });
     }
   };
@@ -877,12 +883,12 @@ const EmployeeProfilePage: React.FC = () => {
               </div>
 
               <div>
-                {employee.resume_url && (
+                {employee.cv_file_url && (
                   <div className="flex items-center">
                     <FileText className="h-4 w-4 mr-2 text-gray-500" />
                     <span className="text-sm text-gray-500">Resume:</span>
                     <a 
-                      href={employee.resume_url} 
+                      href={employee.cv_file_url} 
                       target="_blank" 
                       rel="noopener noreferrer"
                       className="ml-2 text-blue-600 hover:underline"

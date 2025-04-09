@@ -93,21 +93,33 @@ export function parseStorageUrl(url: string): { bucket: string; path: string } |
  * @returns The fixed URL or the original if it cannot be fixed
  */
 export function fixStorageUrl(url: string, defaultBucket: string = 'employee-files'): string {
-  // Handle cases where the URL is already correct
-  if (url.includes('/storage/v1/object/public/')) {
+  try {
+    // If URL is already a public URL, return it as is
+    if (url.includes('/storage/v1/object/public/')) {
+      return url;
+    }
+
+    // If URL is a direct path, construct the public URL
+    if (!url.includes('://')) {
+      return getPublicUrl(defaultBucket, url);
+    }
+
+    // Try to parse the URL to extract bucket and path
+    const parsed = parseStorageUrl(url);
+    if (parsed) {
+      return getPublicUrl(parsed.bucket, parsed.path);
+    }
+
+    // If we can't parse properly but URL contains a path, try to reconstruct it
+    const simplePath = url.split('/').pop();
+    if (simplePath) {
+      return getPublicUrl(defaultBucket, simplePath);
+    }
+
+    // If all else fails, return the original URL
+    return url;
+  } catch (error) {
+    console.error('Error fixing storage URL:', error);
     return url;
   }
-  
-  const parsed = parseStorageUrl(url);
-  if (parsed) {
-    return getPublicUrl(parsed.bucket, parsed.path);
-  }
-  
-  // If we can't parse properly but URL contains a path, try to reconstruct it
-  const simplePath = url.split('/').pop();
-  if (simplePath) {
-    return getPublicUrl(defaultBucket, simplePath);
-  }
-  
-  return url;
 } 
