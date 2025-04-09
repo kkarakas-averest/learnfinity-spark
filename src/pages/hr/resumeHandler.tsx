@@ -77,7 +77,12 @@ export function useResumeHandler(employeeId: string | null) {
       
       // Use the server API to extract the PDF text since client-side can't handle PDFs well
       console.log("Calling extract-pdf-text API to get PDF content");
-      const extractionResponse = await fetch('/api/hr/extract-pdf-text', {
+      
+      // Get the base URL for the current environment
+      const baseUrl = window.location.origin;
+      console.log(`Using base URL for API calls: ${baseUrl}`);
+      
+      const extractionResponse = await fetch(`${baseUrl}/api/hr/extract-pdf-text`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -402,7 +407,7 @@ export function useResumeHandler(employeeId: string | null) {
         console.log("No Groq API key in development, trying server API route");
         
         // Call the API to process the CV
-        const apiUrl = '/api/hr/employees/process-cv';
+        const apiUrl = `${window.location.origin}/api/hr/employees/process-cv`;
         
         console.log(`Calling CV processing API: ${apiUrl}`);
         console.log(`API payload: employeeId=${employeeId}, cvUrl=${cvUrl}`);
