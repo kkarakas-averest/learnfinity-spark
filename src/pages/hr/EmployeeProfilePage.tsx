@@ -548,83 +548,38 @@ const EmployeeProfilePage: React.FC = () => {
     }
 
     try {
-      const timestamp = Date.now();
-      const randomString = Math.random().toString(36).substring(2, 8);
-      const safeFileName = resumeFile.name.replace(/[^a-zA-Z0-9.]/g, '_');
-      const fileName = `${timestamp}_${randomString}_${safeFileName}`;
-      
-      // Create a simple path in the root of the bucket
-      const filePath = fileName;
-      
-      console.log(`Uploading resume with filename: ${filePath}`);
-      
-      // Get Supabase session and service URL
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      // Extract Supabase URL and key from the current instance
-      // or use environment variables
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://ujlqzkkkfatehxeqtbdl.supabase.co';
-      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-      
-      if (!session) {
-        console.error("No active session");
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Authentication required. Please sign in again.",
-        });
-        return;
-      }
-      
-      // Create form data for direct upload
+      // Create FormData for file upload
       const formData = new FormData();
       formData.append('file', resumeFile);
+      formData.append('employeeId', extractedId);
       
-      // Try direct upload using the Supabase JS client instead of REST API
-      const { data, error } = await supabase.storage
-        .from('employee-files')
-        .upload(filePath, resumeFile, {
-          cacheControl: '3600',
-          upsert: true
-        });
+      console.log(`Uploading resume for employee: ${extractedId}`);
+      
+      // Use our API endpoint to upload the file
+      const response = await fetch('/api/hr/resume-upload', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        let errorData;
+        try {
+          errorData = await response.json();
+        } catch (e) {
+          errorData = { error: 'Unknown error' };
+        }
         
-      if (error) {
-        console.error("Error uploading file:", error);
+        console.error("Error uploading file:", errorData);
         toast({
           variant: "destructive",
           title: "Upload Error",
-          description: `Failed to upload file: ${error.message || "Unknown error"}`,
+          description: errorData.error || "Failed to upload resume",
         });
         return;
       }
       
-      // Get the public URL
-      const { data: urlData } = supabase.storage
-        .from('employee-files')
-        .getPublicUrl(filePath);
-      
-      const publicUrl = urlData.publicUrl;
-      console.log("Resume uploaded successfully. URL:", publicUrl);
-      
-      // Update the database with the new URL
-      const { error: updateError } = await supabase
-        .from('hr_employees')
-        .update({
-          cv_file_url: publicUrl,
-          resume_url: publicUrl,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', extractedId);
-      
-      if (updateError) {
-        console.error("Error updating employee record:", updateError);
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Resume uploaded but failed to update employee record",
-        });
-        return;
-      }
+      const { url } = await response.json();
+      console.log("Resume uploaded successfully. URL:", url);
       
       toast({
         title: "Success",
@@ -635,27 +590,27 @@ const EmployeeProfilePage: React.FC = () => {
       setEmployee(prev => {
         if (!prev) return null;
         return {
-          ...prev,
-          cv_file_url: publicUrl,
-          resume_url: publicUrl
+          ...prev, 
+          cv_file_url: url,
+          resume_url: url 
         };
       });
       
       // Call the API to process the CV and generate a summary
       try {
-        const response = await fetch('/api/hr/employees/process-cv', {
+        const processResponse = await fetch('/api/hr/employees/process-cv', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
             employeeId: extractedId,
-            cvUrl: publicUrl
+            cvUrl: url
           })
         });
         
-        if (!response.ok) {
-          console.warn('Failed to process CV for summary generation:', await response.text());
+        if (!processResponse.ok) {
+          console.warn('Failed to process CV for summary generation:', await processResponse.text());
         } else {
           console.log('CV processing started successfully');
         }
@@ -785,7 +740,7 @@ const EmployeeProfilePage: React.FC = () => {
   };
 
   const testAndOpenCvLink = async (url: string) => {
-    if (!url) {
+    if (!url || !extractedId) {
       toast({
         variant: "destructive",
         title: "Error",
@@ -794,12 +749,35 @@ const EmployeeProfilePage: React.FC = () => {
       return;
     }
 
-    console.log("Testing CV URL:", url);
+    console.log("Opening CV URL:", url);
     
-    // For direct viewing, just open the URL
     try {
-      // First try direct access
-      window.open(url, '_blank', 'noopener,noreferrer');
+      // Extract the filename from the URL
+      const fileName = url.split('/').pop();
+      
+      // Use our API endpoint to get a secure URL
+      const response = await fetch(`/api/hr/get-resume-url?employeeId=${extractedId}&fileName=${fileName}`);
+      
+      if (!response.ok) {
+        let errorData;
+        try {
+          errorData = await response.json();
+        } catch (e) {
+          errorData = { error: 'Unknown error' };
+        }
+        
+        console.error("Error getting secure URL:", errorData);
+        
+        // As a fallback, try to open the original URL
+        window.open(url, '_blank', 'noopener,noreferrer');
+        return;
+      }
+      
+      const { url: secureUrl } = await response.json();
+      console.log("Secure URL generated:", secureUrl);
+      
+      // Open the secure URL
+      window.open(secureUrl, '_blank', 'noopener,noreferrer');
     } catch (error) {
       console.error("Error opening CV URL:", error);
       toast({
@@ -807,6 +785,9 @@ const EmployeeProfilePage: React.FC = () => {
         title: "Error",
         description: "Could not open the file. Please try uploading a new resume.",
       });
+      
+      // As a fallback, try to open the original URL
+      window.open(url, '_blank', 'noopener,noreferrer');
     }
   };
 
