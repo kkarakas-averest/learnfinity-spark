@@ -88,6 +88,19 @@ export function useResumeHandler(employeeId: string | null) {
           console.log(`Successfully extracted ${pdfContent.length} characters from PDF`);
           console.log(`PDF metadata:`, extractionResult.metadata);
           console.log(`PDF content preview: "${pdfContent.substring(0, 150)}..."`);
+          
+          // Truncate content if it's too large to prevent Groq API errors
+          const MAX_CONTENT_LENGTH = 6000; // Reduced size to fit within Groq limits
+          if (pdfContent.length > MAX_CONTENT_LENGTH) {
+            console.log(`PDF content too large (${pdfContent.length} chars), truncating to ${MAX_CONTENT_LENGTH} chars`);
+            // Take first 80% from beginning and last 20% from end for better context
+            const firstPortion = Math.floor(MAX_CONTENT_LENGTH * 0.8);
+            const lastPortion = MAX_CONTENT_LENGTH - firstPortion;
+            pdfContent = pdfContent.substring(0, firstPortion) + 
+              "\n[...content truncated due to size limits...]\n" + 
+              pdfContent.substring(pdfContent.length - lastPortion);
+            console.log(`Truncated content length: ${pdfContent.length} chars`);
+          }
         }
       } catch (extractionError) {
         console.error("Error extracting PDF text:", extractionError);
@@ -98,68 +111,55 @@ export function useResumeHandler(employeeId: string | null) {
       console.log("Preparing structured prompt for Groq API");
       
       const structuredPrompt = `
-        You are an expert HR professional analyzing a resume/CV to create a DETAILED and PERSONALIZED profile summary.
+        You are analyzing a resume to create a profile summary.
         
         CV CONTENT:
         ${pdfContent}
         
-        EMPLOYEE NAME: ${employeeName}
+        EMPLOYEE: ${employeeName}
         POSITION: ${positionName}
         DEPARTMENT: ${departmentName}
         
-        Task: Analyze this CV and extract SPECIFIC personal and professional information. Your analysis should be personalized based on the actual content of the resume, not generic. Format your response as a JSON object with the following structure:
-        
+        Extract information into JSON with:
         {
-          "summary": "A 250-word professional profile summary that MUST be personalized to the individual's actual career history, mentioning their specific job titles, companies worked for, years of experience, and notable achievements",
-          "skills": ["skill1", "skill2", "skill3", ...],
+          "summary": "250-word professional profile based on actual career history",
+          "skills": ["skill1", "skill2", ...],
           "experience": [
             {
-              "title": "Exact Job Title from CV",
-              "company": "Actual Company Name",
-              "duration": "Exact Duration (e.g., 'Jan 2018 - Mar 2022')",
-              "highlights": ["Specific accomplishment with metrics if available", "Another specific achievement"]
+              "title": "Job Title",
+              "company": "Company Name",
+              "duration": "Duration",
+              "highlights": ["Achievement 1", "Achievement 2"]
             }
           ],
           "education": [
             {
-              "degree": "Exact Degree Name and Field",
-              "institution": "Actual Institution Name",
-              "year": "Exact Graduation Year"
+              "degree": "Degree",
+              "institution": "Institution",
+              "year": "Year"
             }
           ],
-          "certifications": ["Actual certification name", "Another certification"],
-          "languages": ["Actual language and proficiency level"],
-          "keyAchievements": ["Specific achievement with context", "Another achievement"],
-          "professionalInterests": ["Interest based on CV content", "Another interest"],
+          "certifications": ["Certification1", ...],
+          "languages": ["Language1", ...],
+          "keyAchievements": ["Achievement1", ...],
           "personalInsights": {
-            "yearsOfExperience": "Total years based on CV",
-            "industries": ["Industry1", "Industry2"],
-            "toolsAndTechnologies": ["Tool1", "Tech2", "Software3"],
-            "projectManagement": ["Methodology1", "Framework2"],
-            "softSkills": ["Communication", "Leadership"],
-            "publications": ["Any publications mentioned"]
+            "yearsOfExperience": "Years",
+            "industries": ["Industry1", ...],
+            "toolsAndTechnologies": ["Tool1", ...],
+            "softSkills": ["Skill1", ...]
           }
         }
         
-        IMPORTANT REQUIREMENTS:
-        1. DO NOT generate generic information. Only extract what's actually in the CV.
-        2. If certain information isn't available, include empty arrays or "Not specified in CV" values.
-        3. The summary MUST be personalized with specific details from their career - mention actual companies, roles, years of experience.
-        4. Always clearly specify if something is an inference rather than explicitly stated.
-        5. For experience, try to extract ALL positions mentioned in the CV, not just the most recent ones.
-        6. For skills, include both technical and soft skills exactly as mentioned in the CV.
-        7. Ensure education details are complete with institution names, exact degree titles, and years.
-        8. Include only genuine certifications actually mentioned in the document.
-        
-        Format your response as JSON only with NO explanations, NO comments, and NO additional text before or after the JSON.
+        IMPORTANT: Only include information actually in the CV. If not available, use empty arrays or "Not specified".
+        Respond with ONLY the JSON object.
       `;
 
       // Create system message
-      const systemMessage = "You are an expert resume analyzer that extracts structured information from CVs. You always respond with properly formatted JSON only.";
+      const systemMessage = "Extract structured profile information from resumes as JSON only. Be concise.";
       
       // Make the API call to Groq
       console.log("Calling Groq API directly for CV analysis");
-      console.log(`Using model: llama3-8b-8192, temperature: 0.2, max_tokens: 2000`);
+      console.log(`Using model: llama3-8b-8192, temperature: 0.2, max_tokens: 1500`);
       
       let retries = 2;
       let response;
@@ -180,7 +180,7 @@ export function useResumeHandler(employeeId: string | null) {
                 { role: 'user', content: structuredPrompt }
               ],
               temperature: 0.2,
-              max_tokens: 2000
+              max_tokens: 1500
             })
           });
           
