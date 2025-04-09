@@ -74,6 +74,12 @@ interface Employee {
   last_rag_update?: string;
   user_id?: string;
   status?: string;
+  cv_file_url?: string;
+  cv_extracted_data?: {
+    summary?: string;
+    extraction_date?: string;
+    source?: string;
+  } | string;
 }
 
 interface Course {
@@ -149,6 +155,8 @@ const EmployeeProfilePage: React.FC = () => {
   const [completedCourses, setCompletedCourses] = useState(0);
   const [inProgressCourses, setInProgressCourses] = useState(0);
   const [notStartedCourses, setNotStartedCourses] = useState(0);
+  const [resumeFile, setResumeFile] = useState<File | null>(null);
+  const [resumeFileName, setResumeFileName] = useState<string>('');
   
   useEffect(() => {
     const loadEmployeeData = async () => {
@@ -387,6 +395,10 @@ const EmployeeProfilePage: React.FC = () => {
       setProfileImagePreview(employee.profile_image_url);
     }
     
+    if (employee?.cv_file_url) {
+      setResumeFileName(employee.cv_file_url.split('/').pop() || 'Resume');
+    }
+    
     // Fetch departments if needed
     if (departments.length === 0) {
       try {
@@ -516,6 +528,71 @@ const EmployeeProfilePage: React.FC = () => {
     }
   };
 
+  const handleResumeFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setResumeFile(file);
+      setResumeFileName(file.name);
+    }
+  };
+
+  const uploadResumeFile = async (): Promise<string | null> => {
+    if (!resumeFile) return null;
+    
+    try {
+      const fileExt = resumeFile.name.split('.').pop();
+      const filePath = `resumes/${extractedId}-${Date.now()}.${fileExt}`;
+      
+      const { data, error } = await supabase.storage
+        .from('employee-files')
+        .upload(filePath, resumeFile);
+        
+      if (error) throw error;
+      
+      // Get the public URL
+      const { data: urlData } = supabase.storage
+        .from('employee-files')
+        .getPublicUrl(filePath);
+        
+      return urlData.publicUrl;
+    } catch (error) {
+      console.error('Error uploading resume:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Upload Failed',
+        description: 'Could not upload resume file. Please try again.'
+      });
+      return null;
+    }
+  };
+
+  const fetchEmployeeData = async () => {
+    if (!extractedId) return;
+    
+    try {
+      setLoading(true);
+      
+      // Fetch updated employee data
+      const { data } = await hrEmployeeService.getEmployee(extractedId);
+      setEmployee(data);
+      
+      // Fetch other related data
+      const { data: updatedCourses } = await hrEmployeeService.getEmployeeCourses(extractedId);
+      if (updatedCourses) setCourses(updatedCourses);
+      
+      const { data: updatedSkills } = await hrEmployeeService.getEmployeeSkills(extractedId);
+      if (updatedSkills) setSkills(updatedSkills);
+      
+      const { data: updatedActivities } = await hrEmployeeService.getEmployeeActivities(extractedId);
+      if (updatedActivities) setActivities(updatedActivities);
+    } catch (error) {
+      console.error('Error fetching employee data:', error);
+      setError('Failed to load employee data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSubmitEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -529,6 +606,31 @@ const EmployeeProfilePage: React.FC = () => {
         profileImageUrl = await uploadProfileImage();
       }
       
+      // Upload resume file if changed
+      let resumeFileUrl = null;
+      if (resumeFile) {
+        resumeFileUrl = await uploadResumeFile();
+        
+        // If resume uploaded successfully, generate a profile summary
+        if (resumeFileUrl) {
+          // Call the API to process the CV and generate a summary
+          const response = await fetch('/api/hr/employees/process-cv', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              employeeId: extractedId,
+              cvUrl: resumeFileUrl
+            })
+          });
+          
+          if (!response.ok) {
+            console.warn('Failed to process CV for summary generation');
+          }
+        }
+      }
+      
       // Prepare data for update
       const updateData = {
         name: editFormData.name,
@@ -538,7 +640,8 @@ const EmployeeProfilePage: React.FC = () => {
         position_id: editFormData.position_id,
         hire_date: editFormData.hire_date,
         status: editFormData.status,
-        ...(profileImageUrl && { profile_image_url: profileImageUrl })
+        ...(profileImageUrl && { profile_image_url: profileImageUrl }),
+        ...(resumeFileUrl && { cv_file_url: resumeFileUrl })
       };
       
       console.log("Updating employee with data:", updateData);
@@ -555,29 +658,13 @@ const EmployeeProfilePage: React.FC = () => {
       
       // Close modal and reload employee data
       setIsEditModalOpen(false);
-      // Reload the employee data
-      if (extractedId) {
-        // Force a reload by setting a flag that will trigger the useEffect
-        setEmployee(null);
-        setLoading(true);
-        // Directly call the API again
-        const { data } = await hrEmployeeService.getEmployee(extractedId);
-        setEmployee(data);
-        // Fetch other related data
-        const { data: updatedCourses } = await hrEmployeeService.getEmployeeCourses(extractedId);
-        if (updatedCourses) setCourses(updatedCourses);
-        const { data: updatedSkills } = await hrEmployeeService.getEmployeeSkills(extractedId);
-        if (updatedSkills) setSkills(updatedSkills);
-        const { data: updatedActivities } = await hrEmployeeService.getEmployeeActivities(extractedId);
-        if (updatedActivities) setActivities(updatedActivities);
-        setLoading(false);
-      }
+      fetchEmployeeData();
     } catch (error) {
       console.error('Error updating employee:', error);
       toast({
         variant: 'destructive',
-        title: 'Error',
-        description: 'Failed to update employee profile'
+        title: 'Update Failed',
+        description: 'Could not update employee profile. Please try again.'
       });
     } finally {
       setSubmitting(false);
@@ -638,6 +725,23 @@ const EmployeeProfilePage: React.FC = () => {
                   Edit Profile
                 </Button>
                 
+                {employee.cv_file_url && (
+                  <Button 
+                    variant="outline" 
+                    className="flex items-center gap-2"
+                    asChild
+                  >
+                    <a 
+                      href={employee.cv_file_url} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                    >
+                      <FileText className="h-4 w-4" />
+                      View CV
+                    </a>
+                  </Button>
+                )}
+                
                 <Button 
                   variant="outline" 
                   onClick={() => setIsMessageModalOpen(true)}
@@ -668,6 +772,22 @@ const EmployeeProfilePage: React.FC = () => {
                     <span className="text-sm text-gray-500">Joined:</span>
                     <span className="ml-2">{formatDate(employee.hire_date)}</span>
                   </div>
+                  
+                  {/* Profile Summary Section */}
+                  {employee.cv_extracted_data && (
+                    <div className="mt-4 pt-4 border-t border-gray-200">
+                      <h3 className="text-sm font-medium text-gray-900 mb-2">
+                        Profile Summary
+                      </h3>
+                      <p className="text-sm text-gray-600">
+                        {typeof employee.cv_extracted_data === 'object' && employee.cv_extracted_data.summary
+                          ? employee.cv_extracted_data.summary
+                          : typeof employee.cv_extracted_data === 'string'
+                            ? employee.cv_extracted_data
+                            : 'No profile summary available.'}
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
 

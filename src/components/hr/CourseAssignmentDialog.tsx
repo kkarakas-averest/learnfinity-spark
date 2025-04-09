@@ -37,6 +37,7 @@ const CourseAssignmentDialog: React.FC<CourseAssignmentDialogProps> = ({
   const [loading, setLoading] = useState<boolean>(true);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [generatePersonalizedContent, setGeneratePersonalizedContent] = useState(true);
   
   useEffect(() => {
     if (open) {
@@ -106,17 +107,8 @@ const CourseAssignmentDialog: React.FC<CourseAssignmentDialogProps> = ({
         }
       }
       
-      // If the service method doesn't exist or failed, try direct DB access
+      // If the service method doesn't exist or failed, try direct DB approach
       if (!enrollmentSuccess) {
-        // Prepare the enrollment data
-        const enrollmentData = {
-          employee_id: employeeId,
-          course_id: selectedCourse,
-          enrollment_date: new Date().toISOString(),
-          progress: 0,
-          status: 'assigned'
-        };
-        
         // Check if enrollment already exists
         const { data: existingEnrollment, error: checkError } = await supabase
           .from('hr_course_enrollments')
@@ -124,97 +116,84 @@ const CourseAssignmentDialog: React.FC<CourseAssignmentDialogProps> = ({
           .eq('employee_id', employeeId)
           .eq('course_id', selectedCourse)
           .maybeSingle();
-        
-        if (checkError && checkError.code !== 'PGRST116') {
-          throw checkError;
+          
+        if (checkError) {
+          throw new Error(`Error checking enrollment: ${checkError.message}`);
         }
         
-        // If enrollment exists, we'll just update it
-        if (existingEnrollment) {
-          console.log('Enrollment already exists, updating...');
-          enrollmentSuccess = true;
-        } else {
-          // Insert the enrollment
+        if (!existingEnrollment) {
+          // Create the enrollment if it doesn't exist
           const { error: insertError } = await supabase
             .from('hr_course_enrollments')
-            .insert([enrollmentData]);
+            .insert({
+              employee_id: employeeId,
+              course_id: selectedCourse,
+              enrollment_date: new Date().toISOString(),
+              status: 'assigned',
+              progress: 0
+            });
+            
+          if (insertError) {
+            throw new Error(`Error creating enrollment: ${insertError.message}`);
+          }
           
-          if (insertError) throw insertError;
+          enrollmentSuccess = true;
+        } else {
+          // Enrollment already exists
           enrollmentSuccess = true;
         }
       }
       
-      // First check if the column exists before trying to update it
-      if (enrollmentSuccess && (dueDate || isMandatory)) {
+      // If enrollment was successful and personalized content option is selected
+      if (enrollmentSuccess && generatePersonalizedContent) {
         try {
-          // First check if the columns exist in the table
-          const { data: columnData, error: columnError } = await supabase
-            .rpc('get_table_columns', { table_name: 'hr_course_enrollments' });
-            
-          if (columnError) {
-            console.warn('Error checking columns:', columnError);
-            // Continue without updating due date or mandatory status
-          } else {
-            // Extract column names
-            const columnNames = columnData.map((col: any) => col.column_name);
-            const updateData: any = {};
-            
-            // Only include fields that exist in the table
-            if (dueDate && columnNames.includes('due_date')) {
-              updateData.due_date = dueDate;
-            }
-            
-            if (isMandatory && columnNames.includes('is_mandatory')) {
-              updateData.is_mandatory = isMandatory;
-            }
-            
-            // Only update if we have data to update
-            if (Object.keys(updateData).length > 0) {
-              // Update the enrollment with additional data
-              const { error: updateError } = await supabase
-                .from('hr_course_enrollments')
-                .update(updateData)
-                .eq('employee_id', employeeId)
-                .eq('course_id', selectedCourse);
-                
-              if (updateError) {
-                console.warn('Error updating additional fields:', updateError);
-                // Continue as this is non-critical
+          // Call the personalized content generation API
+          const response = await fetch('/api/hr/courses/generate-content', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              courseId: selectedCourse,
+              employeeId: employeeId,
+              personalizationOptions: {
+                generateOnAssignment: true,
+                adaptToExperience: true
               }
-            }
+            })
+          });
+          
+          if (response.ok) {
+            toast({
+              title: 'Content Generation Started',
+              description: 'Personalized course content is being generated.',
+              duration: 5000
+            });
+          } else {
+            console.warn('Content generation request failed but course was assigned.');
           }
-        } catch (columnCheckError) {
-          console.warn('Error checking columns:', columnCheckError);
-          // Continue without updating due date or mandatory status
+        } catch (contentError) {
+          console.error('Error generating personalized content:', contentError);
+          // Don't fail the overall assignment if just the content generation fails
         }
       }
       
+      // Show success toast
       toast({
-        title: 'Success',
-        description: 'Course assigned successfully'
+        title: 'Course Assigned',
+        description: `Course has been successfully assigned.${generatePersonalizedContent ? ' Personalized content is being generated.' : ''}`,
+        duration: 3000
       });
       
-      // Try to record activity
-      try {
-        await supabase
-          .from('hr_employee_activities')
-          .insert([{
-            employee_id: employeeId,
-            activity_type: 'course_assignment',
-            description: `Assigned to course: ${courses.find(c => c.id === selectedCourse)?.title}`
-          }]);
-      } catch (activityError) {
-        console.warn('Could not create activity record:', activityError);
-        // Non-critical, continue
-      }
-      
-      onOpenChange(false); // Close dialog
-    } catch (err: any) {
-      console.error('Error assigning course:', err);
+      // Close dialog and reload courses if needed
+      onOpenChange(false);
+    } catch (error) {
+      console.error('Error assigning course:', error);
       toast({
         variant: 'destructive',
-        title: 'Error',
-        description: err.message || 'Failed to assign course'
+        title: 'Assignment Failed',
+        description: error instanceof Error ? error.message : 'Failed to assign course.',
+        duration: 5000
       });
     } finally {
       setSubmitting(false);
@@ -309,6 +288,20 @@ const CourseAssignmentDialog: React.FC<CourseAssignmentDialogProps> = ({
                 Mark as Mandatory
               </Label>
             </div>
+            
+            <div className="flex items-center space-x-2 pt-2">
+              <Checkbox 
+                id="generatePersonalized" 
+                checked={generatePersonalizedContent} 
+                onCheckedChange={(checked) => setGeneratePersonalizedContent(checked === true)}
+              />
+              <Label htmlFor="generatePersonalized" className="cursor-pointer">
+                Generate personalized content
+              </Label>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Personalized content is created based on the employee profile including their CV (if uploaded).
+            </p>
           </div>
         )}
         

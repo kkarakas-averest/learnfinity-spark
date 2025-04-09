@@ -318,7 +318,7 @@ export default async function handler(req, res) {
               id,
               title,
               description,
-              thumbnail,
+              thumbnail_url,
               duration_hours,
               category,
               difficulty_level
@@ -341,7 +341,7 @@ export default async function handler(req, res) {
               progress: enrollment.progress || 0,
               completedSections: Math.ceil((enrollment.progress || 0) / 20), // Estimate based on progress
               totalSections: 5,
-              thumbnailUrl: course.thumbnail || "https://placehold.co/300x200",
+              thumbnailUrl: course.thumbnail_url || "https://placehold.co/300x200",
               featured: false,
               category: course.category || "Professional Development",
               skills: ["Communication", "Leadership", "Presentation"],
@@ -360,72 +360,72 @@ export default async function handler(req, res) {
           console.log(`API (Vercel): No course enrollments found for user ${userId}`);
         }
         
-        // If no enrollments found, try direct course fetch as fallback
-        if (courses.length === 0) {
-          // First attempt: get all courses
-          const { data: coursesData, error: coursesError } = await supabase
-            .from('courses')
-            .select('*')
-            .limit(10);
+        // If no enrollments found, try direct course lookup
+        try {
+          // First try failed, now instead of querying courses directly with user_id,
+          // we'll query through employee_user_mapping and hr_course_enrollments
+          const { data: userMappingData, error: userMappingError } = await supabase
+            .from('employee_user_mapping')
+            .select('employee_id')
+            .eq('user_id', userId)
+            .single();
+
+          if (!userMappingError && userMappingData?.employee_id) {
+            const employeeId = userMappingData.employee_id;
             
-          if (!coursesError && coursesData && coursesData.length > 0) {
-            courses = coursesData.map(course => ({
-              id: course.id,
-              title: course.title || 'Untitled Course',
-              description: course.description || 'No description available',
-              duration: course.duration || 240,
-              progress: course.progress || Math.floor(Math.random() * 100),
-              completedSections: course.completed_sections || Math.floor(Math.random() * 5),
-              totalSections: course.total_sections || 10,
-              thumbnailUrl: course.thumbnail_url || "https://placehold.co/300x200",
-              featured: !!course.featured,
-              category: course.category || "Development",
-              skills: course.skills || ["Programming"],
-              ragStatus: course.rag_status || "amber",
-              learningPathId: course.learning_path_id || "path-01",
-              learningPathName: course.learning_path_name || "Development Path"
-            }));
-            console.log(`API (Vercel): Found ${courses.length} courses`);
-          } else {
-            // Second attempt: try with user_id
-            const { data: userCoursesData, error: userCoursesError } = await supabase
-              .from('courses')
-              .select('*')
-              .eq('user_id', userId)
-              .limit(10);
+            // Now fetch courses through hr_course_enrollments with the employee_id
+            const { data: hrCourseData, error: hrCourseError } = await supabase
+              .from('hr_course_enrollments')
+              .select(`
+                id,
+                course_id,
+                progress,
+                status,
+                enrollment_date,
+                completion_date,
+                course:hr_courses(
+                  id,
+                  title,
+                  description,
+                  thumbnail_url,
+                  duration_hours,
+                  difficulty_level
+                )
+              `)
+              .eq('employee_id', employeeId);
+
+            if (!hrCourseError && hrCourseData && hrCourseData.length > 0) {
+              console.log(`API (Vercel): Found ${hrCourseData.length} HR course enrollments for employee ${employeeId}`);
               
-            if (!userCoursesError && userCoursesData && userCoursesData.length > 0) {
-              courses = userCoursesData.map(course => ({
-                id: course.id,
-                title: course.title || 'Untitled Course',
-                description: course.description || 'No description available',
-                duration: course.duration || 240,
-                progress: course.progress || Math.floor(Math.random() * 100),
-                completedSections: course.completed_sections || Math.floor(Math.random() * 5),
-                totalSections: course.total_sections || 10,
-                thumbnailUrl: course.thumbnail_url || "https://placehold.co/300x200",
-                featured: !!course.featured,
-                category: course.category || "Development",
-                skills: course.skills || ["Programming"],
-                ragStatus: course.rag_status || "amber",
-                learningPathId: course.learning_path_id || "path-01",
-                learningPathName: course.learning_path_name || "Development Path"
-              }));
-              console.log(`API (Vercel): Found ${courses.length} courses for user ${userId}`);
-            } else {
-              // Try getting the table structure for debugging
-              const { data: courseColumns, error: columnsError } = await supabase
-                .from('courses')
-                .select('*')
-                .limit(1);
-                
-              if (!columnsError && courseColumns && courseColumns.length > 0) {
-                console.log(`API (Vercel): Courses table structure: ${JSON.stringify(Object.keys(courseColumns[0]))}`);
-              } else {
-                console.log(`API (Vercel): Error getting courses table structure: ${columnsError?.message}`);
-              }
+              // Map the HR courses to the expected format
+              courses = hrCourseData.map(enrollment => {
+                const course = enrollment.course || {};
+                return {
+                  id: course.id || enrollment.course_id,
+                  title: course.title || 'HR Course',
+                  description: course.description || 'HR assigned course',
+                  duration: course.duration_hours ? course.duration_hours * 60 : 120,
+                  progress: enrollment.progress || 0,
+                  completedSections: Math.ceil((enrollment.progress || 0) / 20),
+                  totalSections: 5,
+                  thumbnailUrl: course.thumbnail_url || "https://placehold.co/300x200",
+                  featured: false,
+                  category: course.difficulty_level || "HR Training",
+                  skills: ["Professional Development"],
+                  ragStatus: enrollment.status === 'completed' ? 'green' :
+                    (enrollment.progress > 0 ? 'amber' : 'red'),
+                  enrollmentId: enrollment.id,
+                  enrollmentDate: enrollment.enrollment_date,
+                  completionDate: enrollment.completion_date,
+                  isHrAssigned: true
+                };
+              });
             }
           }
+
+        } catch (courseError) {
+          console.log('API (Vercel): No courses found or error accessing courses table');
+          console.log('API (Vercel): Error details:', courseError);
         }
       } catch (error) {
         console.error(`API (Vercel): Error fetching courses: ${error.message}`);
