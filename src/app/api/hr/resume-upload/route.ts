@@ -5,6 +5,15 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY;
 
+// Add a GET handler to ensure the route is accessible for debugging
+export async function GET() {
+  return NextResponse.json({
+    success: true,
+    message: 'Resume upload API endpoint is available',
+    timestamp: new Date().toISOString()
+  });
+}
+
 export async function POST(request: NextRequest) {
   try {
     if (!supabaseUrl || !supabaseKey) {
@@ -40,6 +49,20 @@ export async function POST(request: NextRequest) {
     // Convert File to Buffer for Supabase storage
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
+
+    // Try to create bucket first (to handle RLS issues)
+    try {
+      const { error: bucketError } = await supabase.storage.createBucket('employee-files', {
+        public: true,
+        fileSizeLimit: 10485760, // 10MB
+      });
+
+      if (bucketError && !bucketError.message.includes('already exists')) {
+        console.error('Error creating bucket:', bucketError);
+      }
+    } catch (e) {
+      console.warn('Error creating bucket (may already exist):', e);
+    }
 
     // Upload to Supabase Storage
     const { data, error } = await supabase.storage

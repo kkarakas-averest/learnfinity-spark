@@ -128,6 +128,7 @@ export async function uploadResumeViaAPI(
     formData.append('file', file);
     formData.append('employeeId', employeeId);
     
+    // Use the pages API route instead of the app router route
     const response = await fetch('/api/hr/resume-upload', {
       method: 'POST',
       body: formData
