@@ -313,8 +313,10 @@ ${randomStatus === 'RED'
                            prompt.toLowerCase().includes('course');
     
     if (isCourseContent) {
-      // Create structured content with sections for educational content
+      // Important: Response structure must match exactly what CourseContentService.generateAIPersonalizedContent expects
       return JSON.stringify({
+        title: `Content about ${topic}`,
+        content: `# ${topic}\n\nThis is mock content about ${topic} generated for intermediate level learners.`,
         mainContent: `# ${topic}\n\nThis is the main content for ${topic}. It contains comprehensive information about the subject matter.`,
         sections: [
           {
@@ -359,7 +361,28 @@ ${randomStatus === 'RED'
               explanation: "Explanation for the correct answer"
             }
           ]
-        }
+        },
+        format: 'markdown',
+        metadata: {
+          generatedAt: new Date().toISOString(),
+          model: "mock-model",
+          version: "1.0",
+          tokensUsed: 500,
+          generationParams: {
+            mockGenerated: true
+          }
+        },
+        suggestedNextSteps: [
+          "Review related materials",
+          "Practice with exercises",
+          "Apply concepts to real-world scenarios"
+        ],
+        relatedTopics: [
+          `${topic} fundamentals`,
+          `Advanced ${topic}`,
+          `${topic} in practice`
+        ],
+        summary: `This is a summary of the content about ${topic}.`
       });
     }
     

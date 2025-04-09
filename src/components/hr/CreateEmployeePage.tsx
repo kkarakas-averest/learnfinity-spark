@@ -83,24 +83,24 @@ const CreateEmployeePage: React.FC = () => {
         course_ids: formData.courseIds || [] 
       };
       
-      // Upload resume if provided
-      if (formData.resumeFile) {
-        try {
-          const uploadResult = await hrEmployeeService.uploadResume(formData.resumeFile);
-          if (uploadResult.success && uploadResult.url) {
-            employeeData.resume_url = uploadResult.url;
-          } else {
-            console.warn('Resume upload failed:', uploadResult.error);
-          }
-        } catch (uploadErr) {
-          console.warn('Error uploading resume:', uploadErr);
-        }
-      }
-      
-      // Create the employee
+      // Create the employee first to get the ID
       const result = await hrEmployeeService.createEmployee(employeeData);
       
-      if (result.success) {
+      if (result.success && result.data) {
+        const employeeId = result.data.id;
+        
+        // Upload resume if provided
+        if (formData.resumeFile && employeeId) {
+          try {
+            const { data: resumeData, error: resumeError } = await hrEmployeeService.uploadEmployeeResume(employeeId, formData.resumeFile);
+            if (resumeError) {
+              console.warn('Resume upload failed:', resumeError.message);
+            }
+          } catch (uploadErr) {
+            console.warn('Error uploading resume:', uploadErr);
+          }
+        }
+        
         // Navigate back to employee list on success
         navigate(`${ROUTES.HR_DASHBOARD}/employees`);
       } else {

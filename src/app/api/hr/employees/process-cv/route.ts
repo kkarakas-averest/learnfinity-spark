@@ -173,42 +173,58 @@ export async function POST(req: NextRequest) {
     
     // Create a more structured prompt for better extraction
     const structuredPrompt = `
-      You are an expert HR professional analyzing a resume/CV to create a structured profile summary.
+      You are an expert HR professional analyzing a resume/CV to create a DETAILED and PERSONALIZED profile summary.
       
       RESUME URL: ${fixedCvUrl}
       EMPLOYEE NAME: ${employee.name}
       POSITION: ${positionTitle}
       DEPARTMENT: ${departmentName}
       
-      Task: Analyze this CV and extract key professional information. Format your response as a JSON object with the following structure:
+      Task: Analyze this CV and extract SPECIFIC personal and professional information. Your analysis should be personalized based on the actual content of the resume, not generic. Format your response as a JSON object with the following structure:
       
       {
-        "summary": "A 250-word professional profile summary highlighting strengths and expertise",
+        "summary": "A 250-word professional profile summary that MUST be personalized to the individual's actual career history, mentioning their specific job titles, companies worked for, years of experience, and notable achievements",
         "skills": ["skill1", "skill2", "skill3", ...],
         "experience": [
           {
-            "title": "Job Title",
-            "company": "Company Name",
-            "duration": "YYYY-YYYY",
-            "highlights": ["accomplishment1", "accomplishment2"]
+            "title": "Exact Job Title from CV",
+            "company": "Actual Company Name",
+            "duration": "Exact Duration (e.g., 'Jan 2018 - Mar 2022')",
+            "highlights": ["Specific accomplishment with metrics if available", "Another specific achievement"]
           }
         ],
         "education": [
           {
-            "degree": "Degree Name",
-            "institution": "Institution Name",
-            "year": "YYYY"
+            "degree": "Exact Degree Name and Field",
+            "institution": "Actual Institution Name",
+            "year": "Exact Graduation Year"
           }
         ],
-        "certifications": ["certification1", "certification2"],
-        "languages": ["language1", "language2"],
-        "keyAchievements": ["achievement1", "achievement2"],
-        "professionalInterests": ["interest1", "interest2"]
+        "certifications": ["Actual certification name", "Another certification"],
+        "languages": ["Actual language and proficiency level"],
+        "keyAchievements": ["Specific achievement with context", "Another achievement"],
+        "professionalInterests": ["Interest based on CV content", "Another interest"],
+        "personalInsights": {
+          "yearsOfExperience": "Total years based on CV",
+          "industries": ["Industry1", "Industry2"],
+          "toolsAndTechnologies": ["Tool1", "Tech2", "Software3"],
+          "projectManagement": ["Methodology1", "Framework2"],
+          "softSkills": ["Communication", "Leadership"],
+          "publications": ["Any publications mentioned"]
+        }
       }
       
-      If you cannot extract certain information, include it as empty arrays or "Unknown" values. Focus on creating a professional, well-structured profile that could be used in an HR system.
+      IMPORTANT REQUIREMENTS:
+      1. DO NOT generate generic information. Only extract what's actually in the CV.
+      2. If certain information isn't available, include empty arrays or "Not specified in CV" values.
+      3. The summary MUST be personalized with specific details from their career - mention actual companies, roles, years of experience.
+      4. Always clearly specify if something is an inference rather than explicitly stated.
+      5. For experience, try to extract ALL positions mentioned in the CV, not just the most recent ones.
+      6. For skills, include both technical and soft skills exactly as mentioned in the CV.
+      7. Ensure education details are complete with institution names, exact degree titles, and years.
+      8. Include only genuine certifications actually mentioned in the document.
       
-      Important: Even if you cannot access the actual CV, make a best guess based on the position and department information provided. In that case, clearly indicate in the summary that it is a placeholder based on limited information.
+      Even if you cannot access the actual PDF, make the most detailed inference possible from the filename, position, and department information.
     `;
     
     try {

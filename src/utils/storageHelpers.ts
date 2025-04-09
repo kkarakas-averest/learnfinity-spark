@@ -120,8 +120,27 @@ export function fixStorageUrl(url: string, defaultBucket: string = 'employee-fil
   try {
     if (!url) return '';
     
-    // If URL is already a public URL, return it as is
+    // If URL is already a public URL, we still need to check if it's accessible
+    // Some nested paths might not be directly accessible
     if (url.includes('/storage/v1/object/public/')) {
+      // Try to extract the file name only, as this might work better
+      const fullPath = url.split('/public/')[1];
+      if (fullPath) {
+        const bucketName = fullPath.split('/')[0];
+        const restOfPath = fullPath.split('/').slice(1).join('/');
+        
+        // If there's a nested path, try a flattened version as a fallback
+        if (restOfPath.includes('/')) {
+          // Extract just the filename from the path
+          const fileName = restOfPath.split('/').pop();
+          
+          // Create a direct file access URL
+          console.log(`Attempting to access file directly: ${bucketName}/${fileName}`);
+          return getPublicUrl(bucketName, fileName || '');
+        }
+      }
+      
+      // If we can't parse it further, return the original URL
       return url;
     }
 
