@@ -24,10 +24,26 @@ export async function uploadFileToStorage(
   file: File
 ): Promise<{ success: boolean; error?: any; publicUrl?: string }> {
   try {
+    // Normalize the path to ensure it doesn't start with a slash
+    const normalizedPath = path.startsWith('/') ? path.substring(1) : path;
+    
+    // Make sure directory exists (for nested paths)
+    if (normalizedPath.includes('/')) {
+      const dirPath = normalizedPath.substring(0, normalizedPath.lastIndexOf('/'));
+      // Attempt to create directory - this is mostly a no-op if it exists
+      try {
+        await supabase.storage
+          .from(bucket)
+          .createSignedUrl(dirPath, 1); // Just a check to see if directory exists
+      } catch (error) {
+        console.log('Directory check failed, but proceeding with upload:', error);
+      }
+    }
+    
     // Upload the file
     const { data, error } = await supabase.storage
       .from(bucket)
-      .upload(path, file, {
+      .upload(normalizedPath, file, {
         cacheControl: '3600',
         upsert: true
       });
@@ -39,7 +55,7 @@ export async function uploadFileToStorage(
     // Get the public URL
     const { data: urlData } = supabase.storage
       .from(bucket)
-      .getPublicUrl(path);
+      .getPublicUrl(normalizedPath);
       
     return { success: true, publicUrl: urlData.publicUrl };
   } catch (error) {
@@ -69,8 +85,20 @@ export async function checkStorageUrl(url: string): Promise<boolean> {
  */
 export function parseStorageUrl(url: string): { bucket: string; path: string } | null {
   try {
+    if (!url) return null;
+    
     // Handle new format URLs (supabase.co/storage/v1/object/public/bucket/path)
-    const match = url.match(/\/storage\/v1\/object\/(?:public|authenticated)\/([^\/]+)\/(.+)$/);
+    let match = url.match(/\/storage\/v1\/object\/(?:public|authenticated)\/([^\/]+)\/(.+)$/);
+    
+    if (match) {
+      return {
+        bucket: match[1],
+        path: match[2]
+      };
+    }
+    
+    // Try alternate format (subdomain.supabase.co/storage/v1/object/bucket/path)
+    match = url.match(/\/storage\/v1\/object\/([^\/]+)\/(.+)$/);
     
     if (match) {
       return {
@@ -94,6 +122,8 @@ export function parseStorageUrl(url: string): { bucket: string; path: string } |
  */
 export function fixStorageUrl(url: string, defaultBucket: string = 'employee-files'): string {
   try {
+    if (!url) return '';
+    
     // If URL is already a public URL, return it as is
     if (url.includes('/storage/v1/object/public/')) {
       return url;
@@ -111,7 +141,8 @@ export function fixStorageUrl(url: string, defaultBucket: string = 'employee-fil
     }
 
     // If we can't parse properly but URL contains a path, try to reconstruct it
-    const simplePath = url.split('/').pop();
+    const pathParts = url.split('/');
+    const simplePath = pathParts.slice(Math.max(pathParts.length - 2, 0)).join('/');
     if (simplePath) {
       return getPublicUrl(defaultBucket, simplePath);
     }
@@ -120,6 +151,6 @@ export function fixStorageUrl(url: string, defaultBucket: string = 'employee-fil
     return url;
   } catch (error) {
     console.error('Error fixing storage URL:', error);
-    return url;
+    return url || '';
   }
 } 

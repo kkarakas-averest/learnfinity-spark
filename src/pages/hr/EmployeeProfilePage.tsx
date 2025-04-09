@@ -549,7 +549,8 @@ const EmployeeProfilePage: React.FC = () => {
 
     try {
       const fileExt = resumeFile.name.split('.').pop();
-      const filePath = `resumes/${extractedId}-${Date.now()}.${fileExt}`;
+      // Changed: Create directory structure with employeeId
+      const filePath = `resumes/${extractedId}/${extractedId}-${Date.now()}.${fileExt}`;
       
       // Upload file using our helper
       const { success, error, publicUrl } = await uploadFileToStorage(
@@ -585,6 +586,7 @@ const EmployeeProfilePage: React.FC = () => {
         .from('hr_employees')
         .update({ 
           cv_file_url: publicUrl,
+          resume_url: publicUrl, // Also update the resume_url field for backward compatibility
           updated_at: new Date().toISOString()
         })
         .eq('id', extractedId);
@@ -607,7 +609,8 @@ const EmployeeProfilePage: React.FC = () => {
       // Update the UI
       setEmployee(prev => ({ 
         ...prev, 
-        cv_file_url: publicUrl 
+        cv_file_url: publicUrl,
+        resume_url: publicUrl 
       }));
       
       // Call the API to process the CV and generate a summary
@@ -883,14 +886,16 @@ const EmployeeProfilePage: React.FC = () => {
               </div>
 
               <div>
-                {employee.cv_file_url && (
+                {employee?.cv_file_url && (
                   <div className="flex items-center">
                     <FileText className="h-4 w-4 mr-2 text-gray-500" />
                     <span className="text-sm text-gray-500">Resume:</span>
                     <a 
-                      href={employee.cv_file_url} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
+                      href="#"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        testAndOpenCvLink(employee.cv_file_url as string);
+                      }}
                       className="ml-2 text-blue-600 hover:underline"
                     >
                       View Resume
