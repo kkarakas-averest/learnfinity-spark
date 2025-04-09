@@ -1,6 +1,7 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { AgentFactory } from '@/agents/AgentFactory';
+import { fixStorageUrl, checkStorageUrl } from '@/utils/storageHelpers';
 
 /**
  * API endpoint to process an employee's CV and generate a profile summary
@@ -19,9 +20,29 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { employeeId, cvUrl } = body;
     
+    console.log("Process CV API called with:", { employeeId, cvUrl });
+    
     if (!employeeId || !cvUrl) {
       return NextResponse.json(
         { error: 'Employee ID and CV URL are required' }, 
+        { status: 400 }
+      );
+    }
+    
+    // Try to fix the URL if needed
+    const fixedCvUrl = fixStorageUrl(cvUrl, 'employee-files');
+    console.log("Fixed CV URL:", fixedCvUrl);
+    
+    // Check if the CV URL is accessible
+    const isUrlAccessible = await checkStorageUrl(fixedCvUrl);
+    if (!isUrlAccessible) {
+      console.error("CV URL is not accessible:", fixedCvUrl);
+      return NextResponse.json(
+        { 
+          error: 'The provided CV URL is not accessible',
+          originalUrl: cvUrl,
+          fixedUrl: fixedCvUrl
+        }, 
         { status: 400 }
       );
     }
@@ -48,7 +69,7 @@ export async function POST(req: NextRequest) {
     const prompt = `
       I need you to analyze this employee's CV/resume and create a professional profile summary.
       
-      CV URL: ${cvUrl}
+      CV URL: ${fixedCvUrl}
       Employee Name: ${employee.name}
       Position: ${employee.position_id ? 'To be extracted from CV' : ''}
       Department: ${employee.department_id ? 'To be extracted from CV' : ''}
@@ -102,7 +123,7 @@ export async function POST(req: NextRequest) {
         .from('hr_employee_cv_extractions')
         .insert({
           employee_id: employeeId,
-          original_file_url: cvUrl,
+          original_file_url: fixedCvUrl,
           extracted_data: { summary },
           extraction_status: 'completed'
         });
@@ -120,7 +141,7 @@ export async function POST(req: NextRequest) {
         .from('hr_employee_cv_extractions')
         .insert({
           employee_id: employeeId,
-          original_file_url: cvUrl,
+          original_file_url: fixedCvUrl,
           extraction_status: 'failed',
           extracted_data: { error: aiError.message }
         });

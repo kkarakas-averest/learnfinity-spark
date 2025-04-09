@@ -55,6 +55,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { supabase } from '@/lib/supabase';
+import { uploadFileToStorage, fixStorageUrl } from '@/utils/storageHelpers';
 
 // Define interfaces for the data
 interface Employee {
@@ -547,26 +548,86 @@ const EmployeeProfilePage: React.FC = () => {
     }
 
     try {
-      const response = await hrEmployeeService.uploadEmployeeResume(extractedId, resumeFile);
+      const fileExt = resumeFile.name.split('.').pop();
+      const filePath = `resumes/${extractedId}-${Date.now()}.${fileExt}`;
       
-      if (response.error) {
-        console.error("Error uploading resume:", response.error);
+      // Upload file using our helper
+      const { success, error, publicUrl } = await uploadFileToStorage(
+        'employee-files',
+        filePath,
+        resumeFile
+      );
+        
+      if (!success || error) {
+        console.error("Error uploading resume:", error);
         toast({
           variant: "destructive",
           title: "Error",
-          description: "Failed to upload resume",
+          description: "Failed to upload resume: " + error.message,
         });
-      } else {
-        toast({
-          title: "Success",
-          description: "Resume uploaded successfully",
-        });
-        
-        // Update the resume URL in the profile data
-        if (response.data?.resumeUrl) {
-          setEmployee(prev => ({ ...prev, resume_url: response.data.resumeUrl }));
-        }
+        return;
       }
+      
+      if (!publicUrl) {
+        console.error("No public URL returned");
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to get public URL for resume",
+        });
+        return;
+      }
+      
+      console.log("Resume URL:", publicUrl);
+      
+      // Update employee with the new CV URL
+      const { error: updateError } = await supabase
+        .from('hr_employees')
+        .update({ 
+          cv_file_url: publicUrl,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', extractedId);
+      
+      if (updateError) {
+        console.error("Error updating employee record:", updateError);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to update employee record with resume URL",
+        });
+        return;
+      }
+      
+      toast({
+        title: "Success",
+        description: "Resume uploaded successfully",
+      });
+      
+      // Update the UI
+      setEmployee(prev => ({ 
+        ...prev, 
+        cv_file_url: publicUrl 
+      }));
+      
+      // Call the API to process the CV and generate a summary
+      const response = await fetch('/api/hr/employees/process-cv', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          employeeId: extractedId,
+          cvUrl: publicUrl
+        })
+      });
+      
+      if (!response.ok) {
+        console.warn('Failed to process CV for summary generation');
+      }
+      
+      // Refresh the employee data
+      fetchEmployeeData();
     } catch (error) {
       console.error("Error uploading resume:", error);
       toast({
@@ -682,6 +743,25 @@ const EmployeeProfilePage: React.FC = () => {
     }
   };
 
+  const testAndOpenCvLink = async (url: string) => {
+    console.log("Testing CV URL:", url);
+    
+    try {
+      // Fix the URL before opening
+      const fixedUrl = fixStorageUrl(url, 'employee-files');
+      console.log("Fixed URL:", fixedUrl);
+      
+      window.open(fixedUrl, '_blank', 'noopener,noreferrer');
+    } catch (error) {
+      console.error("Error opening CV URL:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Could not open the CV file. Please check the storage bucket permissions.",
+      });
+    }
+  };
+
   return (
     <div className="container mx-auto">
       <div className="flex justify-between items-center mb-6">
@@ -740,16 +820,10 @@ const EmployeeProfilePage: React.FC = () => {
                   <Button 
                     variant="outline" 
                     className="flex items-center gap-2"
-                    asChild
+                    onClick={() => testAndOpenCvLink(employee.cv_file_url as string)}
                   >
-                    <a 
-                      href={employee.cv_file_url} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                    >
-                      <FileText className="h-4 w-4" />
-                      View CV
-                    </a>
+                    <FileText className="h-4 w-4" />
+                    View CV
                   </Button>
                 )}
                 
