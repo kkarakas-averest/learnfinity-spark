@@ -24,14 +24,56 @@ export function useResumeHandler(employeeId: string | null) {
   /**
    * Call Groq API directly to analyze a CV and generate profile data
    */
-  const callGroqForCvAnalysis = async (cvUrl: string, employeeName: string): Promise<any> => {
+  const callGroqForCvAnalysis = async (
+    cvUrl: string, 
+    employeeName: string, 
+    departmentId?: string, 
+    positionId?: string,
+    departmentName: string = "Unknown",
+    positionName: string = "Unknown"
+  ): Promise<any> => {
     try {
+      // If department and position names are not provided, try to look them up
+      if ((departmentId || positionId) && (departmentName === "Unknown" || positionName === "Unknown")) {
+        try {
+          // Get department name
+          if (departmentId && departmentName === "Unknown") {
+            const { data: deptData } = await supabase
+              .from('hr_departments')
+              .select('name')
+              .eq('id', departmentId)
+              .single();
+              
+            if (deptData) {
+              departmentName = deptData.name;
+            }
+          }
+          
+          // Get position name
+          if (positionId && positionName === "Unknown") {
+            const { data: posData } = await supabase
+              .from('hr_positions')
+              .select('title')
+              .eq('id', positionId)
+              .single();
+              
+            if (posData) {
+              positionName = posData.title;
+            }
+          }
+        } catch (e) {
+          console.warn("Error fetching department/position names:", e);
+        }
+      }
+      
       // Prepare the prompt
       const structuredPrompt = `
         You are an expert HR professional analyzing a resume/CV to create a structured profile summary.
         
         RESUME URL: ${cvUrl}
         EMPLOYEE NAME: ${employeeName}
+        POSITION: ${positionName}
+        DEPARTMENT: ${departmentName}
         
         Task: Analyze this CV and extract key professional information. Format your response as a JSON object with the following structure:
         
@@ -69,27 +111,53 @@ export function useResumeHandler(employeeId: string | null) {
       
       // Make the API call to Groq
       console.log("Calling Groq API directly for CV analysis");
-      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${GROQ_API_KEY}`
-        },
-        body: JSON.stringify({
-          model: 'llama3-8b-8192',
-          messages: [
-            { role: 'system', content: systemMessage },
-            { role: 'user', content: structuredPrompt }
-          ],
-          temperature: 0.2,
-          max_tokens: 2000
-        })
-      });
+      let retries = 2;
+      let response;
       
-      if (!response.ok) {
-        const errorData = await response.json();
+      while (retries >= 0) {
+        try {
+          response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${GROQ_API_KEY}`
+            },
+            body: JSON.stringify({
+              model: 'llama3-8b-8192',
+              messages: [
+                { role: 'system', content: systemMessage },
+                { role: 'user', content: structuredPrompt }
+              ],
+              temperature: 0.2,
+              max_tokens: 2000
+            })
+          });
+          
+          // If success, break out of retry loop
+          if (response.ok) break;
+          
+          // If error is not retriable, also break
+          if (response.status !== 429 && response.status !== 500 && response.status !== 503) break;
+          
+          // Otherwise, retry after short delay
+          retries--;
+          if (retries >= 0) {
+            const delay = (2 - retries) * 1000; // Incremental backoff
+            console.log(`Retrying Groq API call after ${delay}ms delay...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+          }
+        } catch (fetchError) {
+          console.error("Network error calling Groq API:", fetchError);
+          retries--;
+          if (retries < 0) throw fetchError;
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
+      
+      if (!response || !response.ok) {
+        const errorData = response ? await response.json().catch(() => ({})) : {};
         console.error("Groq API error:", errorData);
-        throw new Error(`Groq API error: ${errorData.error?.message || 'Unknown error'}`);
+        throw new Error(`Groq API error (${response?.status}): ${errorData.error?.message || 'Unknown error'}`);
       }
       
       const result = await response.json();
@@ -138,7 +206,11 @@ export function useResumeHandler(employeeId: string | null) {
       // First get the employee data to get the name
       const { data: employee, error: employeeError } = await supabase
         .from('hr_employees')
-        .select('name, department, position')
+        .select(`
+          *,
+          hr_departments(id, name),
+          hr_positions(id, title)
+        `)
         .eq('id', employeeId)
         .single();
         
@@ -147,6 +219,10 @@ export function useResumeHandler(employeeId: string | null) {
         throw new Error(`Failed to get employee data: ${employeeError?.message || 'Unknown error'}`);
       }
       
+      // Extract department and position names
+      const departmentName = employee.hr_departments?.name || 'Unknown';
+      const positionTitle = employee.hr_positions?.title || 'Unknown';
+      
       let profileData;
       
       // Check if Groq API key is available
@@ -154,7 +230,14 @@ export function useResumeHandler(employeeId: string | null) {
         try {
           // Call Groq API directly regardless of environment
           console.log("Groq API key found, using direct API call");
-          profileData = await callGroqForCvAnalysis(cvUrl, employee.name);
+          profileData = await callGroqForCvAnalysis(
+            cvUrl, 
+            employee.name, 
+            employee.department_id, 
+            employee.position_id,
+            departmentName,
+            positionTitle
+          );
           
           // Add metadata
           profileData = {
@@ -171,7 +254,14 @@ export function useResumeHandler(employeeId: string | null) {
           if (isProduction) {
             // In production, fall back to mock data
             console.log("Falling back to mock data in production");
-            profileData = createMockProfileData(cvUrl, employee.name);
+            profileData = await createMockProfileData(
+              cvUrl, 
+              employee.name, 
+              employee.department_id, 
+              employee.position_id,
+              departmentName,
+              positionTitle
+            );
           } else {
             // In development, try the API route
             console.log("In development, falling back to API route");
@@ -181,7 +271,14 @@ export function useResumeHandler(employeeId: string | null) {
       } else if (isProduction) {
         // No Groq API key and in production, use mock data
         console.log("No Groq API key available in production, using mock data");
-        profileData = createMockProfileData(cvUrl, employee.name);
+        profileData = await createMockProfileData(
+          cvUrl, 
+          employee.name, 
+          employee.department_id, 
+          employee.position_id,
+          departmentName,
+          positionTitle
+        );
       } else {
         // In development with no Groq API key, try the API route
         console.log("No Groq API key in development, trying API route");
@@ -213,7 +310,7 @@ export function useResumeHandler(employeeId: string | null) {
         console.log('CV processing API result:', result);
         
         // Use the result data or create mock data as fallback
-        profileData = result.data || createMockProfileData(cvUrl, employee.name);
+        profileData = result.data || await createMockProfileData(cvUrl, employee.name, employee.department_id, employee.position_id);
       }
       
       // Update the database with the profile data
@@ -249,11 +346,25 @@ export function useResumeHandler(employeeId: string | null) {
         if (employeeId) {
           const { data: employee } = await supabase
             .from('hr_employees')
-            .select('name')
+            .select(`
+              *,
+              hr_departments(id, name),
+              hr_positions(id, title)
+            `)
             .eq('id', employeeId)
             .single();
             
-          const mockData = createMockProfileData(cvUrl, employee?.name || 'Employee');
+          const departmentName = employee?.hr_departments?.name || 'Unknown';
+          const positionTitle = employee?.hr_positions?.title || 'Unknown';
+            
+          const mockData = await createMockProfileData(
+            cvUrl, 
+            employee?.name || 'Employee', 
+            employee?.department_id, 
+            employee?.position_id,
+            departmentName,
+            positionTitle
+          );
           
           await supabase
             .from('hr_employees')
@@ -290,7 +401,51 @@ export function useResumeHandler(employeeId: string | null) {
   /**
    * Create mock profile data when API calls fail
    */
-  const createMockProfileData = (cvUrl: string, employeeName: string): any => {
+  const createMockProfileData = async (
+    cvUrl: string, 
+    employeeName: string, 
+    departmentId?: string, 
+    positionId?: string,
+    departmentName: string = "Unknown",
+    positionName: string = "Unknown"
+  ): Promise<any> => {
+    // Use provided department and position names if available
+    let deptName = departmentName !== "Unknown" ? departmentName : "the organization";
+    let posName = positionName !== "Unknown" ? positionName : "Professional";
+    
+    // If names not provided, try to look them up
+    if ((departmentId || positionId) && (deptName === "the organization" || posName === "Professional")) {
+      try {
+        // Get department name
+        if (departmentId && deptName === "the organization") {
+          const { data: deptData } = await supabase
+            .from('hr_departments')
+            .select('name')
+            .eq('id', departmentId)
+            .single();
+            
+          if (deptData) {
+            deptName = deptData.name;
+          }
+        }
+        
+        // Get position name
+        if (positionId && posName === "Professional") {
+          const { data: posData } = await supabase
+            .from('hr_positions')
+            .select('title')
+            .eq('id', positionId)
+            .single();
+            
+          if (posData) {
+            posName = posData.title;
+          }
+        }
+      } catch (e) {
+        console.warn("Error fetching department/position names for mock data:", e);
+      }
+    }
+    
     // Extract filename from URL to use in the mock data
     const fileName = cvUrl.split('/').pop() || '';
     const nameParts = fileName.split('_');
@@ -299,11 +454,11 @@ export function useResumeHandler(employeeId: string | null) {
       employeeName;
     
     return {
-      summary: `This is a professional summary for ${possibleName}. The CV has been uploaded successfully and is available for review. This is a placeholder profile generated because the AI processing service was unavailable or encountered an error.`,
+      summary: `${employeeName} is a ${posName} in ${deptName}. The CV has been uploaded successfully and is available for review. This is a placeholder profile generated because the AI processing service was unavailable or encountered an error.`,
       skills: ["Communication", "Leadership", "Problem Solving", "Time Management", "Teamwork"],
       experience: [
         {
-          title: "Professional",
+          title: posName,
           company: "Current Organization",
           duration: "Present",
           highlights: ["Successfully uploaded CV", "Profile created"]

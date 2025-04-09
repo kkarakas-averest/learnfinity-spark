@@ -51,7 +51,11 @@ export async function POST(req: NextRequest) {
     // Check if employee exists
     const { data: employee, error: employeeError } = await supabase
       .from('hr_employees')
-      .select('*')
+      .select(`
+        *,
+        hr_departments(id, name),
+        hr_positions(id, title)
+      `)
       .eq('id', employeeId)
       .single();
       
@@ -61,6 +65,10 @@ export async function POST(req: NextRequest) {
         { status: 404 }
       );
     }
+    
+    // Get department and position names
+    const departmentName = employee.hr_departments?.name || 'Unknown';
+    const positionTitle = employee.hr_positions?.title || 'Unknown';
     
     // Initialize Groq LLM service
     const llmService = LLMService.getInstance();
@@ -78,8 +86,8 @@ export async function POST(req: NextRequest) {
         
         CV URL: ${fixedCvUrl}
         Employee Name: ${employee.name}
-        Position: ${employee.position_id ? 'To be extracted from CV' : ''}
-        Department: ${employee.department_id ? 'To be extracted from CV' : ''}
+        Position: ${positionTitle}
+        Department: ${departmentName}
         
         Please extract the key information from the CV and create a 250-word professional profile summary.
         The summary should include:
@@ -102,7 +110,7 @@ export async function POST(req: NextRequest) {
         
         // If we couldn't generate a summary, create a basic one
         const summary = generatedSummary || 
-          `${employee.name} is a professional in the ${employee.department || 'organization'}. Their CV has been uploaded and is available for review.`;
+          `${employee.name} is a professional in the ${departmentName}. Their CV has been uploaded and is available for review.`;
         
         // Store the summary in the database
         const { error: updateError } = await supabase
@@ -169,8 +177,8 @@ export async function POST(req: NextRequest) {
       
       RESUME URL: ${fixedCvUrl}
       EMPLOYEE NAME: ${employee.name}
-      POSITION: ${employee.position || 'Unknown'}
-      DEPARTMENT: ${employee.department || 'Unknown'}
+      POSITION: ${positionTitle}
+      DEPARTMENT: ${departmentName}
       
       Task: Analyze this CV and extract key professional information. Format your response as a JSON object with the following structure:
       
