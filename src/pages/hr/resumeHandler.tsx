@@ -208,7 +208,7 @@ Your response must contain ONLY a properly formatted JSON object with no explana
       
       // Make the API call to Groq
       console.log("Calling Groq API directly for CV analysis");
-      console.log(`Using model: llama3-70b-8192, temperature: 0.0, max_tokens: 2000`);
+      console.log(`Using model: llama-3.3-70b-versatile, temperature: 0.0, max_tokens: 2000`);
       
       let retries = 2;
       let response;
@@ -223,7 +223,7 @@ Your response must contain ONLY a properly formatted JSON object with no explana
               'Authorization': `Bearer ${GROQ_API_KEY}`
             },
             body: JSON.stringify({
-              model: 'llama3-70b-8192',
+              model: 'llama-3.3-70b-versatile',
               messages: [
                 { role: 'system', content: systemMessage },
                 { role: 'user', content: structuredPrompt }
@@ -468,7 +468,7 @@ Your response must contain ONLY a properly formatted JSON object with no explana
             ...profileData,
             extraction_date: new Date().toISOString(),
             source: 'groq_llm_direct',
-            model: 'llama3-70b-8192'
+            model: 'llama-3.3-70b-versatile'
           };
           
           console.log("Successfully extracted profile data using Groq direct call");
