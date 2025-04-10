@@ -75,7 +75,7 @@ export default async function handler(req, res) {
     console.log('Fetching employee data');
     const { data: employee, error: employeeError } = await supabase
       .from('hr_employees')
-      .select('id, name, department_id, position_id')
+      .select('id, name, department_id, position_id, user_id')
       .eq('id', employeeId)
       .single();
       
@@ -85,6 +85,17 @@ export default async function handler(req, res) {
     }
     
     console.log('Employee found:', employee.name);
+    
+    // CRITICAL: Get the user_id from the employee record
+    // This is needed for the foreign key constraint in ai_course_content
+    if (!employee.user_id) {
+      console.error('Employee has no associated user_id');
+      return res.status(400).json({ 
+        error: 'Database constraint error', 
+        message: 'Employee has no associated user_id in the users table',
+        details: 'The ai_course_content table requires a valid user_id reference'
+      });
+    }
     
     // 2. Get department and position info
     let departmentName = 'Department';
@@ -115,12 +126,12 @@ export default async function handler(req, res) {
     }
     
     // 3. Get course info
-    let course = { id: courseId, title: 'Example Course', description: 'Course description' };
+    let course = null;
     
     if (courseId) {
       console.log('Fetching course data');
       const { data: courseData, error: courseError } = await supabase
-        .from('hr_courses')
+        .from('courses') // Use 'courses' table, not 'hr_courses'
         .select('id, title, description, skill_level')
         .eq('id', courseId)
         .single();
@@ -129,16 +140,28 @@ export default async function handler(req, res) {
         course = courseData;
         console.log('Course found:', course.title);
       } else {
-        console.log('Course not found, using default title');
+        console.error('Course not found:', courseError);
+        return res.status(404).json({ 
+          error: 'Database constraint error', 
+          message: 'Course not found or invalid course_id',
+          details: 'The ai_course_content table requires a valid course_id reference'
+        });
       }
+    } else {
+      return res.status(400).json({ 
+        error: 'Missing data', 
+        message: 'courseId is required' 
+      });
     }
     
-    // 4. Create a simple content record with personalized data
+    // 4. Create a personalized content record
     console.log('Creating personalized content');
-    // Generate proper UUIDs for the database
     const contentUuid = generateUUID();
     const moduleUuid = generateUUID();
-    
+
+    // Generate a unique version string
+    const versionString = `emp-${employeeId.substring(0, 6)}-${Date.now()}`;
+
     try {
       // Create personalization context
       const personalizationContext = {
@@ -170,9 +193,9 @@ export default async function handler(req, res) {
         .from('ai_course_content')
         .insert({
           id: contentUuid,
-          course_id: course.id,
-          version: `direct-v1-${Date.now()}`,
-          created_for_user_id: employeeId,
+          course_id: courseId,
+          version: versionString,
+          created_for_user_id: employee.user_id, // Use the user_id from employee record
           metadata: {
             title: course.title,
             description: course.description || 'Course description',

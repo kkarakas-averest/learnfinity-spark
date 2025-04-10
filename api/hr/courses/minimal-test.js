@@ -31,28 +31,62 @@ export default async function handler(req, res) {
   }
   
   try {
-    // Generate test UUIDs
-    const contentUuid = generateProperUUID();
-    const testUserId = generateProperUUID();
-    const testCourseId = generateProperUUID();
+    // First, get a valid course ID from the database
+    let courseId = null;
+    let userId = null;
+    let version = null;
     
-    console.log('Test UUIDs:');
-    console.log('- contentUuid:', contentUuid);
-    console.log('- testUserId:', testUserId);
-    console.log('- testCourseId:', testCourseId);
-    
-    // Try each insert one by one with detailed error reporting
-    
-    // Step 1: Try to insert into ai_course_content
     try {
-      console.log('Attempting to insert into ai_course_content...');
+      // Get a real course ID
+      const { data: courseData, error: courseError } = await supabase
+        .from('courses')
+        .select('id')
+        .limit(1);
+        
+      if (courseError || !courseData || courseData.length === 0) {
+        return res.status(404).json({
+          success: false,
+          error: 'No courses found',
+          details: courseError?.message || 'No courses are available in the database'
+        });
+      }
+      
+      courseId = courseData[0].id;
+      console.log('Found valid course ID:', courseId);
+      
+      // Get a real user ID
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('id')
+        .limit(1);
+        
+      if (userError || !userData || userData.length === 0) {
+        return res.status(404).json({
+          success: false,
+          error: 'No users found',
+          details: userError?.message || 'No users are available in the database'
+        });
+      }
+      
+      userId = userData[0].id;
+      console.log('Found valid user ID:', userId);
+      
+      // Generate a unique version string
+      version = `test-${Date.now()}`;
+      
+      // Generate a new UUID for the content
+      const contentUuid = generateProperUUID();
+      console.log('Generated content UUID:', contentUuid);
+      
+      // Step 1: Try to insert into ai_course_content with real foreign keys
+      console.log('Attempting to insert into ai_course_content with valid foreign keys...');
       const { data: contentData, error: contentError } = await supabase
         .from('ai_course_content')
         .insert({
           id: contentUuid,
-          course_id: testCourseId,
-          version: 'test-version',
-          created_for_user_id: testUserId,
+          course_id: courseId,  // Valid course ID
+          version: version,
+          created_for_user_id: userId,  // Valid user ID
           metadata: { title: 'Test Course', description: 'Test Description' },
           personalization_context: { test: true },
           is_active: true
@@ -72,8 +106,9 @@ export default async function handler(req, res) {
             table: 'ai_course_content',
             data: {
               id: contentUuid,
-              course_id: testCourseId,
-              created_for_user_id: testUserId
+              course_id: courseId,
+              created_for_user_id: userId,
+              version: version
             }
           }
         });
@@ -95,14 +130,19 @@ export default async function handler(req, res) {
       return res.status(200).json({
         success: true,
         message: 'Successfully inserted and cleaned up test record',
-        uuid: contentUuid
+        uuid: contentUuid,
+        validIds: {
+          courseId,
+          userId,
+          version
+        }
       });
       
     } catch (error) {
-      console.error('Unhandled database error:', error);
+      console.error('Database error:', error);
       return res.status(500).json({
         success: false,
-        error: 'Unhandled database error',
+        error: 'Database error',
         message: error.message,
         stack: error.stack
       });
