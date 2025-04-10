@@ -11,10 +11,12 @@ const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiO
 // Create Supabase client directly
 const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 
-// Simple UUID generator
+// Proper UUID generator that follows the standard format
 function generateUUID() {
+  // This creates a proper PostgreSQL-compatible UUID in format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-    var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
     return v.toString(16);
   });
 }
@@ -133,6 +135,7 @@ export default async function handler(req, res) {
     
     // 4. Create a simple content record with personalized data
     console.log('Creating personalized content');
+    // Generate proper UUIDs for the database
     const contentUuid = generateUUID();
     const moduleUuid = generateUUID();
     
@@ -159,6 +162,9 @@ export default async function handler(req, res) {
         }
       };
       
+      console.log('Generated contentUuid:', contentUuid); // Log UUID for debugging
+      console.log('Generated moduleUuid:', moduleUuid); // Log UUID for debugging
+      
       // Insert content record
       const insertResult = await supabase
         .from('ai_course_content')
@@ -183,7 +189,7 @@ export default async function handler(req, res) {
           error: 'Database error', 
           message: insertResult.error.message,
           details: insertResult.error.details || 'No additional details',
-          hint: 'Check RLS policies for the ai_course_content table'
+          hint: 'Check data types for the ai_course_content table'
         });
       }
       
@@ -218,7 +224,7 @@ export default async function handler(req, res) {
           error: 'Database section creation error',
           message: sectionResult.error.message,
           details: sectionResult.error.details || 'No additional details',
-          hint: 'Check RLS policies for the ai_course_content_sections table'
+          hint: 'Check data types for the ai_course_content_sections table'
         });
       } else {
         console.log('Sample section created successfully');
@@ -248,7 +254,7 @@ export default async function handler(req, res) {
           error: 'Database quiz creation error',
           message: questionResult.error.message,
           details: questionResult.error.details || 'No additional details',
-          hint: 'Check RLS policies for the ai_course_quiz_questions table'
+          hint: 'Check data types for the ai_course_quiz_questions table'
         });
       } else {
         console.log('Sample quiz question created successfully');

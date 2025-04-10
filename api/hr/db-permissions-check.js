@@ -60,7 +60,7 @@ export default async function handler(req, res) {
     
     // Test write access to AI course content tables
     const writeResults = {};
-    const testUuid = generateTestUuid();
+    const testUuid = generateProperUUID();
     
     // Test ai_course_content table
     try {
@@ -99,6 +99,7 @@ export default async function handler(req, res) {
     
     // Test ai_course_content_sections table
     try {
+      const sectionUuid = generateProperUUID();
       const { data, error } = await supabase
         .from('ai_course_content_sections')
         .insert({
@@ -189,7 +190,11 @@ export default async function handler(req, res) {
   }
 }
 
-// Generate a test UUID for database operations
-function generateTestUuid() {
-  return 'test-' + Math.random().toString(36).substring(2, 15);
+// Generate a proper PostgreSQL-compatible UUID
+function generateProperUUID() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
 } 
