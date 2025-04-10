@@ -348,4 +348,189 @@ export async function generatePersonalizedCourse(
     console.error('Error in personalized course generation:', error);
     throw error;
   }
+}
+
+/**
+ * Generate personalized content for an existing course based on employee profile data
+ */
+export async function enhanceCourseContent(
+  courseId: string,
+  courseTitle: string,
+  courseDescription: string,
+  employeeId: string,
+  employeeName: string,
+  position: string,
+  department: string,
+  profileData: any,
+  modules: number = 3,
+  sectionsPerModule: number = 3,
+  includeQuiz: boolean = true
+): Promise<any> {
+  console.log('Generating personalized content for existing course:', { 
+    courseId, 
+    courseTitle, 
+    employeeId, 
+    employeeName 
+  });
+  
+  const apiKey = getEnv().GROQ_API_KEY || process.env.GROQ_API_KEY;
+  
+  if (!apiKey) {
+    console.error('GROQ_API_KEY is missing in environment variables');
+    throw new Error('GROQ_API_KEY is not configured');
+  }
+
+  // Extract key information from profile data
+  const skills = Array.isArray(profileData?.skills) ? profileData.skills : [];
+  const experience = Array.isArray(profileData?.experience) ? profileData.experience : [];
+  const education = Array.isArray(profileData?.education) ? profileData.education : [];
+  const certifications = Array.isArray(profileData?.certifications) ? profileData.certifications : [];
+  const personalInsights = profileData?.personalInsights || {};
+  
+  // Create a structured prompt for enhancing existing course content
+  const systemPrompt = `You are an expert curriculum designer and educator specializing in personalizing existing course content.
+  Your task is to create enhanced, tailored course content for an employee based on:
+  1. The course's original title and description
+  2. The employee's profile data from their CV/resume
+  
+  The content should directly relate to the course topic while being personalized to the employee's role, experience, and skills.`;
+
+  const prompt = `Enhance the following existing course with personalized content for:
+
+  EMPLOYEE INFO:
+  Name: ${employeeName}
+  Position: ${position}
+  Department: ${department}
+  
+  COURSE INFO:
+  Title: ${courseTitle}
+  Description: ${courseDescription}
+  
+  EMPLOYEE PROFILE DATA:
+  - Skills: ${skills.join(", ") || "Not specified"}
+  - Experience: ${experience.map(e => `${e.title || ''} at ${e.company || ''}`).join("; ") || "Not specified"}
+  - Education: ${education.map(e => `${e.degree || ''} from ${e.institution || ''}`).join("; ") || "Not specified"}
+  - Certifications: ${certifications.join(", ") || "Not specified"}
+  - Years of Experience: ${personalInsights.yearsOfExperience || "Not specified"}
+  - Tools & Technologies: ${personalInsights.toolsAndTechnologies?.join(", ") || "Not specified"}
+  
+  TASK:
+  Create personalized content for this course that will be MOST RELEVANT to ${employeeName}'s current position as a ${position} in the ${department} department.
+  Focus on how the course topic applies specifically to their role, background, and career progression.
+  
+  Create content with the following:
+  
+  1. Enhanced course description that relates to their professional profile
+  2. 5-7 learning objectives tailored to their skills and career needs
+  3. ${modules} modules, each containing:
+     - Module title (relevant to the course topic AND the employee's position)
+     - Module description focusing on how it applies to their role
+     - ${sectionsPerModule} sections per module, each with:
+       - Section title
+       - Detailed section content (300-500 words with HTML formatting)
+  ${includeQuiz ? '4. Personalized quiz questions that test knowledge relevant to their position' : ''}
+  
+  Format everything as a valid JSON object with the following structure:
+  {
+    "enhancedDescription": "Personalized description that connects course content to employee's profile...",
+    "learningObjectives": ["objective 1", "objective 2", ...],
+    "modules": [
+      {
+        "title": "Module 1 Title",
+        "description": "Module description explaining relevance to employee...",
+        "sections": [
+          {
+            "title": "Section 1.1 Title",
+            "content": "<div class='prose max-w-none'>Section content with HTML formatting...</div>"
+          },
+          ...
+        ]
+      },
+      ...
+    ],
+    "quizzes": [
+      {
+        "moduleIndex": 0,
+        "questions": [
+          {
+            "question": "Question text relevant to their role?",
+            "options": ["Option A", "Option B", "Option C", "Option D"],
+            "correctAnswer": 0
+          },
+          ...
+        ]
+      },
+      ...
+    ]
+  }
+  
+  IMPORTANT: Do NOT change the original course topic or purpose. ENHANCE and PERSONALIZE the content to the employee while staying true to the course's original focus.`;
+
+  try {
+    console.log('Calling Groq API for course content enhancement');
+    
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: 'llama-3.1-70b-versatile',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: prompt }
+        ],
+        temperature: 0.5,
+        max_tokens: 4000
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('Groq API error:', errorData);
+      throw new Error(`Groq API error: ${errorData.error?.message || response.statusText}`);
+    }
+
+    const data = await response.json();
+    console.log('Course enhancement response received:', {
+      model: data.model,
+      usage: data.usage
+    });
+    
+    // Parse the generated content
+    try {
+      // Extract the content from the response
+      const generatedContent = data.choices[0].message.content;
+      console.log('Generated content received, length:', generatedContent.length);
+      
+      // Find the JSON object in the text
+      const jsonMatch = generatedContent.match(/\{[\s\S]*\}/);
+      
+      if (jsonMatch) {
+        console.log('JSON match found, attempting to parse');
+        try {
+          const courseData = JSON.parse(jsonMatch[0]);
+          console.log('Successfully parsed enhanced course data:', {
+            enhancedDescription: courseData.enhancedDescription?.substring(0, 50) + '...',
+            moduleCount: courseData.modules?.length,
+            objectivesCount: courseData.learningObjectives?.length
+          });
+          return courseData;
+        } catch (jsonError) {
+          console.error('JSON parse error:', jsonError);
+          throw new Error('Failed to parse JSON structure - invalid JSON format');
+        }
+      } else {
+        console.error('No JSON match found in content');
+        throw new Error('Failed to extract JSON from GroqAPI response - no JSON object found');
+      }
+    } catch (parseError) {
+      console.error('Error parsing GroqAPI response:', parseError);
+      throw new Error('Failed to parse course data from GroqAPI: ' + parseError.message);
+    }
+  } catch (error) {
+    console.error('Error in course content enhancement:', error);
+    throw error;
+  }
 } 

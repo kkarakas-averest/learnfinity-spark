@@ -59,7 +59,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { supabase } from '@/lib/supabase';
 import { uploadFileToStorage, fixStorageUrl, getPublicUrl } from '@/utils/storageHelpers';
 import { useResumeHandler } from './resumeHandler';
-import GeneratePersonalizedCourseButton from '@/components/hr/GeneratePersonalizedCourseButton';
+import EnhanceCourseContentButton from '@/components/hr/EnhanceCourseContentButton';
 
 // Define interfaces for the data
 interface Employee {
@@ -723,7 +723,7 @@ const EmployeeProfilePage: React.FC = () => {
                 </Button>
                 
                 {employee.cv_extracted_data && (
-                  <GeneratePersonalizedCourseButton 
+                  <EnhanceCourseContentButton 
                     employeeId={employee.id} 
                     disabled={loading} 
                   />
