@@ -30,6 +30,8 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
+
+  console.log("Universal-enhance endpoint called");
   
   try {
     // Get input parameters - either from query params or POST body
@@ -71,6 +73,8 @@ export default async function handler(req, res) {
     
     // Try to get valid employee info if an ID was provided
     try {
+      console.log(`Fetching employee data for ID: ${employeeId}`);
+      
       const { data: employee, error } = await supabase
         .from('hr_employees')
         .select(`
@@ -79,8 +83,8 @@ export default async function handler(req, res) {
           user_id,
           department_id,
           position_id,
-          hr_departments(name),
-          hr_positions(title)
+          hr_departments (name),
+          hr_positions (title)
         `)
         .eq('id', employeeId)
         .single();
@@ -90,7 +94,7 @@ export default async function handler(req, res) {
         departmentName = employee.hr_departments?.name || departmentName;
         positionTitle = employee.hr_positions?.title || positionTitle;
         userId = employee.user_id;
-        console.log('Found employee:', employeeName);
+        console.log('Found employee:', employeeName, departmentName, positionTitle);
       } else if (error) {
         console.warn('Error fetching employee:', error);
       }
@@ -111,9 +115,17 @@ export default async function handler(req, res) {
           userId = users[0].id;
           console.log('Using alternate user ID:', userId);
         } else if (error) {
-          throw new Error(`Failed to fetch users: ${error.message}`);
+          console.error('Failed to fetch users:', error);
+          return res.status(500).json({
+            success: false,
+            error: 'Database error',
+            message: 'Error fetching user data: ' + error.message
+          });
         } else {
-          throw new Error('No users found in the database');
+          console.error('No users found in the database');
+          // Create a fallback ID for development purposes
+          userId = generateUUID();
+          console.log('Generated fallback user ID:', userId);
         }
       } catch (e) {
         console.error('Error fetching users:', e);
@@ -124,31 +136,35 @@ export default async function handler(req, res) {
         });
       }
     }
-    
+
     // 3. Check if course exists in main courses table
     let course = null;
     
-    // Try to get the specified course from the main courses table
     try {
+      console.log(`Checking for course ${courseId} in courses table`);
       const { data, error } = await supabase
         .from('courses')
-        .select('id, title, description, skill_level')
+        .select('id, title, description')
         .eq('id', courseId)
         .single();
         
       if (data) {
         course = data;
         console.log('Found course in main table:', course.title);
-      } else if (error && error.code !== 'PGRST116') {
-        console.warn('Error fetching course from main table:', error);
+      } else if (error) {
+        if (error.code !== 'PGRST116') {
+          console.warn('Error fetching course from main table:', error);
+        } else {
+          console.log('Course not found in main table, will check HR courses');
+        }
       }
     } catch (e) {
       console.warn('Error fetching course from main table:', e);
     }
-    
+
     // If course doesn't exist in main table, try to mirror it from HR courses
     if (!course) {
-      console.log('Course not found in main table, checking HR courses...');
+      console.log('Mirroring HR course to main courses table...');
       
       try {
         // First check if it exists in hr_courses
@@ -162,29 +178,52 @@ export default async function handler(req, res) {
           console.log('Found course in HR table:', hrCourse.title);
           
           // Create a new entry in the main courses table
-          const { data: createdCourse, error: createError } = await supabase
-            .from('courses')
-            .insert({
+          try {
+            const courseInsertData = {
               id: hrCourse.id,
               title: hrCourse.title,
               description: hrCourse.description || 'Course imported from HR system',
-              skill_level: hrCourse.skill_level || 'beginner',
               is_published: true,
               status: 'published',
               created_by: userId, // Use the resolved userId
               version: 1,
               generated_by: 'hr_course_mirror'
-            })
-            .select()
-            .single();
+            };
             
-          if (createError) {
-            console.error('Error mirroring course:', createError);
-            throw createError;
+            // Add skill_level if it exists
+            if (hrCourse.skill_level) {
+              courseInsertData.level = hrCourse.skill_level;
+            }
+            
+            // Try to insert the course
+            const { data: createdCourse, error: createError } = await supabase
+              .from('courses')
+              .insert(courseInsertData)
+              .select()
+              .single();
+              
+            if (createError) {
+              console.error('Error mirroring course:', createError);
+              throw createError;
+            }
+            
+            course = createdCourse;
+            console.log('Course mirrored successfully:', course.title);
+          } catch (mirrorError) {
+            console.error('Error in course create operation:', mirrorError);
+            
+            // If insertion fails, try to get the course again (it might have been created by another request)
+            const { data: existingCourse, error: existingError } = await supabase
+              .from('courses')
+              .select('id, title, description')
+              .eq('id', courseId)
+              .single();
+              
+            if (existingCourse && !existingError) {
+              course = existingCourse;
+              console.log('Using existing course:', course.title);
+            }
           }
-          
-          course = createdCourse;
-          console.log('Course mirrored successfully:', course.title);
         } else if (hrError && hrError.code !== 'PGRST116') {
           console.warn('Error checking HR courses:', hrError);
         } else {
@@ -208,7 +247,7 @@ export default async function handler(req, res) {
             id: placeholderId,
             title: placeholderTitle,
             description: 'Automatically generated personalized learning content',
-            skill_level: 'beginner',
+            level: 'beginner',
             is_published: true,
             status: 'published',
             created_by: userId,
@@ -256,7 +295,7 @@ export default async function handler(req, res) {
         },
         courseContext: {
           title: course.title,
-          level: course.skill_level || 'intermediate',
+          level: course.level || 'intermediate',
           learningObjectives: [
             `Understand concepts relevant to your ${positionTitle} role`,
             `Apply principles to ${departmentName} department challenges`,
@@ -270,63 +309,170 @@ export default async function handler(req, res) {
         }
       };
       
-      // Insert content record
-      const { data, error } = await supabase
-        .from('ai_course_content')
-        .insert({
-          id: contentUuid,
-          course_id: course.id,
-          version: versionString,
-          created_for_user_id: userId,
-          metadata: {
-            title: course.title,
-            description: course.description || 'Course description',
-            level: course.skill_level || 'intermediate'
-          },
-          personalization_context: personalizationContext,
-          is_active: true
-        })
-        .select();
-        
-      if (error) {
-        console.error('Error creating content record:', error);
-        return res.status(500).json({
-          success: false,
-          error: 'Database error',
-          message: error.message,
-          details: error.details || 'No additional details'
-        });
+      // Check if ai_course_content table exists
+      let tableExists = true;
+      try {
+        const { error: checkError } = await supabase
+          .from('ai_course_content')
+          .select('id')
+          .limit(1);
+          
+        if (checkError && checkError.message.includes('does not exist')) {
+          tableExists = false;
+        }
+      } catch (e) {
+        tableExists = false;
       }
       
-      console.log('Content record created successfully');
+      if (!tableExists) {
+        console.log('ai_course_content table not found, using course_ai_content instead');
+        // Try with alternative table name
+        const { data, error } = await supabase
+          .from('course_ai_content')
+          .insert({
+            id: contentUuid,
+            course_id: course.id,
+            title: course.title,
+            description: course.description || 'Personalized course content',
+            created_for: employeeId,
+            is_personalized: true
+          })
+          .select();
+          
+        if (error) {
+          console.error('Error creating content record in course_ai_content:', error);
+          throw error;
+        }
+        console.log('Content record created successfully in course_ai_content');
+      } else {
+        // Insert content record into ai_course_content
+        const { data, error } = await supabase
+          .from('ai_course_content')
+          .insert({
+            id: contentUuid,
+            course_id: course.id,
+            version: versionString,
+            created_for_user_id: userId,
+            metadata: {
+              title: course.title,
+              description: course.description || 'Course description',
+              level: course.level || 'intermediate'
+            },
+            personalization_context: personalizationContext,
+            is_active: true
+          })
+          .select();
+          
+        if (error) {
+          console.error('Error creating content record:', error);
+          return res.status(500).json({
+            success: false,
+            error: 'Database error',
+            message: error.message,
+            details: error.details || 'No additional details'
+          });
+        }
+        
+        console.log('Content record created successfully');
+      }
       
       // 5. Create one sample section
-      const sectionTitle = `${course.title} for ${positionTitle}s`;
-      const sectionContent = `
-        <div class="prose max-w-none">
-          <h2>Welcome ${employeeName}</h2>
-          <p>This course has been personalized for your role as a ${positionTitle} in the ${departmentName} department.</p>
-          <p>${course.description || 'This course will help you develop skills relevant to your role.'}</p>
-          <h3>Why This Matters To You</h3>
-          <p>As a ${positionTitle}, understanding these concepts will help you excel in your daily responsibilities and contribute more effectively to your team's success.</p>
-        </div>
-      `;
+      let sectionCreated = false;
       
-      const { error: sectionError } = await supabase
-        .from('ai_course_content_sections')
-        .insert({
-          content_id: contentUuid,
-          module_id: moduleUuid,
-          section_id: 'section-1-1',
-          title: sectionTitle,
-          content: sectionContent,
-          order_index: 0
-        });
+      // Try first table name
+      try {
+        const sectionTitle = `${course.title} for ${positionTitle}s`;
+        const sectionContent = `
+          <div class="prose max-w-none">
+            <h2>Welcome ${employeeName}</h2>
+            <p>This course has been personalized for your role as a ${positionTitle} in the ${departmentName} department.</p>
+            <p>${course.description || 'This course will help you develop skills relevant to your role.'}</p>
+            <h3>Why This Matters To You</h3>
+            <p>As a ${positionTitle}, understanding these concepts will help you excel in your daily responsibilities and contribute more effectively to your team's success.</p>
+          </div>
+        `;
         
-      if (sectionError) {
-        console.error('Error creating section:', sectionError);
-      } else {
-        console.log('Sample section created successfully');
+        const { error: sectionError } = await supabase
+          .from('ai_course_content_sections')
+          .insert({
+            content_id: contentUuid,
+            module_id: moduleUuid,
+            section_id: 'section-1-1',
+            title: sectionTitle,
+            content: sectionContent,
+            order_index: 0
+          });
+          
+        if (sectionError) {
+          if (sectionError.message.includes('does not exist')) {
+            console.log('ai_course_content_sections table not found, will try alternative');
+          } else {
+            console.error('Error creating section:', sectionError);
+          }
+        } else {
+          sectionCreated = true;
+          console.log('Sample section created successfully in ai_course_content_sections');
+        }
+      } catch (e) {
+        console.warn('Error with ai_course_content_sections table:', e);
+      }
+      
+      // Try alternative table if needed
+      if (!sectionCreated) {
+        try {
+          console.log('Trying to create section in course_content_sections');
+          const sectionTitle = `Introduction to ${course.title}`;
+          const sectionContent = `
+            <div class="prose max-w-none">
+              <h2>Welcome ${employeeName}</h2>
+              <p>This course has been personalized for your role as a ${positionTitle} in the ${departmentName} department.</p>
+              <p>${course.description || 'This course will help you develop skills relevant to your role.'}</p>
+              <h3>Why This Matters To You</h3>
+              <p>As a ${positionTitle}, understanding these concepts will help you excel in your daily responsibilities and contribute more effectively to your team's success.</p>
+            </div>
+          `;
+          
+          const { error: sectionError } = await supabase
+            .from('course_content_sections')
+            .insert({
+              content_id: contentUuid,
+              module_id: `module-1-personalized-${employeeId.slice(0, 8)}`,
+              section_id: 'section-1-1',
+              title: sectionTitle,
+              content: sectionContent,
+              order_index: 0,
+              created_for: employeeId
+            });
+            
+          if (sectionError) {
+            console.error('Error creating section in alternative table:', sectionError);
+          } else {
+            sectionCreated = true;
+            console.log('Sample section created successfully in course_content_sections');
+          }
+        } catch (e) {
+          console.error('Error with course_content_sections table:', e);
+        }
+      }
+      
+      // Update HR course enrollment if needed
+      try {
+        const { data, error } = await supabase
+          .from('hr_course_enrollments')
+          .update({
+            personalized_content_id: contentUuid,
+            updated_at: new Date().toISOString()
+          })
+          .eq('employee_id', employeeId)
+          .eq('course_id', courseId);
+          
+        if (error) {
+          console.warn('Could not update hr_course_enrollments:', error);
+        } else {
+          console.log('Updated hr_course_enrollments with personalized_content_id');
+        }
+      } catch (e) {
+        console.warn('Error updating hr_course_enrollments:', e);
       }
       
       // Return success response

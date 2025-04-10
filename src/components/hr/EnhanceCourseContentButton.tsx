@@ -103,7 +103,7 @@ const EnhanceCourseContentButton: React.FC<EnhanceCourseContentButtonProps> = ({
     setEnhancingCourseId(courseId);
 
     try {
-      // First fetch employee profile data to include in request
+      // First fetch employee profile data to check if CV data is available
       const { data: employeeData, error: employeeError } = await supabase
         .from('hr_employees')
         .select(`
@@ -154,6 +154,19 @@ const EnhanceCourseContentButton: React.FC<EnhanceCourseContentButtonProps> = ({
         profileDataAvailable: !!employeeData.cv_extracted_data
       });
 
+      // Ensure course exists in main courses table
+      console.log('Mirroring HR course to main courses table...');
+      try {
+        // Start by making an API call to mirror the course
+        await fetch('/api/hr/courses/mirror-courses', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ courseId }),
+        });
+      } catch (mirrorError) {
+        console.warn('Error mirroring course (continuing anyway):', mirrorError);
+      }
+
       // Use the universal enhance endpoint for content personalization
       console.log('Enhancing course content...');
       const enhanceResponse = await fetch('/api/hr/courses/universal-enhance', {
@@ -175,7 +188,7 @@ const EnhanceCourseContentButton: React.FC<EnhanceCourseContentButtonProps> = ({
           const errorData = await enhanceResponse.json();
           errorMessage = errorData.error || errorData.message || errorMessage;
         } catch {
-          errorMessage = `Server error (${enhanceResponse.status}): Could not process response`;
+          errorMessage = `Server error (${enhanceResponse.status}): ${await enhanceResponse.text() || 'Could not process response'}`;
         }
         throw new Error(errorMessage);
       }
