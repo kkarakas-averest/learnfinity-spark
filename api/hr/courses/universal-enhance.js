@@ -1,3 +1,4 @@
+
 // Universal course enhancement endpoint that works with any employee
 // This finds valid course IDs and user IDs if the provided ones aren't valid
 
@@ -41,6 +42,11 @@ export default async function handler(req, res) {
         courseId = body.courseId;
       } catch (e) {
         console.error('Error parsing request body:', e);
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid request body',
+          message: e.message
+        });
       }
     } else {
       employeeId = req.query.employeeId;
@@ -49,6 +55,14 @@ export default async function handler(req, res) {
     
     console.log('Input parameters:', { employeeId, courseId });
     
+    if (!employeeId || !courseId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required parameters',
+        message: 'Both employeeId and courseId are required'
+      });
+    }
+    
     // 1. Resolve employee information
     let employeeName = 'Employee';
     let departmentName = 'Department';
@@ -56,39 +70,39 @@ export default async function handler(req, res) {
     let userId = null;
     
     // Try to get valid employee info if an ID was provided
-    if (employeeId) {
-      try {
-        const { data: employee } = await supabase
-          .from('hr_employees')
-          .select(`
-            id, 
-            name, 
-            user_id,
-            department_id,
-            position_id,
-            hr_departments(name),
-            hr_positions(title)
-          `)
-          .eq('id', employeeId)
-          .single();
-          
-        if (employee) {
-          employeeName = employee.name;
-          departmentName = employee.hr_departments?.name || departmentName;
-          positionTitle = employee.hr_positions?.title || positionTitle;
-          userId = employee.user_id;
-          console.log('Found employee:', employeeName);
-        }
-      } catch (e) {
-        console.warn('Error fetching employee:', e);
+    try {
+      const { data: employee, error } = await supabase
+        .from('hr_employees')
+        .select(`
+          id, 
+          name, 
+          user_id,
+          department_id,
+          position_id,
+          hr_departments(name),
+          hr_positions(title)
+        `)
+        .eq('id', employeeId)
+        .single();
+        
+      if (employee) {
+        employeeName = employee.name;
+        departmentName = employee.hr_departments?.name || departmentName;
+        positionTitle = employee.hr_positions?.title || positionTitle;
+        userId = employee.user_id;
+        console.log('Found employee:', employeeName);
+      } else if (error) {
+        console.warn('Error fetching employee:', error);
       }
+    } catch (e) {
+      console.warn('Error fetching employee:', e);
     }
     
     // 2. Ensure we have a valid user ID (needed for foreign key constraint)
     if (!userId) {
       // If employee doesn't have a valid user_id, get the first user from the database
       try {
-        const { data: users } = await supabase
+        const { data: users, error } = await supabase
           .from('users')
           .select('id')
           .limit(1);
@@ -96,12 +110,10 @@ export default async function handler(req, res) {
         if (users && users.length > 0) {
           userId = users[0].id;
           console.log('Using alternate user ID:', userId);
+        } else if (error) {
+          throw new Error(`Failed to fetch users: ${error.message}`);
         } else {
-          return res.status(404).json({
-            success: false,
-            error: 'No users found in the database',
-            message: 'Cannot create course content without a valid user ID'
-          });
+          throw new Error('No users found in the database');
         }
       } catch (e) {
         console.error('Error fetching users:', e);
@@ -113,51 +125,112 @@ export default async function handler(req, res) {
       }
     }
     
-    // 3. Ensure we have a valid course ID
+    // 3. Check if course exists in main courses table
     let course = null;
     
-    // Try to get the specified course if an ID was provided
-    if (courseId) {
+    // Try to get the specified course from the main courses table
+    try {
+      const { data, error } = await supabase
+        .from('courses')
+        .select('id, title, description, skill_level')
+        .eq('id', courseId)
+        .single();
+        
+      if (data) {
+        course = data;
+        console.log('Found course in main table:', course.title);
+      } else if (error && error.code !== 'PGRST116') {
+        console.warn('Error fetching course from main table:', error);
+      }
+    } catch (e) {
+      console.warn('Error fetching course from main table:', e);
+    }
+    
+    // If course doesn't exist in main table, try to mirror it from HR courses
+    if (!course) {
+      console.log('Course not found in main table, checking HR courses...');
+      
       try {
-        const { data } = await supabase
-          .from('courses')
+        // First check if it exists in hr_courses
+        const { data: hrCourse, error: hrError } = await supabase
+          .from('hr_courses')
           .select('id, title, description, skill_level')
           .eq('id', courseId)
           .single();
+        
+        if (hrCourse) {
+          console.log('Found course in HR table:', hrCourse.title);
           
-        if (data) {
-          course = data;
-          console.log('Found course:', course.title);
+          // Create a new entry in the main courses table
+          const { data: createdCourse, error: createError } = await supabase
+            .from('courses')
+            .insert({
+              id: hrCourse.id,
+              title: hrCourse.title,
+              description: hrCourse.description || 'Course imported from HR system',
+              skill_level: hrCourse.skill_level || 'beginner',
+              is_published: true,
+              status: 'published',
+              created_by: userId, // Use the resolved userId
+              version: 1,
+              generated_by: 'hr_course_mirror'
+            })
+            .select()
+            .single();
+            
+          if (createError) {
+            console.error('Error mirroring course:', createError);
+            throw createError;
+          }
+          
+          course = createdCourse;
+          console.log('Course mirrored successfully:', course.title);
+        } else if (hrError && hrError.code !== 'PGRST116') {
+          console.warn('Error checking HR courses:', hrError);
+        } else {
+          console.warn('Course not found in HR courses either');
         }
       } catch (e) {
-        console.warn('Error fetching specified course:', e);
+        console.error('Error in course mirroring process:', e);
       }
     }
     
-    // If we don't have a valid course yet, get the first one from the database
+    // If we still don't have a course, create a placeholder
     if (!course) {
+      console.log('Creating placeholder course...');
+      const placeholderId = courseId || generateUUID();
+      const placeholderTitle = 'Personalized Learning Course';
+      
       try {
-        const { data } = await supabase
+        const { data: createdCourse, error: createError } = await supabase
           .from('courses')
-          .select('id, title, description, skill_level')
-          .limit(1);
+          .insert({
+            id: placeholderId,
+            title: placeholderTitle,
+            description: 'Automatically generated personalized learning content',
+            skill_level: 'beginner',
+            is_published: true,
+            status: 'published',
+            created_by: userId,
+            version: 1,
+            generated_by: 'universal_enhance'
+          })
+          .select()
+          .single();
           
-        if (data && data.length > 0) {
-          course = data[0];
-          console.log('Using alternate course:', course.title);
-        } else {
-          return res.status(404).json({
-            success: false,
-            error: 'No courses found in the database',
-            message: 'Cannot create course content without a valid course'
-          });
+        if (createError) {
+          console.error('Error creating placeholder course:', createError);
+          throw createError;
         }
+        
+        course = createdCourse;
+        console.log('Placeholder course created:', course.title);
       } catch (e) {
-        console.error('Error fetching courses:', e);
+        console.error('Error creating placeholder course:', e);
         return res.status(500).json({
           success: false,
           error: 'Database error',
-          message: 'Error fetching course data: ' + e.message
+          message: 'Failed to create placeholder course: ' + e.message
         });
       }
     }
@@ -269,9 +342,7 @@ export default async function handler(req, res) {
           name: employeeName,
           role: positionTitle,
           department: departmentName
-        },
-        userIdUsed: userId,
-        note: userId !== (employeeId ? 'Used original employee user_id' : 'Used alternative user_id')
+        }
       });
       
     } catch (dbError) {
@@ -291,4 +362,4 @@ export default async function handler(req, res) {
       message: error.message
     });
   }
-} 
+}

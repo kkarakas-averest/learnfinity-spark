@@ -1,3 +1,4 @@
+
 import React from '@/lib/react-helpers';
 import { useState, useEffect } from '@/lib/react-helpers';
 import { Button } from '@/components/ui/button';
@@ -147,146 +148,13 @@ const EnhanceCourseContentButton: React.FC<EnhanceCourseContentButtonProps> = ({
         }
       }
       
-      // Prepare employee profile data
-      const employeeProfile = {
-        name: employeeData.name,
-        role: positionTitle,
-        department: departmentName,
-        cv_extracted_data: employeeData.cv_extracted_data || null
-      };
-      
       console.log('Enhancing course content with employee profile:', {
         employeeId,
         courseId,
         profileDataAvailable: !!employeeData.cv_extracted_data
       });
 
-      // STEP 1: Mirror the HR course to the main courses table first
-      console.log('Mirroring HR course to main courses table...');
-      const mirrorResponse = await fetch('/api/hr/courses/mirror-courses', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          courseId
-        }),
-      });
-      
-      if (!mirrorResponse.ok) {
-        const errorText = await mirrorResponse.text();
-        let errorMessage = 'Failed to mirror HR course';
-        
-        try {
-          // Try to parse as JSON if possible
-          const errorData = JSON.parse(errorText);
-          errorMessage = errorData.error || errorData.details || errorMessage;
-        } catch (e) {
-          // If not JSON, create a readable error message from the text
-          console.error('Non-JSON error response from mirror endpoint:', errorText);
-          errorMessage = `Error (${mirrorResponse.status}): ${errorText.substring(0, 100)}...`;
-        }
-        
-        throw new Error(errorMessage);
-      }
-      
-      const mirrorData = await mirrorResponse.json();
-      console.log('Mirror result:', mirrorData);
-      
-      // Check if the course was successfully mirrored or already existed
-      // Add debugging to verify the structure of the response
-      console.log('Mirror data structure:', {
-        mirrored: mirrorData.results.mirrored,
-        skipped: mirrorData.results.skipped,
-        errors: mirrorData.results.errors,
-        courseId
-      });
-      
-      // Log the details of any errors for debugging
-      if (mirrorData.results.errors && mirrorData.results.errors.length > 0) {
-        console.log('Mirroring errors details:', JSON.stringify(mirrorData.results.errors));
-      }
-      
-      // Fix the verification check to handle empty arrays properly
-      let courseMirrored = false;
-      
-      // Check if course was mirrored successfully
-      if (mirrorData.results.mirrored && mirrorData.results.mirrored.length > 0) {
-        courseMirrored = mirrorData.results.mirrored.some((c) => c.courseId === courseId);
-      }
-      
-      // Check if course was skipped (already exists)
-      if (!courseMirrored && mirrorData.results.skipped && mirrorData.results.skipped.length > 0) {
-        courseMirrored = mirrorData.results.skipped.some((c) => c.courseId === courseId);
-      }
-      
-      // Check if the course wasn't found in the HR system but was recorded as "not found" error
-      // This is a special case we want to handle by continuing anyway
-      if (!courseMirrored && mirrorData.results.errors && mirrorData.results.errors.length > 0) {
-        // More flexible error detection - look for any error related to our courseId 
-        // that mentions "not found" or "404" in the message or code
-        const notFoundError = mirrorData.results.errors.find(
-          (e) => {
-            // Check if this error relates to our courseId
-            const isForOurCourse = e.courseId === courseId || 
-              (e.source && e.source.id === courseId) ||
-              (e.details && e.details.courseId === courseId);
-            
-            // Check if it's a "not found" type of error
-            const isNotFoundError = 
-              (e.notFound === true) || 
-              (e.message && (
-                e.message.toLowerCase().includes('not found') || 
-                e.message.toLowerCase().includes('404')
-              )) ||
-              (e.code === 404) ||
-              (e.type === 'not_found') ||
-              (e.status === 404);
-              
-            return isForOurCourse && isNotFoundError;
-          }
-        );
-        
-        // Fall back to any error for this courseId if we can't clearly identify error type
-        const anyErrorForCourse = mirrorData.results.errors.find(
-          (e) => e.courseId === courseId || 
-            (e.source && e.source.id === courseId) ||
-            (e.details && e.details.courseId === courseId)
-        );
-        
-        if (notFoundError) {
-          console.warn(`Course with ID ${courseId} not found in HR system, continuing anyway`);
-          courseMirrored = true;
-        } else if (anyErrorForCourse) {
-          console.warn(`Unknown error for course ${courseId}, attempting to continue:`, anyErrorForCourse);
-          // For this case, we'll assume we should continue anyway
-          courseMirrored = true;
-        }
-      }
-      
-      // If neither mirrored nor skipped, check if hrCourses was empty
-      if (!courseMirrored && mirrorData.summary && mirrorData.summary.total === 0) {
-        console.warn('No HR courses found to mirror');
-        // If the endpoint found no courses to mirror, it might mean the course doesn't exist
-        // Let's continue anyway and let the universal endpoint handle it
-        courseMirrored = true;
-      }
-      
-      // Override for development: always continue when we have errors
-      if (!courseMirrored && mirrorData.results.errors && mirrorData.results.errors.length > 0) {
-        console.warn('Forcing continuation despite mirroring errors for development');
-        courseMirrored = true;
-      }
-        
-      if (!courseMirrored) {
-        console.error('Course mirroring verification failed:', {
-          courseId,
-          mirrorData
-        });
-        throw new Error('Failed to mirror course. Please check the course data.');
-      }
-
-      // STEP 2: Now enhance the course content using the universal endpoint
+      // Use the universal enhance endpoint for content personalization
       console.log('Enhancing course content...');
       const enhanceResponse = await fetch('/api/hr/courses/universal-enhance', {
         method: 'POST',
@@ -299,48 +167,38 @@ const EnhanceCourseContentButton: React.FC<EnhanceCourseContentButtonProps> = ({
         }),
       });
 
-      // First check if response is OK
+      // Check if response is OK
       if (!enhanceResponse.ok) {
-        const errorText = await enhanceResponse.text();
+        // Try to get error details
         let errorMessage = 'Failed to enhance course content';
-        
         try {
-          // Try to parse as JSON if possible
-          const errorData = JSON.parse(errorText);
-          errorMessage = errorData.error || errorData.details || errorMessage;
-        } catch (e) {
-          // If not JSON, create a readable error message from the text
-          console.error('Non-JSON error response from enhance endpoint:', errorText);
-          errorMessage = `Error (${enhanceResponse.status}): ${errorText.substring(0, 100)}...`;
+          const errorData = await enhanceResponse.json();
+          errorMessage = errorData.error || errorData.message || errorMessage;
+        } catch {
+          errorMessage = `Server error (${enhanceResponse.status}): Could not process response`;
         }
-        
         throw new Error(errorMessage);
       }
 
-      // If response is OK, proceed with JSON parsing
+      // Parse the JSON response
       const data = await enhanceResponse.json();
       
-      // For our universal endpoint, the response format is different
       if (data.success) {
         toast({
           title: 'Success!',
-          description: `Personalized content created for "${data.course.title}" with your profile details.`,
+          description: `Personalized content created for "${data.course?.title || courseTitle}". The content has been tailored to your profile.`,
           variant: 'default',
         });
         return;
+      } else {
+        throw new Error(data.error || 'Unknown error occurred during enhancement');
       }
-
-      toast({
-        title: 'Success!',
-        description: `Personalized content created for "${courseTitle}". The content has been tailored to your profile.`,
-        variant: 'default',
-      });
     } catch (error) {
       console.error('Error enhancing course content:', error);
       
       toast({
         title: 'Failed to enhance course content',
-        description: error.message || 'An unexpected error occurred',
+        description: error instanceof Error ? error.message : 'An unexpected error occurred',
         variant: 'destructive',
       });
     } finally {
@@ -349,7 +207,7 @@ const EnhanceCourseContentButton: React.FC<EnhanceCourseContentButtonProps> = ({
     }
   };
 
-  // Don't render if no employee ID or no CV data
+  // Don't render if no employee ID
   if (!employeeId) return null;
 
   // Show a simplified button if there are no enrolled courses
@@ -411,4 +269,4 @@ const EnhanceCourseContentButton: React.FC<EnhanceCourseContentButtonProps> = ({
   );
 };
 
-export default EnhanceCourseContentButton; 
+export default EnhanceCourseContentButton;

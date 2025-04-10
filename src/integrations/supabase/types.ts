@@ -341,6 +341,138 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_course_content: {
+        Row: {
+          course_id: string | null
+          created_at: string | null
+          created_for_user_id: string | null
+          id: string
+          is_active: boolean | null
+          metadata: Json
+          personalization_context: Json | null
+          updated_at: string | null
+          version: string
+        }
+        Insert: {
+          course_id?: string | null
+          created_at?: string | null
+          created_for_user_id?: string | null
+          id?: string
+          is_active?: boolean | null
+          metadata?: Json
+          personalization_context?: Json | null
+          updated_at?: string | null
+          version: string
+        }
+        Update: {
+          course_id?: string | null
+          created_at?: string | null
+          created_for_user_id?: string | null
+          id?: string
+          is_active?: boolean | null
+          metadata?: Json
+          personalization_context?: Json | null
+          updated_at?: string | null
+          version?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_course_content_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_course_content_sections: {
+        Row: {
+          content: string
+          content_id: string | null
+          created_at: string | null
+          id: string
+          module_id: string
+          order_index: number
+          section_id: string
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          content: string
+          content_id?: string | null
+          created_at?: string | null
+          id?: string
+          module_id: string
+          order_index?: number
+          section_id: string
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          content?: string
+          content_id?: string | null
+          created_at?: string | null
+          id?: string
+          module_id?: string
+          order_index?: number
+          section_id?: string
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_course_content_sections_content_id_fkey"
+            columns: ["content_id"]
+            isOneToOne: false
+            referencedRelation: "ai_course_content"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_course_quiz_questions: {
+        Row: {
+          content_id: string | null
+          correct_answer: string | null
+          created_at: string | null
+          difficulty: string | null
+          explanation: string | null
+          id: string
+          module_id: string
+          options: Json | null
+          question: string
+        }
+        Insert: {
+          content_id?: string | null
+          correct_answer?: string | null
+          created_at?: string | null
+          difficulty?: string | null
+          explanation?: string | null
+          id?: string
+          module_id: string
+          options?: Json | null
+          question: string
+        }
+        Update: {
+          content_id?: string | null
+          correct_answer?: string | null
+          created_at?: string | null
+          difficulty?: string | null
+          explanation?: string | null
+          id?: string
+          module_id?: string
+          options?: Json | null
+          question?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_course_quiz_questions_content_id_fkey"
+            columns: ["content_id"]
+            isOneToOne: false
+            referencedRelation: "ai_course_content"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_generated_content: {
         Row: {
           ai_agent_id: string | null
@@ -379,6 +511,53 @@ export type Database = {
             columns: ["module_id"]
             isOneToOne: false
             referencedRelation: "modules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_generated_course_content: {
+        Row: {
+          content: Json
+          course_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          is_published: boolean | null
+          personalization_params: Json | null
+          title: string
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          content: Json
+          course_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_published?: boolean | null
+          personalization_params?: Json | null
+          title: string
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          content?: Json
+          course_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_published?: boolean | null
+          personalization_params?: Json | null
+          title?: string
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_generated_course_content_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
             referencedColumns: ["id"]
           },
         ]
@@ -1065,6 +1244,50 @@ export type Database = {
           },
         ]
       }
+      course_content_sections: {
+        Row: {
+          content: string
+          content_id: string
+          created_at: string
+          id: string
+          module_id: string
+          order_index: number
+          section_id: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          content: string
+          content_id: string
+          created_at?: string
+          id?: string
+          module_id: string
+          order_index: number
+          section_id: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          content?: string
+          content_id?: string
+          created_at?: string
+          id?: string
+          module_id?: string
+          order_index?: number
+          section_id?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "course_content_sections_content_id_fkey"
+            columns: ["content_id"]
+            isOneToOne: false
+            referencedRelation: "ai_generated_course_content"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       course_enrollments: {
         Row: {
           completion_date: string | null
@@ -1075,6 +1298,7 @@ export type Database = {
           progress: number | null
           status: string | null
           updated_at: string | null
+          user_id: string | null
         }
         Insert: {
           completion_date?: string | null
@@ -1085,6 +1309,7 @@ export type Database = {
           progress?: number | null
           status?: string | null
           updated_at?: string | null
+          user_id?: string | null
         }
         Update: {
           completion_date?: string | null
@@ -1095,6 +1320,7 @@ export type Database = {
           progress?: number | null
           status?: string | null
           updated_at?: string | null
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -1162,6 +1388,41 @@ export type Database = {
             columns: ["course_id"]
             isOneToOne: true
             referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      course_module_quizzes: {
+        Row: {
+          content_id: string
+          created_at: string
+          id: string
+          module_id: string
+          quiz_data: Json
+          updated_at: string
+        }
+        Insert: {
+          content_id: string
+          created_at?: string
+          id?: string
+          module_id: string
+          quiz_data: Json
+          updated_at?: string
+        }
+        Update: {
+          content_id?: string
+          created_at?: string
+          id?: string
+          module_id?: string
+          quiz_data?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "course_module_quizzes_content_id_fkey"
+            columns: ["content_id"]
+            isOneToOne: false
+            referencedRelation: "ai_generated_course_content"
             referencedColumns: ["id"]
           },
         ]
@@ -1602,34 +1863,52 @@ export type Database = {
       }
       hr_course_enrollments: {
         Row: {
+          completed_modules: number | null
           completion_date: string | null
           course_id: string | null
+          course_type: string | null
+          due_date: string | null
           employee_id: string | null
           enrollment_date: string | null
           id: string
+          last_accessed: string | null
           progress: number | null
+          rag_status: string | null
           score: number | null
           status: string | null
+          total_modules: number | null
         }
         Insert: {
+          completed_modules?: number | null
           completion_date?: string | null
           course_id?: string | null
+          course_type?: string | null
+          due_date?: string | null
           employee_id?: string | null
           enrollment_date?: string | null
           id?: string
+          last_accessed?: string | null
           progress?: number | null
+          rag_status?: string | null
           score?: number | null
           status?: string | null
+          total_modules?: number | null
         }
         Update: {
+          completed_modules?: number | null
           completion_date?: string | null
           course_id?: string | null
+          course_type?: string | null
+          due_date?: string | null
           employee_id?: string | null
           enrollment_date?: string | null
           id?: string
+          last_accessed?: string | null
           progress?: number | null
+          rag_status?: string | null
           score?: number | null
           status?: string | null
+          total_modules?: number | null
         }
         Relationships: [
           {
@@ -1650,41 +1929,59 @@ export type Database = {
       }
       hr_courses: {
         Row: {
+          category: string | null
           created_at: string | null
           department_id: string | null
           description: string | null
           difficulty_level: string | null
           duration: number | null
           duration_hours: number | null
+          estimated_duration: number | null
           id: string
+          module_count: number | null
           skill_level: string | null
+          skills: Json | null
           status: string | null
+          thumbnail: string | null
+          thumbnail_url: string | null
           title: string
           updated_at: string | null
         }
         Insert: {
+          category?: string | null
           created_at?: string | null
           department_id?: string | null
           description?: string | null
           difficulty_level?: string | null
           duration?: number | null
           duration_hours?: number | null
+          estimated_duration?: number | null
           id?: string
+          module_count?: number | null
           skill_level?: string | null
+          skills?: Json | null
           status?: string | null
+          thumbnail?: string | null
+          thumbnail_url?: string | null
           title: string
           updated_at?: string | null
         }
         Update: {
+          category?: string | null
           created_at?: string | null
           department_id?: string | null
           description?: string | null
           difficulty_level?: string | null
           duration?: number | null
           duration_hours?: number | null
+          estimated_duration?: number | null
           id?: string
+          module_count?: number | null
           skill_level?: string | null
+          skills?: Json | null
           status?: string | null
+          thumbnail?: string | null
+          thumbnail_url?: string | null
           title?: string
           updated_at?: string | null
         }
@@ -1767,10 +2064,95 @@ export type Database = {
           },
         ]
       }
+      hr_employee_cv_extractions: {
+        Row: {
+          employee_id: string | null
+          extracted_data: Json | null
+          extraction_date: string | null
+          extraction_status: string | null
+          id: string
+          original_file_url: string | null
+        }
+        Insert: {
+          employee_id?: string | null
+          extracted_data?: Json | null
+          extraction_date?: string | null
+          extraction_status?: string | null
+          id?: string
+          original_file_url?: string | null
+        }
+        Update: {
+          employee_id?: string | null
+          extracted_data?: Json | null
+          extraction_date?: string | null
+          extraction_status?: string | null
+          id?: string
+          original_file_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hr_employee_cv_extractions_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "hr_employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hr_employee_skills: {
+        Row: {
+          created_at: string | null
+          employee_id: string | null
+          id: string
+          is_in_progress: boolean | null
+          proficiency_level: string
+          skill_name: string
+          updated_at: string | null
+          verification_date: string | null
+          verification_status: string | null
+          verified_by: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          employee_id?: string | null
+          id?: string
+          is_in_progress?: boolean | null
+          proficiency_level: string
+          skill_name: string
+          updated_at?: string | null
+          verification_date?: string | null
+          verification_status?: string | null
+          verified_by?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          employee_id?: string | null
+          id?: string
+          is_in_progress?: boolean | null
+          proficiency_level?: string
+          skill_name?: string
+          updated_at?: string | null
+          verification_date?: string | null
+          verification_status?: string | null
+          verified_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hr_employee_skills_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "hr_employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hr_employees: {
         Row: {
           company_id: string | null
           created_at: string | null
+          cv_extracted_data: Json | null
+          cv_extraction_date: string | null
+          cv_file_url: string | null
           department_id: string | null
           email: string
           hire_date: string | null
@@ -1794,6 +2176,9 @@ export type Database = {
         Insert: {
           company_id?: string | null
           created_at?: string | null
+          cv_extracted_data?: Json | null
+          cv_extraction_date?: string | null
+          cv_file_url?: string | null
           department_id?: string | null
           email: string
           hire_date?: string | null
@@ -1817,6 +2202,9 @@ export type Database = {
         Update: {
           company_id?: string | null
           created_at?: string | null
+          cv_extracted_data?: Json | null
+          cv_extraction_date?: string | null
+          cv_file_url?: string | null
           department_id?: string | null
           email?: string
           hire_date?: string | null
@@ -1906,6 +2294,7 @@ export type Database = {
           completion_date: string | null
           employee_id: string | null
           enrollment_date: string | null
+          estimated_completion_date: string | null
           id: string
           learning_path_id: string | null
           progress: number | null
@@ -1915,6 +2304,7 @@ export type Database = {
           completion_date?: string | null
           employee_id?: string | null
           enrollment_date?: string | null
+          estimated_completion_date?: string | null
           id?: string
           learning_path_id?: string | null
           progress?: number | null
@@ -1924,6 +2314,7 @@ export type Database = {
           completion_date?: string | null
           employee_id?: string | null
           enrollment_date?: string | null
+          estimated_completion_date?: string | null
           id?: string
           learning_path_id?: string | null
           progress?: number | null
@@ -1948,26 +2339,38 @@ export type Database = {
       }
       hr_learning_paths: {
         Row: {
+          course_count: number | null
           created_at: string | null
           description: string | null
+          duration: number | null
           id: string
           skill_level: string | null
+          skills: Json | null
+          thumbnail_url: string | null
           title: string
           updated_at: string | null
         }
         Insert: {
+          course_count?: number | null
           created_at?: string | null
           description?: string | null
+          duration?: number | null
           id?: string
           skill_level?: string | null
+          skills?: Json | null
+          thumbnail_url?: string | null
           title: string
           updated_at?: string | null
         }
         Update: {
+          course_count?: number | null
           created_at?: string | null
           description?: string | null
+          duration?: number | null
           id?: string
           skill_level?: string | null
+          skills?: Json | null
+          thumbnail_url?: string | null
           title?: string
           updated_at?: string | null
         }
@@ -2540,6 +2943,59 @@ export type Database = {
             columns: ["learner_id"]
             isOneToOne: false
             referencedRelation: "learner_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      learner_statistics: {
+        Row: {
+          assigned_courses: number | null
+          average_score: number | null
+          certificates_earned: number | null
+          courses_completed: number | null
+          courses_in_progress: number | null
+          created_at: string | null
+          employee_id: string | null
+          id: string
+          learning_paths_completed: number | null
+          skills_acquired: number | null
+          total_time_spent: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          assigned_courses?: number | null
+          average_score?: number | null
+          certificates_earned?: number | null
+          courses_completed?: number | null
+          courses_in_progress?: number | null
+          created_at?: string | null
+          employee_id?: string | null
+          id?: string
+          learning_paths_completed?: number | null
+          skills_acquired?: number | null
+          total_time_spent?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          assigned_courses?: number | null
+          average_score?: number | null
+          certificates_earned?: number | null
+          courses_completed?: number | null
+          courses_in_progress?: number | null
+          created_at?: string | null
+          employee_id?: string | null
+          id?: string
+          learning_paths_completed?: number | null
+          skills_acquired?: number | null
+          total_time_spent?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "learner_statistics_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: true
+            referencedRelation: "hr_employees"
             referencedColumns: ["id"]
           },
         ]
@@ -3578,29 +4034,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      binary_quantize:
-        | {
-            Args: {
-              "": string
-            }
-            Returns: unknown
-          }
-        | {
-            Args: {
-              "": unknown
-            }
-            Returns: unknown
-          }
+      binary_quantize: {
+        Args: { "": string } | { "": unknown }
+        Returns: unknown
+      }
       check_and_fix_column_names: {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
       create_confirmed_user: {
-        Args: {
-          user_email: string
-          user_password: string
-          user_data?: Json
-        }
+        Args: { user_email: string; user_password: string; user_data?: Json }
         Returns: Json
       }
       create_notifications_table: {
@@ -3612,168 +4055,95 @@ export type Database = {
         Returns: undefined
       }
       exec_sql: {
-        Args: {
-          sql: string
-        }
+        Args: { sql: string }
         Returns: undefined
       }
       halfvec_avg: {
-        Args: {
-          "": number[]
-        }
+        Args: { "": number[] }
         Returns: unknown
       }
       halfvec_out: {
-        Args: {
-          "": unknown
-        }
+        Args: { "": unknown }
         Returns: unknown
       }
       halfvec_send: {
-        Args: {
-          "": unknown
-        }
+        Args: { "": unknown }
         Returns: string
       }
       halfvec_typmod_in: {
-        Args: {
-          "": unknown[]
-        }
+        Args: { "": unknown[] }
         Returns: number
       }
       hnsw_bit_support: {
-        Args: {
-          "": unknown
-        }
+        Args: { "": unknown }
         Returns: unknown
       }
       hnsw_halfvec_support: {
-        Args: {
-          "": unknown
-        }
+        Args: { "": unknown }
         Returns: unknown
       }
       hnsw_sparsevec_support: {
-        Args: {
-          "": unknown
-        }
+        Args: { "": unknown }
         Returns: unknown
       }
       hnswhandler: {
-        Args: {
-          "": unknown
-        }
+        Args: { "": unknown }
         Returns: unknown
       }
       ivfflat_bit_support: {
-        Args: {
-          "": unknown
-        }
+        Args: { "": unknown }
         Returns: unknown
       }
       ivfflat_halfvec_support: {
-        Args: {
-          "": unknown
-        }
+        Args: { "": unknown }
         Returns: unknown
       }
       ivfflathandler: {
-        Args: {
-          "": unknown
-        }
+        Args: { "": unknown }
         Returns: unknown
       }
-      l2_norm:
-        | {
-            Args: {
-              "": unknown
-            }
-            Returns: number
-          }
-        | {
-            Args: {
-              "": unknown
-            }
-            Returns: number
-          }
-      l2_normalize:
-        | {
-            Args: {
-              "": string
-            }
-            Returns: string
-          }
-        | {
-            Args: {
-              "": unknown
-            }
-            Returns: unknown
-          }
-        | {
-            Args: {
-              "": unknown
-            }
-            Returns: unknown
-          }
+      l2_norm: {
+        Args: { "": unknown } | { "": unknown }
+        Returns: number
+      }
+      l2_normalize: {
+        Args: { "": string } | { "": unknown } | { "": unknown }
+        Returns: string
+      }
       sparsevec_out: {
-        Args: {
-          "": unknown
-        }
+        Args: { "": unknown }
         Returns: unknown
       }
       sparsevec_send: {
-        Args: {
-          "": unknown
-        }
+        Args: { "": unknown }
         Returns: string
       }
       sparsevec_typmod_in: {
-        Args: {
-          "": unknown[]
-        }
+        Args: { "": unknown[] }
         Returns: number
       }
       vector_avg: {
-        Args: {
-          "": number[]
-        }
+        Args: { "": number[] }
         Returns: string
       }
-      vector_dims:
-        | {
-            Args: {
-              "": string
-            }
-            Returns: number
-          }
-        | {
-            Args: {
-              "": unknown
-            }
-            Returns: number
-          }
+      vector_dims: {
+        Args: { "": string } | { "": unknown }
+        Returns: number
+      }
       vector_norm: {
-        Args: {
-          "": string
-        }
+        Args: { "": string }
         Returns: number
       }
       vector_out: {
-        Args: {
-          "": string
-        }
+        Args: { "": string }
         Returns: unknown
       }
       vector_send: {
-        Args: {
-          "": string
-        }
+        Args: { "": string }
         Returns: string
       }
       vector_typmod_in: {
-        Args: {
-          "": unknown[]
-        }
+        Args: { "": unknown[] }
         Returns: number
       }
     }
@@ -3788,27 +4158,29 @@ export type Database = {
   }
 }
 
-type PublicSchema = Database[Extract<keyof Database, "public">]
+type DefaultSchema = Database[Extract<keyof Database, "public">]
 
 export type Tables<
-  PublicTableNameOrOptions extends
-    | keyof (PublicSchema["Tables"] & PublicSchema["Views"])
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof Database },
-  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
-    ? keyof (Database[PublicTableNameOrOptions["schema"]]["Tables"] &
-        Database[PublicTableNameOrOptions["schema"]]["Views"])
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof Database
+  }
+    ? keyof (Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        Database[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
     : never = never,
-> = PublicTableNameOrOptions extends { schema: keyof Database }
-  ? (Database[PublicTableNameOrOptions["schema"]]["Tables"] &
-      Database[PublicTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+> = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
+  ? (Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      Database[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
       Row: infer R
     }
     ? R
     : never
-  : PublicTableNameOrOptions extends keyof (PublicSchema["Tables"] &
-        PublicSchema["Views"])
-    ? (PublicSchema["Tables"] &
-        PublicSchema["Views"])[PublicTableNameOrOptions] extends {
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
         Row: infer R
       }
       ? R
@@ -3816,20 +4188,22 @@ export type Tables<
     : never
 
 export type TablesInsert<
-  PublicTableNameOrOptions extends
-    | keyof PublicSchema["Tables"]
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
     | { schema: keyof Database },
-  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
-    ? keyof Database[PublicTableNameOrOptions["schema"]]["Tables"]
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof Database
+  }
+    ? keyof Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never = never,
-> = PublicTableNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+> = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
+  ? Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Insert: infer I
     }
     ? I
     : never
-  : PublicTableNameOrOptions extends keyof PublicSchema["Tables"]
-    ? PublicSchema["Tables"][PublicTableNameOrOptions] extends {
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
         Insert: infer I
       }
       ? I
@@ -3837,20 +4211,22 @@ export type TablesInsert<
     : never
 
 export type TablesUpdate<
-  PublicTableNameOrOptions extends
-    | keyof PublicSchema["Tables"]
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
     | { schema: keyof Database },
-  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
-    ? keyof Database[PublicTableNameOrOptions["schema"]]["Tables"]
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof Database
+  }
+    ? keyof Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never = never,
-> = PublicTableNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+> = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
+  ? Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Update: infer U
     }
     ? U
     : never
-  : PublicTableNameOrOptions extends keyof PublicSchema["Tables"]
-    ? PublicSchema["Tables"][PublicTableNameOrOptions] extends {
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
         Update: infer U
       }
       ? U
@@ -3858,21 +4234,23 @@ export type TablesUpdate<
     : never
 
 export type Enums<
-  PublicEnumNameOrOptions extends
-    | keyof PublicSchema["Enums"]
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema["Enums"]
     | { schema: keyof Database },
-  EnumName extends PublicEnumNameOrOptions extends { schema: keyof Database }
-    ? keyof Database[PublicEnumNameOrOptions["schema"]]["Enums"]
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof Database
+  }
+    ? keyof Database[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
     : never = never,
-> = PublicEnumNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicEnumNameOrOptions["schema"]]["Enums"][EnumName]
-  : PublicEnumNameOrOptions extends keyof PublicSchema["Enums"]
-    ? PublicSchema["Enums"][PublicEnumNameOrOptions]
+> = DefaultSchemaEnumNameOrOptions extends { schema: keyof Database }
+  ? Database[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
     : never
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
-    | keyof PublicSchema["CompositeTypes"]
+    | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof Database },
   CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
     schema: keyof Database
@@ -3881,6 +4259,16 @@ export type CompositeTypes<
     : never = never,
 > = PublicCompositeTypeNameOrOptions extends { schema: keyof Database }
   ? Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
-  : PublicCompositeTypeNameOrOptions extends keyof PublicSchema["CompositeTypes"]
-    ? PublicSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
+
+export const Constants = {
+  public: {
+    Enums: {
+      content_status: ["Draft", "Published", "Archived"],
+      rag_status: ["Green", "Amber", "Red"],
+      user_role: ["Learner", "HR", "Mentor", "SuperAdmin"],
+    },
+  },
+} as const
