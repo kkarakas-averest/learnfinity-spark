@@ -18,7 +18,8 @@ const initPdfJs = async (): Promise<typeof import('pdfjs-dist')> => {
     PDFJS = await import('pdfjs-dist');
     
     // Set the worker source to a CDN URL
-    const workerUrl = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/5.1.91/pdf.worker.min.js';
+    // Use unpkg instead of cdnjs as it dynamically serves the correct version
+    const workerUrl = 'https://unpkg.com/pdfjs-dist@5.1.91/build/pdf.worker.min.js';
     PDFJS.GlobalWorkerOptions.workerSrc = workerUrl;
   }
   
