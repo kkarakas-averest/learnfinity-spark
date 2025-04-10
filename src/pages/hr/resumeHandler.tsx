@@ -3,6 +3,7 @@ import { toast } from '@/components/ui/use-toast';
 import { uploadResumeFile, uploadResumeViaAPI, createMockResumeUrl } from '@/utils/resumeUpload';
 import { supabase } from '@/lib/supabase';
 import { GROQ_API_KEY } from '@/lib/env';
+import { extractTextFromPdf } from '@/lib/pdf/pdfExtractor';
 
 /**
  * Hook for handling resume upload and viewing in employee profiles
@@ -72,47 +73,22 @@ export function useResumeHandler(employeeId: string | null) {
         }
       }
       
-      // Extract text from PDF using the server-side API route
-      console.log("Extracting PDF text via server-side API...");
+      // Extract text from PDF using our enhanced client-side extraction
+      console.log("Extracting PDF text using PDF.js...");
       let pdfContent = "";
       let pdfMetadata = {};
       
       try {
-        // Use relative URL that will work regardless of domain
-        const apiUrl = `/api/hr/extract-pdf`;
-        console.log(`Calling PDF extraction API at: ${apiUrl}`);
+        const extractionResult = await extractTextFromPdf(cvUrl);
         
-        const extractionResponse = await fetch(apiUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ pdfUrl: cvUrl })
-        });
-        
-        if (!extractionResponse.ok) {
-          const errorData = await extractionResponse.json().catch(() => ({}));
-          const errorStatus = extractionResponse.status;
-          const errorMessage = errorData.error || 'Unknown error';
-          console.warn(`PDF extraction API returned status ${errorStatus}: ${errorMessage}`);
-          
-          if (errorStatus === 404) {
-            throw new Error("PDF extraction API endpoint not found. The API may not be deployed yet.");
-          } else {
-            throw new Error(`PDF extraction API failed: ${errorStatus} - ${errorMessage}`);
-          }
-        }
-        
-        const extractionResult = await extractionResponse.json();
-        
-        if (!extractionResult.success || !extractionResult.text) {
-          console.error("Server-side PDF extraction failed:", extractionResult.error);
+        if (!extractionResult.success) {
+          console.error("PDF extraction failed:", extractionResult.metadata?.error);
           pdfContent = "PDF text extraction failed. Please analyze based on the employee name, position, and department information provided.";
         } else {
           pdfContent = extractionResult.text;
           pdfMetadata = extractionResult.metadata || {};
-          console.log(`Successfully extracted ${pdfContent.length} characters via API`);
-          console.log(`PDF metadata via API:`, pdfMetadata);
+          console.log(`Successfully extracted ${pdfContent.length} characters from PDF`);
+          console.log(`PDF metadata:`, pdfMetadata);
           
           // Add a sample to help the model understand the content quality
           const contentPreview = pdfContent.substring(0, 150);
@@ -145,10 +121,10 @@ export function useResumeHandler(employeeId: string | null) {
             console.log(`Truncated content length: ${pdfContent.length} chars`);
           }
         }
-      } catch (extractionApiError) {
-        console.error("Error calling PDF extraction API:", extractionApiError);
+      } catch (extractionError) {
+        console.error("Error extracting PDF text:", extractionError);
         // Enhanced fallback prompt with better guidance for the LLM
-        pdfContent = `PDF text extraction service error: ${extractionApiError.message}
+        pdfContent = `PDF text extraction error: ${extractionError.message}
 
           Please generate a placeholder profile for:
           Name: ${employeeName}
