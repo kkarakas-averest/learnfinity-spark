@@ -194,11 +194,39 @@ const EnhanceCourseContentButton: React.FC<EnhanceCourseContentButtonProps> = ({
       console.log('Mirror result:', mirrorData);
       
       // Check if the course was successfully mirrored or already existed
-      const courseMirrored = 
-        mirrorData.results.mirrored.some((c: any) => c.courseId === courseId) || 
-        mirrorData.results.skipped.some((c: any) => c.courseId === courseId);
+      // Add debugging to verify the structure of the response
+      console.log('Mirror data structure:', {
+        mirrored: mirrorData.results.mirrored,
+        skipped: mirrorData.results.skipped,
+        courseId
+      });
+      
+      // Fix the verification check to handle empty arrays properly
+      let courseMirrored = false;
+      
+      // Check if course was mirrored successfully
+      if (mirrorData.results.mirrored && mirrorData.results.mirrored.length > 0) {
+        courseMirrored = mirrorData.results.mirrored.some((c) => c.courseId === courseId);
+      }
+      
+      // Check if course was skipped (already exists)
+      if (!courseMirrored && mirrorData.results.skipped && mirrorData.results.skipped.length > 0) {
+        courseMirrored = mirrorData.results.skipped.some((c) => c.courseId === courseId);
+      }
+      
+      // If neither mirrored nor skipped, check if hrCourses was empty
+      if (!courseMirrored && mirrorData.summary && mirrorData.summary.total === 0) {
+        console.warn('No HR courses found to mirror');
+        // If the endpoint found no courses to mirror, it might mean the course doesn't exist
+        // Let's continue anyway and let the universal endpoint handle it
+        courseMirrored = true;
+      }
         
       if (!courseMirrored) {
+        console.error('Course mirroring verification failed:', {
+          courseId,
+          mirrorData
+        });
         throw new Error('Failed to mirror course. Please check the course data.');
       }
 

@@ -70,6 +70,19 @@ export default async function handler(req, res) {
       }
       
       hrCourses = data || [];
+      
+      // If no course found with this ID, add special notification
+      if (hrCourses.length === 0) {
+        console.log(`No HR course found with ID: ${courseId}`);
+        
+        // Add to results explicitly
+        results.errors.push({
+          courseId: courseId,
+          title: 'Unknown Course',
+          error: 'Course not found in hr_courses table',
+          notFound: true
+        });
+      }
     } else if (employeeId) {
       // Employee's courses mode
       const { data, error } = await supabase
