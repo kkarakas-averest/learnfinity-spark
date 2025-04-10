@@ -26,7 +26,7 @@ const initPdfJs = async (): Promise<typeof import('pdfjs-dist')> => {
         try {
           // Try to load the worker directly from the same origin
           // This will work when the worker is properly bundled with the app
-          PDFJS.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
+          PDFJS.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
           
           console.log('PDF.js worker source set to same-origin path');
         } catch (workerError) {
