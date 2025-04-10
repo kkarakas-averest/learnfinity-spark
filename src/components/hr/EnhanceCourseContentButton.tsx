@@ -161,8 +161,8 @@ const EnhanceCourseContentButton: React.FC<EnhanceCourseContentButtonProps> = ({
         profileDataAvailable: !!employeeData.cv_extracted_data
       });
 
-      // Use the simplified endpoint for testing
-      const response = await fetch('/api/hr/courses/enhance-course-content-simple', {
+      // Use the direct endpoint that doesn't rely on getSupabase
+      const response = await fetch('/api/hr/courses/direct-enhance-content', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -194,11 +194,11 @@ const EnhanceCourseContentButton: React.FC<EnhanceCourseContentButtonProps> = ({
       // If response is OK, proceed with JSON parsing
       const data = await response.json();
       
-      // For our simplified endpoint, the response is different
+      // For our direct endpoint, the response is different
       if (data.success) {
         toast({
           title: 'Success!',
-          description: `Basic personalized content created for "${courseTitle}". Content ID: ${data.contentId}`,
+          description: `Personalized content created for "${courseTitle}" with your profile details.`,
           variant: 'default',
         });
         return;
@@ -206,7 +206,7 @@ const EnhanceCourseContentButton: React.FC<EnhanceCourseContentButtonProps> = ({
 
       toast({
         title: 'Success!',
-        description: `Personalized content created for "${courseTitle}". The content has been tailored to the employee's profile.`,
+        description: `Personalized content created for "${courseTitle}". The content has been tailored to your profile.`,
         variant: 'default',
       });
     } catch (error) {
