@@ -182,7 +182,8 @@ export default async function handler(req, res) {
         return res.status(500).json({ 
           error: 'Database error', 
           message: insertResult.error.message,
-          hint: 'Check database permissions and Supabase configuration'
+          details: insertResult.error.details || 'No additional details',
+          hint: 'Check RLS policies for the ai_course_content table'
         });
       }
       
@@ -213,6 +214,12 @@ export default async function handler(req, res) {
         
       if (sectionResult.error) {
         console.error('Error creating section:', sectionResult.error);
+        return res.status(500).json({
+          error: 'Database section creation error',
+          message: sectionResult.error.message,
+          details: sectionResult.error.details || 'No additional details',
+          hint: 'Check RLS policies for the ai_course_content_sections table'
+        });
       } else {
         console.log('Sample section created successfully');
       }
@@ -237,6 +244,12 @@ export default async function handler(req, res) {
         
       if (questionResult.error) {
         console.error('Error creating quiz question:', questionResult.error);
+        return res.status(500).json({
+          error: 'Database quiz creation error',
+          message: questionResult.error.message,
+          details: questionResult.error.details || 'No additional details',
+          hint: 'Check RLS policies for the ai_course_quiz_questions table'
+        });
       } else {
         console.log('Sample quiz question created successfully');
       }
