@@ -78,7 +78,11 @@ export function useResumeHandler(employeeId: string | null) {
       let pdfMetadata = {};
       
       try {
-        const extractionResponse = await fetch('/api/hr/extract-pdf', {
+        // Use relative URL that will work regardless of domain
+        const apiUrl = `/api/hr/extract-pdf`;
+        console.log(`Calling PDF extraction API at: ${apiUrl}`);
+        
+        const extractionResponse = await fetch(apiUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
@@ -88,7 +92,15 @@ export function useResumeHandler(employeeId: string | null) {
         
         if (!extractionResponse.ok) {
           const errorData = await extractionResponse.json().catch(() => ({}));
-          throw new Error(`PDF extraction API failed: ${extractionResponse.status} - ${errorData.error || 'Unknown error'}`);
+          const errorStatus = extractionResponse.status;
+          const errorMessage = errorData.error || 'Unknown error';
+          console.warn(`PDF extraction API returned status ${errorStatus}: ${errorMessage}`);
+          
+          if (errorStatus === 404) {
+            throw new Error("PDF extraction API endpoint not found. The API may not be deployed yet.");
+          } else {
+            throw new Error(`PDF extraction API failed: ${errorStatus} - ${errorMessage}`);
+          }
         }
         
         const extractionResult = await extractionResponse.json();
@@ -101,7 +113,25 @@ export function useResumeHandler(employeeId: string | null) {
           pdfMetadata = extractionResult.metadata || {};
           console.log(`Successfully extracted ${pdfContent.length} characters via API`);
           console.log(`PDF metadata via API:`, pdfMetadata);
-          console.log(`PDF content preview: "${pdfContent.substring(0, 150)}..."`);
+          
+          // Add a sample to help the model understand the content quality
+          const contentPreview = pdfContent.substring(0, 150);
+          console.log(`PDF content preview: "${contentPreview}..."`);
+          
+          // Check if the extracted content seems valid
+          if (pdfContent.length < 100 || 
+              contentPreview.includes("PDF text extraction failed") ||
+              contentPreview.match(/^[\s\d\W]+$/)) { // Only whitespace, numbers, and non-word chars
+            console.warn("Extracted PDF content appears to be low quality or invalid");
+            pdfContent = `The PDF text extraction produced low-quality results. Please analyze based on the following details:
+              Employee Name: ${employeeName}
+              Department: ${departmentName}
+              Position: ${positionName}
+              
+              Please generate a reasonable profile summary based on the position and department,
+              but indicate that this is a placeholder due to text extraction limitations.
+              ${pdfContent.substring(0, 500)}`;  // Include first 500 chars as potential context
+          }
           
           // Truncate content if it's too large to prevent Groq API errors
           const MAX_CONTENT_LENGTH = 8000; // Keep increased limit
@@ -117,7 +147,17 @@ export function useResumeHandler(employeeId: string | null) {
         }
       } catch (extractionApiError) {
         console.error("Error calling PDF extraction API:", extractionApiError);
-        pdfContent = "Error calling PDF text extraction service. Please analyze based on the employee name, position, and department information provided.";
+        // Enhanced fallback prompt with better guidance for the LLM
+        pdfContent = `PDF text extraction service error: ${extractionApiError.message}
+
+          Please generate a placeholder profile for:
+          Name: ${employeeName}
+          Position: ${positionName}
+          Department: ${departmentName}
+          
+          Create a reasonable professional profile summary for someone in this role and department.
+          Include likely skills, experience, and qualifications that would be typical for this position.
+          Make it clear in the summary that this is a placeholder profile due to technical limitations.`;
       }
       
       // Prepare prompt with the extracted PDF content
@@ -133,91 +173,92 @@ export function useResumeHandler(employeeId: string | null) {
         POSITION: ${positionName}
         DEPARTMENT: ${departmentName}
         
-        Your task is to carefully analyze this CV and extract specific, detailed information about the candidate.
-        Read through all the content thoroughly to find relevant details about their work history, education, skills, and achievements.
+        TASK:
+        Your task is to create a detailed professional profile based on the CV content provided.
+        If the CV content appears to be missing, corrupted, or contains extraction errors, create a realistic
+        placeholder profile for someone with this name, position, and department, but clearly indicate it's a placeholder.
         
         EXTRACTION INSTRUCTIONS:
-        1. Extract ONLY actual information present in the CV - never make assumptions or generate generic content
-        2. Look for specific company names, job titles, time periods, skills, and accomplishments
-        3. If a section has no information in the CV, use empty arrays [] rather than "Not specified"
-        4. Pay special attention to dates, locations, technical skills, and quantifiable achievements
-        5. Include exact phrases and terminology used in the CV whenever possible
+        1. If the CV content is readable:
+           - Extract REAL information from the CV - never make assumptions
+           - Focus on specific company names, job titles, time periods, skills, and accomplishments
+           - If a section truly has no information, use empty arrays [] rather than "Not specified"
+        
+        2. If the CV content is NOT readable (contains errors or is missing):
+           - Create a realistic placeholder profile for someone in this position and department
+           - Generate reasonable skills, experience, education based on the position
+           - CLEARLY indicate in the summary that this is a generated placeholder profile
+           - Try to incorporate any readable fragments from the CV content if available
         
         Format your response as this JSON structure:
         {
-          "summary": "A detailed professional profile based on the candidate's actual experience. Include specific years of experience, industry focus, key roles, and notable achievements. Minimum 100 words.",
+          "summary": "Detailed professional profile summarizing career and expertise. If this is a placeholder, clearly state this fact.",
           
           "skills": [
-            "Skill 1 exactly as mentioned in CV",
-            "Skill 2 exactly as mentioned in CV",
-            "Technical skill with any proficiency level mentioned"
+            "Skill 1 from CV or realistic for position if CV is unreadable",
+            "Skill 2 from CV or realistic for position if CV is unreadable"
           ],
           
           "experience": [
             {
-              "title": "Exact job title from CV",
-              "company": "Exact company name from CV",
-              "duration": "Specific time period (e.g., 'Jan 2018 - Present')",
+              "title": "Job title from CV or realistic title if CV is unreadable",
+              "company": "Company name from CV or 'Generated placeholder' if CV is unreadable",
+              "duration": "Time period from CV or realistic duration if CV is unreadable",
               "highlights": [
-                "Specific accomplishment or responsibility with metrics if available",
-                "Another specific duty or achievement from the CV"
+                "Achievement from CV or realistic for position if CV is unreadable",
+                "Another achievement from CV or realistic for position if CV is unreadable"
               ]
             }
           ],
           
           "education": [
             {
-              "degree": "Exact degree name and field from CV",
-              "institution": "Exact institution name from CV",
-              "year": "Graduation year or date range from CV"
+              "degree": "Degree from CV or realistic for position if CV is unreadable",
+              "institution": "Institution from CV or realistic institution if CV is unreadable",
+              "year": "Year from CV or realistic year if CV is unreadable"
             }
           ],
           
           "certifications": [
-            "Exact certification name and date if available",
-            "Another certification exactly as mentioned in CV"
+            "Certification from CV or realistic for position if CV is unreadable"
           ],
           
           "languages": [
-            "Language with proficiency level as mentioned in CV"
+            "Language from CV or realistic assumption if CV is unreadable"
           ],
           
           "keyAchievements": [
-            "Notable achievement explicitly mentioned in CV",
-            "Award, recognition, or significant project outcome"
+            "Achievement from CV or realistic for position if CV is unreadable"
           ],
           
           "personalInsights": {
-            "yearsOfExperience": "Total years based on work history in CV",
+            "yearsOfExperience": "Years from CV or realistic for position if CV is unreadable",
             "industries": [
-              "Specific industry mentioned or evident from work history",
-              "Another relevant industry from the CV"
+              "Industry from CV or related to department if CV is unreadable"
             ],
             "toolsAndTechnologies": [
-              "Specific tool, software, or technology mentioned in CV",
-              "Another technical tool extracted from CV"
+              "Tool/technology from CV or realistic for position if CV is unreadable"
             ],
             "softSkills": [
-              "Soft skill explicitly mentioned in CV",
-              "Leadership style or interpersonal skill from CV"
+              "Soft skill from CV or realistic for position if CV is unreadable"
             ]
-          }
+          },
+          
+          "isPlaceholder": true/false  // Set to true if generating a placeholder profile
         }
         
         IMPORTANT:
-        - ONLY extract information that is explicitly stated in the CV
-        - DO NOT invent or assume information that isn't present
-        - If a field truly has no information, use [] for arrays or null for strings
-        - Focus on ACCURACY over completeness
-        - Your response must be ONLY the JSON object with no additional text before or after
+        - If using real CV data, be as accurate and specific as possible
+        - If creating a placeholder, make it realistic but clearly labeled
+        - Respond ONLY with the JSON object, no explanatory text
       `;
 
       // Create system message
-      const systemMessage = `You are an AI specialized in precise information extraction from resumes and CVs. 
-Your task is to extract specific details from the provided document and format them into a structured JSON object.
-Focus ONLY on extracting information that is explicitly present in the document - never invent details.
-If certain information is not available, use empty arrays or null values rather than placeholders.
-Your response must contain ONLY a properly formatted JSON object with no explanatory text before or after.`;
+      const systemMessage = `You are an expert CV analyzer that extracts or generates structured profile information.
+When provided with CV text, extract real information accurately.
+If the CV text appears corrupted, missing, or contains extraction errors, generate a realistic placeholder profile for the person's position and department.
+Always indicate clearly when generating placeholder information.
+Return ONLY a properly formatted JSON object with no additional text.`;
       
       // Make the API call to Groq
       console.log("Calling Groq API directly for CV analysis");

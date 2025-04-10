@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import pdf from 'pdf-parse';
 
-export const runtime = 'nodejs'; // Ensure Node.js runtime for pdf-parse
+// Use edge runtime for better compatibility with Vercel
+export const runtime = 'edge';
 
 // Simple function to clean text: normalize whitespace, remove non-printables
 function cleanText(text: string): string {
@@ -13,10 +13,46 @@ function cleanText(text: string): string {
     .trim();                     // Trim leading/trailing whitespace
 }
 
-export async function POST(request: NextRequest) {
-  console.log("--- API: extract-pdf START ---");
+// Simple function to extract text from PDF using regex patterns on raw data
+function extractTextFromPdfBuffer(buffer: ArrayBuffer): string {
   try {
-    const { pdfUrl } = await request.json();
+    // Convert buffer to string
+    const uint8Array = new Uint8Array(buffer);
+    let textContent = "";
+    
+    // Basic approach: extract text by converting to string and preserving basic ASCII characters
+    for (let i = 0; i < uint8Array.length; i++) {
+      const charCode = uint8Array[i];
+      if (charCode >= 32 && charCode <= 126) {
+        textContent += String.fromCharCode(charCode);
+      } else if (charCode === 10 || charCode === 13) {
+        textContent += "\n";
+      }
+    }
+    
+    // Extract text between parentheses, which often contains actual text in PDFs
+    const textRegex = /\(([^)]+)\)/g;
+    let extractedText = "";
+    let match;
+    
+    while ((match = textRegex.exec(textContent)) !== null) {
+      if (match[1] && match[1].trim().length > 2) {
+        extractedText += match[1].trim() + "\n";
+      }
+    }
+    
+    return extractedText.length > 500 ? extractedText : textContent;
+  } catch (error) {
+    console.error("Error in simple PDF text extraction:", error);
+    return "";
+  }
+}
+
+export async function POST(request: NextRequest) {
+  console.log("--- API: extract-pdf START (edge runtime) ---");
+  try {
+    const data = await request.json();
+    const { pdfUrl } = data;
 
     if (!pdfUrl || typeof pdfUrl !== 'string') {
       console.error("Invalid request: pdfUrl missing or not a string");
@@ -47,21 +83,21 @@ export async function POST(request: NextRequest) {
     }
     console.log(`PDF fetched, size: ${arrayBuffer.byteLength} bytes`);
 
-    // Parse PDF using pdf-parse
-    console.log("Parsing PDF using pdf-parse...");
-    const data = await pdf(Buffer.from(arrayBuffer));
-    console.log(`PDF parsed successfully. Pages: ${data.numpages}, Chars: ${data.text.length}`);
-
+    // Extract text using our basic method (no external dependencies)
+    const extractedText = extractTextFromPdfBuffer(arrayBuffer);
+    console.log(`Extracted ${extractedText.length} characters from PDF`);
+    
     // Clean the extracted text
-    const cleanedText = cleanText(data.text);
+    const cleanedText = cleanText(extractedText);
+    console.log(`Cleaned text length: ${cleanedText.length} characters`);
 
-    console.log("--- API: extract-pdf COMPLETE ---");
+    console.log("--- API: extract-pdf COMPLETE (edge runtime) ---");
     return NextResponse.json({
       success: true,
       text: cleanedText,
       metadata: {
-        pageCount: data.numpages,
-        info: data.info // Includes title, author etc. if available
+        pageCount: 0,  // We can't determine this accurately without pdf-parse
+        textLength: cleanedText.length,
       }
     }, { status: 200 });
 
