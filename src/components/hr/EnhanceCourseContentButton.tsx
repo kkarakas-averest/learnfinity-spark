@@ -161,15 +161,14 @@ const EnhanceCourseContentButton: React.FC<EnhanceCourseContentButtonProps> = ({
         profileDataAvailable: !!employeeData.cv_extracted_data
       });
 
-      // Use a relative path that works in both development and production
-      const response = await fetch('/api/hr/courses/enhance-course-content', {
+      // Use the simplified endpoint for testing
+      const response = await fetch('/api/hr/courses/enhance-course-content-simple', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ 
           employeeId,
-          employeeProfile,
           courseId 
         }),
       });
@@ -195,17 +194,14 @@ const EnhanceCourseContentButton: React.FC<EnhanceCourseContentButtonProps> = ({
       // If response is OK, proceed with JSON parsing
       const data = await response.json();
       
-      // Check if we have results from the API
-      if (data.success && data.results && data.results.length > 0) {
-        const result = data.results.find(r => r.courseId === courseId);
-        if (result && result.success) {
-          toast({
-            title: 'Success!',
-            description: `Personalized content created for "${courseTitle}" with ${result.moduleCount} modules. The content has been tailored to the employee's profile.`,
-            variant: 'default',
-          });
-          return;
-        }
+      // For our simplified endpoint, the response is different
+      if (data.success) {
+        toast({
+          title: 'Success!',
+          description: `Basic personalized content created for "${courseTitle}". Content ID: ${data.contentId}`,
+          variant: 'default',
+        });
+        return;
       }
 
       toast({
@@ -213,7 +209,7 @@ const EnhanceCourseContentButton: React.FC<EnhanceCourseContentButtonProps> = ({
         description: `Personalized content created for "${courseTitle}". The content has been tailored to the employee's profile.`,
         variant: 'default',
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error enhancing course content:', error);
       
       toast({
