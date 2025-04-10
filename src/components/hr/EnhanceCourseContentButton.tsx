@@ -198,6 +198,7 @@ const EnhanceCourseContentButton: React.FC<EnhanceCourseContentButtonProps> = ({
       console.log('Mirror data structure:', {
         mirrored: mirrorData.results.mirrored,
         skipped: mirrorData.results.skipped,
+        errors: mirrorData.results.errors,
         courseId
       });
       
@@ -212,6 +213,19 @@ const EnhanceCourseContentButton: React.FC<EnhanceCourseContentButtonProps> = ({
       // Check if course was skipped (already exists)
       if (!courseMirrored && mirrorData.results.skipped && mirrorData.results.skipped.length > 0) {
         courseMirrored = mirrorData.results.skipped.some((c) => c.courseId === courseId);
+      }
+      
+      // Check if the course wasn't found in the HR system but was recorded as "not found" error
+      // This is a special case we want to handle by continuing anyway
+      if (!courseMirrored && mirrorData.results.errors && mirrorData.results.errors.length > 0) {
+        const notFoundError = mirrorData.results.errors.find(
+          (e) => e.courseId === courseId && e.notFound === true
+        );
+        
+        if (notFoundError) {
+          console.warn(`Course with ID ${courseId} not found in HR system, continuing anyway`);
+          courseMirrored = true;
+        }
       }
       
       // If neither mirrored nor skipped, check if hrCourses was empty
