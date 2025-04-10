@@ -161,8 +161,8 @@ const EnhanceCourseContentButton: React.FC<EnhanceCourseContentButtonProps> = ({
         profileDataAvailable: !!employeeData.cv_extracted_data
       });
 
-      // Use the direct endpoint that doesn't rely on getSupabase
-      const response = await fetch('/api/hr/courses/direct-enhance-content', {
+      // Use the universal endpoint that handles missing IDs gracefully
+      const response = await fetch('/api/hr/courses/universal-enhance', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -194,11 +194,11 @@ const EnhanceCourseContentButton: React.FC<EnhanceCourseContentButtonProps> = ({
       // If response is OK, proceed with JSON parsing
       const data = await response.json();
       
-      // For our direct endpoint, the response is different
+      // For our universal endpoint, the response format is different
       if (data.success) {
         toast({
           title: 'Success!',
-          description: `Personalized content created for "${courseTitle}" with your profile details.`,
+          description: `Personalized content created for "${data.course.title}" with your profile details.`,
           variant: 'default',
         });
         return;
