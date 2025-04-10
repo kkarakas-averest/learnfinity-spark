@@ -102,6 +102,65 @@ const EnhanceCourseContentButton: React.FC<EnhanceCourseContentButtonProps> = ({
     setEnhancingCourseId(courseId);
 
     try {
+      // First fetch employee profile data to include in request
+      const { data: employeeData, error: employeeError } = await supabase
+        .from('hr_employees')
+        .select(`
+          id,
+          name,
+          cv_extracted_data,
+          department_id,
+          position_id
+        `)
+        .eq('id', employeeId)
+        .single();
+      
+      if (employeeError) {
+        throw new Error(`Failed to fetch employee data: ${employeeError.message}`);
+      }
+      
+      // Fetch department and position data separately
+      let departmentName = '';
+      let positionTitle = '';
+      
+      if (employeeData.department_id) {
+        const { data: departmentData } = await supabase
+          .from('hr_departments')
+          .select('name')
+          .eq('id', employeeData.department_id)
+          .single();
+          
+        if (departmentData) {
+          departmentName = departmentData.name;
+        }
+      }
+      
+      if (employeeData.position_id) {
+        const { data: positionData } = await supabase
+          .from('hr_positions')
+          .select('title')
+          .eq('id', employeeData.position_id)
+          .single();
+          
+        if (positionData) {
+          positionTitle = positionData.title;
+        }
+      }
+      
+      // Prepare employee profile data
+      const employeeProfile = {
+        name: employeeData.name,
+        role: positionTitle,
+        department: departmentName,
+        cv_extracted_data: employeeData.cv_extracted_data || null
+      };
+      
+      console.log('Enhancing course content with employee profile:', {
+        employeeId,
+        courseId,
+        profileDataAvailable: !!employeeData.cv_extracted_data
+      });
+
       // Use a relative path that works in both development and production
       const response = await fetch('/api/hr/courses/enhance-course-content', {
         method: 'POST',
@@ -110,6 +169,7 @@ const EnhanceCourseContentButton: React.FC<EnhanceCourseContentButtonProps> = ({
         },
         body: JSON.stringify({ 
           employeeId,
+          employeeProfile,
           courseId 
         }),
       });
@@ -134,6 +194,19 @@ const EnhanceCourseContentButton: React.FC<EnhanceCourseContentButtonProps> = ({
 
       // If response is OK, proceed with JSON parsing
       const data = await response.json();
+      
+      // Check if we have results from the API
+      if (data.success && data.results && data.results.length > 0) {
+        const result = data.results.find(r => r.courseId === courseId);
+        if (result && result.success) {
+          toast({
+            title: 'Success!',
+            description: `Personalized content created for "${courseTitle}" with ${result.moduleCount} modules. The content has been tailored to the employee's profile.`,
+            variant: 'default',
+          });
+          return;
+        }
+      }
 
       toast({
         title: 'Success!',

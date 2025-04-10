@@ -1,0 +1,477 @@
+// API endpoint for enhancing HR course content with personalized data
+// Using Groq API to generate personalized content for enrolled courses
+
+import { getSupabase } from '../../../src/lib/supabase.js';
+import { z } from 'zod';
+
+// GROQ API configuration
+const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
+const GROQ_MODEL = 'llama3-70b-8192';
+
+// Request validation schema
+const requestSchema = z.object({
+  employeeId: z.string().uuid("Invalid employee ID format"),
+  employeeProfile: z.object({
+    // Basic employee data
+    name: z.string(),
+    role: z.string().optional(),
+    department: z.string().optional(),
+    
+    // Optional fields from profile data
+    skills: z.array(z.string()).optional(),
+    experience: z.array(z.any()).optional(),
+    education: z.array(z.any()).optional(),
+    certifications: z.array(z.string()).optional(),
+    interests: z.array(z.string()).optional(),
+    
+    // Any additional extracted data
+    cv_extracted_data: z.any().optional()
+  }).optional(),
+  
+  // Optional course ID to enhance a specific course (otherwise enhance all enrolled courses)
+  courseId: z.string().optional(),
+});
+
+// CORS headers helper
+const setCorsHeaders = (res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+};
+
+export default async function handler(req, res) {
+  // Set CORS headers
+  setCorsHeaders(res);
+  
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  
+  // Only allow POST requests
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed. Use POST.' });
+  }
+
+  try {
+    // Parse request body
+    let body;
+    try {
+      body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+    } catch (parseError) {
+      console.error('Error parsing request body:', parseError);
+      return res.status(400).json({ error: 'Invalid JSON in request body' });
+    }
+    
+    console.log('Request received for employee data:', body.employeeId);
+    
+    // Validate request
+    const validationResult = requestSchema.safeParse(body);
+    if (!validationResult.success) {
+      console.error('Validation error:', validationResult.error.format());
+      return res.status(400).json({ 
+        error: 'Invalid request data', 
+        details: validationResult.error.format() 
+      });
+    }
+    
+    const { employeeId, employeeProfile, courseId } = validationResult.data;
+    
+    // Get Supabase instance
+    const supabase = getSupabase();
+    if (!supabase) {
+      return res.status(500).json({ error: 'Failed to initialize database connection' });
+    }
+    
+    // 1. Fetch employee data if profile wasn't provided
+    let profile = employeeProfile;
+    if (!profile) {
+      const { data: employeeData, error: employeeError } = await supabase
+        .from('hr_employees')
+        .select(`
+          *,
+          hr_departments(id, name),
+          hr_positions(id, title)
+        `)
+        .eq('id', employeeId)
+        .single();
+        
+      if (employeeError) {
+        console.error('Error fetching employee data:', employeeError);
+        return res.status(404).json({ error: 'Employee not found', details: employeeError.message });
+      }
+      
+      profile = {
+        name: employeeData.name,
+        role: employeeData.hr_positions?.title || '',
+        department: employeeData.hr_departments?.name || '',
+        cv_extracted_data: employeeData.cv_extracted_data || null
+      };
+    }
+    
+    // 2. Fetch enrolled courses
+    let enrolledCoursesQuery = supabase
+      .from('hr_course_enrollments')
+      .select(`
+        id,
+        course_id,
+        status,
+        progress,
+        hr_courses(
+          id,
+          title,
+          description,
+          category,
+          skill_level,
+          duration,
+          status
+        )
+      `)
+      .eq('employee_id', employeeId);
+    
+    // If specific courseId provided, filter by it
+    if (courseId) {
+      enrolledCoursesQuery = enrolledCoursesQuery.eq('course_id', courseId);
+    }
+    
+    const { data: enrolledCourses, error: coursesError } = await enrolledCoursesQuery;
+    
+    if (coursesError) {
+      console.error('Error fetching enrolled courses:', coursesError);
+      return res.status(500).json({ error: 'Failed to fetch enrolled courses' });
+    }
+    
+    if (!enrolledCourses || enrolledCourses.length === 0) {
+      return res.status(404).json({ 
+        error: 'No enrolled courses found',
+        details: courseId ? 'Specified course not found or not enrolled' : 'Employee has no enrolled courses'
+      });
+    }
+    
+    console.log(`Found ${enrolledCourses.length} enrolled courses for enhancement`);
+    
+    // Check GROQ API key
+    const GROQ_API_KEY = process.env.GROQ_API_KEY;
+    if (!GROQ_API_KEY) {
+      console.error('GROQ_API_KEY is not configured');
+      return res.status(500).json({ error: 'AI API is not configured on the server' });
+    }
+    
+    // 3. Process each enrolled course to enhance content
+    const results = [];
+    for (const enrollment of enrolledCourses) {
+      const course = enrollment.hr_courses;
+      if (!course) continue;
+      
+      try {
+        console.log(`Enhancing course "${course.title}" (${course.id}) for ${profile.name}`);
+        
+        // Generate personalized content for this course using Groq
+        const enhancedContent = await generatePersonalizedCourseContent(
+          GROQ_API_KEY,
+          course,
+          profile,
+          enrollment
+        );
+        
+        if (!enhancedContent || !enhancedContent.course_content) {
+          throw new Error('Failed to generate personalized content');
+        }
+        
+        // Save the enhanced content to the database
+        const { data: contentRecord, error: contentError } = await supabase
+          .from('ai_course_content')
+          .insert({
+            course_id: course.id,
+            version: `v1-${Date.now()}`,
+            created_for_user_id: employeeId,
+            metadata: {
+              title: course.title,
+              description: course.description,
+              level: course.skill_level || 'intermediate'
+            },
+            personalization_context: {
+              userProfile: {
+                role: profile.role,
+                department: profile.department,
+                preferences: profile.cv_extracted_data?.personalInsights || {}
+              },
+              courseContext: {
+                title: course.title,
+                level: course.skill_level || 'intermediate',
+                learning_objectives: enhancedContent.course_content.course_overview?.learning_objectives || []
+              },
+              employeeContext: {
+                department: profile.department,
+                position: profile.role,
+                skills: profile.cv_extracted_data?.skills || []
+              }
+            },
+            is_active: true
+          })
+          .select()
+          .single();
+          
+        if (contentError) {
+          throw new Error(`Failed to save AI course content: ${contentError.message}`);
+        }
+        
+        const contentId = contentRecord.id;
+        
+        // Save module and section content
+        const modules = enhancedContent.course_content.modules || [];
+        for (let i = 0; i < modules.length; i++) {
+          const module = modules[i];
+          
+          // Save module sections
+          const sections = module.sections || [];
+          for (let j = 0; j < sections.length; j++) {
+            const section = sections[j];
+            
+            // Format content as HTML
+            let sectionHtml = section.content;
+            if (!sectionHtml.startsWith('<div') && !sectionHtml.startsWith('<p')) {
+              sectionHtml = `<div class="prose max-w-none">${sectionHtml}</div>`;
+            }
+            
+            await supabase
+              .from('ai_course_content_sections')
+              .insert({
+                content_id: contentId,
+                module_id: module.id || `module-${i+1}`,
+                section_id: section.id || `section-${i+1}-${j+1}`,
+                title: section.title,
+                content: sectionHtml,
+                order_index: j
+              });
+          }
+          
+          // Save quiz questions if available
+          if (module.quiz && Array.isArray(module.quiz.questions)) {
+            for (const question of module.quiz.questions) {
+              await supabase
+                .from('ai_course_quiz_questions')
+                .insert({
+                  content_id: contentId,
+                  module_id: module.id || `module-${i+1}`,
+                  question: question.question,
+                  options: question.options || question.answers || [],
+                  correct_answer: question.correctAnswer || question.correct_answer,
+                  explanation: question.explanation || ''
+                });
+            }
+          }
+        }
+        
+        results.push({
+          courseId: course.id,
+          title: course.title,
+          success: true,
+          contentId: contentId,
+          moduleCount: modules.length
+        });
+        
+      } catch (courseError) {
+        console.error(`Error enhancing course ${course.id}:`, courseError);
+        results.push({
+          courseId: course.id,
+          title: course.title,
+          success: false,
+          error: courseError.message
+        });
+      }
+    }
+    
+    return res.status(200).json({
+      success: true,
+      processed: enrolledCourses.length,
+      results
+    });
+    
+  } catch (error) {
+    console.error('Error enhancing course content:', error);
+    return res.status(500).json({ 
+      error: 'Failed to enhance course content', 
+      details: error.message 
+    });
+  }
+}
+
+/**
+ * Generate personalized course content for an employee using Groq API
+ */
+async function generatePersonalizedCourseContent(apiKey, course, profile, enrollment) {
+  // Create a rich prompt that includes employee profile and course details
+  const systemPrompt = `You are an expert curriculum designer and educator who specializes in creating personalized learning content. 
+Your task is to create a detailed, personalized course structure based on an employee's profile and an existing course.
+Format your response as a JSON object with the structure specified below.`;
+
+  // Build a detailed user prompt with all relevant information
+  const userPrompt = `
+Create a personalized version of the following course for this specific employee:
+
+COURSE DETAILS:
+- Title: ${course.title}
+- Description: ${course.description || 'No description provided'}
+- Category: ${course.category || 'General'}
+- Skill Level: ${course.skill_level || 'Intermediate'}
+- Duration: ${course.duration || '2-3 hours'} minutes
+
+EMPLOYEE PROFILE:
+- Name: ${profile.name}
+- Role: ${profile.role || 'Not specified'}
+- Department: ${profile.department || 'Not specified'}
+${profile.cv_extracted_data ? `
+- Skills: ${(profile.cv_extracted_data.skills || []).join(', ')}
+- Experience: ${formatExperienceForPrompt(profile.cv_extracted_data.experience)}
+- Education: ${formatEducationForPrompt(profile.cv_extracted_data.education)}
+- Certifications: ${(profile.cv_extracted_data.certifications || []).join(', ')}
+- Key Achievements: ${(profile.cv_extracted_data.keyAchievements || []).join(', ')}
+- Years of Experience: ${profile.cv_extracted_data.personalInsights?.yearsOfExperience || 'Not specified'}
+- Industries: ${(profile.cv_extracted_data.personalInsights?.industries || []).join(', ')}
+- Tools & Technologies: ${(profile.cv_extracted_data.personalInsights?.toolsAndTechnologies || []).join(', ')}
+- Soft Skills: ${(profile.cv_extracted_data.personalInsights?.softSkills || []).join(', ')}
+` : ''}
+
+ENROLLMENT DETAILS:
+- Current Progress: ${enrollment.progress || 0}%
+- Status: ${enrollment.status || 'enrolled'}
+
+PERSONALIZATION GUIDELINES:
+1. Adapt the content to be directly relevant to the employee's role, industry, and experience level
+2. Incorporate examples that relate to their department and responsibilities
+3. Reference technologies or tools they already know, when applicable
+4. Structure content to build on their existing skills and knowledge
+5. Include practical exercises that would be valuable in their specific role
+6. Highlight how course concepts apply specifically to their industry
+7. Make connections to their educational background where relevant
+8. The content should feel tailored specifically for this individual
+
+CREATE A COMPLETE COURSE with:
+- A personalized overview highlighting why this course is valuable for this specific employee
+- 3-5 modules (depending on course size)
+- 3-4 sections per module
+- Each module should include at least one quiz with 3-5 questions
+- All content should be directly relevant and appropriately challenging for this individual
+
+Format your response as valid JSON matching this structure:
+{
+  "course_content": {
+    "course_overview": {
+      "title": "personalized course title",
+      "description": "personalized course description",
+      "learning_objectives": ["objective 1", "objective 2", ...],
+      "relevance_to_employee": "paragraph explaining specific relevance to this employee"
+    },
+    "modules": [
+      {
+        "id": "module-1",
+        "title": "Module 1: Title",
+        "description": "Module description",
+        "sections": [
+          {
+            "id": "section-1-1",
+            "title": "Section Title",
+            "type": "text/video/exercise",
+            "content": "Detailed section content with personalized examples",
+            "duration": 20
+          },
+          ...more sections...
+        ],
+        "quiz": {
+          "questions": [
+            {
+              "question": "Question text?",
+              "options": ["Option A", "Option B", "Option C", "Option D"],
+              "correct_answer": "Option B",
+              "explanation": "Explanation for why this is correct"
+            },
+            ...more questions...
+          ]
+        }
+      },
+      ...more modules...
+    ]
+  }
+}
+
+Respond ONLY with the JSON object, no additional text.`;
+
+  // Call the Groq API
+  const response = await fetch(GROQ_API_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`
+    },
+    body: JSON.stringify({
+      model: GROQ_MODEL,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ],
+      temperature: 0.5,
+      max_tokens: 4000
+    })
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('Groq API error response:', errorText);
+    throw new Error(`Groq API error (${response.status}): ${errorText}`);
+  }
+
+  // Parse the response
+  const data = await response.json();
+  const content = data.choices[0].message.content;
+  
+  // Try to parse the content as JSON
+  try {
+    // First try direct parse
+    return JSON.parse(content);
+  } catch (parseError) {
+    console.error('Error parsing JSON from Groq response:', parseError);
+    
+    // Try to extract JSON from the response if it contains text
+    const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/) || 
+                     content.match(/```\s*([\s\S]*?)\s*```/) ||
+                     content.match(/\{[\s\S]*\}/);
+                     
+    if (jsonMatch) {
+      try {
+        return JSON.parse(jsonMatch[1] || jsonMatch[0]);
+      } catch (extractError) {
+        console.error('Error parsing extracted JSON:', extractError);
+        throw new Error('Failed to parse JSON from Groq response');
+      }
+    }
+    
+    throw new Error('Failed to extract JSON from Groq response');
+  }
+}
+
+/**
+ * Format experience entries for the prompt
+ */
+function formatExperienceForPrompt(experience) {
+  if (!experience || !Array.isArray(experience) || experience.length === 0) {
+    return 'Not specified';
+  }
+  
+  return experience.map(exp => 
+    `${exp.title || 'Role'} at ${exp.company || 'Company'} (${exp.duration || 'Unknown duration'})`
+  ).join('; ');
+}
+
+/**
+ * Format education entries for the prompt
+ */
+function formatEducationForPrompt(education) {
+  if (!education || !Array.isArray(education) || education.length === 0) {
+    return 'Not specified';
+  }
+  
+  return education.map(edu => 
+    `${edu.degree || 'Degree'} from ${edu.institution || 'Institution'} (${edu.year || ''})`
+  ).join('; ');
+} 
