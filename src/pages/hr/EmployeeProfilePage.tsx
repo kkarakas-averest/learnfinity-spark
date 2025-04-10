@@ -32,7 +32,9 @@ import {
   AlertCircle,
   FileText,
   MessageSquare,
-  Upload
+  Upload,
+  Pencil,
+  GraduationCap
 } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { hrEmployeeService } from '@/services/hrEmployeeService';
@@ -57,6 +59,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { supabase } from '@/lib/supabase';
 import { uploadFileToStorage, fixStorageUrl, getPublicUrl } from '@/utils/storageHelpers';
 import { useResumeHandler } from './resumeHandler';
+import GeneratePersonalizedCourseButton from '@/components/hr/GeneratePersonalizedCourseButton';
 
 // Define interfaces for the data
 interface Employee {
@@ -664,8 +667,8 @@ const EmployeeProfilePage: React.FC = () => {
         <div className="space-x-2">
           <Button variant="outline" asChild>
             <Link to={`${ROUTES.HR_DASHBOARD}/employees`}>
-            Back to List
-          </Link>
+              Back to List
+            </Link>
           </Button>
         </div>
       </div>
@@ -702,33 +705,29 @@ const EmployeeProfilePage: React.FC = () => {
                         <span>{employee.department}</span>
                       </div>
                     )}
-            </div>
-            </div>
-          </div>
-
-              <div className="flex flex-col sm:flex-row gap-2">
-                <Button variant="outline" onClick={handleEditClick}>
-                  Edit Profile
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex flex-wrap gap-2 items-center">
+                <Button variant="outline" size="sm" onClick={handleEditClick}>
+                  <Pencil className="h-4 w-4 mr-2" /> Edit
                 </Button>
                 
-                {employee.cv_file_url && (
-                  <Button 
-                    variant="outline" 
-                    className="flex items-center gap-2"
-                    onClick={() => testAndOpenCvLink(employee.cv_file_url as string)}
-                  >
-                    <FileText className="h-4 w-4" />
-                    View CV
-                  </Button>
+                <Button variant="outline" size="sm" onClick={() => setIsMessageModalOpen(true)}>
+                  <Mail className="h-4 w-4 mr-2" /> Message
+                </Button>
+                
+                <Button variant="outline" size="sm" onClick={() => setAssignDialogOpen(true)}>
+                  <GraduationCap className="h-4 w-4 mr-2" /> Assign Course
+                </Button>
+                
+                {employee.cv_extracted_data && (
+                  <GeneratePersonalizedCourseButton 
+                    employeeId={employee.id} 
+                    disabled={loading} 
+                  />
                 )}
-                
-                <Button 
-                  variant="outline" 
-                  onClick={() => setIsMessageModalOpen(true)}
-                >
-                  <MessageSquare className="h-4 w-4 mr-2" />
-                  Send Message
-                </Button>
               </div>
             </div>
             

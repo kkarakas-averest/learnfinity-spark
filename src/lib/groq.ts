@@ -175,4 +175,177 @@ export async function generateCourseWithGroq(
     console.error('Error in GroqAPI call:', error);
     throw error;
   }
+}
+
+/**
+ * Generate personalized course content for an employee based on their profile data
+ */
+export async function generatePersonalizedCourse(
+  employeeId: string,
+  employeeName: string,
+  position: string,
+  department: string,
+  profileData: any,
+  modules: number = 3,
+  sectionsPerModule: number = 3,
+  includeQuiz: boolean = true
+): Promise<any> {
+  console.log('Generating personalized course for employee:', { employeeId, employeeName, position, department });
+  
+  const apiKey = getEnv().GROQ_API_KEY || process.env.GROQ_API_KEY;
+  
+  if (!apiKey) {
+    console.error('GROQ_API_KEY is missing in environment variables');
+    throw new Error('GROQ_API_KEY is not configured');
+  }
+
+  // Extract key information from profile data
+  const skills = Array.isArray(profileData?.skills) ? profileData.skills : [];
+  const experience = Array.isArray(profileData?.experience) ? profileData.experience : [];
+  const education = Array.isArray(profileData?.education) ? profileData.education : [];
+  const certifications = Array.isArray(profileData?.certifications) ? profileData.certifications : [];
+  const personalInsights = profileData?.personalInsights || {};
+  
+  // Create title based on position and top skills
+  const topSkills = skills.slice(0, 3).join(", ");
+  const courseTopic = `Advanced ${position} Skills${topSkills ? ': ' + topSkills : ''}`;
+
+  // Create a structured prompt for personalized course generation
+  const systemPrompt = `You are an expert curriculum designer and educator specializing in personalized professional development.
+  Your task is to create a comprehensive, tailored course for the employee based on their profile data.
+  The content should directly address their current position, skills, and growth opportunities.`;
+
+  const prompt = `Create a personalized professional development course for:
+
+  Employee Name: ${employeeName}
+  Position: ${position}
+  Department: ${department}
+  
+  EMPLOYEE PROFILE DATA:
+  - Skills: ${skills.join(", ") || "Not specified"}
+  - Experience: ${experience.map(e => `${e.title || ''} at ${e.company || ''}`).join("; ") || "Not specified"}
+  - Education: ${education.map(e => `${e.degree || ''} from ${e.institution || ''}`).join("; ") || "Not specified"}
+  - Certifications: ${certifications.join(", ") || "Not specified"}
+  - Years of Experience: ${personalInsights.yearsOfExperience || "Not specified"}
+  - Tools & Technologies: ${personalInsights.toolsAndTechnologies?.join(", ") || "Not specified"}
+  
+  Please structure the course to help this employee advance in their current position, addressing skill gaps and advancing their expertise.
+  
+  Create a detailed course with the following:
+  
+  1. Course title (related to their position and department)
+  2. Brief course description focusing on their professional growth needs
+  3. 5-7 learning objectives tailored to their profile
+  4. ${modules} modules, each containing:
+     - Module title
+     - Module description
+     - ${sectionsPerModule} sections per module, each with:
+       - Section title
+       - Detailed section content (300-500 words)
+  ${includeQuiz ? '5. A personalized quiz with 5 multiple choice questions for each module' : ''}
+  
+  Format everything as a valid JSON object with the following structure:
+  {
+    "title": "Course Title",
+    "description": "Course description...",
+    "learningObjectives": ["objective 1", "objective 2", ...],
+    "modules": [
+      {
+        "title": "Module 1 Title",
+        "description": "Module 1 description...",
+        "sections": [
+          {
+            "title": "Section 1.1 Title",
+            "content": "<div class='prose max-w-none'>Section 1.1 content with HTML formatting...</div>"
+          },
+          ...
+        ]
+      },
+      ...
+    ],
+    "quizzes": [
+      {
+        "moduleIndex": 0,
+        "questions": [
+          {
+            "question": "Question text?",
+            "options": ["Option A", "Option B", "Option C", "Option D"],
+            "correctAnswer": 0
+          },
+          ...
+        ]
+      },
+      ...
+    ]
+  }
+  
+  Ensure the content is professional, directly relevant to ${employeeName}'s career path, and helps them grow in their ${position} role.`;
+
+  try {
+    console.log('Calling Groq API for personalized course generation');
+    
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: 'llama-3.1-70b-versatile',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: prompt }
+        ],
+        temperature: 0.5,
+        max_tokens: 4000
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('Groq API error:', errorData);
+      throw new Error(`Groq API error: ${errorData.error?.message || response.statusText}`);
+    }
+
+    const data = await response.json();
+    console.log('Course generation response received:', {
+      model: data.model,
+      usage: data.usage
+    });
+    
+    // Parse the generated content
+    try {
+      // Extract the content from the response
+      const generatedContent = data.choices[0].message.content;
+      console.log('Generated content received, length:', generatedContent.length);
+      
+      // Find the JSON object in the text
+      const jsonMatch = generatedContent.match(/\{[\s\S]*\}/);
+      
+      if (jsonMatch) {
+        console.log('JSON match found, attempting to parse');
+        try {
+          const courseData = JSON.parse(jsonMatch[0]);
+          console.log('Successfully parsed personalized course data:', {
+            title: courseData.title,
+            moduleCount: courseData.modules?.length,
+            objectivesCount: courseData.learningObjectives?.length
+          });
+          return courseData;
+        } catch (jsonError) {
+          console.error('JSON parse error:', jsonError);
+          throw new Error('Failed to parse JSON structure - invalid JSON format');
+        }
+      } else {
+        console.error('No JSON match found in content');
+        throw new Error('Failed to extract JSON from GroqAPI response - no JSON object found');
+      }
+    } catch (parseError) {
+      console.error('Error parsing GroqAPI response:', parseError);
+      throw new Error('Failed to parse course data from GroqAPI: ' + parseError.message);
+    }
+  } catch (error) {
+    console.error('Error in personalized course generation:', error);
+    throw error;
+  }
 } 
