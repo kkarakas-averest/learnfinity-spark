@@ -161,8 +161,50 @@ const EnhanceCourseContentButton: React.FC<EnhanceCourseContentButtonProps> = ({
         profileDataAvailable: !!employeeData.cv_extracted_data
       });
 
-      // Use the universal endpoint that handles missing IDs gracefully
-      const response = await fetch('/api/hr/courses/universal-enhance', {
+      // STEP 1: Mirror the HR course to the main courses table first
+      console.log('Mirroring HR course to main courses table...');
+      const mirrorResponse = await fetch('/api/hr/courses/mirror-courses', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          courseId
+        }),
+      });
+      
+      if (!mirrorResponse.ok) {
+        const errorText = await mirrorResponse.text();
+        let errorMessage = 'Failed to mirror HR course';
+        
+        try {
+          // Try to parse as JSON if possible
+          const errorData = JSON.parse(errorText);
+          errorMessage = errorData.error || errorData.details || errorMessage;
+        } catch (e) {
+          // If not JSON, create a readable error message from the text
+          console.error('Non-JSON error response from mirror endpoint:', errorText);
+          errorMessage = `Error (${mirrorResponse.status}): ${errorText.substring(0, 100)}...`;
+        }
+        
+        throw new Error(errorMessage);
+      }
+      
+      const mirrorData = await mirrorResponse.json();
+      console.log('Mirror result:', mirrorData);
+      
+      // Check if the course was successfully mirrored or already existed
+      const courseMirrored = 
+        mirrorData.results.mirrored.some((c: any) => c.courseId === courseId) || 
+        mirrorData.results.skipped.some((c: any) => c.courseId === courseId);
+        
+      if (!courseMirrored) {
+        throw new Error('Failed to mirror course. Please check the course data.');
+      }
+
+      // STEP 2: Now enhance the course content using the universal endpoint
+      console.log('Enhancing course content...');
+      const enhanceResponse = await fetch('/api/hr/courses/universal-enhance', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -174,8 +216,8 @@ const EnhanceCourseContentButton: React.FC<EnhanceCourseContentButtonProps> = ({
       });
 
       // First check if response is OK
-      if (!response.ok) {
-        const errorText = await response.text();
+      if (!enhanceResponse.ok) {
+        const errorText = await enhanceResponse.text();
         let errorMessage = 'Failed to enhance course content';
         
         try {
@@ -184,15 +226,15 @@ const EnhanceCourseContentButton: React.FC<EnhanceCourseContentButtonProps> = ({
           errorMessage = errorData.error || errorData.details || errorMessage;
         } catch (e) {
           // If not JSON, create a readable error message from the text
-          console.error('Non-JSON error response:', errorText);
-          errorMessage = `Error (${response.status}): ${errorText.substring(0, 100)}...`;
+          console.error('Non-JSON error response from enhance endpoint:', errorText);
+          errorMessage = `Error (${enhanceResponse.status}): ${errorText.substring(0, 100)}...`;
         }
         
         throw new Error(errorMessage);
       }
 
       // If response is OK, proceed with JSON parsing
-      const data = await response.json();
+      const data = await enhanceResponse.json();
       
       // For our universal endpoint, the response format is different
       if (data.success) {
