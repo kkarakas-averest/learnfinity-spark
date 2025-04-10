@@ -3,10 +3,14 @@
 
 import { getSupabase } from '../../../src/lib/supabase.js';
 import { z } from 'zod';
+import crypto from 'crypto';
 
 // GROQ API configuration
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_MODEL = 'llama3-70b-8192';
+
+// Import GROQ API key from environment
+const GROQ_API_KEY = process.env.GROQ_API_KEY;
 
 // Request validation schema
 const requestSchema = z.object({
@@ -150,12 +154,27 @@ export default async function handler(req, res) {
     
     console.log(`Found ${enrolledCourses.length} enrolled courses for enhancement`);
     
-    // Check GROQ API key
-    const GROQ_API_KEY = process.env.GROQ_API_KEY;
+    // Check GROQ API key - similar to the implementation in Profile Summary feature
     if (!GROQ_API_KEY) {
-      console.error('GROQ_API_KEY is not configured');
-      return res.status(500).json({ error: 'AI API is not configured on the server' });
+      console.error('GROQ_API_KEY is not configured in process.env');
+      
+      // Print all available environment variables (excluding sensitive values)
+      const safeEnvVars = Object.keys(process.env)
+        .filter(key => !key.toLowerCase().includes('key') && !key.toLowerCase().includes('secret') && !key.toLowerCase().includes('token'))
+        .reduce((obj, key) => {
+          obj[key] = process.env[key];
+          return obj;
+        }, {});
+      
+      console.log('Available environment variables:', safeEnvVars);
+      
+      return res.status(500).json({ 
+        error: 'GROQ API is not configured on the server',
+        details: 'The GROQ_API_KEY environment variable is missing'
+      });
     }
+    
+    console.log('GROQ_API_KEY found with prefix:', GROQ_API_KEY.substring(0, 5) + '...');
     
     // 3. Process each enrolled course to enhance content
     const results = [];
@@ -179,41 +198,51 @@ export default async function handler(req, res) {
         }
         
         // Save the enhanced content to the database
-        const { data: contentRecord, error: contentError } = await supabase
-          .from('ai_course_content')
-          .insert({
-            course_id: course.id,
-            version: `v1-${Date.now()}`,
-            created_for_user_id: employeeId,
-            metadata: {
-              title: course.title,
-              description: course.description,
-              level: course.skill_level || 'intermediate'
-            },
-            personalization_context: {
-              userProfile: {
-                role: profile.role,
-                department: profile.department,
-                preferences: profile.cv_extracted_data?.personalInsights || {}
-              },
-              courseContext: {
+        let contentRecord;
+        try {
+          const insertResult = await supabase
+            .from('ai_course_content')
+            .insert({
+              course_id: course.id,
+              version: `v1-${Date.now()}`,
+              created_for_user_id: employeeId,
+              metadata: {
                 title: course.title,
-                level: course.skill_level || 'intermediate',
-                learning_objectives: enhancedContent.course_content.course_overview?.learning_objectives || []
+                description: course.description,
+                level: course.skill_level || 'intermediate'
               },
-              employeeContext: {
-                department: profile.department,
-                position: profile.role,
-                skills: profile.cv_extracted_data?.skills || []
-              }
-            },
-            is_active: true
-          })
-          .select()
-          .single();
+              personalization_context: {
+                userProfile: {
+                  role: profile.role,
+                  department: profile.department,
+                  preferences: profile.cv_extracted_data?.personalInsights || {}
+                },
+                courseContext: {
+                  title: course.title,
+                  level: course.skill_level || 'intermediate',
+                  learningObjectives: enhancedContent.course_content.course_overview?.learning_objectives || []
+                },
+                employeeContext: {
+                  department: profile.department,
+                  position: profile.role,
+                  skills: profile.cv_extracted_data?.skills || []
+                }
+              },
+              is_active: true
+            })
+            .select()
+            .single();
+            
+          if (insertResult.error) {
+            console.error('Error creating content record:', insertResult.error);
+            throw new Error(`Failed to save AI course content: ${insertResult.error.message}`);
+          }
           
-        if (contentError) {
-          throw new Error(`Failed to save AI course content: ${contentError.message}`);
+          contentRecord = insertResult.data;
+        } catch (dbError) {
+          console.error('Database error saving content:', dbError);
+          console.log('Detailed error:', JSON.stringify(dbError, Object.getOwnPropertyNames(dbError)));
+          throw dbError;
         }
         
         const contentId = contentRecord.id;
@@ -222,6 +251,10 @@ export default async function handler(req, res) {
         const modules = enhancedContent.course_content.modules || [];
         for (let i = 0; i < modules.length; i++) {
           const module = modules[i];
+          
+          // Generate proper UUID for module
+          const moduleUuid = crypto.randomUUID ? crypto.randomUUID() : 
+                            `${course.id.split('-')[0]}-module-${i+1}-${Date.now().toString(36)}`;
           
           // Save module sections
           const sections = module.sections || [];
@@ -234,31 +267,58 @@ export default async function handler(req, res) {
               sectionHtml = `<div class="prose max-w-none">${sectionHtml}</div>`;
             }
             
-            await supabase
+            const sectionResult = await supabase
               .from('ai_course_content_sections')
               .insert({
                 content_id: contentId,
-                module_id: module.id || `module-${i+1}`,
+                module_id: moduleUuid, // Use UUID instead of string ID
                 section_id: section.id || `section-${i+1}-${j+1}`,
                 title: section.title,
                 content: sectionHtml,
                 order_index: j
               });
+              
+            if (sectionResult.error) {
+              console.error(`Error saving section ${j} for module ${i}:`, sectionResult.error);
+              // Continue with other sections
+            }
           }
           
           // Save quiz questions if available
           if (module.quiz && Array.isArray(module.quiz.questions)) {
             for (const question of module.quiz.questions) {
-              await supabase
-                .from('ai_course_quiz_questions')
-                .insert({
-                  content_id: contentId,
-                  module_id: module.id || `module-${i+1}`,
-                  question: question.question,
-                  options: question.options || question.answers || [],
-                  correct_answer: question.correctAnswer || question.correct_answer,
-                  explanation: question.explanation || ''
-                });
+              try {
+                // Ensure options is a valid JSONB array
+                const questionOptions = question.options || question.answers || [];
+                const correctAnswer = question.correctAnswer || question.correct_answer || "";
+                
+                // Create proper quiz question record
+                const questionResult = await supabase
+                  .from('ai_course_quiz_questions')
+                  .insert({
+                    content_id: contentId,
+                    module_id: moduleUuid, // Use UUID instead of string ID
+                    question: question.question || "Quiz question",
+                    options: JSON.stringify(questionOptions),
+                    correct_answer: correctAnswer,
+                    explanation: question.explanation || '',
+                    difficulty: 'intermediate'
+                  });
+                  
+                if (questionResult.error) {
+                  console.error('Error saving quiz question:', questionResult.error);
+                  console.log('Question data:', {
+                    content_id: contentId,
+                    module_id: moduleUuid,
+                    question: question.question || "Quiz question",
+                    optionsType: typeof questionOptions,
+                    correctAnswer: correctAnswer
+                  });
+                }
+              } catch (quizError) {
+                console.error('Exception saving quiz question:', quizError);
+                // Continue with other questions
+              }
             }
           }
         }
@@ -273,6 +333,7 @@ export default async function handler(req, res) {
         
       } catch (courseError) {
         console.error(`Error enhancing course ${course.id}:`, courseError);
+        console.log('Detailed error:', JSON.stringify(courseError, Object.getOwnPropertyNames(courseError)));
         results.push({
           courseId: course.id,
           title: course.title,
@@ -290,6 +351,7 @@ export default async function handler(req, res) {
     
   } catch (error) {
     console.error('Error enhancing course content:', error);
+    console.log('Detailed error:', JSON.stringify(error, Object.getOwnPropertyNames(error)));
     return res.status(500).json({ 
       error: 'Failed to enhance course content', 
       details: error.message 
@@ -301,6 +363,10 @@ export default async function handler(req, res) {
  * Generate personalized course content for an employee using Groq API
  */
 async function generatePersonalizedCourseContent(apiKey, course, profile, enrollment) {
+  console.log('----------- GROQ DIRECT CALL START -----------');
+  console.log(`Course: "${course.title}" (${course.id})`);
+  console.log(`Employee: ${profile.name}, Department: ${profile.department || 'Unknown'}, Role: ${profile.role || 'Unknown'}`);
+  
   // Create a rich prompt that includes employee profile and course details
   const systemPrompt = `You are an expert curriculum designer and educator who specializes in creating personalized learning content. 
 Your task is to create a detailed, personalized course structure based on an employee's profile and an existing course.
@@ -397,56 +463,123 @@ Format your response as valid JSON matching this structure:
 
 Respond ONLY with the JSON object, no additional text.`;
 
-  // Call the Groq API
-  const response = await fetch(GROQ_API_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`
-    },
-    body: JSON.stringify({
-      model: GROQ_MODEL,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt }
-      ],
-      temperature: 0.5,
-      max_tokens: 4000
-    })
-  });
+  console.log("Calling Groq API with model:", GROQ_MODEL);
+  console.log("Prompt excerpt:", userPrompt.substring(0, 200) + "...");
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('Groq API error response:', errorText);
-    throw new Error(`Groq API error (${response.status}): ${errorText}`);
-  }
-
-  // Parse the response
-  const data = await response.json();
-  const content = data.choices[0].message.content;
-  
-  // Try to parse the content as JSON
   try {
-    // First try direct parse
-    return JSON.parse(content);
-  } catch (parseError) {
-    console.error('Error parsing JSON from Groq response:', parseError);
+    // Call the Groq API
+    let retries = 2;
+    let response;
     
-    // Try to extract JSON from the response if it contains text
-    const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/) || 
-                     content.match(/```\s*([\s\S]*?)\s*```/) ||
-                     content.match(/\{[\s\S]*\}/);
-                     
-    if (jsonMatch) {
+    while (retries >= 0) {
       try {
-        return JSON.parse(jsonMatch[1] || jsonMatch[0]);
-      } catch (extractError) {
-        console.error('Error parsing extracted JSON:', extractError);
-        throw new Error('Failed to parse JSON from Groq response');
+        console.log(`Groq API attempt ${2-retries+1} of 3`);
+        response = await fetch(GROQ_API_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+          },
+          body: JSON.stringify({
+            model: GROQ_MODEL,
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: userPrompt }
+            ],
+            temperature: 0.5,
+            max_tokens: 4000
+          })
+        });
+        
+        // If success, break out of retry loop
+        if (response.ok) {
+          console.log("Groq API responded successfully");
+          break;
+        }
+        
+        console.error(`Groq API responded with error status: ${response.status}`);
+        
+        // If error is not retriable, also break
+        if (response.status !== 429 && response.status !== 500 && response.status !== 503) break;
+        
+        // Otherwise, retry after short delay
+        retries--;
+        if (retries >= 0) {
+          const delay = (2 - retries) * 1000; // Incremental backoff
+          console.log(`Retrying Groq API call after ${delay}ms delay...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      } catch (fetchError) {
+        console.error("Network error calling Groq API:", fetchError);
+        console.log("Fetch error details:", fetchError.message);
+        retries--;
+        if (retries < 0) throw fetchError;
+        await new Promise(resolve => setTimeout(resolve, 1000));
       }
     }
+
+    if (!response || !response.ok) {
+      const errorData = response ? await response.json().catch(() => ({})) : {};
+      console.error("Groq API error:", errorData);
+      console.log("Groq API error status:", response?.status);
+      console.log("Groq API error details:", errorData?.error?.message || "Unknown error");
+      throw new Error(`Groq API error (${response?.status}): ${errorData.error?.message || 'Unknown error'}`);
+    }
+
+    // Parse the response
+    const data = await response.json();
+    console.log("Received response from Groq API");
+    console.log("Response metadata:", {
+      model: data.model,
+      usage: data.usage,
+      choices: data.choices?.length || 0
+    });
     
-    throw new Error('Failed to extract JSON from Groq response');
+    const content = data.choices[0].message.content;
+    
+    console.log("Content received, length:", content.length);
+    console.log("Content preview:", content.substring(0, 150) + "...");
+    
+    // Try to parse the content as JSON
+    try {
+      // First try direct parse
+      const parsedData = JSON.parse(content);
+      console.log('Successfully parsed response JSON directly');
+      console.log('----------- GROQ DIRECT CALL COMPLETE -----------');
+      return parsedData;
+    } catch (parseError) {
+      console.error('Error parsing JSON from Groq response:', parseError);
+      
+      // Try to extract JSON from the response if it contains text
+      const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/) || 
+                       content.match(/```\s*([\s\S]*?)\s*```/) ||
+                       content.match(/\{[\s\S]*\}/);
+                       
+      if (jsonMatch) {
+        try {
+          const jsonString = jsonMatch[1] || jsonMatch[0];
+          console.log('Extracted potential JSON:', jsonString.substring(0, 100) + '...');
+          const extractedData = JSON.parse(jsonString);
+          console.log('Successfully parsed JSON from extracted content');
+          console.log('----------- GROQ DIRECT CALL COMPLETE -----------');
+          return extractedData;
+        } catch (extractError) {
+          console.error('Error parsing extracted JSON:', extractError);
+          console.log('Full content:', content);
+          console.log('----------- GROQ DIRECT CALL FAILED -----------');
+          throw new Error('Failed to parse JSON from Groq response');
+        }
+      }
+      
+      console.log('Full content:', content);
+      console.log('----------- GROQ DIRECT CALL FAILED -----------');
+      throw new Error('Failed to extract JSON from Groq response');
+    }
+  } catch (error) {
+    console.error('Error in Groq API call:', error);
+    console.log('Error details:', error.message);
+    console.log('----------- GROQ DIRECT CALL FAILED -----------');
+    throw error;
   }
 }
 
