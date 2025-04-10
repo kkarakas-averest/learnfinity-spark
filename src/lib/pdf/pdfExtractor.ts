@@ -14,13 +14,33 @@ const initPdfJs = async (): Promise<typeof import('pdfjs-dist')> => {
   }
   
   if (!PDFJS) {
-    // Dynamically import PDF.js
-    PDFJS = await import('pdfjs-dist');
-    
-    // Set the worker source to a CDN URL
-    // Use unpkg instead of cdnjs as it dynamically serves the correct version
-    const workerUrl = 'https://unpkg.com/pdfjs-dist@5.1.91/build/pdf.worker.min.js';
-    PDFJS.GlobalWorkerOptions.workerSrc = workerUrl;
+    try {
+      // Dynamically import PDF.js
+      PDFJS = await import('pdfjs-dist');
+      
+      // Let PDF.js set up its own worker via its built-in web worker
+      // This avoids CORS issues with external CDNs
+      
+      // First check if worker source is already set
+      if (!PDFJS.GlobalWorkerOptions.workerSrc) {
+        try {
+          // Try to load the worker directly from the same origin
+          // This will work when the worker is properly bundled with the app
+          PDFJS.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
+          
+          console.log('PDF.js worker source set to same-origin path');
+        } catch (workerError) {
+          console.warn('Unable to set PDF.js worker source:', workerError);
+          
+          // Last resort - let PDF.js use a fake worker
+          // This is less efficient but will work without a separate worker script
+          console.log('Falling back to PDF.js fake worker mode');
+        }
+      }
+    } catch (error) {
+      console.error('Failed to initialize PDF.js:', error);
+      throw error;
+    }
   }
   
   return PDFJS;
