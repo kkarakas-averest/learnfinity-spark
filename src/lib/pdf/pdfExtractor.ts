@@ -3,14 +3,27 @@
  * 
  * A client-side PDF text extraction service using PDF.js for high-quality text extraction.
  */
-import * as PDFJS from 'pdfjs-dist';
+// Import PDF.js only in browser environment
+// This uses dynamic imports to avoid require() calls during SSR/build time
+let PDFJS: typeof import('pdfjs-dist');
 
-// Set worker source for PDF.js (required)
-if (typeof window !== 'undefined') {
-  // @ts-ignore - This works at runtime even if TypeScript doesn't recognize the import
-  const pdfjsWorker = require('pdfjs-dist/build/pdf.worker.entry');
-  PDFJS.GlobalWorkerOptions.workerSrc = pdfjsWorker;
-}
+// Initialize PDF.js only in browser environment
+const initPdfJs = async (): Promise<typeof import('pdfjs-dist')> => {
+  if (typeof window === 'undefined') {
+    throw new Error('PDF.js can only be initialized in browser environment');
+  }
+  
+  if (!PDFJS) {
+    // Dynamically import PDF.js
+    PDFJS = await import('pdfjs-dist');
+    
+    // Set the worker source to a CDN URL
+    const workerUrl = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/5.1.91/pdf.worker.min.js';
+    PDFJS.GlobalWorkerOptions.workerSrc = workerUrl;
+  }
+  
+  return PDFJS;
+};
 
 /**
  * Result of PDF text extraction
@@ -37,6 +50,14 @@ export async function extractTextFromPdf(pdfUrl: string): Promise<PDFExtractionR
   console.log(`Extracting text from PDF URL using PDF.js: ${pdfUrl}`);
   
   try {
+    // Check if we're in a browser environment
+    if (typeof window === 'undefined') {
+      throw new Error('PDF extraction is only available in browser environment');
+    }
+    
+    // Initialize PDF.js
+    const pdfjs = await initPdfJs();
+    
     // Extract filename from URL (for debugging)
     const filename = pdfUrl.split('/').pop() || 'unknown.pdf';
     
@@ -58,7 +79,7 @@ export async function extractTextFromPdf(pdfUrl: string): Promise<PDFExtractionR
     console.log(`PDF fetched, size: ${arrayBuffer.byteLength} bytes`);
     
     // Use PDF.js to load the document
-    const loadingTask = PDFJS.getDocument({ data: arrayBuffer });
+    const loadingTask = pdfjs.getDocument({ data: arrayBuffer });
     const pdfDocument = await loadingTask.promise;
     
     // Get document metadata
