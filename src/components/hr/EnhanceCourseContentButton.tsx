@@ -102,6 +102,7 @@ const EnhanceCourseContentButton: React.FC<EnhanceCourseContentButtonProps> = ({
     setEnhancingCourseId(courseId);
 
     try {
+      // Use a relative path that works in both development and production
       const response = await fetch('/api/hr/courses/enhance-course-content', {
         method: 'POST',
         headers: {
@@ -113,11 +114,26 @@ const EnhanceCourseContentButton: React.FC<EnhanceCourseContentButtonProps> = ({
         }),
       });
 
-      const data = await response.json();
-
+      // First check if response is OK
       if (!response.ok) {
-        throw new Error(data.error || data.details || 'Failed to enhance course content');
+        const errorText = await response.text();
+        let errorMessage = 'Failed to enhance course content';
+        
+        try {
+          // Try to parse as JSON if possible
+          const errorData = JSON.parse(errorText);
+          errorMessage = errorData.error || errorData.details || errorMessage;
+        } catch (e) {
+          // If not JSON, create a readable error message from the text
+          console.error('Non-JSON error response:', errorText);
+          errorMessage = `Error (${response.status}): ${errorText.substring(0, 100)}...`;
+        }
+        
+        throw new Error(errorMessage);
       }
+
+      // If response is OK, proceed with JSON parsing
+      const data = await response.json();
 
       toast({
         title: 'Success!',
