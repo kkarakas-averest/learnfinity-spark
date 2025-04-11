@@ -1,6 +1,7 @@
+
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,11 @@ import Link from "next/link";
 import { ModuleList } from "./ModuleList";
 import { QuizList } from "./QuizList";
 import { ResourceList } from "./ResourceList";
+import { PersonalizedContentView } from "./PersonalizedContentView";
+import { PersonalizedContentService } from "@/services/personalized-content-service";
+import { useToast } from "@/components/ui/use-toast";
+import { supabase } from "@/lib/supabase";
+import { AICourseContent, AICourseContentSection } from "@/lib/types/content";
 
 interface CourseDetails {
   id: string;
@@ -64,6 +70,56 @@ interface CourseDetailsProps {
 }
 
 export function CourseDetails({ course }: CourseDetailsProps) {
+  const [activeTab, setActiveTab] = useState("modules");
+  const [personalizedContent, setPersonalizedContent] = useState<AICourseContent | null>(null);
+  const [personalizedSections, setPersonalizedSections] = useState<AICourseContentSection[]>([]);
+  const [isLoadingPersonalized, setIsLoadingPersonalized] = useState(false);
+  const [hasPersonalized, setHasPersonalized] = useState(false);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    const fetchPersonalizedContent = async () => {
+      try {
+        setIsLoadingPersonalized(true);
+        // Get the current user
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (!session?.user) {
+          console.log("No user session");
+          return;
+        }
+        
+        const userId = session.user.id;
+        const contentService = PersonalizedContentService.getInstance();
+        
+        // Check if personalized content exists
+        const hasContent = await contentService.hasPersonalizedContent(course.id, userId);
+        setHasPersonalized(hasContent);
+        
+        if (hasContent) {
+          // If content exists, fetch it
+          const { content, sections } = await contentService.getPersonalizedContent(course.id, userId);
+          setPersonalizedContent(content);
+          setPersonalizedSections(sections);
+          
+          // Switch to personalized content tab if content exists
+          setActiveTab("personalized");
+        }
+      } catch (error) {
+        console.error("Error fetching personalized content:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load personalized content",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoadingPersonalized(false);
+      }
+    };
+
+    fetchPersonalizedContent();
+  }, [course.id, toast]);
+
   return (
     <div className="space-y-8">
       {/* Header section */}
@@ -79,6 +135,9 @@ export function CourseDetails({ course }: CourseDetailsProps) {
             <Badge className={course.isPublished ? "bg-green-500" : "bg-yellow-500"}>
               {course.status}
             </Badge>
+            {hasPersonalized && (
+              <Badge className="bg-blue-500">Personalized</Badge>
+            )}
           </div>
           <h1 className="mt-4 text-3xl font-bold tracking-tight">{course.title}</h1>
           <div className="mt-2 flex flex-wrap items-center gap-4">
@@ -114,22 +173,38 @@ export function CourseDetails({ course }: CourseDetailsProps) {
       </Card>
 
       {/* Course content tabs */}
-      <Tabs defaultValue="modules">
-        <TabsList className="grid w-full grid-cols-3">
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className={`grid w-full ${hasPersonalized ? 'grid-cols-4' : 'grid-cols-3'}`}>
+          {hasPersonalized && (
+            <TabsTrigger value="personalized">Personalized</TabsTrigger>
+          )}
           <TabsTrigger value="modules">Modules</TabsTrigger>
           <TabsTrigger value="quizzes">Quizzes</TabsTrigger>
           <TabsTrigger value="resources">Resources</TabsTrigger>
         </TabsList>
+        
+        {hasPersonalized && (
+          <TabsContent value="personalized" className="mt-6">
+            <PersonalizedContentView 
+              content={personalizedContent}
+              sections={personalizedSections}
+              isLoading={isLoadingPersonalized}
+            />
+          </TabsContent>
+        )}
+        
         <TabsContent value="modules" className="mt-6">
           <ModuleList modules={course.modules} />
         </TabsContent>
+        
         <TabsContent value="quizzes" className="mt-6">
           <QuizList quizzes={course.quizzes} />
         </TabsContent>
+        
         <TabsContent value="resources" className="mt-6">
           <ResourceList resources={course.resources} />
         </TabsContent>
       </Tabs>
     </div>
   );
-} 
+}

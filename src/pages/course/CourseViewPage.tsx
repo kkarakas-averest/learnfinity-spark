@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from '@/lib/react-helpers';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
@@ -7,6 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from '@/components/ui/use-toast';
 import CourseView from '@/components/learner/CourseView';
 import { supabase } from '@/lib/supabase';
+import { PersonalizedContentService } from '@/services/personalized-content-service';
 
 /**
  * CourseViewPage component
@@ -20,6 +22,8 @@ const CourseViewPage: React.FC = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [hasAccess, setHasAccess] = useState(false);
+  const [hasPersonalizedContent, setHasPersonalizedContent] = useState(false);
+  const [employeeId, setEmployeeId] = useState<string | null>(null);
 
   useEffect(() => {
     // Check if the user has access to this course
@@ -46,6 +50,13 @@ const CourseViewPage: React.FC = () => {
         // If regular enrollment exists, grant access
         if (!enrollmentError && enrollment) {
           setHasAccess(true);
+          setEmployeeId(session.user.id);
+          
+          // Check for personalized content
+          const contentService = PersonalizedContentService.getInstance();
+          const hasContent = await contentService.hasPersonalizedContent(id, session.user.id);
+          setHasPersonalizedContent(hasContent);
+          
           setLoading(false);
           return;
         }
@@ -56,17 +67,37 @@ const CourseViewPage: React.FC = () => {
         }
 
         // Next, check if the course is HR-assigned to this user
-        const { data: hrEnrollment, error: hrError } = await supabase
-          .from('hr_course_enrollments')
+        const { data: hrEmployee, error: hrEmployeeError } = await supabase
+          .from('hr_employees')
           .select('id')
-          .eq('course_id', id)
-          .eq('employee_id', session.user.id)
+          .eq('user_id', session.user.id)
           .single();
-
-        if (!hrError && hrEnrollment) {
-          setHasAccess(true);
-          setLoading(false);
-          return;
+          
+        if (hrEmployeeError) {
+          console.log('Error or no HR employee record found:', hrEmployeeError);
+        } else if (hrEmployee) {
+          // Found employee record, now check enrollment
+          const empId = hrEmployee.id;
+          setEmployeeId(empId);
+          
+          const { data: hrEnrollment, error: hrError } = await supabase
+            .from('hr_course_enrollments')
+            .select('id')
+            .eq('course_id', id)
+            .eq('employee_id', empId)
+            .single();
+  
+          if (!hrError && hrEnrollment) {
+            setHasAccess(true);
+            
+            // Check for personalized content
+            const contentService = PersonalizedContentService.getInstance();
+            const hasContent = await contentService.hasPersonalizedContent(id, session.user.id);
+            setHasPersonalizedContent(hasContent);
+            
+            setLoading(false);
+            return;
+          }
         }
 
         // For development/testing - if the course ID is from mock data, grant access
@@ -74,13 +105,15 @@ const CourseViewPage: React.FC = () => {
         if (id.startsWith('comm-skills-') || id.startsWith('data-python-') || id.startsWith('leadership-')) {
           console.log('Granting access to mock course:', id);
           setHasAccess(true);
+          setEmployeeId(session.user.id);
           setLoading(false);
           return;
         }
 
         // If neither enrollment type was found, deny access
         if ((enrollmentError && enrollmentError.code === 'PGRST116') || 
-            (hrError && hrError.code === 'PGRST116')) {
+            (hrEmployeeError && hrEmployeeError.code === 'PGRST116') || 
+            (hrEmployee && hrError && hrError.code === 'PGRST116')) {
           toast({
             title: "Not enrolled",
             description: "You need to enroll in this course first",
@@ -134,7 +167,11 @@ const CourseViewPage: React.FC = () => {
     );
   }
 
-  return <CourseView />;
+  return <CourseView 
+    courseId={id} 
+    employeeId={employeeId} 
+    hasPersonalizedContent={hasPersonalizedContent}
+  />;
 };
 
-export default CourseViewPage; 
+export default CourseViewPage;
