@@ -193,9 +193,11 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 <!-- Latest deployment trigger: 2025-04-04 -->
 
-# Learnfinity Spark
+# LearnFinity LMS Platform
 
-Learning Management System platform.
+Version: 6.0.1 (Minor update: 2024-07-12)
+
+LearnFinity LMS is a modern learning management system designed for enterprises to manage employee training and development.
 
 ## Deployment Status
 
