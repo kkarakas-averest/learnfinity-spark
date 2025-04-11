@@ -1872,6 +1872,9 @@ export type Database = {
           enrollment_date: string | null
           id: string
           last_accessed: string | null
+          personalized_content_generation_status: string | null
+          personalized_content_id: string | null
+          personalized_content_started_at: string | null
           progress: number | null
           rag_status: string | null
           score: number | null
@@ -1888,6 +1891,9 @@ export type Database = {
           enrollment_date?: string | null
           id?: string
           last_accessed?: string | null
+          personalized_content_generation_status?: string | null
+          personalized_content_id?: string | null
+          personalized_content_started_at?: string | null
           progress?: number | null
           rag_status?: string | null
           score?: number | null
@@ -1904,6 +1910,9 @@ export type Database = {
           enrollment_date?: string | null
           id?: string
           last_accessed?: string | null
+          personalized_content_generation_status?: string | null
+          personalized_content_id?: string | null
+          personalized_content_started_at?: string | null
           progress?: number | null
           rag_status?: string | null
           score?: number | null
@@ -1923,6 +1932,13 @@ export type Database = {
             columns: ["employee_id"]
             isOneToOne: false
             referencedRelation: "hr_employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_course_enrollments_personalized_content_id_fkey"
+            columns: ["personalized_content_id"]
+            isOneToOne: false
+            referencedRelation: "ai_course_content"
             referencedColumns: ["id"]
           },
         ]

@@ -53,6 +53,8 @@ const EnhanceCourseContentButton: React.FC<EnhanceCourseContentButtonProps> = ({
     setIsLoadingCourses(true);
     
     try {
+      console.log(`Fetching enrolled courses for employee ID: ${employeeId}`);
+      
       // First get the course IDs from enrollments
       const { data: enrollments, error: enrollmentError } = await supabase
         .from('hr_course_enrollments')
@@ -60,11 +62,15 @@ const EnhanceCourseContentButton: React.FC<EnhanceCourseContentButtonProps> = ({
         .eq('employee_id', employeeId);
       
       if (enrollmentError) {
+        console.error('Error fetching enrollments:', enrollmentError);
         throw enrollmentError;
       }
       
+      console.log(`Found ${enrollments?.length || 0} course enrollments`);
+      
       if (!enrollments || enrollments.length === 0) {
         setEnrolledCourses([]);
+        setIsLoadingCourses(false);
         return;
       }
       
@@ -77,15 +83,19 @@ const EnhanceCourseContentButton: React.FC<EnhanceCourseContentButtonProps> = ({
       });
       
       setPersonalizedCourses(personalizedCourseIds);
+      console.log('Personalized courses:', Array.from(personalizedCourseIds));
       
       // Get the course details for each enrolled course
       const courseIds = enrollments.map(e => e.course_id);
+      
+      console.log('Fetching course details for IDs:', courseIds);
       const { data: coursesData, error: coursesError } = await supabase
         .from('hr_courses')
         .select('id, title')
         .in('id', courseIds);
       
       if (coursesError) {
+        console.error('Error fetching courses:', coursesError);
         throw coursesError;
       }
       
@@ -124,7 +134,9 @@ const EnhanceCourseContentButton: React.FC<EnhanceCourseContentButtonProps> = ({
           name,
           cv_extracted_data,
           department_id,
-          position_id
+          position_id,
+          hr_departments(id, name),
+          hr_positions(id, title)
         `)
         .eq('id', employeeId)
         .single();
@@ -140,8 +152,20 @@ const EnhanceCourseContentButton: React.FC<EnhanceCourseContentButtonProps> = ({
       console.log('Enhancing course content with employee profile:', {
         employeeId,
         courseId,
-        hasExtractedData: !!employeeData.cv_extracted_data
+        hasExtractedData: !!employeeData.cv_extracted_data,
+        departmentName: employeeData.hr_departments?.name,
+        positionTitle: employeeData.hr_positions?.title
       });
+
+      // Update the enrollment record with generation status
+      await supabase
+        .from('hr_course_enrollments')
+        .update({
+          personalized_content_generation_status: 'generating',
+          personalized_content_started_at: new Date().toISOString()
+        })
+        .eq('course_id', courseId)
+        .eq('employee_id', employeeId);
 
       // Use the universal enhance endpoint for content personalization
       console.log('Enhancing course content...');
@@ -193,6 +217,19 @@ const EnhanceCourseContentButton: React.FC<EnhanceCourseContentButtonProps> = ({
       }
     } catch (error) {
       console.error('Error enhancing course content:', error);
+      
+      // Update the enrollment record to show generation failed
+      try {
+        await supabase
+          .from('hr_course_enrollments')
+          .update({
+            personalized_content_generation_status: 'failed'
+          })
+          .eq('course_id', courseId)
+          .eq('employee_id', employeeId);
+      } catch (updateError) {
+        console.error('Failed to update enrollment status:', updateError);
+      }
       
       toast({
         title: 'Failed to enhance course content',

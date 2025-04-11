@@ -1,6 +1,6 @@
 
-import { supabase } from "@/lib/supabase";
-import { AICourseContent, AICourseContentSection } from "@/lib/types/content";
+import { supabase } from '@/lib/supabase';
+import { AICourseContent, AICourseContentSection } from '@/lib/types/content';
 
 /**
  * Service for retrieving personalized course content
