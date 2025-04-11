@@ -1,7 +1,9 @@
+
 import { LLMProvider } from './llm-service';
+import { PUBLIC_APP_URL } from '@/lib/env';
 
 /**
- * Implementation of LLMProvider using Groq API
+ * Implementation of LLMProvider using Groq API via an edge function
  */
 export class GroqAPI implements LLMProvider {
   private apiKey: string;
@@ -50,13 +52,19 @@ export class GroqAPI implements LLMProvider {
    * Check if a model is available through the Groq API
    */
   public async checkModelAvailability(model: string = this.model): Promise<boolean> {
+    if (!this.isConfigured()) {
+      console.warn('Groq API not configured, cannot check model availability');
+      return false;
+    }
+
     try {
-      // Make a request to list available models
-      const response = await fetch('https://api.groq.com/openai/v1/models', {
-        method: 'GET',
+      // Call the edge function to check models
+      const response = await fetch(`${PUBLIC_APP_URL}/api/groq/list-models`, {
+        method: 'POST',
         headers: {
-          'Authorization': `Bearer ${this.apiKey}`
-        }
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ apiKey: this.apiKey })
       });
       
       if (!response.ok) {
@@ -65,13 +73,13 @@ export class GroqAPI implements LLMProvider {
       }
       
       const data = await response.json();
-      const availableModels = data.data || [];
+      const availableModels = data.models || [];
       
       // Check if the model is in the list
-      const isAvailable = availableModels.some((m: any) => m.id === model);
+      const isAvailable = availableModels.some((m: any) => m === model);
       
       if (!isAvailable && this.options.debug) {
-        console.warn(`Model ${model} is not available in Groq API. Available models: ${availableModels.map((m: any) => m.id).join(', ')}`);
+        console.warn(`Model ${model} is not available in Groq API. Available models: ${availableModels.join(', ')}`);
       }
       
       return isAvailable;
@@ -111,23 +119,20 @@ export class GroqAPI implements LLMProvider {
     }
 
     try {
-      // Make the request to Groq API
-      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      // Call the Supabase Edge Function for Groq API
+      const response = await fetch(`${PUBLIC_APP_URL}/functions/v1/groq-api`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.apiKey}`
         },
         body: JSON.stringify({
           model: this.model,
-          messages: [
-            { role: 'system', content: options.system || 'You are a helpful assistant.' },
-            { role: 'user', content: prompt }
-          ],
+          prompt,
+          systemPrompt: options.system || 'You are a helpful assistant.',
           temperature: options.temperature ?? 0.7,
-          max_tokens: options.maxTokens ?? 1024,
-          top_p: options.topP ?? 1,
-          stop: options.stopSequences || null
+          maxTokens: options.maxTokens ?? 1024,
+          topP: options.topP ?? 1,
+          stopSequences: options.stopSequences || null
         })
       });
 
@@ -136,21 +141,21 @@ export class GroqAPI implements LLMProvider {
       
       if (!response.ok) {
         // Handle specific error cases
-        if (data.error && data.error.message && 
-            (data.error.message.includes('model') || 
-             data.error.message.includes('not found') || 
-             data.error.message.includes('deprecated'))) {
-          throw new Error(`Groq API model error: ${data.error.message}`);
+        if (data.error && 
+            (data.error.includes('model') || 
+             data.error.includes('not found') || 
+             data.error.includes('deprecated'))) {
+          throw new Error(`Groq API model error: ${data.error}`);
         }
-        throw new Error(`Groq API error: ${data.error?.message || 'Unknown error'}`);
+        throw new Error(`Groq API error: ${data.error || 'Unknown error'}`);
       }
 
       // Extract the completion text and token usage
-      const completionText = data.choices[0]?.message?.content || '';
-      const usage = {
-        prompt_tokens: data.usage?.prompt_tokens || 0,
-        completion_tokens: data.usage?.completion_tokens || 0,
-        total_tokens: data.usage?.total_tokens || 0
+      const completionText = data.text || '';
+      const usage = data.usage || {
+        prompt_tokens: 0,
+        completion_tokens: 0,
+        total_tokens: 0
       };
 
       // Log response details if debug is enabled
@@ -165,7 +170,7 @@ export class GroqAPI implements LLMProvider {
         text: completionText,
         usage
       };
-    } catch (error) {
+    } catch (error: any) {
       const errorMessage = error.message || String(error);
       
       // Check if it's a model-related error
@@ -192,4 +197,4 @@ export class GroqAPI implements LLMProvider {
       throw error;
     }
   }
-} 
+}

@@ -1,3 +1,4 @@
+
 /**
  * Direct environment variable exports
  * This file ensures environment variables are properly exposed to the browser bundle
@@ -30,7 +31,7 @@ export const DISABLE_SIGNUPS = import.meta.env.VITE_DISABLE_SIGNUPS === 'true';
 export const ENABLE_EMAIL_CONFIRMATION = import.meta.env.VITE_ENABLE_EMAIL_CONFIRMATION === 'true';
 
 // LLM settings
-export const LLM_MODEL = import.meta.env.VITE_LLM_MODEL || 'llama3-8b-8192';
+export const LLM_MODEL = import.meta.env.VITE_LLM_MODEL || 'llama3-70b-8192';
 export const LLM_TEMPERATURE = parseFloat(import.meta.env.VITE_LLM_TEMPERATURE || '0.7');
 export const MAX_TOKENS = parseInt(import.meta.env.VITE_MAX_TOKENS || '2048');
 
