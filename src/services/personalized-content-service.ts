@@ -27,6 +27,8 @@ export class PersonalizedContentService {
     content: AICourseContent | null;
     sections: AICourseContentSection[];
   }> {
+    console.log(`Fetching personalized content for course ${courseId} and user ${userId}`);
+    
     try {
       // Check if there's personalized content for this course and user
       const { data: contentData, error: contentError } = await supabase
@@ -39,10 +41,12 @@ export class PersonalizedContentService {
         .limit(1)
         .single();
 
-      if (contentError || !contentData) {
-        console.log("No personalized content found", contentError);
+      if (contentError) {
+        console.log(`No personalized content found: ${contentError.message}`);
         return { content: null, sections: [] };
       }
+
+      console.log(`Personalized content found with ID: ${contentData.id}`);
 
       // Get sections for this personalized content
       const { data: sectionsData, error: sectionsError } = await supabase
@@ -52,13 +56,15 @@ export class PersonalizedContentService {
         .order('order_index', { ascending: true });
 
       if (sectionsError) {
-        console.error("Error retrieving personalized sections:", sectionsError);
+        console.error(`Error retrieving personalized sections: ${sectionsError.message}`);
         return { content: contentData as AICourseContent, sections: [] };
       }
 
+      console.log(`Found ${sectionsData?.length || 0} personalized content sections`);
+
       return { 
         content: contentData as AICourseContent, 
-        sections: sectionsData as AICourseContentSection[] 
+        sections: sectionsData as AICourseContentSection[] || []
       };
     } catch (error) {
       console.error("Error retrieving personalized content:", error);
@@ -70,16 +76,23 @@ export class PersonalizedContentService {
    * Check if personalized content exists for a course and user
    */
   public async hasPersonalizedContent(courseId: string, userId: string): Promise<boolean> {
+    console.log(`Checking if personalized content exists for course ${courseId} and user ${userId}`);
+    
     try {
       const { count, error } = await supabase
         .from('ai_course_content')
-        .select('id', { count: true })
+        .select('id', { count: 'exact', head: true })
         .eq('course_id', courseId)
         .eq('created_for_user_id', userId)
-        .eq('is_active', true)
-        .single();
+        .eq('is_active', true);
 
-      return !error && !!count && count > 0;
+      if (error) {
+        console.error(`Error checking for personalized content: ${error.message}`);
+        return false;
+      }
+
+      console.log(`Found ${count} personalized content records`);
+      return count !== null && count > 0;
     } catch (error) {
       console.error("Error checking personalized content:", error);
       return false;
@@ -91,6 +104,8 @@ export class PersonalizedContentService {
    */
   public async getEnrollmentId(courseId: string, employeeId: string): Promise<string | null> {
     try {
+      console.log(`Looking up enrollment for course ${courseId} and employee ${employeeId}`);
+      
       const { data, error } = await supabase
         .from('hr_course_enrollments')
         .select('id, personalized_content_id')
@@ -98,15 +113,47 @@ export class PersonalizedContentService {
         .eq('employee_id', employeeId)
         .single();
 
-      if (error || !data) {
-        console.log("No enrollment found", error);
+      if (error) {
+        console.log(`No enrollment found: ${error.message}`);
         return null;
       }
 
+      console.log(`Enrollment found with ID: ${data.id}`);
       return data.id;
     } catch (error) {
-      console.error("Error getting enrollment:", error);
+      console.error(`Error getting enrollment: ${error instanceof Error ? error.message : String(error)}`);
       return null;
+    }
+  }
+  
+  /**
+   * Check the status of a content generation request
+   */
+  public async getContentGenerationStatus(enrollmentId: string): Promise<{
+    isGenerating: boolean;
+    startedAt?: string;
+    estimatedCompletion?: string;
+  }> {
+    try {
+      const { data, error } = await supabase
+        .from('hr_course_enrollments')
+        .select('personalized_content_generation_status, personalized_content_started_at')
+        .eq('id', enrollmentId)
+        .single();
+        
+      if (error || !data) {
+        return { isGenerating: false };
+      }
+      
+      return {
+        isGenerating: data.personalized_content_generation_status === 'generating',
+        startedAt: data.personalized_content_started_at,
+        estimatedCompletion: data.personalized_content_started_at ? 
+          new Date(new Date(data.personalized_content_started_at).getTime() + 5 * 60000).toISOString() : undefined
+      };
+    } catch (error) {
+      console.error("Error checking content generation status:", error);
+      return { isGenerating: false };
     }
   }
 }

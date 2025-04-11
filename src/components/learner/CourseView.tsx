@@ -8,8 +8,9 @@ import { AICourseContent, AICourseContentSection } from '@/lib/types/content';
 import { supabase } from '@/lib/supabase';
 import { PersonalizedContentService } from '@/services/personalized-content-service';
 import { PersonalizedContentView } from '@/components/courses/PersonalizedContentView';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, AlertCircle } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 interface CourseViewProps {
   courseId?: string;
@@ -40,6 +41,7 @@ const CourseView: React.FC<CourseViewProps> = ({
   const [hasPersonalized, setHasPersonalized] = useState(!!propsHasPersonalized);
   const [employeeId, setEmployeeId] = useState<string | null>(propsEmployeeId || null);
   const { toast } = useToast();
+  const [contentError, setContentError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchCourse = async () => {
@@ -49,6 +51,7 @@ const CourseView: React.FC<CourseViewProps> = ({
         setLoading(true);
         
         // Fetch course details
+        console.log(`Fetching course details for ID: ${id}`);
         const { data: courseData, error: courseError } = await supabase
           .from('courses')
           .select('*')
@@ -56,8 +59,9 @@ const CourseView: React.FC<CourseViewProps> = ({
           .single();
           
         if (courseError) {
-          console.error('Error fetching course:', courseError);
+          console.log('Error fetching standard course:', courseError);
           // Try the HR courses table as fallback
+          console.log('Trying hr_courses table instead...');
           const { data: hrCourseData, error: hrCourseError } = await supabase
             .from('hr_courses')
             .select('*')
@@ -76,14 +80,19 @@ const CourseView: React.FC<CourseViewProps> = ({
             description: hrCourseData.description || '',
             modules: [] // Will fetch modules separately
           });
+          
+          console.log('Found course in hr_courses:', hrCourseData);
         } else {
           setCourse(courseData);
+          console.log('Found course in courses:', courseData);
         }
         
         // Identify the employee ID if not provided
         if (!employeeId) {
+          console.log('No employee ID provided, looking up from session');
           const { data: { session } } = await supabase.auth.getSession();
           if (session?.user) {
+            console.log('Found user session, checking for HR employee record');
             // Check if there's an HR employee record
             const { data: hrEmployee } = await supabase
               .from('hr_employees')
@@ -92,9 +101,11 @@ const CourseView: React.FC<CourseViewProps> = ({
               .single();
               
             if (hrEmployee) {
+              console.log('Found HR employee record:', hrEmployee);
               setEmployeeId(hrEmployee.id);
             } else {
               // Fall back to user ID
+              console.log('No HR employee record found, using user ID');
               setEmployeeId(session.user.id);
             }
           }
@@ -117,10 +128,17 @@ const CourseView: React.FC<CourseViewProps> = ({
 
   useEffect(() => {
     const fetchPersonalizedContent = async () => {
-      if (!id || !employeeId) return;
+      if (!id || !employeeId) {
+        console.log('Missing ID or employeeId, skipping personalized content fetch');
+        return;
+      }
       
       try {
         setIsLoadingPersonalized(true);
+        setContentError(null);
+        
+        console.log(`Fetching personalized content for course ${id} and employee ${employeeId}`);
+        
         // Get the current user
         const { data: { session } } = await supabase.auth.getSession();
         
@@ -132,9 +150,11 @@ const CourseView: React.FC<CourseViewProps> = ({
         const contentService = PersonalizedContentService.getInstance();
         
         // Check for personalized content using both user ID and employee ID
+        console.log(`Checking for personalized content with user ID: ${session.user.id}`);
         let hasContent = await contentService.hasPersonalizedContent(id, session.user.id);
         
         if (!hasContent && employeeId !== session.user.id) {
+          console.log(`No content found for user ID, checking with employee ID: ${employeeId}`);
           // Try with employee ID if different from user ID
           hasContent = await contentService.hasPersonalizedContent(id, employeeId);
         }
@@ -142,22 +162,31 @@ const CourseView: React.FC<CourseViewProps> = ({
         setHasPersonalized(hasContent);
         
         if (hasContent) {
+          console.log('Personalized content exists, fetching it');
           // Try to get content with user ID first
           let contentResult = await contentService.getPersonalizedContent(id, session.user.id);
           
           // If no content found and employee ID is different, try with employee ID
           if (!contentResult.content && employeeId !== session.user.id) {
+            console.log(`Trying to fetch content with employee ID: ${employeeId}`);
             contentResult = await contentService.getPersonalizedContent(id, employeeId);
           }
           
           setPersonalizedContent(contentResult.content);
           setPersonalizedSections(contentResult.sections);
           
+          console.log(`Found personalized content: ${contentResult.content?.id}, sections: ${contentResult.sections.length}`);
+          
           // Switch to personalized content tab if content exists
-          setActiveTab('personalized');
+          if (contentResult.content) {
+            setActiveTab('personalized');
+          }
+        } else {
+          console.log('No personalized content found');
         }
       } catch (error) {
         console.error("Error fetching personalized content:", error);
+        setContentError(error instanceof Error ? error.message : 'Unknown error fetching personalized content');
       } finally {
         setIsLoadingPersonalized(false);
       }
@@ -201,6 +230,14 @@ const CourseView: React.FC<CourseViewProps> = ({
           <p>{course.description}</p>
         </CardContent>
       </Card>
+
+      {contentError && (
+        <Alert variant="destructive" className="mb-6">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>{contentError}</AlertDescription>
+        </Alert>
+      )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
@@ -250,6 +287,21 @@ const CourseView: React.FC<CourseViewProps> = ({
           )}
         </TabsContent>
       </Tabs>
+      
+      {/* Development mode debugging */}
+      {import.meta.env.DEV && (
+        <div className="mt-8 p-4 border border-gray-200 rounded-md bg-gray-50">
+          <h3 className="text-sm font-medium text-gray-500 mb-2">Debug Information</h3>
+          <div className="text-xs font-mono">
+            <p>Course ID: {id}</p>
+            <p>Employee ID: {employeeId || 'Not set'}</p>
+            <p>Has Personalized Content: {hasPersonalized ? 'Yes' : 'No'}</p>
+            <p>Active Tab: {activeTab}</p>
+            <p>Personalized Content ID: {personalizedContent?.id || 'None'}</p>
+            <p>Personalized Sections: {personalizedSections?.length || 0}</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

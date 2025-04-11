@@ -1,8 +1,8 @@
 
 import React from 'react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from '@/lib/react-helpers';
 import { Button } from '@/components/ui/button';
-import { Loader2 } from 'lucide-react';
+import { Loader2, RefreshCw } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/lib/supabase';
 import {
@@ -11,6 +11,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { PersonalizedContentService } from '@/services/personalized-content-service';
 
 interface EnhanceCourseContentButtonProps {
   employeeId: string;
@@ -37,6 +38,7 @@ const EnhanceCourseContentButton: React.FC<EnhanceCourseContentButtonProps> = ({
   const [enhancingCourseId, setEnhancingCourseId] = useState<string | null>(null);
   const [enrolledCourses, setEnrolledCourses] = useState<Course[]>([]);
   const [isLoadingCourses, setIsLoadingCourses] = useState<boolean>(false);
+  const [personalizedCourses, setPersonalizedCourses] = useState<Set<string>>(new Set());
   
   // Fetch enrolled courses when the component mounts
   useEffect(() => {
@@ -54,7 +56,7 @@ const EnhanceCourseContentButton: React.FC<EnhanceCourseContentButtonProps> = ({
       // First get the course IDs from enrollments
       const { data: enrollments, error: enrollmentError } = await supabase
         .from('hr_course_enrollments')
-        .select('course_id')
+        .select('course_id, personalized_content_id')
         .eq('employee_id', employeeId);
       
       if (enrollmentError) {
@@ -65,6 +67,16 @@ const EnhanceCourseContentButton: React.FC<EnhanceCourseContentButtonProps> = ({
         setEnrolledCourses([]);
         return;
       }
+      
+      // Track which courses already have personalized content
+      const personalizedCourseIds = new Set<string>();
+      enrollments.forEach(enrollment => {
+        if (enrollment.personalized_content_id) {
+          personalizedCourseIds.add(enrollment.course_id);
+        }
+      });
+      
+      setPersonalizedCourses(personalizedCourseIds);
       
       // Get the course details for each enrolled course
       const courseIds = enrollments.map(e => e.course_id);
@@ -84,6 +96,7 @@ const EnhanceCourseContentButton: React.FC<EnhanceCourseContentButtonProps> = ({
       }));
       
       setEnrolledCourses(courses);
+      console.log(`Fetched ${courses.length} enrolled courses`);
     } catch (error) {
       console.error('Error fetching enrolled courses:', error);
       toast({
@@ -120,52 +133,15 @@ const EnhanceCourseContentButton: React.FC<EnhanceCourseContentButtonProps> = ({
         throw new Error(`Failed to fetch employee data: ${employeeError.message}`);
       }
       
-      // Fetch department and position data separately
-      let departmentName = '';
-      let positionTitle = '';
-      
-      if (employeeData.department_id) {
-        const { data: departmentData } = await supabase
-          .from('hr_departments')
-          .select('name')
-          .eq('id', employeeData.department_id)
-          .single();
-          
-        if (departmentData) {
-          departmentName = departmentData.name;
-        }
-      }
-      
-      if (employeeData.position_id) {
-        const { data: positionData } = await supabase
-          .from('hr_positions')
-          .select('title')
-          .eq('id', employeeData.position_id)
-          .single();
-          
-        if (positionData) {
-          positionTitle = positionData.title;
-        }
+      if (!employeeData.cv_extracted_data) {
+        throw new Error("Employee does not have any CV data. Please upload and extract CV data first.");
       }
       
       console.log('Enhancing course content with employee profile:', {
         employeeId,
         courseId,
-        profileDataAvailable: !!employeeData.cv_extracted_data
+        hasExtractedData: !!employeeData.cv_extracted_data
       });
-
-      // Ensure course exists in main courses table
-      console.log('Mirroring HR course to main courses table...');
-      try {
-        // Start by making an API call to mirror the course
-        await fetch('/api/hr/courses/mirror-courses', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ courseId }),
-        });
-      } catch (mirrorError) {
-        console.warn('Error mirroring course (continuing anyway):', mirrorError);
-      }
 
       // Use the universal enhance endpoint for content personalization
       console.log('Enhancing course content...');
@@ -176,7 +152,8 @@ const EnhanceCourseContentButton: React.FC<EnhanceCourseContentButtonProps> = ({
         },
         body: JSON.stringify({ 
           employeeId,
-          courseId 
+          courseId,
+          debug: true // Request verbose logs for debugging
         }),
       });
 
@@ -187,6 +164,7 @@ const EnhanceCourseContentButton: React.FC<EnhanceCourseContentButtonProps> = ({
         try {
           const errorData = await enhanceResponse.json();
           errorMessage = errorData.error || errorData.message || errorMessage;
+          console.error('Server returned error:', errorData);
         } catch {
           errorMessage = `Server error (${enhanceResponse.status}): ${await enhanceResponse.text() || 'Could not process response'}`;
         }
@@ -195,13 +173,20 @@ const EnhanceCourseContentButton: React.FC<EnhanceCourseContentButtonProps> = ({
 
       // Parse the JSON response
       const data = await enhanceResponse.json();
+      console.log('Content enhancement response:', data);
       
       if (data.success) {
+        // Add this course to personalized courses set
+        setPersonalizedCourses(prev => new Set([...prev, courseId]));
+        
         toast({
           title: 'Success!',
           description: `Personalized content created for "${data.course?.title || courseTitle}". The content has been tailored to your profile.`,
           variant: 'default',
         });
+        
+        // Refresh the list of courses to show updated personalization status
+        fetchEnrolledCourses();
         return;
       } else {
         throw new Error(data.error || 'Unknown error occurred during enhancement');
@@ -218,6 +203,10 @@ const EnhanceCourseContentButton: React.FC<EnhanceCourseContentButtonProps> = ({
       setIsLoading(false);
       setEnhancingCourseId(null);
     }
+  };
+
+  const isPersonalized = (courseId: string) => {
+    return personalizedCourses.has(courseId);
   };
 
   // Don't render if no employee ID
@@ -259,24 +248,34 @@ const EnhanceCourseContentButton: React.FC<EnhanceCourseContentButtonProps> = ({
           )}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
+      <DropdownMenuContent align="end" className="w-64">
         {enrolledCourses.map((course) => (
           <DropdownMenuItem
             key={course.id}
             onClick={() => enhanceCourseContent(course.id, course.title)}
-            disabled={isLoading && enhancingCourseId === course.id}
-            className="flex items-center"
+            disabled={isLoading}
+            className="flex items-center justify-between"
           >
+            <span className="truncate mr-2">{course.title}</span>
             {isLoading && enhancingCourseId === course.id ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Enhancing...
-              </>
+              <Loader2 className="h-4 w-4 animate-spin ml-auto" />
+            ) : isPersonalized(course.id) ? (
+              <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full ml-auto">
+                Personalized
+              </span>
             ) : (
-              course.title
+              <span className="text-xs bg-gray-100 px-2 py-1 rounded-full ml-auto">
+                Standard
+              </span>
             )}
           </DropdownMenuItem>
         ))}
+        <DropdownMenuItem 
+          className="border-t mt-2 pt-2 text-xs text-center flex justify-center"
+          onClick={() => fetchEnrolledCourses()}
+        >
+          <RefreshCw className="h-3 w-3 mr-1" /> Refresh courses
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
