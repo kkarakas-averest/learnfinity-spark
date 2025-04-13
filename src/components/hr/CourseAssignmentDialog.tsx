@@ -169,21 +169,35 @@ const CourseAssignmentDialog: React.FC<CourseAssignmentDialogProps> = ({
               description: 'Personalized course content is being generated.',
               duration: 5000
             });
+          } else if (response.status === 404) {
+            console.warn('Content generation API endpoint not available in this environment.');
+            toast({
+              title: 'Course Assigned',
+              description: 'Course has been successfully assigned. Note: Content personalization is not available in this environment.',
+              duration: 5000
+            });
           } else {
             console.warn('Content generation request failed but course was assigned.');
           }
         } catch (contentError) {
           console.error('Error generating personalized content:', contentError);
           // Don't fail the overall assignment if just the content generation fails
+          toast({
+            title: 'Course Assigned',
+            description: 'Course has been successfully assigned, but content personalization failed.',
+            duration: 5000
+          });
         }
       }
       
-      // Show success toast
-      toast({
-        title: 'Course Assigned',
-        description: `Course has been successfully assigned.${generatePersonalizedContent ? ' Personalized content is being generated.' : ''}`,
-        duration: 3000
-      });
+      // Show success toast only if we haven't already shown a toast for the specific case
+      if (!generatePersonalizedContent) {
+        toast({
+          title: 'Course Assigned',
+          description: 'Course has been successfully assigned.',
+          duration: 3000
+        });
+      }
       
       // Close dialog and reload courses if needed
       onOpenChange(false);
