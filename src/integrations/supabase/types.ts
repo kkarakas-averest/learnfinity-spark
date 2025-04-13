@@ -2392,6 +2392,36 @@ export type Database = {
         }
         Relationships: []
       }
+      hr_personalized_course_content: {
+        Row: {
+          content: Json
+          course_id: string
+          created_at: string
+          employee_id: string
+          id: string
+          is_active: boolean
+          updated_at: string
+        }
+        Insert: {
+          content: Json
+          course_id: string
+          created_at?: string
+          employee_id: string
+          id: string
+          is_active?: boolean
+          updated_at?: string
+        }
+        Update: {
+          content?: Json
+          course_id?: string
+          created_at?: string
+          employee_id?: string
+          id?: string
+          is_active?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
       hr_positions: {
         Row: {
           created_at: string | null
@@ -4061,6 +4091,14 @@ export type Database = {
       create_confirmed_user: {
         Args: { user_email: string; user_password: string; user_data?: Json }
         Returns: Json
+      }
+      create_hr_content_table: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      create_hr_personalized_content_table: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
       }
       create_notifications_table: {
         Args: Record<PropertyKey, never>
