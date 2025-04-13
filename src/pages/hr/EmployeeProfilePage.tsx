@@ -767,7 +767,7 @@ const EmployeeProfilePage: React.FC = () => {
                       </p>
                       
                       {/* Display skills if available */}
-                      {typeof employee.cv_extracted_data === 'object' && employee.cv_extracted_data.skills && employee.cv_extracted_data.skills.length > 0 && (
+                      {typeof employee.cv_extracted_data === 'object' && employee.cv_extracted_data.skills && Array.isArray(employee.cv_extracted_data.skills) && employee.cv_extracted_data.skills.length > 0 && (
                         <div className="mt-2">
                           <h4 className="text-xs font-medium text-gray-700 mb-1">Key Skills</h4>
                           <div className="flex flex-wrap gap-1">
@@ -785,9 +785,10 @@ const EmployeeProfilePage: React.FC = () => {
                         </div>
                       )}
                       
-                      {/* Display latest experience if available */}
+                      {/* Display experience if available */}
                       {typeof employee.cv_extracted_data === 'object' && 
                        employee.cv_extracted_data.experience && 
+                       Array.isArray(employee.cv_extracted_data.experience) &&
                        employee.cv_extracted_data.experience.length > 0 && (
                         <div className="mt-2">
                           <h4 className="text-xs font-medium text-gray-700 mb-1">Experience</h4>
@@ -806,6 +807,7 @@ const EmployeeProfilePage: React.FC = () => {
                       {/* Display education if available */}
                       {typeof employee.cv_extracted_data === 'object' && 
                        employee.cv_extracted_data.education && 
+                       Array.isArray(employee.cv_extracted_data.education) &&
                        employee.cv_extracted_data.education.length > 0 && (
                         <div className="mt-2">
                           <h4 className="text-xs font-medium text-gray-700 mb-1">Education</h4>
@@ -824,6 +826,7 @@ const EmployeeProfilePage: React.FC = () => {
                       {/* Display certifications if available */}
                       {typeof employee.cv_extracted_data === 'object' && 
                        employee.cv_extracted_data.certifications && 
+                       Array.isArray(employee.cv_extracted_data.certifications) &&
                        employee.cv_extracted_data.certifications.length > 0 && (
                         <div className="mt-2">
                           <h4 className="text-xs font-medium text-gray-700 mb-1">Certifications</h4>
@@ -840,6 +843,7 @@ const EmployeeProfilePage: React.FC = () => {
                       {/* Display languages if available */}
                       {typeof employee.cv_extracted_data === 'object' && 
                        employee.cv_extracted_data.languages && 
+                       Array.isArray(employee.cv_extracted_data.languages) &&
                        employee.cv_extracted_data.languages.length > 0 && (
                         <div className="mt-2">
                           <h4 className="text-xs font-medium text-gray-700 mb-1">Languages</h4>
@@ -855,7 +859,8 @@ const EmployeeProfilePage: React.FC = () => {
                       
                       {/* Display personal insights if available */}
                       {typeof employee.cv_extracted_data === 'object' && 
-                       employee.cv_extracted_data.personalInsights && (
+                       employee.cv_extracted_data.personalInsights &&
+                       typeof employee.cv_extracted_data.personalInsights === 'object' && (
                         <div className="mt-3 pt-3 border-t border-dashed border-gray-200">
                           <h4 className="text-xs font-medium text-gray-700 mb-2">Professional Insights</h4>
                           
@@ -867,16 +872,14 @@ const EmployeeProfilePage: React.FC = () => {
                               </div>
                             )}
                             
-                            {employee.cv_extracted_data.personalInsights.industries && 
-                             employee.cv_extracted_data.personalInsights.industries.length > 0 && (
+                            {employee.cv_extracted_data.personalInsights.industries && Array.isArray(employee.cv_extracted_data.personalInsights.industries) && employee.cv_extracted_data.personalInsights.industries.length > 0 && (
                               <div>
                                 <span className="text-gray-500">Industries:</span>
                                 <span className="ml-1 font-medium">{employee.cv_extracted_data.personalInsights.industries.slice(0, 2).join(", ")}</span>
                               </div>
                             )}
                             
-                            {employee.cv_extracted_data.personalInsights.toolsAndTechnologies && 
-                             employee.cv_extracted_data.personalInsights.toolsAndTechnologies.length > 0 && (
+                            {employee.cv_extracted_data.personalInsights.toolsAndTechnologies && Array.isArray(employee.cv_extracted_data.personalInsights.toolsAndTechnologies) && employee.cv_extracted_data.personalInsights.toolsAndTechnologies.length > 0 && (
                               <div className="col-span-2">
                                 <span className="text-gray-500">Tools & Technologies:</span>
                                 <span className="ml-1 font-medium">{employee.cv_extracted_data.personalInsights.toolsAndTechnologies.slice(0, 3).join(", ")}</span>
@@ -885,8 +888,7 @@ const EmployeeProfilePage: React.FC = () => {
                               </div>
                             )}
                             
-                            {employee.cv_extracted_data.personalInsights.softSkills && 
-                             employee.cv_extracted_data.personalInsights.softSkills.length > 0 && (
+                            {employee.cv_extracted_data.personalInsights.softSkills && Array.isArray(employee.cv_extracted_data.personalInsights.softSkills) && employee.cv_extracted_data.personalInsights.softSkills.length > 0 && (
                               <div className="col-span-2">
                                 <span className="text-gray-500">Soft Skills:</span>
                                 <span className="ml-1 font-medium">{employee.cv_extracted_data.personalInsights.softSkills.join(", ")}</span>
@@ -1382,12 +1384,14 @@ const EmployeeProfilePage: React.FC = () => {
               <div>
                 <h3 className="text-lg font-semibold mb-2">Professional Summary</h3>
                 <div className="bg-gray-50 p-4 rounded-md border">
-                  <p className="text-sm">{employee.cv_extracted_data.summary}</p>
+                  <p className="text-sm">
+                    {employee.cv_extracted_data.summary || 'No professional summary available.'}
+                  </p>
                 </div>
               </div>
               
               {/* Skills Section */}
-              {employee.cv_extracted_data.skills && employee.cv_extracted_data.skills.length > 0 && (
+              {employee.cv_extracted_data.skills && Array.isArray(employee.cv_extracted_data.skills) && employee.cv_extracted_data.skills.length > 0 && (
                 <div>
                   <h3 className="text-lg font-semibold mb-2">Skills & Competencies</h3>
                   <div className="bg-gray-50 p-4 rounded-md border">
@@ -1403,7 +1407,7 @@ const EmployeeProfilePage: React.FC = () => {
               )}
               
               {/* Experience Section */}
-              {employee.cv_extracted_data.experience && employee.cv_extracted_data.experience.length > 0 && (
+              {employee.cv_extracted_data.experience && Array.isArray(employee.cv_extracted_data.experience) && employee.cv_extracted_data.experience.length > 0 && (
                 <div>
                   <h3 className="text-lg font-semibold mb-2">Professional Experience</h3>
                   <div className="space-y-4">
@@ -1432,7 +1436,7 @@ const EmployeeProfilePage: React.FC = () => {
               )}
               
               {/* Education Section */}
-              {employee.cv_extracted_data.education && employee.cv_extracted_data.education.length > 0 && (
+              {employee.cv_extracted_data.education && Array.isArray(employee.cv_extracted_data.education) && employee.cv_extracted_data.education.length > 0 && (
                 <div>
                   <h3 className="text-lg font-semibold mb-2">Education</h3>
                   <div className="space-y-4">
@@ -1454,7 +1458,7 @@ const EmployeeProfilePage: React.FC = () => {
               )}
               
               {/* Certifications Section */}
-              {employee.cv_extracted_data.certifications && employee.cv_extracted_data.certifications.length > 0 && (
+              {employee.cv_extracted_data.certifications && Array.isArray(employee.cv_extracted_data.certifications) && employee.cv_extracted_data.certifications.length > 0 && (
                 <div>
                   <h3 className="text-lg font-semibold mb-2">Certifications</h3>
                   <div className="bg-gray-50 p-4 rounded-md border">
@@ -1468,7 +1472,7 @@ const EmployeeProfilePage: React.FC = () => {
               )}
               
               {/* Languages Section */}
-              {employee.cv_extracted_data.languages && employee.cv_extracted_data.languages.length > 0 && (
+              {employee.cv_extracted_data.languages && Array.isArray(employee.cv_extracted_data.languages) && employee.cv_extracted_data.languages.length > 0 && (
                 <div>
                   <h3 className="text-lg font-semibold mb-2">Languages</h3>
                   <div className="bg-gray-50 p-4 rounded-md border">
@@ -1484,7 +1488,7 @@ const EmployeeProfilePage: React.FC = () => {
               )}
               
               {/* Personal Insights Section */}
-              {employee.cv_extracted_data.personalInsights && (
+              {employee.cv_extracted_data.personalInsights && typeof employee.cv_extracted_data.personalInsights === 'object' && (
                 <div>
                   <h3 className="text-lg font-semibold mb-2">Professional Insights</h3>
                   <div className="bg-gray-50 p-4 rounded-md border">
@@ -1496,35 +1500,35 @@ const EmployeeProfilePage: React.FC = () => {
                         </div>
                       )}
                       
-                      {employee.cv_extracted_data.personalInsights.industries && employee.cv_extracted_data.personalInsights.industries.length > 0 && (
+                      {employee.cv_extracted_data.personalInsights.industries && Array.isArray(employee.cv_extracted_data.personalInsights.industries) && employee.cv_extracted_data.personalInsights.industries.length > 0 && (
                         <div>
                           <h4 className="text-sm font-medium text-gray-700">Industries</h4>
                           <p className="text-sm">{employee.cv_extracted_data.personalInsights.industries.join(", ")}</p>
                         </div>
                       )}
                       
-                      {employee.cv_extracted_data.personalInsights.toolsAndTechnologies && employee.cv_extracted_data.personalInsights.toolsAndTechnologies.length > 0 && (
+                      {employee.cv_extracted_data.personalInsights.toolsAndTechnologies && Array.isArray(employee.cv_extracted_data.personalInsights.toolsAndTechnologies) && employee.cv_extracted_data.personalInsights.toolsAndTechnologies.length > 0 && (
                         <div>
                           <h4 className="text-sm font-medium text-gray-700">Tools & Technologies</h4>
                           <p className="text-sm">{employee.cv_extracted_data.personalInsights.toolsAndTechnologies.join(", ")}</p>
                         </div>
                       )}
                       
-                      {employee.cv_extracted_data.personalInsights.projectManagement && employee.cv_extracted_data.personalInsights.projectManagement.length > 0 && (
+                      {employee.cv_extracted_data.personalInsights.projectManagement && Array.isArray(employee.cv_extracted_data.personalInsights.projectManagement) && employee.cv_extracted_data.personalInsights.projectManagement.length > 0 && (
                         <div>
                           <h4 className="text-sm font-medium text-gray-700">Project Management</h4>
                           <p className="text-sm">{employee.cv_extracted_data.personalInsights.projectManagement.join(", ")}</p>
                         </div>
                       )}
                       
-                      {employee.cv_extracted_data.personalInsights.softSkills && employee.cv_extracted_data.personalInsights.softSkills.length > 0 && (
+                      {employee.cv_extracted_data.personalInsights.softSkills && Array.isArray(employee.cv_extracted_data.personalInsights.softSkills) && employee.cv_extracted_data.personalInsights.softSkills.length > 0 && (
                         <div>
                           <h4 className="text-sm font-medium text-gray-700">Soft Skills</h4>
                           <p className="text-sm">{employee.cv_extracted_data.personalInsights.softSkills.join(", ")}</p>
                         </div>
                       )}
                       
-                      {employee.cv_extracted_data.personalInsights.publications && employee.cv_extracted_data.personalInsights.publications.length > 0 && (
+                      {employee.cv_extracted_data.personalInsights.publications && Array.isArray(employee.cv_extracted_data.personalInsights.publications) && employee.cv_extracted_data.personalInsights.publications.length > 0 && (
                         <div className="col-span-2">
                           <h4 className="text-sm font-medium text-gray-700">Publications</h4>
                           <ul className="list-disc list-inside space-y-1 text-sm text-gray-600">
