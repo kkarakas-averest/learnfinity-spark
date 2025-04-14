@@ -351,6 +351,7 @@ export type Database = {
           employee_id: string | null
           id: string
           is_active: boolean | null
+          learning_objectives: Json | null
           metadata: Json
           personalization_context: Json | null
           personalization_params: Json | null
@@ -367,6 +368,7 @@ export type Database = {
           employee_id?: string | null
           id?: string
           is_active?: boolean | null
+          learning_objectives?: Json | null
           metadata?: Json
           personalization_context?: Json | null
           personalization_params?: Json | null
@@ -383,6 +385,7 @@ export type Database = {
           employee_id?: string | null
           id?: string
           is_active?: boolean | null
+          learning_objectives?: Json | null
           metadata?: Json
           personalization_context?: Json | null
           personalization_params?: Json | null
