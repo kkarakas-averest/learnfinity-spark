@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from '@/lib/react-helpers';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { PersonalizedContentService } from '@/services/personalized-content-service';
 import CourseModuleList from './CourseModuleList';
 import CourseContentSection from './CourseContentSection';
+import PersonalizedCourseContent from './PersonalizedCourseContent';
 
 interface CourseViewProps {
   courseId: string;
@@ -23,22 +24,22 @@ const CourseView: React.FC<CourseViewProps> = ({
   hasPersonalizedContent: initialPersonalizationState = false
 }) => {
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(true);
-  const [course, setCourse] = useState<any>(null);
-  const [hasPersonalizedContent, setHasPersonalizedContent] = useState<boolean>(initialPersonalizationState);
-  const [personalizedContent, setPersonalizedContent] = useState<any>(null);
-  const [selectedModuleId, setSelectedModuleId] = useState<string | null>(null);
-  const [loadingPersonalization, setLoadingPersonalization] = useState<boolean>(false);
-  const [generatingContent, setGeneratingContent] = useState<boolean>(false);
-  const [enrollmentId, setEnrollmentId] = useState<string | null>(null);
-  const [personalizedContentSections, setPersonalizedContentSections] = useState<any[]>([]);
-  const [contentGenerationStatus, setContentGenerationStatus] = useState<{
+  const [loading, setLoading] = React.useState(true);
+  const [course, setCourse] = React.useState<any>(null);
+  const [hasPersonalizedContent, setHasPersonalizedContent] = React.useState<boolean>(initialPersonalizationState);
+  const [personalizedContent, setPersonalizedContent] = React.useState<any>(null);
+  const [selectedModuleId, setSelectedModuleId] = React.useState<string | null>(null);
+  const [loadingPersonalization, setLoadingPersonalization] = React.useState<boolean>(false);
+  const [generatingContent, setGeneratingContent] = React.useState<boolean>(false);
+  const [enrollmentId, setEnrollmentId] = React.useState<string | null>(null);
+  const [personalizedContentSections, setPersonalizedContentSections] = React.useState<any[]>([]);
+  const [contentGenerationStatus, setContentGenerationStatus] = React.useState<{
     isGenerating: boolean;
     startedAt?: string;
     estimatedCompletion?: string;
   }>({ isGenerating: false });
 
-  useEffect(() => {
+  React.useEffect(() => {
     const loadCourseData = async () => {
       if (!courseId) return;
       
