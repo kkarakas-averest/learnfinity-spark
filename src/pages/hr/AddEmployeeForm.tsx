@@ -346,7 +346,12 @@ export default function AddEmployeeForm() {
               
               // Try to directly record the enrollment in Supabase
               try {
-                const enrollmentId = 'static-' + Math.random().toString(36).substring(2, 15);
+                // Generate a proper UUID for the enrollment
+                const enrollmentId = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                  const r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+                  return v.toString(16);
+                });
+                
                 await supabase
                   .from('hr_course_enrollments')
                   .insert([{

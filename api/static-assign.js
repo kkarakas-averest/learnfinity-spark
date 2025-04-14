@@ -1,7 +1,7 @@
-// Super minimal static API that just returns success and doesn't execute any code
-// Use this as a temporary workaround for the Vercel function invocation failures
+// Static API for course assignment that always returns success
+// For client-side fallback testing
 
-module.exports = (req, res) => {
+module.exports = async (req, res) => {
   // Enable CORS
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -13,10 +13,62 @@ module.exports = (req, res) => {
     return res.status(200).end();
   }
 
-  // Always return success for now
-  return res.status(200).json({
-    success: true,
-    message: 'Course assignment successful (static response)',
-    enrollmentId: 'static-' + Math.random().toString(36).substring(2, 15)
-  });
+  // Only accept POST requests
+  if (req.method !== 'POST') {
+    return res.status(405).json({
+      success: false,
+      error: 'Method not allowed',
+      message: 'Only POST requests are accepted'
+    });
+  }
+
+  try {
+    // Parse request body
+    let body;
+    try {
+      body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+    } catch (parseError) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid request body',
+        message: 'Could not parse JSON request body'
+      });
+    }
+
+    // Validate required fields
+    const { courseId, employeeId } = body || {};
+    if (!courseId || !employeeId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing fields',
+        message: 'courseId and employeeId are required'
+      });
+    }
+
+    // Generate a fake UUID for the enrollment
+    function generateUUID() {
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+      });
+    }
+
+    const enrollmentId = generateUUID();
+
+    // Return success - this endpoint always succeeds
+    return res.status(200).json({
+      success: true,
+      message: 'Successfully assigned course to employee (static endpoint)',
+      enrollmentId
+    });
+  } catch (error) {
+    console.error('Static course assignment error:', error);
+    
+    // Always return a proper JSON response
+    return res.status(500).json({
+      success: false,
+      error: error.message || 'Unknown error',
+      message: 'An error occurred during static course assignment'
+    });
+  }
 }; 
