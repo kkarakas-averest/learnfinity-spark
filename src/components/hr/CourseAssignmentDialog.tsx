@@ -86,8 +86,10 @@ const CourseAssignmentDialog: React.FC<CourseAssignmentDialogProps> = ({
     setError(null);
     
     try {
-      // Call our server-side API endpoint for course assignment with corrected path
-      const response = await fetch('/api/hr/courses/assign', {
+      // Try the new test endpoint first, fall back to the regular endpoint if it fails
+      let response;
+      let result;
+      const requestPayload = {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -96,9 +98,18 @@ const CourseAssignmentDialog: React.FC<CourseAssignmentDialogProps> = ({
           courseId: selectedCourse,
           employeeId: employeeId
         })
-      });
+      };
       
-      const result = await response.json();
+      try {
+        // First try our test endpoint with hardcoded credentials
+        response = await fetch('/api/hr/courses/assign-test', requestPayload);
+        result = await response.json();
+      } catch (testEndpointError) {
+        console.warn('Test endpoint failed, trying standard endpoint:', testEndpointError);
+        // Fall back to the regular endpoint
+        response = await fetch('/api/hr/courses/assign', requestPayload);
+        result = await response.json();
+      }
       
       if (!response.ok || !result.success) {
         console.error('Error assigning course:', result.error || 'Unknown error');
