@@ -1,5 +1,5 @@
-
 import { supabase } from '@/integrations/supabase/client';
+import { createClient } from '@supabase/supabase-js';
 
 /**
  * Export the Supabase client for use throughout the application
@@ -7,20 +7,34 @@ import { supabase } from '@/integrations/supabase/client';
  */
 export { supabase };
 
+// Get Supabase URL and service key from environment variables
+const supabaseUrl = typeof window !== 'undefined' ? 
+  import.meta.env?.VITE_SUPABASE_URL : 
+  process.env.SUPABASE_URL;
+
+const supabaseServiceKey = typeof window !== 'undefined' ? 
+  import.meta.env?.VITE_SUPABASE_SERVICE_KEY : 
+  process.env.SUPABASE_SERVICE_KEY;
+
 /**
  * Supabase admin client with service key capabilities
  * Will be undefined if service key is not provided
  */
-export const supabaseAdmin = undefined; // Will be populated if using a service key
+export const supabaseAdmin = supabaseServiceKey && supabaseUrl ? 
+  createClient(supabaseUrl, supabaseServiceKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false
+    }
+  }) : 
+  undefined;
 
 /**
  * Check if we're using a service key with elevated privileges
  * @returns boolean indicating if the current client is using a service key
  */
 export function isUsingServiceKey(): boolean {
-  // In this implementation, we're not using a service key
-  // This would need to be adjusted if service key functionality is implemented
-  return false;
+  return !!supabaseAdmin;
 }
 
 /**

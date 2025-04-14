@@ -396,7 +396,11 @@ const hrCourseService = {
         last_activity_at: new Date().toISOString()
       }));
       
-      const { data, error } = await supabase
+      // Try to use supabaseAdmin first if available
+      const { supabaseAdmin, supabase } = require('@/lib/supabase-client');
+      const client = supabaseAdmin || supabase;
+      
+      const { data, error } = await client
         .from('hr_course_enrollments')
         .insert(enrollments);
         

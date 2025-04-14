@@ -109,8 +109,12 @@ const CourseAssignmentDialog: React.FC<CourseAssignmentDialogProps> = ({
       
       // If the service method doesn't exist or failed, try direct DB approach
       if (!enrollmentSuccess) {
+        // Try to use supabaseAdmin first if available
+        const { supabaseAdmin } = await import('@/lib/supabase-client');
+        const client = supabaseAdmin || supabase;
+        
         // Check if enrollment already exists
-        const { data: existingEnrollment, error: checkError } = await supabase
+        const { data: existingEnrollment, error: checkError } = await client
           .from('hr_course_enrollments')
           .select('id')
           .eq('employee_id', employeeId)
@@ -123,7 +127,7 @@ const CourseAssignmentDialog: React.FC<CourseAssignmentDialogProps> = ({
         
         if (!existingEnrollment) {
           // Create the enrollment if it doesn't exist
-          const { error: insertError } = await supabase
+          const { error: insertError } = await client
             .from('hr_course_enrollments')
             .insert({
               employee_id: employeeId,

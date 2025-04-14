@@ -753,7 +753,7 @@ const EmployeeProfilePage: React.FC = () => {
                   </div>
                   
                   {/* Profile Summary Section */}
-                  {employee.cv_extracted_data && (
+                  {employee.cv_extracted_data ? (
                     <div className="mt-4 pt-4 border-t border-gray-200">
                       <h3 className="text-sm font-medium text-gray-900 mb-2">
                         Profile Summary
@@ -919,6 +919,50 @@ const EmployeeProfilePage: React.FC = () => {
                             View Full CV Profile
                           </Button>
                         </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="mt-4 pt-4 border-t border-gray-200">
+                      <div className="flex justify-between items-center">
+                        <h3 className="text-sm font-medium text-gray-900">
+                          Profile Summary
+                        </h3>
+                        <Input
+                          id="quick_resume_upload"
+                          type="file"
+                          accept=".pdf,.doc,.docx"
+                          onChange={handleResumeFileChange}
+                          className="hidden"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-7 py-0 px-2 text-xs"
+                          onClick={() => document.getElementById('quick_resume_upload')?.click()}
+                        >
+                          <Upload className="h-3 w-3 mr-1" />
+                          Upload CV
+                        </Button>
+                      </div>
+                      
+                      {resumeFileName ? (
+                        <div className="flex items-center mt-2 mb-3">
+                          <span className="text-xs text-gray-600 mr-2">{resumeFileName}</span>
+                          <Button 
+                            type="button" 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-auto p-0 text-xs text-blue-600"
+                            onClick={uploadResume}
+                          >
+                            Save
+                          </Button>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-gray-500 mt-2 mb-3">
+                          No profile summary available. Upload a CV to generate one automatically.
+                        </p>
                       )}
                     </div>
                   )}

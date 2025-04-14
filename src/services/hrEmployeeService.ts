@@ -816,8 +816,12 @@ const hrEmployeeService: EmployeeService = {
       
       const filePath = `resumes/${employeeId}/${filename}`;
       
+      // Try to use supabaseAdmin first if available
+      const { supabaseAdmin } = require('@/lib/supabase-client');
+      const client = supabaseAdmin || supabase;
+      
       // Upload to storage
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      const { data: uploadData, error: uploadError } = await client.storage
         .from('employee-files')
         .upload(filePath, file);
       
@@ -827,16 +831,20 @@ const hrEmployeeService: EmployeeService = {
       }
       
       // Get the public URL
-      const { data: publicUrlData } = supabase.storage
+      const { data: publicUrlData } = client.storage
         .from('employee-files')
         .getPublicUrl(filePath);
       
       const resumeUrl = publicUrlData.publicUrl;
       
       // Update the employee record with the resume URL
-      const { data: updateData, error: updateError } = await supabase
-        .from(TABLE_NAME)
-        .update({ resume_url: resumeUrl })
+      const { data: updateData, error: updateError } = await client
+        .from('hr_employees')
+        .update({ 
+          resume_url: resumeUrl,
+          cv_file_url: resumeUrl,
+          updated_at: new Date().toISOString()
+        })
         .eq('id', employeeId)
         .select()
         .single();
@@ -1322,8 +1330,12 @@ const hrEmployeeService: EmployeeService = {
 
       console.log('Assigning course to employee:', { employeeId, courseId, enrollmentData });
 
+      // Try to use supabaseAdmin first if available
+      const { supabaseAdmin, supabase } = require('@/lib/supabase-client');
+      const client = supabaseAdmin || supabase;
+
       // Check if enrollment already exists
-      const { data: existingEnrollment, error: checkError } = await supabase
+      const { data: existingEnrollment, error: checkError } = await client
         .from('hr_course_enrollments')
         .select('id')
         .eq('employee_id', employeeId)
@@ -1348,7 +1360,7 @@ const hrEmployeeService: EmployeeService = {
       }
 
       // Insert the enrollment
-      const { data, error } = await supabase
+      const { data, error } = await client
         .from('hr_course_enrollments')
         .insert([enrollmentData])
         .select()

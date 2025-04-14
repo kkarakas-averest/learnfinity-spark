@@ -52,6 +52,7 @@ interface EmployeeFormData {
   position_id?: string;
   phone?: string;
   status: string;
+  resumeFile?: File | null;
 }
 
 interface SkillFormData {
@@ -109,7 +110,8 @@ export default function AddEmployeeForm() {
     department_id: '',
     position_id: '',
     phone: '',
-    status: 'active'
+    status: 'active',
+    resumeFile: null
   });
 
   React.useEffect(() => {
@@ -252,6 +254,48 @@ export default function AddEmployeeForm() {
         return;
       }
       
+      // Upload resume if provided
+      if (formData.resumeFile && employeeId) {
+        try {
+          console.log('Uploading resume file...');
+          const { data: resumeData, error: resumeError } = 
+            await (hrEmployeeService as any).uploadEmployeeResume(employeeId, formData.resumeFile);
+          
+          if (resumeError) {
+            console.warn('Resume upload failed:', resumeError);
+          } else {
+            console.log('Resume uploaded successfully:', resumeData);
+            
+            // Try to trigger CV processing
+            if (resumeData?.resumeUrl) {
+              try {
+                console.log('Triggering CV processing...');
+                const processCvResponse = await fetch('/api/hr/employees/process-cv', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify({
+                    employeeId: employeeId,
+                    cvUrl: resumeData.resumeUrl
+                  })
+                });
+                
+                if (processCvResponse.ok) {
+                  console.log('CV processing triggered successfully');
+                } else {
+                  console.warn('CV processing request failed:', await processCvResponse.text());
+                }
+              } catch (processingError) {
+                console.error('Error triggering CV processing:', processingError);
+              }
+            }
+          }
+        } catch (uploadErr) {
+          console.error('Error uploading resume:', uploadErr);
+        }
+      }
+      
       setSuccessMessage('Employee created successfully!');
       console.log('Employee created successfully with ID:', employeeId);
       
@@ -366,6 +410,15 @@ export default function AddEmployeeForm() {
   
   const removeSkill = (index: number) => {
     setSkills(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setFormData(prev => ({
+        ...prev,
+        resumeFile: e.target.files?.[0] || null
+      }));
+    }
   };
 
   if (loadingDepartments) {
@@ -520,15 +573,31 @@ export default function AddEmployeeForm() {
                     disabled={submitting}
                   >
                     <SelectTrigger>
-                      <SelectValue />
+                      <SelectValue placeholder="Select status" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="active">Active</SelectItem>
                       <SelectItem value="pending">Pending</SelectItem>
-                      <SelectItem value="on_leave">On Leave</SelectItem>
                       <SelectItem value="inactive">Inactive</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="resumeFile">CV/Resume</Label>
+                  <div className="flex items-center space-x-2">
+                    <Input
+                      id="resumeFile"
+                      type="file"
+                      accept=".pdf,.doc,.docx"
+                      onChange={handleFileChange}
+                      disabled={submitting}
+                      className="flex-1"
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Upload a CV to automatically generate a profile summary (PDF, DOC, or DOCX)
+                  </p>
                 </div>
               </form>
             </CardContent>

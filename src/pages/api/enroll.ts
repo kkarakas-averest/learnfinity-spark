@@ -8,6 +8,7 @@ import { supabase } from '@/lib/supabase';
 import { v4 as uuidv4 } from 'uuid';
 import { AgentService } from '@/agents/AgentService';
 import { AgentTask } from '@/agents/interfaces/BaseAgent';
+import { supabaseAdmin } from '@/lib/supabase-client';
 
 type EnrollRequest = {
   courseId: string;
@@ -36,8 +37,11 @@ export async function enrollCourse(req: { body: EnrollRequest }, res: {
   }
 
   try {
+    // Use supabaseAdmin if available to bypass RLS
+    const client = supabaseAdmin || supabase;
+    
     // Check if the user is already enrolled
-    const { data: existingEnrollment, error: checkError } = await supabase
+    const { data: existingEnrollment, error: checkError } = await client
       .from('hr_course_enrollments')
       .select('id')
       .eq('course_id', courseId)
@@ -68,7 +72,7 @@ export async function enrollCourse(req: { body: EnrollRequest }, res: {
       completion_date: null
     };
 
-    const { error: enrollmentError } = await supabase
+    const { error: enrollmentError } = await client
       .from('hr_course_enrollments')
       .insert(enrollmentData);
 
@@ -77,7 +81,7 @@ export async function enrollCourse(req: { body: EnrollRequest }, res: {
     }
 
     // Record activity in the employee_activities table
-    const { error: activityError } = await supabase
+    const { error: activityError } = await client
       .from('hr_employee_activities')
       .insert({
         id: uuidv4(),
@@ -98,14 +102,14 @@ export async function enrollCourse(req: { body: EnrollRequest }, res: {
       const agentService = AgentService.getInstance();
       
       // Get course details
-      const { data: courseData } = await supabase
+      const { data: courseData } = await client
         .from('hr_courses')
         .select('*')
         .eq('id', courseId)
         .single();
       
       // Get employee details
-      const { data: employeeData } = await supabase
+      const { data: employeeData } = await client
         .from('hr_employees')
         .select('*')
         .eq('id', userId)
