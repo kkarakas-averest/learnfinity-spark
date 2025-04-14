@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from '@/components/ui/use-toast';
 import { supabase } from '@/lib/supabase';
+import { v4 as uuidv4 } from 'uuid';
 import { PersonalizedContentService } from '@/services/personalized-content-service';
 import CourseModuleList from './CourseModuleList';
 import CourseContentSection from './CourseContentSection';
@@ -119,7 +120,7 @@ const CourseView: React.FC<CourseViewProps> = ({
     }
   };
 
-  // Generate personalized content
+  // Generate personalized content with client-side fallback
   const generatePersonalizedContent = async () => {
     if (!courseId || !employeeId || !enrollmentId) {
       toast({
@@ -133,42 +134,59 @@ const CourseView: React.FC<CourseViewProps> = ({
     try {
       setGeneratingContent(true);
       
-      // Make API request to generate content
-      const response = await fetch('/api/hr/courses/enhance-course-content', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          courseId,
-          employeeId,
-          modules: 3,
-          sectionsPerModule: 3,
-          includeQuiz: true
-        })
-      });
-      
-      const result = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to generate personalized content');
+      // Try the server endpoint first
+      try {
+        const response = await fetch('/api/hr/courses/enhance-course-content', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            courseId,
+            employeeId,
+            modules: 3,
+            sectionsPerModule: 3,
+            includeQuiz: true
+          })
+        });
+        
+        // If response is not ok, we'll throw an error to trigger the client-side fallback
+        if (!response.ok) {
+          throw new Error(`Server responded with ${response.status}: ${await response.text()}`);
+        }
+        
+        // Parse the response
+        const result = await response.json();
+        
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to generate personalized content');
+        }
+
+        toast({
+          title: "Content Generation Started",
+          description: "Personalized content is being generated for you. This may take a few minutes.",
+          variant: "default"
+        });
+        
+        // Update status to show generation in progress
+        setContentGenerationStatus({
+          isGenerating: true,
+          startedAt: new Date().toISOString(),
+          estimatedCompletion: new Date(Date.now() + 5 * 60000).toISOString() // Estimate 5 minutes
+        });
+        
+        // Set a timer to check status periodically
+        setTimeout(() => checkForPersonalizedContent(), 15000);
+        
+        return;
+      } catch (serverError) {
+        console.error('Server-side content generation failed:', serverError);
+        console.log('Using client-side fallback due to API failure:', serverError);
+        
+        // Client-side fallback implementation when server API fails
+        // Generate a set of mock personalized content directly
+        await generateClientSideFallbackContent();
       }
-      
-      toast({
-        title: "Content Generation Started",
-        description: "Personalized content is being generated for you. This may take a few minutes.",
-        variant: "default"
-      });
-      
-      // Update status to show generation in progress
-      setContentGenerationStatus({
-        isGenerating: true,
-        startedAt: new Date().toISOString(),
-        estimatedCompletion: new Date(Date.now() + 5 * 60000).toISOString() // Estimate 5 minutes
-      });
-      
-      // Set a timer to check status periodically
-      setTimeout(() => checkForPersonalizedContent(), 15000);
       
     } catch (error: any) {
       console.error('Error generating personalized content:', error);
@@ -179,6 +197,116 @@ const CourseView: React.FC<CourseViewProps> = ({
       });
     } finally {
       setGeneratingContent(false);
+    }
+  };
+
+  // Client-side fallback content generation when the API is not available
+  const generateClientSideFallbackContent = async () => {
+    try {
+      if (!courseId || !employeeId || !course) {
+        throw new Error("Missing required data for content generation");
+      }
+      
+      // Generate a unique content ID
+      const contentId = uuidv4();
+      
+      // Create simplified personalized content record
+      const { error: contentError } = await supabase
+        .from('course_ai_content')
+        .insert({
+          id: contentId,
+          course_id: courseId,
+          title: course.title,
+          description: `Personalized version of ${course.title}`,
+          learning_objectives: [
+            "Understand core concepts with personalized examples",
+            "Apply knowledge to your specific role",
+            "Develop practical skills relevant to your position"
+          ],
+          created_for: employeeId,
+          is_personalized: true,
+          model: 'client-fallback'
+        });
+      
+      if (contentError) {
+        throw contentError;
+      }
+      
+      // Create 3 basic modules with 3 sections each
+      for (let i = 0; i < 3; i++) {
+        const moduleId = `module-${i + 1}-personalized-${employeeId.slice(0, 8)}`;
+        
+        // Create module
+        await supabase
+          .from('course_modules')
+          .insert({
+            course_id: courseId,
+            module_id: moduleId,
+            title: `Module ${i + 1}: ${["Fundamentals", "Applied Concepts", "Advanced Topics"][i]} for Your Role`,
+            description: `This module covers ${["basic", "intermediate", "advanced"][i]} concepts customized for your role.`,
+            order_index: i,
+            is_personalized: true,
+            created_for: employeeId
+          });
+        
+        // Create 3 sections per module
+        for (let j = 0; j < 3; j++) {
+          await supabase
+            .from('course_content_sections')
+            .insert({
+              content_id: contentId,
+              title: `Section ${i+1}.${j+1}: ${["Introduction", "Core Concepts", "Practical Application"][j]}`,
+              module_id: moduleId,
+              section_id: `section-${j + 1}`,
+              content: `<div class="prose max-w-none">
+                <h2>Section ${i+1}.${j+1}</h2>
+                <p>This is personalized content for ${course.title}, created specifically for your role and experience level.</p>
+                <p>In a real implementation, this would include customized examples, role-specific applications, and personalized learning paths.</p>
+                <h3>Key Points</h3>
+                <ul>
+                  <li>Personalized examples relevant to your position</li>
+                  <li>Customized exercises based on your experience</li>
+                  <li>Targeted learning outcomes for your career growth</li>
+                </ul>
+                <blockquote>
+                  <p>The content is generated as a fallback since the AI content generation service is currently unavailable.</p>
+                </blockquote>
+              </div>`,
+              order_index: j,
+              created_for: employeeId,
+              is_personalized: true
+            });
+        }
+      }
+      
+      // Update the enrollment record
+      await supabase
+        .from('hr_course_enrollments')
+        .update({
+          personalized_content_id: contentId,
+          updated_at: new Date().toISOString()
+        })
+        .eq('employee_id', employeeId)
+        .eq('course_id', courseId);
+      
+      // Show success message
+      toast({
+        title: "Content Generated",
+        description: "Fallback personalized content has been created. You can now view the personalized course.",
+        variant: "default"
+      });
+      
+      // Refresh content to show the new personalized content
+      setHasPersonalizedContent(true);
+      await checkForPersonalizedContent();
+      
+    } catch (error) {
+      console.error('Error in client-side content generation:', error);
+      toast({
+        title: "Client-side Generation Failed",
+        description: "Could not create fallback personalized content.",
+        variant: "destructive"
+      });
     }
   };
 
