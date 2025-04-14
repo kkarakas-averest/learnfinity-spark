@@ -217,8 +217,18 @@ export default async function handler(req, res) {
       try {
         const { Groq } = await import('groq-sdk');
         
-        // Initialize the Groq client
-        const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+        // Get the API key and validate it's not empty
+        const apiKey = process.env.GROQ_API_KEY;
+        if (!apiKey || apiKey.trim() === '') {
+          throw new Error('GROQ_API_KEY environment variable is empty or invalid');
+        }
+        
+        // Log a masked version of the key to help with debugging
+        const maskedKey = apiKey.substring(0, 3) + '...' + apiKey.substring(apiKey.length - 3);
+        console.log(`[regenerate-content] Using Groq API key starting with: ${maskedKey}`);
+        
+        // Initialize the Groq client with explicit API key
+        const groq = new Groq({ apiKey });
         
         console.log(`[regenerate-content] Initialized Groq client directly`);
         
@@ -418,6 +428,19 @@ export default async function handler(req, res) {
           } catch (moduleError) {
             console.error(`[regenerate-content] Error generating content for module ${moduleOutline.title}:`, moduleError);
             
+            // Check for authentication errors specifically
+            if (moduleError.message?.includes('Invalid API Key') || 
+                moduleError.code === 'invalid_api_key' || 
+                moduleError.status === 401) {
+              
+              console.log('[regenerate-content] Authentication error with Groq API. Falling back to mock content.');
+              
+              // We'll throw after all modules to stop using Groq for subsequent calls
+              if (moduleOutline.orderIndex === moduleOutlines.length) {
+                throw new Error('Groq API authentication failed. Please check your API key.');
+              }
+            }
+            
             // Create fallback module with basic content
             const fallbackSections = moduleOutline.sections.map((sectionOutline, index) => ({
               id: `${moduleOutline.id}-section-${index + 1}`,
@@ -489,6 +512,21 @@ export default async function handler(req, res) {
           stack: groqError.stack,
           code: groqError.code
         });
+        
+        // Log specific error info for auth issues to help debugging
+        if (groqError.message?.includes('Invalid API Key') || 
+            groqError.code === 'invalid_api_key' || 
+            groqError.status === 401) {
+          
+          console.error('[regenerate-content] Groq API authentication failed. Please check that:');
+          console.error('1. The GROQ_API_KEY environment variable is correctly set in Vercel');
+          console.error('2. The API key has not expired or been revoked');
+          console.error('3. There are no typos or extra spaces in the key');
+          
+          // Try to get length of the key to provide more debugging info
+          const keyLength = process.env.GROQ_API_KEY?.length || 0;
+          console.error(`[regenerate-content] API key length: ${keyLength} characters`);
+        }
         
         // Use fallback mock content but now with a better approach
         console.log('[regenerate-content] Using fallback mock content generator');
