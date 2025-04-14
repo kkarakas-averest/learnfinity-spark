@@ -1,4 +1,3 @@
-
 import { supabase } from '@/lib/supabase';
 import { AICourseContent, AICourseContentSection } from '@/lib/types/content';
 import { v4 as uuidv4 } from 'uuid';
@@ -95,19 +94,103 @@ export class PersonalizedContentService {
 
       if (sectionsError) {
         console.error(`Error retrieving personalized sections: ${sectionsError.message}`);
-        return { content: contentData as AICourseContent, sections: [] };
+        // If we can't get sections but we do have content, generate some basic sections
+        const generatedSections = await this.generateBasicSections(contentData.id, contentData.title);
+        return { content: contentData as AICourseContent, sections: generatedSections };
       }
 
-      console.log(`Found ${sectionsData?.length || 0} personalized content sections`);
+      const sections = sectionsData as AICourseContentSection[] || [];
+      console.log(`Found ${sections.length} personalized content sections`);
+      
+      // If no sections were found but content exists, generate basic sections
+      if (sections.length === 0) {
+        console.log('No sections found, generating basic sections');
+        const generatedSections = await this.generateBasicSections(contentData.id, contentData.title);
+        return { content: contentData as AICourseContent, sections: generatedSections };
+      }
 
       return { 
         content: contentData as AICourseContent, 
-        sections: sectionsData as AICourseContentSection[] || []
+        sections: sections
       };
     } catch (error) {
       console.error("Error retrieving personalized content:", error);
       return { content: null, sections: [] };
     }
+  }
+
+  /**
+   * Generate basic sections for content that has no sections
+   */
+  private async generateBasicSections(contentId: string, title: string): Promise<AICourseContentSection[]> {
+    try {
+      const moduleIds = ['module-1', 'module-2', 'module-3'];
+      const sections: AICourseContentSection[] = [];
+      
+      for (let moduleIndex = 0; moduleIndex < moduleIds.length; moduleIndex++) {
+        const moduleId = moduleIds[moduleIndex];
+        const moduleTitles = [
+          'Introduction',
+          'Core Concepts',
+          'Advanced Applications'
+        ];
+        
+        for (let sectionIndex = 0; sectionIndex < 2; sectionIndex++) {
+          const sectionId = uuidv4();
+          const sectionTitle = `${moduleTitles[moduleIndex]} - Section ${sectionIndex + 1}`;
+          const content = this.generateBasicContent(moduleIndex, sectionIndex, title);
+          
+          const section: AICourseContentSection = {
+            id: sectionId,
+            content_id: contentId,
+            module_id: moduleId,
+            section_id: `section-${moduleIndex + 1}-${sectionIndex + 1}`,
+            title: sectionTitle,
+            content: content,
+            order_index: moduleIndex * 3 + sectionIndex,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          };
+          
+          sections.push(section);
+          
+          // Save to database for future use
+          await supabase.from('ai_course_content_sections').insert(section);
+        }
+      }
+      
+      console.log(`Generated ${sections.length} basic sections for content ID: ${contentId}`);
+      return sections;
+    } catch (error) {
+      console.error('Error generating basic sections:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Generate basic content for a section
+   */
+  private generateBasicContent(moduleIndex: number, sectionIndex: number, courseTitle: string): string {
+    const moduleTypes = ['introductory', 'intermediate', 'advanced'];
+    const sectionTypes = ['conceptual', 'practical'];
+    
+    const content = `
+      <div class="prose max-w-none">
+        <h2>${courseTitle} - ${moduleTypes[moduleIndex]} ${sectionTypes[sectionIndex]} content</h2>
+        <p>Welcome to this section of the course. This content is automatically generated because the personalized content was found without specific sections.</p>
+        <p>In this ${moduleTypes[moduleIndex]} section, you'll learn about ${sectionTypes[sectionIndex]} aspects of ${courseTitle}.</p>
+        <ul>
+          <li>Key concept 1: Understanding the fundamentals</li>
+          <li>Key concept 2: Applying knowledge to real scenarios</li>
+          <li>Key concept 3: Advanced problem solving</li>
+        </ul>
+        <blockquote>
+          <p>This is placeholder content that was generated automatically. For full personalized content, please regenerate the course content.</p>
+        </blockquote>
+      </div>
+    `;
+    
+    return content;
   }
 
   /**

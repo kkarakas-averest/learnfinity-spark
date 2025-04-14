@@ -13,9 +13,11 @@ const CourseContentSection: React.FC<CourseContentSectionProps> = ({
 }) => {
   return (
     <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-lg">{title}</CardTitle>
-      </CardHeader>
+      {title && (
+        <CardHeader className="pb-2">
+          <CardTitle className="text-lg">{title}</CardTitle>
+        </CardHeader>
+      )}
       <CardContent>
         <div 
           className="prose max-w-none" 

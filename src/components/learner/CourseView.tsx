@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -39,7 +38,6 @@ const CourseView: React.FC<CourseViewProps> = ({
     estimatedCompletion?: string;
   }>({ isGenerating: false });
 
-  // Load course details
   useEffect(() => {
     const loadCourseData = async () => {
       if (!courseId) return;
@@ -57,7 +55,6 @@ const CourseView: React.FC<CourseViewProps> = ({
         
         setCourse(data);
         
-        // If employee ID is provided, check for personalized content
         if (employeeId) {
           await checkForPersonalizedContent();
         }
@@ -76,36 +73,30 @@ const CourseView: React.FC<CourseViewProps> = ({
     loadCourseData();
   }, [courseId, employeeId]);
 
-  // Check for personalized content
   const checkForPersonalizedContent = async () => {
     if (!courseId || !employeeId) return;
     
     try {
       setLoadingPersonalization(true);
       
-      // First, get enrollment ID for this course and employee
       const contentService = PersonalizedContentService.getInstance();
       const enrollmentIdResult = await contentService.getEnrollmentId(courseId, employeeId);
       
       if (enrollmentIdResult) {
         setEnrollmentId(enrollmentIdResult);
         
-        // Check if content is being generated
         const statusResult = await contentService.getContentGenerationStatus(enrollmentIdResult);
         setContentGenerationStatus(statusResult);
         
         if (!statusResult.isGenerating) {
-          // Check if personalized content exists
           const hasContent = await contentService.hasPersonalizedContent(courseId, employeeId);
           setHasPersonalizedContent(hasContent);
           
           if (hasContent) {
-            // Load personalized content
             const { content, sections } = await contentService.getPersonalizedContent(courseId, employeeId);
             setPersonalizedContent(content);
             setPersonalizedContentSections(sections);
             
-            // Set first module as selected if available
             if (sections && sections.length > 0) {
               const firstModuleId = sections[0].module_id;
               setSelectedModuleId(firstModuleId);
@@ -120,7 +111,6 @@ const CourseView: React.FC<CourseViewProps> = ({
     }
   };
 
-  // Generate personalized content with client-side fallback
   const generatePersonalizedContent = async () => {
     if (!courseId || !employeeId || !enrollmentId) {
       toast({
@@ -134,7 +124,6 @@ const CourseView: React.FC<CourseViewProps> = ({
     try {
       setGeneratingContent(true);
       
-      // Try the server endpoint first
       try {
         const response = await fetch('/api/hr/courses/enhance-course-content', {
           method: 'POST',
@@ -150,12 +139,10 @@ const CourseView: React.FC<CourseViewProps> = ({
           })
         });
         
-        // If response is not ok, we'll throw an error to trigger the client-side fallback
         if (!response.ok) {
           throw new Error(`Server responded with ${response.status}: ${await response.text()}`);
         }
         
-        // Parse the response
         const result = await response.json();
         
         if (!result.success) {
@@ -168,14 +155,12 @@ const CourseView: React.FC<CourseViewProps> = ({
           variant: "default"
         });
         
-        // Update status to show generation in progress
         setContentGenerationStatus({
           isGenerating: true,
           startedAt: new Date().toISOString(),
-          estimatedCompletion: new Date(Date.now() + 5 * 60000).toISOString() // Estimate 5 minutes
+          estimatedCompletion: new Date(Date.now() + 5 * 60000).toISOString()
         });
         
-        // Set a timer to check status periodically
         setTimeout(() => checkForPersonalizedContent(), 15000);
         
         return;
@@ -183,8 +168,6 @@ const CourseView: React.FC<CourseViewProps> = ({
         console.error('Server-side content generation failed:', serverError);
         console.log('Using client-side fallback due to API failure:', serverError);
         
-        // Client-side fallback implementation when server API fails
-        // Generate a set of mock personalized content directly
         await generateClientSideFallbackContent();
       }
       
@@ -200,18 +183,14 @@ const CourseView: React.FC<CourseViewProps> = ({
     }
   };
 
-  // Client-side fallback content generation when the API is not available
   const generateClientSideFallbackContent = async () => {
     try {
       if (!courseId || !employeeId || !course) {
         throw new Error("Missing required data for content generation");
       }
       
-      // Generate a unique content ID
       const contentId = uuidv4();
       
-      // Create simplified personalized content record
-      // Use ai_course_content table instead of course_ai_content
       const { error: contentError } = await supabase
         .from('ai_course_content')
         .insert({
@@ -239,11 +218,9 @@ const CourseView: React.FC<CourseViewProps> = ({
         throw contentError;
       }
       
-      // Create 3 basic modules with 3 sections each
       for (let i = 0; i < 3; i++) {
         const moduleId = `module-${i + 1}-personalized-${employeeId.slice(0, 8)}`;
         
-        // Create module
         await supabase
           .from('course_modules')
           .insert({
@@ -256,7 +233,6 @@ const CourseView: React.FC<CourseViewProps> = ({
             created_for: employeeId
           });
         
-        // Create 3 sections per module using ai_course_content_sections table
         for (let j = 0; j < 3; j++) {
           await supabase
             .from('ai_course_content_sections')
@@ -284,7 +260,6 @@ const CourseView: React.FC<CourseViewProps> = ({
         }
       }
       
-      // Update the enrollment record
       await supabase
         .from('hr_course_enrollments')
         .update({
@@ -294,14 +269,12 @@ const CourseView: React.FC<CourseViewProps> = ({
         .eq('employee_id', employeeId)
         .eq('course_id', courseId);
       
-      // Show success message
       toast({
         title: "Content Generated",
         description: "Fallback personalized content has been created. You can now view the personalized course.",
         variant: "default"
       });
       
-      // Refresh content to show the new personalized content
       setHasPersonalizedContent(true);
       await checkForPersonalizedContent();
       
@@ -324,7 +297,6 @@ const CourseView: React.FC<CourseViewProps> = ({
       );
     }
     
-    // Filter sections for the selected module
     const moduleSections = personalizedContentSections.filter(
       section => section.module_id === selectedModuleId
     ).sort((a, b) => a.order_index - b.order_index);
@@ -387,8 +359,8 @@ const CourseView: React.FC<CourseViewProps> = ({
         <CardHeader>
           <div className="flex justify-between">
             <div>
-              <CardTitle className="text-2xl">{course.title}</CardTitle>
-              {course.skill_level && (
+              <CardTitle className="text-2xl">{course?.title}</CardTitle>
+              {course?.skill_level && (
                 <div className="mt-2 text-sm font-medium text-muted-foreground">
                   Level: {course.skill_level.charAt(0).toUpperCase() + course.skill_level.slice(1)}
                 </div>
@@ -403,9 +375,8 @@ const CourseView: React.FC<CourseViewProps> = ({
           </div>
         </CardHeader>
         <CardContent>
-          <p>{course.description}</p>
+          <p>{course?.description}</p>
           
-          {/* Personalization Status */}
           {employeeId && (
             <div className="mt-4 p-4 bg-muted rounded-md">
               <h3 className="text-lg font-medium mb-2">Personalized Learning</h3>
@@ -454,8 +425,7 @@ const CourseView: React.FC<CourseViewProps> = ({
         </CardContent>
       </Card>
 
-      {/* Content Tabs */}
-      <Tabs defaultValue="overview" className="space-y-4">
+      <Tabs defaultValue={hasPersonalizedContent ? "personalized" : "overview"} className="space-y-4">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
           {hasPersonalizedContent && <TabsTrigger value="personalized">Personalized Content</TabsTrigger>}
@@ -472,13 +442,13 @@ const CourseView: React.FC<CourseViewProps> = ({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <h3 className="font-medium">Duration</h3>
-                  <p>{course.duration || course.estimated_duration || 'Not specified'} {course.duration ? 'hours' : ''}</p>
+                  <p>{course?.duration || course?.estimated_duration || 'Not specified'} {course?.duration ? 'hours' : ''}</p>
                 </div>
                 <div>
                   <h3 className="font-medium">Category</h3>
-                  <p>{course.category || 'General'}</p>
+                  <p>{course?.category || 'General'}</p>
                 </div>
-                {course.skills && course.skills.length > 0 && (
+                {course?.skills && course.skills.length > 0 && (
                   <div className="col-span-2">
                     <h3 className="font-medium">Skills</h3>
                     <div className="flex flex-wrap gap-2 mt-1">
@@ -500,36 +470,11 @@ const CourseView: React.FC<CourseViewProps> = ({
         
         {hasPersonalizedContent && (
           <TabsContent value="personalized" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Personalized Learning Path</CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                <div className="grid grid-cols-1 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x">
-                  <div className="p-4 md:p-6">
-                    <h3 className="text-lg font-medium mb-4">Modules</h3>
-                    <CourseModuleList
-                      modules={
-                        Array.from(
-                          new Set(
-                            personalizedContentSections.map(section => ({
-                              id: section.module_id,
-                              title: section.module_id.replace(/-/g, ' ').replace(/personalized.*$/, '')
-                            }))
-                          )
-                        )
-                      }
-                      selectedModuleId={selectedModuleId}
-                      onSelectModule={setSelectedModuleId}
-                    />
-                  </div>
-                  <div className="p-4 md:p-6 col-span-3">
-                    <h3 className="text-lg font-medium mb-4">Content</h3>
-                    {renderModuleContent()}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            <PersonalizedCourseContent
+              content={personalizedContent}
+              sections={personalizedContentSections}
+              isLoading={loadingPersonalization}
+            />
           </TabsContent>
         )}
         
