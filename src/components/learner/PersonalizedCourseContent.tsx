@@ -17,7 +17,7 @@ const PersonalizedCourseContent: React.FC<PersonalizedCourseContentProps> = ({
   sections, 
   isLoading = false 
 }) => {
-  console.log(`Rendering PersonalizedCourseContent with: ${content ? `contentId: ${content.id}, sectionsCount: ${sections.length}` : 'null content'}, sections: ${sections}`);
+  console.log(`Rendering PersonalizedCourseContent with: ${content ? `contentId: ${content.id}, sectionsCount: ${sections.length}` : 'null content'}, sections: ${JSON.stringify(sections)}`);
   
   // Group sections by module_id
   const moduleMap = React.useMemo(() => {

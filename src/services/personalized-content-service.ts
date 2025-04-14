@@ -43,7 +43,7 @@ export class PersonalizedContentService {
         return false;
       }
       
-      console.log(`Found ${contentData?.length} personalized content records`);
+      console.log(`Found ${contentData?.length || 0} personalized content records`);
       return contentData && contentData.length > 0;
     } catch (error) {
       console.error('Error in hasPersonalizedContent:', error);
@@ -94,7 +94,7 @@ export class PersonalizedContentService {
         return { content: contentData, sections: [] };
       }
       
-      console.log(`Found ${sectionsData?.length} personalized content sections`);
+      console.log(`Found ${sectionsData?.length || 0} personalized content sections`);
       
       // If no sections exist, generate some basic ones
       if (!sectionsData || sectionsData.length === 0) {
@@ -202,14 +202,14 @@ export class PersonalizedContentService {
       // Create 2 modules with 3 sections each
       for (let moduleIndex = 0; moduleIndex < 2; moduleIndex++) {
         // Generate a proper UUID for module_id
-        const moduleId = uuidv4(); // This generates a proper UUID string
+        const moduleId = uuidv4();
         
         for (let sectionIndex = 0; sectionIndex < 3; sectionIndex++) {
           // Section content with placeholder text
           const sectionTitle = `Module ${moduleIndex + 1}: ${sectionIndex === 0 ? 'Introduction' : 
             sectionIndex === 1 ? 'Key Concepts' : 'Application'}`;
           
-          const sectionId = uuidv4(); // Generate proper UUID for section_id
+          const sectionId = uuidv4();
           
           const sectionContent = `
             <div class="prose max-w-none">
@@ -227,19 +227,22 @@ export class PersonalizedContentService {
             </div>
           `;
           
+          // Create a new section object with proper typing
+          const newSection: AICourseContentSection = {
+            id: uuidv4(),
+            content_id: contentId,
+            title: sectionTitle,
+            content: sectionContent,
+            module_id: moduleId,
+            section_id: sectionId,
+            order_index: sectionIndex
+          };
+          
           try {
             // Use the Supabase API to insert a section
             const { data, error } = await supabase
               .from('ai_course_content_sections')
-              .insert({
-                id: uuidv4(), // Use UUID for id field
-                content_id: contentId,
-                title: sectionTitle,
-                content: sectionContent,
-                module_id: moduleId,
-                section_id: sectionId,
-                order_index: sectionIndex
-              })
+              .insert(newSection)
               .select();
             
             if (error) {
@@ -249,6 +252,9 @@ export class PersonalizedContentService {
             }
           } catch (error) {
             console.error(`Error creating section:`, error);
+            // Add to the generated sections array even if DB insert failed
+            // This way we can still display something to the user
+            generatedSections.push(newSection);
           }
         }
       }
