@@ -2,7 +2,7 @@ import { NextResponse, NextRequest } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { getEmployeeDataForPersonalization } from '@/lib/api/hr/employee-data';
 import { AgentFactory } from '@/agents/AgentFactory';
-import { headers } from 'next/headers';
+import { cookies } from 'next/headers';
 
 /**
  * API endpoint to regenerate personalized course content
@@ -10,6 +10,20 @@ import { headers } from 'next/headers';
  */
 export async function POST(req: NextRequest) {
   try {
+    // CORS headers for preflight requests
+    if (req.method === 'OPTIONS') {
+      return new NextResponse(null, {
+        status: 204,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-CSRF-Token',
+          'Access-Control-Allow-Credentials': 'true',
+          'Access-Control-Max-Age': '86400',
+        },
+      });
+    }
+
     // Get cookies from the request for auth
     const cookieHeader = req.headers.get('cookie') || '';
     
@@ -17,59 +31,86 @@ export async function POST(req: NextRequest) {
     const authHeader = req.headers.get('authorization') || '';
     
     // Log debugging info
-    console.log('Received regenerate-content request');
+    console.log('Received regenerate-content request on App Router API');
     console.log('Cookie header length:', cookieHeader.length);
     console.log('Has auth header:', !!authHeader);
     
-    // Authenticate request with session from cookie
-    const { data: { session }, error: authError } = await supabase.auth.getSession();
+    // Initialize user ID and session variables
+    let userId: string | undefined;
+    let session: any;
     
-    // If no session from cookie, try to get from auth header if it exists
-    if ((!session || authError) && authHeader.startsWith('Bearer ')) {
-      const token = authHeader.replace('Bearer ', '');
-      console.log('Attempting authentication with Bearer token');
+    // Try cookie-based auth first
+    try {
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
       
-      try {
-        const { data, error } = await supabase.auth.getUser(token);
-        if (error || !data.user) {
-          console.error('Bearer token auth failed:', error);
-          return NextResponse.json({ 
-            error: 'Unauthorized', 
-            details: 'Authentication failed with provided token' 
-          }, { status: 401 });
+      if (!sessionError && sessionData.session?.user) {
+        session = sessionData.session;
+        userId = session.user.id;
+        console.log('Authenticated via cookie session for user:', userId);
+      } else if (sessionError) {
+        console.error('Session error:', sessionError);
+      }
+    } catch (sessionError) {
+      console.error('Error getting session:', sessionError);
+    }
+    
+    // If no session from cookie, try JWT token from auth header
+    if (!userId && authHeader) {
+      if (authHeader.startsWith('Bearer ')) {
+        const token = authHeader.replace('Bearer ', '');
+        console.log('Attempting authentication with Bearer token');
+        
+        try {
+          const { data, error } = await supabase.auth.getUser(token);
+          if (!error && data.user) {
+            userId = data.user.id;
+            console.log('Authenticated with Bearer token for user:', userId);
+          } else {
+            console.error('Bearer token auth failed:', error);
+          }
+        } catch (tokenError) {
+          console.error('Error authenticating with token:', tokenError);
         }
-        
-        // Use the user data from the token
-        const userId = data.user.id;
-        console.log('Authenticated with token for user:', userId);
-        
-        // Continue processing with this user ID
-        // Rest of the function would need to be duplicated here
-        // For simplicity, we'll just return success for now
-        return NextResponse.json({
-          success: true,
-          message: 'Authentication with token successful',
-          userId
-        });
-      } catch (tokenError) {
-        console.error('Error authenticating with token:', tokenError);
-        return NextResponse.json({ 
-          error: 'Unauthorized', 
-          details: 'Token authentication error' 
-        }, { status: 401 });
       }
     }
     
-    if (authError || !session?.user) {
-      console.error('Auth error in regenerate-content route:', authError);
-      return NextResponse.json({ 
-        error: 'Unauthorized', 
-        details: authError?.message || 'No valid session found'
-      }, { status: 401 });
+    // Last resort: try to extract auth from request URL
+    if (!userId) {
+      try {
+        // Some Supabase clients append the token in the URL
+        const url = new URL(req.url);
+        const accessToken = url.searchParams.get('access_token');
+        
+        if (accessToken) {
+          console.log('Attempting authentication with URL token');
+          const { data, error } = await supabase.auth.getUser(accessToken);
+          
+          if (!error && data.user) {
+            userId = data.user.id;
+            console.log('Authenticated with URL token for user:', userId);
+          }
+        }
+      } catch (urlError) {
+        console.error('Error with URL token auth:', urlError);
+      }
     }
     
-    const userId = session.user.id;
-    console.log('Authenticated user:', userId);
+    // If still no authentication, return unauthorized
+    if (!userId) {
+      console.error('Authentication failed on regenerate-content route');
+      return NextResponse.json({ 
+        error: 'Unauthorized', 
+        details: 'No valid authentication found. Please log in again.'
+      }, { 
+        status: 401,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Credentials': 'true',
+        }
+      });
+    }
+    
+    console.log('Successfully authenticated user:', userId);
     
     // Get request body
     const body = await req.json();
@@ -175,6 +216,31 @@ export async function POST(req: NextRequest) {
             .eq('id', content.id);
         }
       }
+      
+      // Check for content in ai_course_content
+      const { data: aiContent } = await supabase
+        .from('ai_course_content')
+        .select('id')
+        .eq('course_id', courseId)
+        .eq('created_for_user_id', userId);
+      
+      if (aiContent && aiContent.length > 0) {
+        // Delete related sections
+        for (const content of aiContent) {
+          await supabase
+            .from('ai_course_content_sections')
+            .delete()
+            .eq('content_id', content.id);
+        }
+        
+        // Then delete the main content
+        for (const content of aiContent) {
+          await supabase
+            .from('ai_course_content')
+            .delete()
+            .eq('id', content.id);
+        }
+      }
     }
     
     // Get course enrollment data
@@ -193,20 +259,22 @@ export async function POST(req: NextRequest) {
     const baseUrl = `${apiUrl.protocol}//${apiUrl.host}`;
     
     try {
-      // Call the content generation endpoint
+      // Call the content generation endpoint with all authentication methods
       const response = await fetch(`${baseUrl}/api/hr/courses/generate-content`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           // Pass along the auth header
-          'Cookie': req.headers.get('cookie') || '',
-          // Also include Authorization header if it exists
+          'Cookie': cookieHeader,
+          // Include Authorization header if it exists
           ...(authHeader ? { 'Authorization': authHeader } : {})
         },
+        credentials: 'include',
         body: JSON.stringify({
           courseId,
           employeeId: targetEmployeeId,
-          personalizationOptions
+          personalizationOptions,
+          access_token: session?.access_token // Include token in request body as fallback
         })
       });
       
@@ -217,28 +285,54 @@ export async function POST(req: NextRequest) {
             error: 'Error calling content generation service', 
             details: errorData.error || response.statusText 
           }, 
-          { status: 500 }
+          { 
+            status: 500,
+            headers: {
+              'Access-Control-Allow-Origin': '*',
+              'Access-Control-Allow-Credentials': 'true',
+            }
+          }
         );
       }
       
       // Return success response with the course data
-      return NextResponse.json({
-        success: true,
-        message: 'Course content regeneration started successfully',
-        course: courseData
-      });
+      return NextResponse.json(
+        {
+          success: true,
+          message: 'Course content regeneration started successfully',
+          course: courseData
+        },
+        {
+          headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Credentials': 'true',
+          }
+        }
+      );
     } catch (regenerateError: any) {
       console.error('Error calling regeneration service:', regenerateError);
       return NextResponse.json(
         { error: 'Failed to regenerate course content', details: regenerateError.message }, 
-        { status: 500 }
+        { 
+          status: 500,
+          headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Credentials': 'true',
+          }
+        }
       );
     }
   } catch (error: any) {
     console.error('Error in course regeneration:', error);
     return NextResponse.json(
       { error: 'Failed to regenerate course content', details: error.message }, 
-      { status: 500 }
+      { 
+        status: 500,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Credentials': 'true',
+        }
+      }
     );
   }
 } 
