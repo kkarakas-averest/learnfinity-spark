@@ -397,7 +397,7 @@ const hrCourseService = {
       }));
       
       // Try to use supabaseAdmin first if available
-      const { supabaseAdmin, supabase } = require('@/lib/supabase-client');
+      const { supabaseAdmin, supabase } = await import('@/lib/supabase-client');
       const client = supabaseAdmin || supabase;
       
       const { data, error } = await client

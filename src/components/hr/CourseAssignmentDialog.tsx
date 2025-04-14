@@ -8,16 +8,9 @@ import { Calendar, Check, BookOpen } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
 import { Input } from '@/components/ui/input';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase-client';
 import { hrEmployeeService } from '@/services/hrEmployeeService';
-
-interface Course {
-  id: string;
-  title: string;
-  description?: string;
-  difficulty_level?: string;
-  duration_hours?: number;
-}
+import { Course } from '@/types/course.types';
 
 interface CourseAssignmentDialogProps {
   open: boolean;
@@ -90,128 +83,46 @@ const CourseAssignmentDialog: React.FC<CourseAssignmentDialogProps> = ({
     }
     
     setSubmitting(true);
+    setError(null);
     
     try {
-      let enrollmentSuccess = false;
+      // Use the hrEmployeeService to assign the course
+      const { success, error: assignError } = await hrEmployeeService.assignCourseToEmployee(
+        employeeId, 
+        selectedCourse
+      );
       
-      // First check if the service method exists using type assertion
-      if ('assignCourseToEmployee' in hrEmployeeService) {
-        // Use the hrEmployeeService to assign the course with type assertion
-        const { success, error } = await (hrEmployeeService as any).assignCourseToEmployee(employeeId, selectedCourse);
-        
-        if (!success) {
-          console.warn('Service method failed:', error);
-          // We'll try the direct DB approach below
-        } else {
-          enrollmentSuccess = true;
-        }
-      }
-      
-      // If the service method doesn't exist or failed, try direct DB approach
-      if (!enrollmentSuccess) {
-        // Try to use supabaseAdmin first if available
-        const { supabaseAdmin } = await import('@/lib/supabase-client');
-        const client = supabaseAdmin || supabase;
-        
-        // Check if enrollment already exists
-        const { data: existingEnrollment, error: checkError } = await client
-          .from('hr_course_enrollments')
-          .select('id')
-          .eq('employee_id', employeeId)
-          .eq('course_id', selectedCourse)
-          .maybeSingle();
-          
-        if (checkError) {
-          throw new Error(`Error checking enrollment: ${checkError.message}`);
-        }
-        
-        if (!existingEnrollment) {
-          // Create the enrollment if it doesn't exist
-          const { error: insertError } = await client
-            .from('hr_course_enrollments')
-            .insert({
-              employee_id: employeeId,
-              course_id: selectedCourse,
-              enrollment_date: new Date().toISOString(),
-              status: 'assigned',
-              progress: 0
-            });
-            
-          if (insertError) {
-            throw new Error(`Error creating enrollment: ${insertError.message}`);
-          }
-          
-          enrollmentSuccess = true;
-        } else {
-          // Enrollment already exists
-          enrollmentSuccess = true;
-        }
-      }
-      
-      // If enrollment was successful and personalized content option is selected
-      if (enrollmentSuccess && generatePersonalizedContent) {
-        try {
-          // Call the personalized content generation API
-          const response = await fetch('/api/hr/courses/generate-content', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              courseId: selectedCourse,
-              employeeId: employeeId,
-              personalizationOptions: {
-                generateOnAssignment: true,
-                adaptToExperience: true
-              }
-            })
-          });
-          
-          if (response.ok) {
-            toast({
-              title: 'Content Generation Started',
-              description: 'Personalized course content is being generated.',
-              duration: 5000
-            });
-          } else if (response.status === 404) {
-            console.warn('Content generation API endpoint not available in this environment.');
-            toast({
-              title: 'Course Assigned',
-              description: 'Course has been successfully assigned. Note: Content personalization is not available in this environment.',
-              duration: 5000
-            });
-          } else {
-            console.warn('Content generation request failed but course was assigned.');
-          }
-        } catch (contentError) {
-          console.error('Error generating personalized content:', contentError);
-          // Don't fail the overall assignment if just the content generation fails
-          toast({
-            title: 'Course Assigned',
-            description: 'Course has been successfully assigned, but content personalization failed.',
-            duration: 5000
-          });
-        }
-      }
-      
-      // Show success toast only if we haven't already shown a toast for the specific case
-      if (!generatePersonalizedContent) {
+      if (!success) {
+        console.error('Error assigning course:', assignError);
+        setError('Error creating enrollment: ' + assignError);
         toast({
-          title: 'Course Assigned',
-          description: 'Course has been successfully assigned.',
-          duration: 3000
+          variant: 'destructive',
+          title: 'Assignment Failed',
+          description: assignError || 'Failed to assign course'
         });
+        return;
       }
       
-      // Close dialog and reload courses if needed
+      // Handle successful course assignment
+      toast({
+        title: 'Course Assigned',
+        description: 'Course has been successfully assigned to the employee',
+      });
+      
+      // Reset the form
+      setSelectedCourse('');
+      setIsMandatory(false);
+      setDueDate('');
+      
+      // Close the dialog
       onOpenChange(false);
-    } catch (error) {
-      console.error('Error assigning course:', error);
+    } catch (err: any) {
+      console.error('Error assigning course:', err);
+      setError('Error assigning course: ' + (err.message || err));
       toast({
         variant: 'destructive',
         title: 'Assignment Failed',
-        description: error instanceof Error ? error.message : 'Failed to assign course.',
-        duration: 5000
+        description: err.message || 'An unexpected error occurred'
       });
     } finally {
       setSubmitting(false);

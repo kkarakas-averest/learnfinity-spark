@@ -817,7 +817,7 @@ const hrEmployeeService: EmployeeService = {
       const filePath = `resumes/${employeeId}/${filename}`;
       
       // Try to use supabaseAdmin first if available
-      const { supabaseAdmin } = require('@/lib/supabase-client');
+      const { supabaseAdmin } = await import('@/lib/supabase-client');
       const client = supabaseAdmin || supabase;
       
       // Upload to storage
@@ -1331,7 +1331,7 @@ const hrEmployeeService: EmployeeService = {
       console.log('Assigning course to employee:', { employeeId, courseId, enrollmentData });
 
       // Try to use supabaseAdmin first if available
-      const { supabaseAdmin, supabase } = require('@/lib/supabase-client');
+      const { supabaseAdmin, supabase } = await import('@/lib/supabase-client');
       const client = supabaseAdmin || supabase;
 
       // Check if enrollment already exists
