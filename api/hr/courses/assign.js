@@ -1,34 +1,35 @@
+// Adapter file to forward course assignment API requests to the Next.js App Router API
+import { supabase } from '../../../src/lib/supabase-client';
+import { v4 as uuidv4 } from 'uuid';
+
 /**
  * Course assignment API endpoint for HR
- * Handles HR course assignment requests
+ * Handles HR course assignment requests in Vercel serverless environment
  */
-import { supabase } from '@/lib/supabase-client';
-import { v4 as uuidv4 } from 'uuid';
-import { NextApiRequest, NextApiResponse } from 'next';
-
-// Express-compatible handler for course assignment
-export default async function assignCourse(req: NextApiRequest, res: NextApiResponse) {
-  // Only allow POST requests
+export default async function handler(req, res) {
+  // Only allow POST method
   if (req.method !== 'POST') {
     return res.status(405).json({ 
-      success: false, 
+      success: false,
       error: 'Method not allowed',
       message: 'Only POST requests are allowed'
     });
   }
 
-  const { courseId, employeeId } = req.body;
-
-  // Validate required fields
-  if (!courseId || !employeeId) {
-    return res.status(400).json({ 
-      success: false,
-      error: 'Missing required fields', 
-      message: 'Both courseId and employeeId are required'
-    });
-  }
-
   try {
+    // Parse request body
+    const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+    const { courseId, employeeId } = body;
+
+    // Validate required fields
+    if (!courseId || !employeeId) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Missing required fields', 
+        message: 'Both courseId and employeeId are required'
+      });
+    }
+
     // Check if the employee is already enrolled
     const { data: existingEnrollment, error: checkError } = await supabase
       .from('hr_course_enrollments')
@@ -63,7 +64,7 @@ export default async function assignCourse(req: NextApiRequest, res: NextApiResp
       completion_date: null
     };
 
-    // Insert the enrollment with supabase client
+    // Insert the enrollment with service role client
     const { error: insertError } = await supabase
       .from('hr_course_enrollments')
       .insert([enrollmentData]);
