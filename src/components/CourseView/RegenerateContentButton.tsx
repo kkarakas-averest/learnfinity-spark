@@ -17,13 +17,14 @@ export function RegenerateContentButton({ courseId, onSuccess }: RegenerateConte
     try {
       setIsLoading(true);
       
-      // Call the App Router API endpoint instead of the older API route
-      const response = await fetch(`/api/courses/${courseId}/regenerate`, {
+      // Revert back to the HR courses endpoint which is more reliable
+      const response = await fetch(`/api/hr/courses/regenerate-content`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
+          courseId: courseId,
           forceRegenerate: true,
           personalizationOptions: {
             learning_preferences: {
