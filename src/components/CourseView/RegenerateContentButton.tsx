@@ -1,4 +1,3 @@
-
 import React, { useState } from '@/lib/react-helpers';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
@@ -17,7 +16,8 @@ export function RegenerateContentButton({ courseId, onSuccess }: RegenerateConte
     try {
       setIsLoading(true);
       
-      // Revert back to the HR courses endpoint which is more reliable
+      // Call the API to regenerate content
+      // Use the new App Router API endpoint
       const response = await fetch(`/api/hr/courses/regenerate-content`, {
         method: 'POST',
         headers: {
@@ -37,24 +37,28 @@ export function RegenerateContentButton({ courseId, onSuccess }: RegenerateConte
       });
       
       if (!response.ok) {
-        throw new Error('Failed to regenerate content');
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Failed to regenerate content:', errorData.error || response.statusText);
+        throw new Error(errorData.error || 'Failed to regenerate content');
       }
       
       const data = await response.json();
       
       // Show success toast
       toast({
-        title: 'Content Regenerated',
-        description: 'Your personalized course content has been regenerated.',
-        duration: 3000
+        title: 'Content Regeneration Started',
+        description: 'Your personalized course content is being regenerated. This may take a moment.',
+        duration: 5000
       });
       
       // Call the onSuccess callback if provided
       if (onSuccess && data.course) {
         onSuccess(data.course);
       } else {
-        // Force page refresh as fallback
-        window.location.reload();
+        // Wait briefly, then force page refresh
+        setTimeout(() => {
+          window.location.reload();
+        }, 3000);
       }
     } catch (error) {
       console.error('Error regenerating content:', error);
@@ -62,7 +66,7 @@ export function RegenerateContentButton({ courseId, onSuccess }: RegenerateConte
       // Show error toast
       toast({
         title: 'Error',
-        description: 'Failed to regenerate course content. Please try again.',
+        description: error instanceof Error ? error.message : 'Failed to regenerate course content. Please try again.',
         variant: 'destructive',
         duration: 3000
       });
@@ -83,4 +87,4 @@ export function RegenerateContentButton({ courseId, onSuccess }: RegenerateConte
       {isLoading ? 'Generating...' : 'Regenerate Content'}
     </Button>
   );
-}
+} 
