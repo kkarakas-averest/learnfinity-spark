@@ -17,6 +17,7 @@ import type { SupabaseResponse } from '@/types/service-responses';
 import BulkEmployeeImport from '@/components/hr/BulkEmployeeImport';
 import { BookOpen, FileText, User, CheckCircle } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { v4 as uuidv4 } from 'uuid';
 
 // Define our own interfaces for the component
 interface Employee {
@@ -346,11 +347,8 @@ export default function AddEmployeeForm() {
               
               // Try to directly record the enrollment in Supabase
               try {
-                // Generate a proper UUID for the enrollment
-                const enrollmentId = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-                  const r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
-                  return v.toString(16);
-                });
+                // Generate a proper UUID for the enrollment using the uuid package
+                const enrollmentId = uuidv4();
                 
                 await supabase
                   .from('hr_course_enrollments')
