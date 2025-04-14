@@ -86,10 +86,8 @@ const CourseAssignmentDialog: React.FC<CourseAssignmentDialogProps> = ({
     setError(null);
     
     try {
-      // Try the new test endpoint first, fall back to the regular endpoint if it fails
-      let response;
-      let result;
-      const requestPayload = {
+      // Use our simple endpoint without external dependencies
+      const response = await fetch('/api/simple-assign', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -98,17 +96,16 @@ const CourseAssignmentDialog: React.FC<CourseAssignmentDialogProps> = ({
           courseId: selectedCourse,
           employeeId: employeeId
         })
-      };
+      });
       
+      // Handle non-JSON responses
+      let result;
+      const responseText = await response.text();
       try {
-        // First try our test endpoint with hardcoded credentials
-        response = await fetch('/api/hr/courses/assign-test', requestPayload);
-        result = await response.json();
-      } catch (testEndpointError) {
-        console.warn('Test endpoint failed, trying standard endpoint:', testEndpointError);
-        // Fall back to the regular endpoint
-        response = await fetch('/api/hr/courses/assign', requestPayload);
-        result = await response.json();
+        result = JSON.parse(responseText);
+      } catch (jsonError) {
+        console.error('Failed to parse response as JSON:', responseText);
+        throw new Error('Server returned an invalid response');
       }
       
       if (!response.ok || !result.success) {

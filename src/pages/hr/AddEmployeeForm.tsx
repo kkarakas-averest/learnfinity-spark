@@ -328,10 +328,8 @@ export default function AddEmployeeForm() {
       if (selectedCourses.length > 0) {
         try {
           for (const courseId of selectedCourses) {
-            // Try the test endpoint first, then fall back to the regular one
-            let response;
-            let result;
-            const requestPayload = {
+            // Use our simple API endpoint
+            const response = await fetch('/api/simple-assign', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -340,17 +338,16 @@ export default function AddEmployeeForm() {
                 courseId,
                 employeeId
               })
-            };
+            });
             
+            // Handle non-JSON responses
+            let result;
+            const responseText = await response.text();
             try {
-              // First try our test endpoint with hardcoded credentials
-              response = await fetch('/api/hr/courses/assign-test', requestPayload);
-              result = await response.json();
-            } catch (testEndpointError) {
-              console.warn('Test endpoint failed, trying standard endpoint:', testEndpointError);
-              // Fall back to the regular endpoint
-              response = await fetch('/api/hr/courses/assign', requestPayload);
-              result = await response.json();
+              result = JSON.parse(responseText);
+            } catch (jsonError) {
+              console.error('Failed to parse response as JSON:', responseText);
+              continue;
             }
             
             if (result.success) {
