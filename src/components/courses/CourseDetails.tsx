@@ -75,6 +75,7 @@ export function CourseDetails({ course }: CourseDetailsProps) {
   const [personalizedSections, setPersonalizedSections] = useState<AICourseContentSection[]>([]);
   const [isLoadingPersonalized, setIsLoadingPersonalized] = useState(false);
   const [hasPersonalized, setHasPersonalized] = useState(false);
+  const [employeeId, setEmployeeId] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -91,6 +92,21 @@ export function CourseDetails({ course }: CourseDetailsProps) {
         
         const userId = session.user.id;
         const contentService = PersonalizedContentService.getInstance();
+        
+        // Get employee ID
+        const { data: employee, error: employeeError } = await supabase
+          .from('hr_employees')
+          .select('id')
+          .eq('user_id', userId)
+          .single();
+          
+        if (employeeError && employeeError.code !== 'PGRST116') {
+          console.error('Error fetching employee:', employeeError);
+        } else if (employee) {
+          setEmployeeId(employee.id);
+        } else {
+          setEmployeeId(userId); // Fallback to user ID
+        }
         
         // Check if personalized content exists
         const hasContent = await contentService.hasPersonalizedContent(course.id, userId);
@@ -119,6 +135,61 @@ export function CourseDetails({ course }: CourseDetailsProps) {
 
     fetchPersonalizedContent();
   }, [course.id, toast]);
+
+  // Function to generate personalized content
+  const generatePersonalizedContent = async () => {
+    if (!employeeId || !course.id) {
+      toast({
+        title: "Cannot Generate Content",
+        description: "Missing required information for personalization",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    try {
+      const response = await fetch('/api/hr/courses/enhance-course-content', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          courseId: course.id,
+          employeeId,
+          modules: 3,
+          sectionsPerModule: 3,
+          includeQuiz: true
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Server responded with ${response.status}: ${await response.text()}`);
+      }
+      
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to generate personalized content');
+      }
+
+      toast({
+        title: "Content Generation Started",
+        description: "Personalized content is being generated for you. This may take a few minutes.",
+        variant: "default"
+      });
+      
+      setActiveTab("personalized");
+      
+    } catch (error: any) {
+      console.error('Error generating personalized content:', error);
+      toast({
+        title: "Error Generating Content",
+        description: error.message || "An error occurred while generating personalized content",
+        variant: "destructive"
+      });
+      throw error;
+    }
+  };
 
   return (
     <div className="space-y-8">
@@ -183,13 +254,29 @@ export function CourseDetails({ course }: CourseDetailsProps) {
           <TabsTrigger value="resources">Resources</TabsTrigger>
         </TabsList>
         
-        {hasPersonalized && (
+        {hasPersonalized || isLoadingPersonalized ? (
           <TabsContent value="personalized" className="mt-6">
             <PersonalizedContentView 
               content={personalizedContent}
               sections={personalizedSections}
               isLoading={isLoadingPersonalized}
+              courseId={course.id}
+              employeeId={employeeId}
+              onGenerateContent={generatePersonalizedContent}
             />
+          </TabsContent>
+        ) : (
+          <TabsContent value="personalized" className="mt-6">
+            <Card>
+              <CardContent className="p-8 text-center">
+                <BookOpen className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
+                <h3 className="text-xl font-semibold mb-2">No personalized content</h3>
+                <p className="text-muted-foreground mb-6">
+                  This course doesn't have any personalized content generated for you yet.
+                </p>
+                <Button onClick={generatePersonalizedContent}>Generate Personalized Content</Button>
+              </CardContent>
+            </Card>
           </TabsContent>
         )}
         
