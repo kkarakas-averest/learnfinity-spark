@@ -68,6 +68,7 @@ export default async function handler(req, res) {
         .from('learner_profiles')
         .upsert({
           user_id: userId,
+          preferences: personalizationOptions.preferences || {},
           ...personalizationOptions
         });
       
@@ -450,7 +451,7 @@ export default async function handler(req, res) {
                 sections.push({
                   id: `${moduleOutline.id}-section-${i + 1}`,
                   title: sectionOutline.title,
-                  content: sectionContent,
+                  content: sectionContent.replace(/\\n/g, '\n').replace(/\\"/g, '"'),
                   contentType: sectionOutline.type || 'text',
                   orderIndex: i + 1,
                   duration: sectionOutline.duration || 20

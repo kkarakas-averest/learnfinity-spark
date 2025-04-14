@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { AICourseContent, AICourseContentSection } from '@/lib/types/content';
 import { Skeleton } from '@/components/ui/skeleton';
 import { RegenerateContentButton } from '@/components/CourseView/RegenerateContentButton';
+import ReactMarkdown from 'react-markdown';
 
 interface PersonalizedCourseContentProps {
   content: AICourseContent | null;
@@ -49,7 +50,7 @@ const PersonalizedCourseContent: React.FC<PersonalizedCourseContentProps> = ({
       const moduleSections = moduleMap.get(moduleId) || [];
       // Use the first section's title to derive module title
       const firstSection = moduleSections[0];
-      let moduleTitle = `Module ${moduleId.slice(-1)}`;
+      let moduleTitle = `Module ${typeof moduleId === 'string' ? moduleId.slice(-1) : ''}`;
       
       if (firstSection && firstSection.title) {
         const titleParts = firstSection.title.split(':');
@@ -140,10 +141,11 @@ const PersonalizedCourseContent: React.FC<PersonalizedCourseContentProps> = ({
                     <CardTitle className="text-lg">{section.title}</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div 
-                      className="prose max-w-none" 
-                      dangerouslySetInnerHTML={{ __html: section.content }} 
-                    />
+                    <div className="prose max-w-none">
+                      <ReactMarkdown>
+                        {section.content}
+                      </ReactMarkdown>
+                    </div>
                   </CardContent>
                 </Card>
               ))}

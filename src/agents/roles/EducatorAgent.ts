@@ -467,44 +467,44 @@ ${request.includeQuizQuestions ? 'Include 3-5 quiz questions with answers at the
       }
       
       const originalContent = await this.fetchContentById(originalContentId);
-      if (!originalContent) {
+    if (!originalContent) {
         throw new Error(`Content with ID ${originalContentId} not found`);
-      }
-      
-      const prompt = `
+    }
+
+    const prompt = `
         Please adapt the following educational content to match the learner's profile and preferences.
-        
-        Original Content:
+
+      Original Content:
         ${originalContent.mainContent}
-        
-        Learner Profile:
-        ${JSON.stringify(params.learnerProfile, null, 2)}
-        
+
+      Learner Profile:
+      ${JSON.stringify(params.learnerProfile, null, 2)}
+
         Adaptation Type: ${params.adaptationType || 'personalize'}
-        ${params.targetLevel ? `Target Difficulty Level: ${params.targetLevel}` : ''}
-        ${params.focusAreas?.length ? `Focus Areas: ${params.focusAreas.join(', ')}` : ''}
-        ${params.preserveStructure ? 'Preserve the original structure of the content.' : 'You may restructure the content as needed.'}
-        
-        Adaptation Guidelines:
-        - For 'simplify', reduce complexity and use more basic language and concepts
-        - For 'elaborate', add more details, examples, and explanations
+      ${params.targetLevel ? `Target Difficulty Level: ${params.targetLevel}` : ''}
+      ${params.focusAreas?.length ? `Focus Areas: ${params.focusAreas.join(', ')}` : ''}
+      ${params.preserveStructure ? 'Preserve the original structure of the content.' : 'You may restructure the content as needed.'}
+
+      Adaptation Guidelines:
+      - For 'simplify', reduce complexity and use more basic language and concepts
+      - For 'elaborate', add more details, examples, and explanations
         - For 'restyle', adapt to the learner's preferred learning style (${(params.learnerProfile as ExtendedLearnerProfile).learningStyle})
-        - For 'supplement', add additional information focused on the learner's interests and goals
-        
-        Format the content using markdown, preserving appropriate headings, bullet points, code blocks, and other formatting.
-      `;
-      
+      - For 'supplement', add additional information focused on the learner's interests and goals
+
+      Format the content using markdown, preserving appropriate headings, bullet points, code blocks, and other formatting.
+    `;
+
       // Get personalized content from LLM
       const generatedText = await this.llmService.complete(prompt, {
         temperature: 0.7,
         maxTokens: 4000
       });
-      
+
       // Extract title from the generated content (first line)
       const contentLines = generatedText.trim().split('\n');
       const title = contentLines[0].replace(/^#\s*/, '').trim();
       const content = contentLines.slice(1).join('\n').trim();
-      
+
       // Return the personalized content with original topic
       return {
         id: uuidv4(),
@@ -529,7 +529,7 @@ ${request.includeQuizQuestions ? 'Include 3-5 quiz questions with answers at the
       return this.generateMockPersonalizedContent(params);
     }
   }
-  
+
   // Continue with the rest of the class...
   // Since there are too many errors to fix in one edit, I'll focus on the most critical ones
   // The patterns established above should be followed for the remaining methods
