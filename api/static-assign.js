@@ -1,5 +1,8 @@
+
 // Static API for course assignment that always returns success
 // For client-side fallback testing
+
+const { v4: uuidv4 } = require('uuid');
 
 module.exports = async (req, res) => {
   // Enable CORS
@@ -45,15 +48,8 @@ module.exports = async (req, res) => {
       });
     }
 
-    // Generate a fake UUID for the enrollment
-    function generateUUID() {
-      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-        var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
-        return v.toString(16);
-      });
-    }
-
-    const enrollmentId = generateUUID();
+    // Generate a proper UUID for the enrollment using the uuid package
+    const enrollmentId = uuidv4();
 
     // Return success - this endpoint always succeeds
     return res.status(200).json({
@@ -71,4 +67,4 @@ module.exports = async (req, res) => {
       message: 'An error occurred during static course assignment'
     });
   }
-}; 
+};

@@ -343,35 +343,50 @@ export type Database = {
       }
       ai_course_content: {
         Row: {
+          content: Json | null
           course_id: string | null
           created_at: string | null
           created_for_user_id: string | null
+          description: string | null
+          employee_id: string | null
           id: string
           is_active: boolean | null
           metadata: Json
           personalization_context: Json | null
+          personalization_params: Json | null
+          title: string | null
           updated_at: string | null
           version: string
         }
         Insert: {
+          content?: Json | null
           course_id?: string | null
           created_at?: string | null
           created_for_user_id?: string | null
+          description?: string | null
+          employee_id?: string | null
           id?: string
           is_active?: boolean | null
           metadata?: Json
           personalization_context?: Json | null
+          personalization_params?: Json | null
+          title?: string | null
           updated_at?: string | null
           version: string
         }
         Update: {
+          content?: Json | null
           course_id?: string | null
           created_at?: string | null
           created_for_user_id?: string | null
+          description?: string | null
+          employee_id?: string | null
           id?: string
           is_active?: boolean | null
           metadata?: Json
           personalization_context?: Json | null
+          personalization_params?: Json | null
+          title?: string | null
           updated_at?: string | null
           version?: string
         }
@@ -381,6 +396,13 @@ export type Database = {
             columns: ["course_id"]
             isOneToOne: false
             referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_course_content_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "hr_employees"
             referencedColumns: ["id"]
           },
         ]
@@ -1872,6 +1894,7 @@ export type Database = {
           enrollment_date: string | null
           id: string
           last_accessed: string | null
+          personalized_content_completed_at: string | null
           personalized_content_generation_status: string | null
           personalized_content_id: string | null
           personalized_content_started_at: string | null
@@ -1891,6 +1914,7 @@ export type Database = {
           enrollment_date?: string | null
           id?: string
           last_accessed?: string | null
+          personalized_content_completed_at?: string | null
           personalized_content_generation_status?: string | null
           personalized_content_id?: string | null
           personalized_content_started_at?: string | null
@@ -1910,6 +1934,7 @@ export type Database = {
           enrollment_date?: string | null
           id?: string
           last_accessed?: string | null
+          personalized_content_completed_at?: string | null
           personalized_content_generation_status?: string | null
           personalized_content_id?: string | null
           personalized_content_started_at?: string | null
@@ -3820,6 +3845,33 @@ export type Database = {
           },
         ]
       }
+      system_logs: {
+        Row: {
+          action: string | null
+          category: string | null
+          created_at: string | null
+          details: Json | null
+          id: string
+          timestamp: string | null
+        }
+        Insert: {
+          action?: string | null
+          category?: string | null
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          timestamp?: string | null
+        }
+        Update: {
+          action?: string | null
+          category?: string | null
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          timestamp?: string | null
+        }
+        Relationships: []
+      }
       team_members: {
         Row: {
           created_at: string | null
@@ -4175,6 +4227,10 @@ export type Database = {
       sparsevec_typmod_in: {
         Args: { "": unknown[] }
         Returns: number
+      }
+      test_auth_user_insert: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
       }
       vector_avg: {
         Args: { "": number[] }

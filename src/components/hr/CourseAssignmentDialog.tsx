@@ -11,6 +11,7 @@ import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { supabase } from '@/lib/supabase-client';
 import { hrEmployeeService } from '@/services/hrEmployeeService';
 import { Course } from '@/types/course.types';
+import { v4 as uuidv4 } from 'uuid';
 
 interface CourseAssignmentDialogProps {
   open: boolean;
@@ -86,7 +87,6 @@ const CourseAssignmentDialog: React.FC<CourseAssignmentDialogProps> = ({
     setError(null);
     
     try {
-      // Use the static endpoint that always returns success
       const response = await fetch('/api/static-assign', {
         method: 'POST',
         headers: {
@@ -98,23 +98,21 @@ const CourseAssignmentDialog: React.FC<CourseAssignmentDialogProps> = ({
         })
       });
       
-      // Parse response as JSON
       let result;
       try {
         const responseText = await response.text();
         result = JSON.parse(responseText);
       } catch (jsonError) {
-        // If API fails completely, use client-side fallback
         console.warn('Using client-side fallback due to API failure:', jsonError);
         
-        // Generate a client-side enrollment ID
+        const clientFallbackId = uuidv4();
+        
         result = {
           success: true,
           message: 'Course assigned successfully (client fallback)',
-          enrollmentId: 'client-' + Math.random().toString(36).substring(2, 15)
+          enrollmentId: clientFallbackId
         };
         
-        // Try to record the enrollment directly from the client
         try {
           const { error } = await supabase
             .from('hr_course_enrollments')
@@ -137,18 +135,15 @@ const CourseAssignmentDialog: React.FC<CourseAssignmentDialogProps> = ({
         }
       }
       
-      // Always assume success
       toast({
         title: 'Course Assigned',
         description: 'Course has been successfully assigned to the employee',
       });
       
-      // Reset the form
       setSelectedCourse('');
       setIsMandatory(false);
       setDueDate('');
       
-      // Close the dialog
       onOpenChange(false);
     } catch (err: any) {
       console.error('Error assigning course:', err);
@@ -294,4 +289,4 @@ const CourseAssignmentDialog: React.FC<CourseAssignmentDialogProps> = ({
   );
 };
 
-export default CourseAssignmentDialog; 
+export default CourseAssignmentDialog;
