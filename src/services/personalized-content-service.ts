@@ -204,7 +204,7 @@ export class PersonalizedContentService {
     try {
       // Create 2 modules with 3 sections each
       for (let moduleIndex = 0; moduleIndex < 2; moduleIndex++) {
-        // Generate a proper UUID for module_id instead of a string
+        // Generate a proper UUID for module_id
         const moduleId = uuidv4(); // Use UUID format for module_id
         
         for (let sectionIndex = 0; sectionIndex < 3; sectionIndex++) {
