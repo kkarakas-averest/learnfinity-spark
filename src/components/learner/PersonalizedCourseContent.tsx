@@ -47,6 +47,13 @@ const PersonalizedCourseContent: React.FC<PersonalizedCourseContentProps> = ({
     );
   }
 
+  // Log content and sections for debugging
+  console.log('Rendering PersonalizedCourseContent with:', { 
+    contentId: content?.id, 
+    sectionsCount: sections?.length,
+    sections: sections
+  });
+
   // Group sections by module_id
   const moduleMap = sections.reduce<Record<string, AICourseContentSection[]>>(
     (acc, section) => {

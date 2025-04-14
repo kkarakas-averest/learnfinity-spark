@@ -1,14 +1,19 @@
 
-// Add or update the PersonalizedContentService implementation
 import { supabase } from '@/lib/supabase';
 import { AICourseContent, AICourseContentSection } from '@/lib/types/content';
 import { v4 as uuidv4 } from 'uuid';
 
+/**
+ * Service for managing personalized course content
+ */
 export class PersonalizedContentService {
   private static instance: PersonalizedContentService;
 
   private constructor() {}
 
+  /**
+   * Get singleton instance of PersonalizedContentService
+   */
   public static getInstance(): PersonalizedContentService {
     if (!PersonalizedContentService.instance) {
       PersonalizedContentService.instance = new PersonalizedContentService();
@@ -17,48 +22,57 @@ export class PersonalizedContentService {
   }
 
   /**
-   * Check if personalized content exists for a course and user
+   * Check if a user has personalized content for a specific course
+   * @param courseId The course ID
+   * @param userId The user ID
+   * @returns boolean indicating if personalized content exists
    */
   public async hasPersonalizedContent(courseId: string, userId: string): Promise<boolean> {
+    console.log(`Checking if personalized content exists for course ${courseId} and user ${userId}`);
+    
     try {
-      console.log(`Checking if personalized content exists for course ${courseId} and user ${userId}`);
+      // First check if the user is an employee
+      let employeeId = userId; // Default to userId if no employee record found
       
-      const { data, error } = await supabase
+      // First check if personalized content exists
+      const { data: contentData, error: contentError } = await supabase
         .from('ai_course_content')
         .select('id')
         .eq('course_id', courseId)
-        .eq('created_for_user_id', userId)
-        .eq('is_active', true)
-        .limit(1);
+        .eq('created_for_user_id', userId);
       
-      if (error) throw error;
+      if (contentError) {
+        console.error('Error checking personalized content:', contentError);
+        return false;
+      }
       
-      const exists = data && data.length > 0;
-      console.log(`Found ${data?.length} personalized content records`);
-      return exists;
+      console.log(`Found ${contentData?.length} personalized content records`);
+      return contentData && contentData.length > 0;
     } catch (error) {
-      console.error('Error checking for personalized content:', error);
+      console.error('Error in hasPersonalizedContent:', error);
       return false;
     }
   }
 
   /**
-   * Get personalized content for a course and user
+   * Get personalized content for a specific course and user
+   * @param courseId The course ID
+   * @param userId The user ID
+   * @returns Object containing the content and sections
    */
   public async getPersonalizedContent(courseId: string, userId: string): Promise<{
-    content: AICourseContent | null;
-    sections: AICourseContentSection[];
+    content: AICourseContent | null,
+    sections: AICourseContentSection[]
   }> {
+    console.log(`Fetching personalized content for course ${courseId} and user ${userId}`);
+    
     try {
-      console.log(`Fetching personalized content for course ${courseId} and user ${userId}`);
-      
-      // Get content
+      // Get the personalized content
       const { data: contentData, error: contentError } = await supabase
         .from('ai_course_content')
         .select('*')
         .eq('course_id', courseId)
         .eq('created_for_user_id', userId)
-        .eq('is_active', true)
         .single();
       
       if (contentError) {
@@ -66,193 +80,49 @@ export class PersonalizedContentService {
         return { content: null, sections: [] };
       }
       
-      console.log(`Personalized content found with ID: ${contentData?.id}`);
+      if (!contentData) {
+        return { content: null, sections: [] };
+      }
       
-      // Get sections for this content
+      console.log(`Personalized content found with ID: ${contentData.id}`);
+      
+      // Get the sections for this content
       const { data: sectionsData, error: sectionsError } = await supabase
         .from('ai_course_content_sections')
         .select('*')
-        .eq('content_id', contentData?.id)
-        .order('order_index', { ascending: true });
+        .eq('content_id', contentData.id);
       
       if (sectionsError) {
-        console.error('Error fetching sections:', sectionsError);
+        console.error('Error fetching content sections:', sectionsError);
         return { content: contentData, sections: [] };
       }
       
       console.log(`Found ${sectionsData?.length} personalized content sections`);
       
-      // If no sections found, generate basic placeholder sections
-      if (contentData && (!sectionsData || sectionsData.length === 0)) {
-        console.log(`No sections found, generating basic sections`);
-        try {
-          const generatedSections = await this.generateBasicSections(contentData);
-          console.log(`Generated ${generatedSections.length} basic sections for content ID: ${contentData.id}`);
-          return { content: contentData, sections: generatedSections };
-        } catch (error) {
-          console.error('Error generating basic sections:', error);
-          // Return content but with empty sections
-          return { content: contentData, sections: [] };
-        }
+      // If no sections exist, generate some basic ones
+      if (!sectionsData || sectionsData.length === 0) {
+        console.log('No sections found, generating basic sections');
+        const generatedSections = await this.generateBasicSections(contentData.id);
+        return { content: contentData, sections: generatedSections };
       }
       
-      return { content: contentData, sections: sectionsData || [] };
+      return { content: contentData, sections: sectionsData };
     } catch (error) {
-      console.error('Error fetching personalized content:', error);
+      console.error('Error in getPersonalizedContent:', error);
       return { content: null, sections: [] };
     }
   }
-  
+
   /**
-   * Generate basic placeholder sections for content that doesn't have any
-   */
-  private async generateBasicSections(content: AICourseContent): Promise<AICourseContentSection[]> {
-    const sections: AICourseContentSection[] = [];
-    
-    try {
-      // Helper function to create a section and handle insertion
-      const createSection = async (moduleId: string, sectionIndex: number, title: string, sectionContent: string): Promise<AICourseContentSection> => {
-        // Generate proper UUIDs for module_id and section_id
-        const sectionId = uuidv4();
-        const sectionModuleId = uuidv4(); // Using UUID instead of string format
-        
-        const section: AICourseContentSection = {
-          id: sectionId,
-          title: title,
-          module_id: sectionModuleId, // Using proper UUID
-          section_id: sectionId, // Using the same UUID as id for section_id
-          content: sectionContent,
-          content_id: content.id,
-          order_index: sectionIndex
-        };
-        
-        try {
-          const { error } = await supabase
-            .from('ai_course_content_sections')
-            .insert(section);
-            
-          if (error) {
-            console.error(`Error inserting section:`, error);
-            // Return the section object even if insertion failed - user will still see something
-          }
-        } catch (err) {
-          console.error('Exception inserting section:', err);
-        }
-        
-        return section;
-      };
-      
-      // Module one UUID
-      const moduleOneId = uuidv4();
-      const moduleTwoId = uuidv4();
-      
-      // For first module (Introduction)
-      const introContent = `<div class="prose max-w-none">
-        <h2>Welcome to Your Personalized Course</h2>
-        <p>This content has been specially tailored for you based on your profile, experience level, and career goals.</p>
-        <p>The system is currently preparing your complete personalized learning path. In the meantime, here is some introductory content to get you started.</p>
-        <h3>How to Use This Course</h3>
-        <ul>
-          <li>Work through the sections sequentially</li>
-          <li>Complete all activities and quizzes</li>
-          <li>Mark sections as complete when you're done with them</li>
-        </ul>
-        <blockquote>
-          <p>Learning is not a spectator sport. To understand is to discover, to reconstruct for oneself, and to invent.</p>
-        </blockquote>
-      </div>`;
-      
-      const overviewContent = `<div class="prose max-w-none">
-        <h2>Course Overview</h2>
-        <p>This course will cover key concepts and skills that are relevant to your role and experience level.</p>
-        <h3>Learning Objectives</h3>
-        <ul>
-          <li>Understand core concepts with examples tailored to your background</li>
-          <li>Develop practical skills that are immediately applicable to your role</li>
-          <li>Connect new knowledge with your existing experience</li>
-        </ul>
-        <p>Your profile indicates interests and experience that will be incorporated throughout this personalized learning experience.</p>
-      </div>`;
-      
-      // For second module (Core Content)
-      const conceptsContent = `<div class="prose max-w-none">
-        <h2>Key Concepts</h2>
-        <p>This section introduces the fundamental concepts of the course with examples relevant to your background.</p>
-        <p>Your personalized learning path will expand on these concepts with more specific examples and applications once it's fully generated.</p>
-        <h3>Core Principles</h3>
-        <ul>
-          <li>Principle One: Foundation of understanding</li>
-          <li>Principle Two: Application in context</li>
-          <li>Principle Three: Advanced implementation</li>
-        </ul>
-      </div>`;
-      
-      const applicationsContent = `<div class="prose max-w-none">
-        <h2>Practical Applications</h2>
-        <p>This section provides practical examples of how to apply course concepts in real-world scenarios.</p>
-        <h3>Case Study</h3>
-        <p>Consider a situation where you need to implement these concepts in your current role. What steps would you take?</p>
-        <ol>
-          <li>Identify the specific challenge</li>
-          <li>Apply relevant principles from this course</li>
-          <li>Measure outcomes and adjust your approach</li>
-        </ol>
-      </div>`;
-      
-      // For assessment/activities
-      const activitiesContent = `<div class="prose max-w-none">
-        <h2>Learning Activities</h2>
-        <p>Complete these activities to reinforce your understanding:</p>
-        <h3>Activity 1: Reflection</h3>
-        <p>Consider how the concepts in this course relate to your current role:</p>
-        <ul>
-          <li>What aspects are most relevant to your daily work?</li>
-          <li>Which concepts represent new knowledge for you?</li>
-          <li>How might applying these concepts improve your effectiveness?</li>
-        </ul>
-      </div>`;
-      
-      const resourcesContent = `<div class="prose max-w-none">
-        <h2>Additional Resources</h2>
-        <p>These resources will help deepen your understanding:</p>
-        <ul>
-          <li>Recommended reading materials tailored to your learning style</li>
-          <li>Practical exercises to apply concepts in your specific context</li>
-          <li>Community forums to discuss topics with peers</li>
-        </ul>
-        <p>Your complete personalized learning path will include more specific resources matched to your profile and learning preferences.</p>
-      </div>`;
-      
-      // Create and save sections
-      const contents = [
-        { moduleId: moduleOneId, title: "Module 1: Introduction", content: introContent },
-        { moduleId: moduleOneId, title: "Module 1: Course Overview", content: overviewContent },
-        { moduleId: moduleTwoId, title: "Module 2: Key Concepts", content: conceptsContent },
-        { moduleId: moduleTwoId, title: "Module 2: Practical Applications", content: applicationsContent },
-        { moduleId: moduleTwoId, title: "Module 2: Learning Activities", content: activitiesContent },
-        { moduleId: moduleTwoId, title: "Module 2: Additional Resources", content: resourcesContent }
-      ];
-      
-      let index = 0;
-      for (const item of contents) {
-        const section = await createSection(item.moduleId, index, item.title, item.content);
-        sections.push(section);
-        index++;
-      }
-    } catch (error) {
-      console.error('Error in generateBasicSections:', error);
-    }
-    
-    return sections;
-  }
-  
-  /**
-   * Get enrollment ID for a course and employee
+   * Get the enrollment ID for a course and employee
+   * @param courseId The course ID
+   * @param employeeId The employee ID
+   * @returns The enrollment ID or null if not found
    */
   public async getEnrollmentId(courseId: string, employeeId: string): Promise<string | null> {
+    console.log(`Looking up enrollment for course ${courseId} and employee ${employeeId}`);
+    
     try {
-      console.log(`Looking up enrollment for course ${courseId} and employee ${employeeId}`);
-      
       const { data, error } = await supabase
         .from('hr_course_enrollments')
         .select('id')
@@ -261,23 +131,25 @@ export class PersonalizedContentService {
         .single();
       
       if (error) {
-        if (error.code === 'PGRST116') {
-          console.log('No enrollment found');
-          return null;
-        }
-        throw error;
+        console.error('Error fetching enrollment:', error);
+        return null;
       }
       
-      console.log(`Enrollment found with ID: ${data?.id}`);
-      return data?.id || null;
+      if (data) {
+        console.log(`Enrollment found with ID: ${data.id}`);
+        return data.id;
+      }
+      
+      return null;
     } catch (error) {
-      console.error('Error getting enrollment ID:', error);
+      console.error('Error in getEnrollmentId:', error);
       return null;
     }
   }
-  
+
   /**
-   * Get content generation status
+   * Get content generation status for an enrollment
+   * @param enrollmentId The enrollment ID
    */
   public async getContentGenerationStatus(enrollmentId: string): Promise<{
     isGenerating: boolean;
@@ -291,27 +163,139 @@ export class PersonalizedContentService {
         .eq('id', enrollmentId)
         .single();
       
-      if (error) throw error;
-      
-      const isGenerating = data?.personalized_content_generation_status === 'in_progress';
-      const startedAt = data?.personalized_content_started_at;
-      
-      // Estimate completion time (5 minutes from start)
-      let estimatedCompletion;
-      if (startedAt) {
-        const startTime = new Date(startedAt);
-        const estimatedTime = new Date(startTime.getTime() + 5 * 60000); // 5 minutes
-        estimatedCompletion = estimatedTime.toISOString();
+      if (error) {
+        console.error('Error fetching content generation status:', error);
+        return { isGenerating: false };
       }
       
-      return {
-        isGenerating,
-        startedAt,
-        estimatedCompletion
-      };
-    } catch (error) {
-      console.error('Error getting content generation status:', error);
+      if (data.personalized_content_generation_status === 'generating') {
+        // Calculate estimated completion time (5 minutes from start)
+        const startedAt = data.personalized_content_started_at;
+        let estimatedCompletion = undefined;
+        
+        if (startedAt) {
+          const startTime = new Date(startedAt);
+          const estimatedTime = new Date(startTime.getTime() + 5 * 60000); // 5 minutes
+          estimatedCompletion = estimatedTime.toISOString();
+        }
+        
+        return {
+          isGenerating: true,
+          startedAt,
+          estimatedCompletion
+        };
+      }
+      
       return { isGenerating: false };
+    } catch (error) {
+      console.error('Error in getContentGenerationStatus:', error);
+      return { isGenerating: false };
+    }
+  }
+
+  /**
+   * Generate basic sections for personalized content when no sections exist yet
+   * This is a fallback mechanism when automatic generation fails
+   * @param contentId The content ID to create sections for
+   */
+  private async generateBasicSections(contentId: string): Promise<AICourseContentSection[]> {
+    const generatedSections: AICourseContentSection[] = [];
+    
+    try {
+      // Create 2 modules with 3 sections each
+      for (let moduleIndex = 0; moduleIndex < 2; moduleIndex++) {
+        // Generate a proper UUID for module_id instead of a string
+        const moduleId = uuidv4(); // Use UUID format for module_id
+        
+        for (let sectionIndex = 0; sectionIndex < 3; sectionIndex++) {
+          // Section content with placeholder text
+          const sectionTitle = `Module ${moduleIndex + 1}: ${sectionIndex === 0 ? 'Introduction' : 
+            sectionIndex === 1 ? 'Key Concepts' : 'Application'}`;
+          
+          const sectionContent = `
+            <div class="prose max-w-none">
+              <h2>${sectionTitle}</h2>
+              <p>This is a placeholder for personalized content that will be tailored to your profile and learning needs.</p>
+              <p>In a fully generated version, this would include customized examples, targeted learning materials, and personalized exercises.</p>
+              <ul>
+                <li>Personalized learning point 1</li>
+                <li>Customized example for your role</li>
+                <li>Tailored application scenario</li>
+              </ul>
+              <blockquote>
+                <p>This content is automatically generated as a fallback. For full personalization, please try regenerating the content.</p>
+              </blockquote>
+            </div>
+          `;
+          
+          try {
+            // Insert the section into the database
+            const { data, error } = await supabase
+              .from('ai_course_content_sections')
+              .insert({
+                id: uuidv4(),
+                content_id: contentId,
+                title: sectionTitle,
+                content: sectionContent,
+                module_id: moduleId, // Use the UUID here
+                section_id: uuidv4(), // Also use UUID for section_id
+                order_index: sectionIndex
+              })
+              .select();
+            
+            if (error) {
+              console.error(`Error inserting section:`, error);
+            } else if (data && data[0]) {
+              generatedSections.push(data[0]);
+            }
+          } catch (error) {
+            console.error(`Error creating section:`, error);
+          }
+        }
+      }
+      
+      console.log(`Generated ${generatedSections.length} basic sections for content ID: ${contentId}`);
+      return generatedSections;
+    } catch (error) {
+      console.error('Error generating basic sections:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Check if HR tables have been initialized properly
+   */
+  public async checkHRTablesExist(): Promise<boolean> {
+    try {
+      // Check if essential tables exist
+      const essentialTables = [
+        'hr_employees',
+        'hr_courses',
+        'hr_course_enrollments',
+        'ai_course_content',
+        'ai_course_content_sections'
+      ];
+      
+      let allExist = true;
+      
+      for (const tableName of essentialTables) {
+        try {
+          // Just query for a single row to see if the table exists
+          await supabase
+            .from(tableName)
+            .select('id')
+            .limit(1);
+        } catch (error) {
+          console.error(`Table ${tableName} does not exist or is not accessible`, error);
+          allExist = false;
+        }
+      }
+      
+      console.log('HR tables essential check:', allExist ? 'All exist' : 'Some missing');
+      return allExist;
+    } catch (error) {
+      console.error('Error checking HR tables:', error);
+      return false;
     }
   }
 }

@@ -1,3 +1,4 @@
+"use client";
 
 import React, { useState, useEffect } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -6,7 +7,7 @@ import { BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { AICourseContent, AICourseContentSection } from '@/lib/types/content';
 import PersonalizedContentGenerationStatus from './PersonalizedContentGenerationStatus';
-import PersonalizedCourseContent from '../learner/PersonalizedCourseContent'; // Import the correct component
+import PersonalizedCourseContent from '../learner/PersonalizedCourseContent'; // Properly import the component
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/lib/supabase';
 import { 
@@ -43,7 +44,6 @@ export function PersonalizedContentView({
   const [pollInterval, setPollInterval] = useState<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
   
-  // Define the generation steps
   const generationSteps = [
     {
       id: 'profile-data',
@@ -82,20 +82,16 @@ export function PersonalizedContentView({
     }
   ];
   
-  // Update steps based on current progress
   const [steps, setSteps] = useState(generationSteps);
   
-  // Check generation status periodically
   useEffect(() => {
     if (isGenerating) {
-      // Start with a base time estimate
-      setEstimatedTimeRemaining(300); // 5 minutes initial estimate
+      setEstimatedTimeRemaining(300);
       
       const checkStatusInterval = setInterval(async () => {
         if (!courseId || !employeeId) return;
         
         try {
-          // Check the personalization status
           const { data: statusData, error: statusError } = await supabase
             .from('hr_course_enrollments')
             .select('personalized_content_generation_status, personalized_content_id')
@@ -105,28 +101,21 @@ export function PersonalizedContentView({
             
           if (statusError) throw statusError;
           
-          // Handle different status values
           if (statusData?.personalized_content_generation_status === 'in_progress') {
-            // Update current step based on some logic
-            // This logic could be more sophisticated based on additional metadata
             if (currentStep < 1) setCurrentStep(1);
             else if (currentStep < 2) setCurrentStep(2);
             
-            // Reduce remaining time
             setEstimatedTimeRemaining(prev => prev ? Math.max(prev - 10, 60) : 180);
             
-            // Update step statuses
             updateStepStatus(0, 'complete');
             updateStepStatus(1, 'complete');
             updateStepStatus(2, 'loading');
           } 
           else if (statusData?.personalized_content_generation_status === 'completed') {
-            // Content generation completed
             setIsGenerating(false);
             clearInterval(checkStatusInterval);
             setPollInterval(null);
             
-            // Update steps
             updateStepStatus(0, 'complete');
             updateStepStatus(1, 'complete');
             updateStepStatus(2, 'complete');
@@ -134,26 +123,21 @@ export function PersonalizedContentView({
             updateStepStatus(4, 'complete');
             setCurrentStep(4);
             
-            // Refresh the page to show the new content
             window.location.reload();
           } 
           else if (statusData?.personalized_content_generation_status === 'failed') {
-            // Handle failure
             setGenerationError('Content generation failed. Please try again later.');
             setIsGenerating(false);
             clearInterval(checkStatusInterval);
             setPollInterval(null);
             
-            // Update steps to show error
             updateStepStatus(currentStep, 'error');
           }
           else if (statusData?.personalized_content_id) {
-            // Content already exists
             setIsGenerating(false);
             clearInterval(checkStatusInterval);
             setPollInterval(null);
             
-            // All steps are complete
             generationSteps.forEach((_, index) => updateStepStatus(index, 'complete'));
             setCurrentStep(4);
           }
@@ -161,7 +145,7 @@ export function PersonalizedContentView({
         } catch (error) {
           console.error('Error checking personalization status:', error);
         }
-      }, 5000); // Check every 5 seconds
+      }, 5000);
       
       setPollInterval(checkStatusInterval);
       
@@ -171,7 +155,6 @@ export function PersonalizedContentView({
     }
   }, [isGenerating, courseId, employeeId, currentStep]);
   
-  // Helper function to update a specific step's status
   const updateStepStatus = (stepIndex: number, status: 'pending' | 'loading' | 'complete' | 'error') => {
     setSteps(prevSteps => {
       const newSteps = [...prevSteps];
@@ -182,7 +165,6 @@ export function PersonalizedContentView({
     });
   };
   
-  // Handle content generation start
   const handleGenerateContent = async () => {
     if (!employeeId || !courseId || !onGenerateContent) {
       toast({
@@ -198,13 +180,10 @@ export function PersonalizedContentView({
       setGenerationError(undefined);
       setCurrentStep(0);
       
-      // Update first step status
       updateStepStatus(0, 'loading');
       
-      // Call the provided generation function
       await onGenerateContent();
       
-      // After the API call, the status polling will handle updating the steps
       updateStepStatus(0, 'complete');
       setCurrentStep(1);
       updateStepStatus(1, 'loading');
