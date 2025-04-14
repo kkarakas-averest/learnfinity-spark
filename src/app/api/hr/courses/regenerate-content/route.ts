@@ -169,17 +169,17 @@ export async function POST(req: NextRequest) {
     // Force regeneration by clearing existing content (if requested)
     if (forceRegenerate) {
       // First, check for personalized content in hr_personalized_course_content
-      const { data: personalizedContent } = await supabase
+      const { data: existingPersonalizedContent } = await supabase
         .from('hr_personalized_course_content')
         .select('id')
         .eq('course_id', courseId)
         .eq('employee_id', targetEmployeeId);
       
-      if (personalizedContent && personalizedContent.length > 0) {
-        console.log('Found personalized content to regenerate:', personalizedContent);
+      if (existingPersonalizedContent && existingPersonalizedContent.length > 0) {
+        console.log('Found personalized content to regenerate:', existingPersonalizedContent);
         
         // Delete existing personalized content
-        for (const content of personalizedContent) {
+        for (const content of existingPersonalizedContent) {
           await supabase
             .from('hr_personalized_course_content')
             .delete()

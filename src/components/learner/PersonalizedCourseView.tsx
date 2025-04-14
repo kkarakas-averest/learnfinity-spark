@@ -343,9 +343,9 @@ const PersonalizedCourseView: React.FC = () => {
     switch (section.contentType) {
       case 'video':
         return (
-          <div className="aspect-video bg-muted rounded-md flex items-center justify-center">
-            <iframe 
-              className="w-full h-full rounded-md"
+          <div className="aspect-video bg-black rounded-md overflow-hidden">
+            <iframe
+              className="w-full h-full"
               src={section.content}
               title={section.title}
               allowFullScreen
@@ -363,7 +363,7 @@ const PersonalizedCourseView: React.FC = () => {
           </div>
         );
       default:
-        return <div>{section.content}</div>;
+        return <div dangerouslySetInnerHTML={{ __html: section.content }} />;
     }
   };
 

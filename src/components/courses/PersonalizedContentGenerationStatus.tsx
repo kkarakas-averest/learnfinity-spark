@@ -1,6 +1,6 @@
 'use client';
 
-import * as React from 'react';
+import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/lib/supabase';
@@ -12,14 +12,15 @@ import {
   Zap,
   Sparkles,
   AlertTriangle,
-  RefreshCw,
-  XCircle
+  RefreshCw, 
+  X
 } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/components/ui/use-toast';
 import { useRouter } from 'next/navigation';
 import ReactMarkdown from 'react-markdown';
+import HtmlContentRenderer from './HtmlContentRenderer';
 
 interface StepType {
   id: number;
@@ -351,7 +352,7 @@ export default function PersonalizedContentGenerationStatus({
       case 'started':
         return (
           <div className="flex items-center gap-2 text-blue-500">
-            <RefreshCw size={16} className="animate-spin" />
+            <Loader2 size={16} className="animate-spin" />
             <span>Starting content generation...</span>
           </div>
         );
@@ -364,9 +365,10 @@ export default function PersonalizedContentGenerationStatus({
             </div>
             <p className="text-sm text-muted-foreground">
               {stepDescription ? (
-                <div className="prose max-w-none dark:prose-invert text-sm">
-                  <ReactMarkdown>{stepDescription}</ReactMarkdown>
-                </div>
+                <HtmlContentRenderer 
+                  content={stepDescription} 
+                  className="prose max-w-none dark:prose-invert text-sm" 
+                />
               ) : (
                 `Step ${currentStep} of ${totalSteps}`
               )}
@@ -385,7 +387,7 @@ export default function PersonalizedContentGenerationStatus({
         return (
           <div className="space-y-2">
             <div className="flex items-center gap-2 text-red-500">
-              <XCircle size={16} />
+              <X size={16} />
               <span>Content generation failed</span>
             </div>
             {errorMessage && (

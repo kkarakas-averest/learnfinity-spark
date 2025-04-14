@@ -92,7 +92,7 @@ const PersonalizedCourseContent: React.FC<PersonalizedCourseContentProps> = ({
   }
   
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -124,8 +124,8 @@ const PersonalizedCourseContent: React.FC<PersonalizedCourseContentProps> = ({
       </Card>
       
       {modules.length > 0 ? (
-        <Tabs defaultValue={modules[0].id} className="w-full">
-          <TabsList className="mb-4 w-full">
+        <Tabs defaultValue={modules[0].id}>
+          <TabsList className="mb-4">
             {modules.map(module => (
               <TabsTrigger key={module.id} value={module.id} className="flex-1">
                 {module.title}
@@ -141,11 +141,10 @@ const PersonalizedCourseContent: React.FC<PersonalizedCourseContentProps> = ({
                     <CardTitle className="text-lg">{section.title}</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="prose max-w-none">
-                      <ReactMarkdown>
-                        {section.content}
-                      </ReactMarkdown>
-                    </div>
+                    <div 
+                      className="prose max-w-none"
+                      dangerouslySetInnerHTML={{ __html: section.content }}
+                    />
                   </CardContent>
                 </Card>
               ))}
