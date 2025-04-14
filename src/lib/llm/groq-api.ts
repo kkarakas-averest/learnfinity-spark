@@ -1,4 +1,3 @@
-
 import { LLMProvider } from './llm-service';
 import { PUBLIC_APP_URL } from '@/lib/env';
 
@@ -118,8 +117,31 @@ export class GroqAPI implements LLMProvider {
       });
     }
 
+    // Always log configuration info
+    console.log('[GroqAPI] Configuration:', {
+      apiKeyExists: !!this.apiKey,
+      apiKeyFormat: this.apiKey?.startsWith('gsk_') ? 'valid' : 'invalid',
+      apiKeyLength: this.apiKey?.length || 0,
+      model: this.model,
+      supabaseEdgeFunctionUrl: `${PUBLIC_APP_URL}/functions/v1/groq-api`,
+      isConfigured: this.isConfigured()
+    });
+
     try {
+      // First check if the API is properly configured
+      if (!this.isConfigured()) {
+        console.error('[GroqAPI] API not properly configured', {
+          apiKeyExists: !!this.apiKey,
+          apiKeyFormat: this.apiKey ? (this.apiKey.startsWith('gsk_') ? 'valid' : 'invalid') : 'none',
+          apiKeyLength: this.apiKey?.length || 0
+        });
+        throw new Error('Groq API not properly configured');
+      }
+      
+      console.log('[GroqAPI] Calling Supabase Edge Function for Groq API');
+      
       // Call the Supabase Edge Function for Groq API
+      const startTime = Date.now();
       const response = await fetch(`${PUBLIC_APP_URL}/functions/v1/groq-api`, {
         method: 'POST',
         headers: {
@@ -135,11 +157,27 @@ export class GroqAPI implements LLMProvider {
           stopSequences: options.stopSequences || null
         })
       });
+      const responseTime = Date.now() - startTime;
+      
+      console.log('[GroqAPI] Edge function response received', {
+        status: response.status,
+        statusText: response.statusText,
+        responseTime: `${responseTime}ms`,
+        contentType: response.headers.get('content-type')
+      });
 
       // Parse the response
       const data = await response.json();
       
       if (!response.ok) {
+        // Log the detailed error
+        console.error('[GroqAPI] Edge function returned error', {
+          status: response.status,
+          statusText: response.statusText,
+          errorData: data,
+          responseTime: `${responseTime}ms`
+        });
+        
         // Handle specific error cases
         if (data.error && 
             (data.error.includes('model') || 
@@ -158,13 +196,14 @@ export class GroqAPI implements LLMProvider {
         total_tokens: 0
       };
 
-      // Log response details if debug is enabled
-      if (this.options.debug) {
-        console.log('Groq API response:', {
-          text: completionText.length > 100 ? completionText.substring(0, 100) + '...' : completionText,
-          usage
-        });
-      }
+      // Log response details
+      console.log('[GroqAPI] Successfully received content from Groq API', {
+        textLength: completionText.length,
+        textPreview: completionText.substring(0, 100) + '...',
+        usage,
+        model: data.model,
+        responseId: data.id
+      });
 
       return {
         text: completionText,
@@ -172,6 +211,16 @@ export class GroqAPI implements LLMProvider {
       };
     } catch (error: any) {
       const errorMessage = error.message || String(error);
+      
+      // Log detailed error information
+      console.error('[GroqAPI] Error calling Groq API:', {
+        message: errorMessage,
+        stack: error.stack,
+        apiKeyExists: !!this.apiKey,
+        apiKeyFormat: this.apiKey?.startsWith('gsk_') ? 'valid' : 'invalid',
+        model: this.model,
+        retryAttemptsLeft: this.options.maxRetries
+      });
       
       // Check if it's a model-related error
       const isModelError = errorMessage.includes('model') || 
@@ -181,11 +230,11 @@ export class GroqAPI implements LLMProvider {
       // Retry logic for transient errors or model errors if max retries > 0
       if (this.options.maxRetries > 0) {
         if (isModelError) {
-          console.warn(`Model error with ${this.model}, retrying might not help unless we change models.`);
+          console.warn(`[GroqAPI] Model error with ${this.model}, retrying might not help unless we change models.`);
           // Let the caller handle model switching
           throw error;
         } else {
-          console.warn(`Groq API request failed, retrying... (${this.options.maxRetries} attempts left)`);
+          console.warn(`[GroqAPI] Request failed, retrying... (${this.options.maxRetries} attempts left)`);
           // Create a new instance with one less retry
           const newOptions = { ...this.options, maxRetries: this.options.maxRetries - 1 };
           const retryAPI = new GroqAPI(this.apiKey, this.model, newOptions);
@@ -193,7 +242,6 @@ export class GroqAPI implements LLMProvider {
         }
       }
       
-      console.error('Error calling Groq API:', error);
       throw error;
     }
   }

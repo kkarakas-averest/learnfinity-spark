@@ -1,4 +1,3 @@
-
 /**
  * LLM Service for handling AI text generation
  * Provides a unified interface for working with language models
@@ -164,12 +163,31 @@ export class LLMService {
     const trackId = options.trackId || uuidv4().substring(0, 8);
     console.log(`[LLM:${trackId}] Processing prompt (${prompt.length} chars) with ${this.providerType} provider`);
     
+    // Log environment and configuration state
+    console.log(`[LLM:${trackId}] Configuration:`, {
+      provider: this.providerType,
+      model: this.provider.getModel(),
+      isConfigured: this.provider.isConfigured(),
+      apiKeyExists: !!GROQ_API_KEY,
+      apiKeyLength: GROQ_API_KEY ? GROQ_API_KEY.length : 0,
+      apiKeyPrefix: GROQ_API_KEY ? GROQ_API_KEY.substring(0, 5) + '...' : 'none'
+    });
+    
     try {
       this.usageStats.requests++;
       this.usageStats.last_request_time = new Date();
       
       // Use default temperature from config if not provided
       const temperature = options.temperature !== undefined ? options.temperature : LLM_TEMPERATURE;
+      
+      // Verify configuration
+      if (!this.provider.isConfigured()) {
+        console.warn(`[LLM:${trackId}] Provider not configured, falling back to mock provider`);
+        const mockProvider = new MockLLM();
+        return mockProvider.complete(prompt, options).then(result => result.text);
+      }
+      
+      console.log(`[LLM:${trackId}] Sending request to ${this.providerType} provider`);
       
       // Get completion from provider
       const result = await this.provider.complete(prompt, {
@@ -190,7 +208,13 @@ export class LLMService {
       
       return result.text;
     } catch (error) {
-      console.error(`[LLM:${trackId}] Error during completion:`, error);
+      console.error(`[LLM:${trackId}] Error during completion:`, {
+        message: error.message,
+        code: error.code,
+        stack: error.stack,
+        provider: this.providerType,
+        model: this.provider.getModel()
+      });
       
       // Return a fallback response
       if (this.providerType !== 'mock') {

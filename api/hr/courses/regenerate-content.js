@@ -191,9 +191,19 @@ export default async function handler(req, res) {
       // Using native fetch if available (Node.js 18+) or a polyfill
       const fetch = (await import('node-fetch')).default;
       
-      console.log(`[regenerate-content] Triggering content generation at ${baseUrl}/api/hr/courses/generate-content`);
+      // Check if GROQ_API_KEY is set in environment
+      const hasGroqApiKey = !!process.env.GROQ_API_KEY;
+      console.log(`[regenerate-content] GROQ_API_KEY is ${hasGroqApiKey ? 'set' : 'NOT set'} in environment`);
       
-      const response = await fetch(`${baseUrl}/api/hr/courses/generate-content`, {
+      const generateContentEndpoint = `${baseUrl}/api/hr/courses/generate-content`;
+      console.log(`[regenerate-content] Triggering content generation at ${generateContentEndpoint}`, {
+        courseId,
+        employeeId: targetEmployeeId,
+        hasGroqApiKey
+      });
+      
+      const startTime = Date.now();
+      const response = await fetch(generateContentEndpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -206,20 +216,42 @@ export default async function handler(req, res) {
           access_token: accessToken
         })
       });
+      const responseTime = Date.now() - startTime;
       
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('[regenerate-content] Generation service error:', response.status, errorText);
+        console.error('[regenerate-content] Generation service error:', {
+          status: response.status,
+          statusText: response.statusText,
+          responseBody: errorText,
+          responseTime: `${responseTime}ms`,
+          headers: Array.from(response.headers.entries())
+            .filter(([key]) => !key.toLowerCase().includes('authorization'))
+            .reduce((obj, [key, val]) => ({ ...obj, [key]: val }), {})
+        });
         
         // We'll continue and not fail the request if generation fails
         // The user can try regenerating again
         console.log('[regenerate-content] Continuing despite generation service error');
       } else {
-        console.log('[regenerate-content] Successfully triggered content generation');
+        const responseData = await response.json();
+        console.log('[regenerate-content] Successfully triggered content generation', {
+          responseTime: `${responseTime}ms`,
+          responseData: {
+            success: responseData.success,
+            message: responseData.message,
+            contentId: responseData.content?.id,
+            generatedModules: responseData.content?.modules?.length
+          }
+        });
       }
     } catch (generationError) {
       // Log but don't fail the request
-      console.error('[regenerate-content] Error calling generation service:', generationError);
+      console.error('[regenerate-content] Error calling generation service:', {
+        error: generationError.message,
+        stack: generationError.stack,
+        code: generationError.code
+      });
     }
     
     // 6. Return success with course data
