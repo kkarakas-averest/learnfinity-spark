@@ -9,7 +9,8 @@ export default async function handler(req, res) {
   // Set CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
 
   // Handle OPTIONS request for CORS
   if (req.method === 'OPTIONS') {
@@ -25,15 +26,22 @@ export default async function handler(req, res) {
     const { data: { session }, error: authError } = await supabase.auth.getSession();
     
     if (authError || !session?.user) {
-      return res.status(401).json({ error: 'Unauthorized' });
+      console.error('Authentication error in legacy API:', authError);
+      return res.status(401).json({ error: 'Unauthorized', details: authError?.message });
     }
     
     // Forward the request to the new App Router API
     console.log('Legacy API: Forwarding request to App Router API');
     
+    // Extract all cookies to forward
+    const cookies = req.headers.cookie || '';
+    
     // Construct the proper URL for the App Router API
     const baseUrl = `${req.headers['x-forwarded-proto'] || 'https'}://${req.headers.host}`;
     const appRouterUrl = `${baseUrl}/api/hr/courses/regenerate-content`;
+    
+    console.log(`Forwarding to: ${appRouterUrl}`);
+    console.log(`User ID: ${session.user.id}`);
     
     // Forward the request with the same body
     const response = await fetch(appRouterUrl, {
@@ -41,8 +49,11 @@ export default async function handler(req, res) {
       headers: {
         'Content-Type': 'application/json',
         // Forward the auth cookie to maintain session
-        'Cookie': req.headers.cookie || ''
+        'Cookie': cookies,
+        // Add authorization header as alternative auth method
+        'Authorization': `Bearer ${session.access_token}` 
       },
+      credentials: 'include',
       body: JSON.stringify(req.body)
     });
     

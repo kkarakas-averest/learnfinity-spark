@@ -23,6 +23,8 @@ export function RegenerateContentButton({ courseId, onSuccess }: RegenerateConte
         headers: {
           'Content-Type': 'application/json'
         },
+        // Add credentials to ensure auth cookies are sent
+        credentials: 'include',
         body: JSON.stringify({
           courseId: courseId,
           forceRegenerate: true,
