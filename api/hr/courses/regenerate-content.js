@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { v4 as uuidv4 } from 'uuid';
 
 // Initialize Supabase client
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -191,57 +192,118 @@ export default async function handler(req, res) {
       const hasGroqApiKey = !!process.env.GROQ_API_KEY;
       console.log(`[regenerate-content] GROQ_API_KEY is ${hasGroqApiKey ? 'set' : 'NOT set'} in environment`);
       
-      // Use the production URL directly instead of relying on VERCEL_URL, which might be a preview deployment
-      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://learnfinity-spark.vercel.app';
-      const generateContentEndpoint = `${baseUrl}/api/hr/courses/generate-content`;
-      console.log(`[regenerate-content] Triggering content generation at ${generateContentEndpoint}`, {
-        courseId,
-        employeeId: targetEmployeeId,
-        hasGroqApiKey
-      });
-      
-      const startTime = Date.now();
-      const response = await fetch(generateContentEndpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken}`
-        },
-        body: JSON.stringify({
-          courseId,
-          employeeId: targetEmployeeId,
-          personalizationOptions,
-          access_token: accessToken
-        })
-      });
-      const responseTime = Date.now() - startTime;
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('[regenerate-content] Generation service error:', {
-          status: response.status,
-          statusText: response.statusText,
-          responseBody: errorText,
-          responseTime: `${responseTime}ms`,
-          headers: Array.from(response.headers.entries())
-            .filter(([key]) => !key.toLowerCase().includes('authorization'))
-            .reduce((obj, [key, val]) => ({ ...obj, [key]: val }), {})
+      // Let's use the Groq API directly from this serverless function
+      try {
+        const { GroqClient } = await import('groq-sdk');
+        
+        // Initialize the Groq client
+        const groq = new GroqClient({ apiKey: process.env.GROQ_API_KEY });
+        
+        console.log(`[regenerate-content] Initialized Groq client directly`);
+        
+        // Get or create a prompt template for course content
+        const promptTemplate = `
+        You are an expert educational content creator tasked with creating personalized learning content.
+        
+        COURSE TITLE: ${courseData.title}
+        COURSE DESCRIPTION: ${courseData.description || 'No description available'}
+        
+        Please generate a complete course structure with:
+        - 3 modules
+        - Each module should have:
+          - A clear title
+          - 2-3 sections with educational content
+          - Learning objectives
+          - A short quiz
+        
+        The content should be written for someone in the role of ${personalizationOptions.userRole || 'professional'}.
+        Make the content practical and applicable to real-world scenarios.
+        `;
+        
+        console.log(`[regenerate-content] Sending request to Groq API directly`);
+        const startTime = Date.now();
+        
+        // Make the API call directly
+        const completion = await groq.chat.completions.create({
+          model: "llama3-70b-8192",
+          messages: [
+            {
+              role: "system",
+              content: "You are an expert educational content creator specialized in creating personalized learning materials."
+            },
+            {
+              role: "user",
+              content: promptTemplate
+            }
+          ],
+          temperature: 0.7,
+          max_tokens: 4096,
         });
         
-        // We'll continue and not fail the request if generation fails
-        // The user can try regenerating again
-        console.log('[regenerate-content] Continuing despite generation service error');
-      } else {
-        const responseData = await response.json();
-        console.log('[regenerate-content] Successfully triggered content generation', {
-          responseTime: `${responseTime}ms`,
-          responseData: {
-            success: responseData.success,
-            message: responseData.message,
-            contentId: responseData.content?.id,
-            generatedModules: responseData.content?.modules?.length
+        const responseTime = Date.now() - startTime;
+        console.log(`[regenerate-content] Groq API responded in ${responseTime}ms`);
+        
+        // Extract and save the content
+        const generatedContent = completion.choices[0]?.message.content;
+        
+        if (generatedContent) {
+          console.log(`[regenerate-content] Successfully generated content with Groq (${generatedContent.length} chars)`);
+          
+          // Store the generated content in the database
+          const contentId = uuidv4();
+          const { error: contentError } = await supabase
+            .from('ai_course_content')
+            .insert({
+              id: contentId,
+              course_id: courseId,
+              content: generatedContent,
+              created_for_user_id: userId,
+              created_at: new Date().toISOString()
+            });
+            
+          if (contentError) {
+            console.error('[regenerate-content] Error saving generated content:', contentError);
+          } else {
+            console.log(`[regenerate-content] Content saved to database with ID: ${contentId}`);
           }
+        } else {
+          console.error('[regenerate-content] Groq API returned empty content');
+        }
+      } catch (groqError) {
+        console.error('[regenerate-content] Error using Groq API directly:', {
+          message: groqError.message,
+          stack: groqError.stack,
+          code: groqError.code
         });
+        
+        // Fall back to the default method if direct API call fails
+        console.log('[regenerate-content] Falling back to regular endpoint method');
+        
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://learnfinity-spark.vercel.app';
+        const generateContentEndpoint = `${baseUrl}/api/hr/courses/generate-content`;
+        
+        const response = await fetch(generateContentEndpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}`
+          },
+          body: JSON.stringify({
+            courseId,
+            employeeId: targetEmployeeId,
+            personalizationOptions,
+            access_token: accessToken
+          })
+        });
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('[regenerate-content] Fallback generation service error:', {
+            status: response.status,
+            statusText: response.statusText,
+            responseBody: errorText
+          });
+        }
       }
     } catch (generationError) {
       // Log but don't fail the request
