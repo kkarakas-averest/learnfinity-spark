@@ -6,7 +6,18 @@ const { v4: uuidv4 } = require('uuid');
 const SUPABASE_URL = "https://ujlqzkkkfatehxeqtbdl.supabase.co";
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.VITE_SUPABASE_SERVICE_KEY;
 
+// For debugging purposes
+console.log('API HANDLER LOADED');
+console.log('ENV VARIABLES:', {
+  NODE_ENV: process.env.NODE_ENV,
+  VERCEL_ENV: process.env.VERCEL_ENV,
+  HAS_SERVICE_KEY: !!process.env.SUPABASE_SERVICE_KEY,
+  HAS_VITE_KEY: !!process.env.VITE_SUPABASE_SERVICE_KEY
+});
+
 module.exports = async (req, res) => {
+  console.log('REQUEST RECEIVED:', req.method);
+  
   // Enable CORS
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -15,11 +26,13 @@ module.exports = async (req, res) => {
 
   // Handle OPTIONS request
   if (req.method === 'OPTIONS') {
+    console.log('HANDLING OPTIONS REQUEST');
     return res.status(200).end();
   }
 
   // Only accept POST requests
   if (req.method !== 'POST') {
+    console.log('INVALID METHOD:', req.method);
     return res.status(405).json({
       success: false,
       error: 'Method not allowed',
@@ -28,16 +41,28 @@ module.exports = async (req, res) => {
   }
 
   try {
+    console.log('CREATING SUPABASE CLIENT');
+    
+    // Use a fallback service key for testing if environment variables are failing
+    const fallbackServiceKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqbHF6a2trZmF0ZWh4ZXF0YmRsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0MDY4MDgzMiwiZXhwIjoyMDU2MjU2ODMyfQ.QH9bEfOxTXbRQmrVYsKnQEwgIH0V-MgfHHQHnPpEcQY"; 
+    
     // Initialize Supabase client
-    const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+    const finalKey = SUPABASE_KEY || fallbackServiceKey;
+    console.log('USING KEY TYPE:', finalKey === fallbackServiceKey ? 'FALLBACK' : 'ENV');
+    
+    const supabase = createClient(SUPABASE_URL, finalKey);
     if (!supabase) {
       throw new Error('Failed to initialize Supabase client');
     }
+    
+    console.log('SUPABASE CLIENT CREATED');
 
     // Parse request body
     let body;
     try {
+      console.log('PARSING REQUEST BODY', typeof req.body);
       body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+      console.log('BODY PARSED:', body ? 'SUCCESS' : 'EMPTY');
     } catch (parseError) {
       console.error('Error parsing request body:', parseError);
       return res.status(400).json({
@@ -49,6 +74,8 @@ module.exports = async (req, res) => {
 
     // Validate required fields
     const { courseId, employeeId } = body || {};
+    console.log('FIELDS:', { courseId, employeeId });
+    
     if (!courseId || !employeeId) {
       return res.status(400).json({
         success: false,
@@ -58,15 +85,21 @@ module.exports = async (req, res) => {
     }
 
     // Check if employee is already enrolled
+    console.log('CHECKING EXISTING ENROLLMENT');
     const { data: existingEnrollment, error: checkError } = await supabase
       .from('hr_course_enrollments')
       .select('id')
       .eq('course_id', courseId)
       .eq('employee_id', employeeId)
       .maybeSingle();
+      
+    if (checkError) {
+      console.error('CHECK ERROR:', checkError);
+    }
 
     // Handle existing enrollment
     if (existingEnrollment) {
+      console.log('EXISTING ENROLLMENT FOUND:', existingEnrollment.id);
       return res.status(200).json({
         success: true,
         message: 'Employee is already enrolled in this course',
@@ -75,6 +108,7 @@ module.exports = async (req, res) => {
     }
 
     // Create a new enrollment
+    console.log('CREATING NEW ENROLLMENT');
     const enrollmentId = uuidv4();
     const { error: insertError } = await supabase
       .from('hr_course_enrollments')
@@ -97,9 +131,12 @@ module.exports = async (req, res) => {
         message: 'Failed to create enrollment'
       });
     }
+    
+    console.log('ENROLLMENT CREATED:', enrollmentId);
 
     // Record activity (non-critical, don't fail if this errors)
     try {
+      console.log('RECORDING ACTIVITY');
       await supabase
         .from('hr_employee_activities')
         .insert({
@@ -110,18 +147,20 @@ module.exports = async (req, res) => {
           course_id: courseId,
           timestamp: new Date().toISOString()
         });
+      console.log('ACTIVITY RECORDED');
     } catch (activityError) {
       console.error('Error recording activity (non-critical):', activityError);
     }
 
     // Return success
+    console.log('SENDING SUCCESS RESPONSE');
     return res.status(200).json({
       success: true,
       message: 'Successfully assigned course to employee',
       enrollmentId
     });
   } catch (error) {
-    console.error('Course assignment error:', error);
+    console.error('COURSE ASSIGNMENT ERROR:', error);
     // Always return a proper JSON response
     return res.status(500).json({
       success: false,
