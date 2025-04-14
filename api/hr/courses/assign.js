@@ -1,12 +1,32 @@
-// Adapter file to forward course assignment API requests to the Next.js App Router API
-import { supabase } from '../../../src/lib/supabase-client';
+// Adapter file for course assignment API requests in Vercel serverless environment
+import { createClient } from '@supabase/supabase-js';
 import { v4 as uuidv4 } from 'uuid';
+
+// Initialize Supabase client for server environment
+const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY || process.env.VITE_SUPABASE_SERVICE_KEY;
+const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+  auth: {
+    persistSession: false,
+    autoRefreshToken: false
+  }
+});
 
 /**
  * Course assignment API endpoint for HR
  * Handles HR course assignment requests in Vercel serverless environment
  */
 export default async function handler(req, res) {
+  // Set CORS headers
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
   // Only allow POST method
   if (req.method !== 'POST') {
     return res.status(405).json({ 
