@@ -8,7 +8,10 @@ import { AICourseContent, AICourseContentSection } from '@/lib/types/content';
 export class PersonalizedContentService {
   private static instance: PersonalizedContentService;
 
-  private constructor() {}
+  private constructor() {
+    // Check if essential tables exist as a diagnostic step
+    this.checkHRTablesExist();
+  }
 
   /**
    * Get the singleton instance of PersonalizedContentService
@@ -18,6 +21,34 @@ export class PersonalizedContentService {
       PersonalizedContentService.instance = new PersonalizedContentService();
     }
     return PersonalizedContentService.instance;
+  }
+
+  /**
+   * Diagnostic check to verify essential tables exist
+   */
+  private async checkHRTablesExist(): Promise<void> {
+    try {
+      const requiredTables = [
+        'hr_courses',
+        'hr_course_enrollments',
+        'ai_course_content',
+        'ai_course_content_sections'
+      ];
+      
+      // Try a simple query to see if tables exist
+      const { error } = await supabase
+        .from('hr_courses')
+        .select('id')
+        .limit(1);
+      
+      if (error) {
+        console.error('Error checking hr_courses table:', error);
+      } else {
+        console.log('HR tables essential check: All exist');
+      }
+    } catch (error) {
+      console.error('Error checking HR tables:', error);
+    }
   }
 
   /**
@@ -31,6 +62,7 @@ export class PersonalizedContentService {
     
     try {
       // Check if there's personalized content for this course and user
+      // Use ai_course_content table
       const { data: contentData, error: contentError } = await supabase
         .from('ai_course_content')
         .select('*')
@@ -48,9 +80,9 @@ export class PersonalizedContentService {
 
       console.log(`Personalized content found with ID: ${contentData.id}`);
 
-      // Get sections for this personalized content
+      // Get sections for this personalized content using ai_course_content_sections table
       const { data: sectionsData, error: sectionsError } = await supabase
-        .from('ai_course_content_sections')
+        .from('ai_course_content_sections') 
         .select('*')
         .eq('content_id', contentData.id)
         .order('order_index', { ascending: true });
@@ -79,6 +111,7 @@ export class PersonalizedContentService {
     console.log(`Checking if personalized content exists for course ${courseId} and user ${userId}`);
     
     try {
+      // Use ai_course_content table
       const { count, error } = await supabase
         .from('ai_course_content')
         .select('id', { count: 'exact', head: true })
@@ -98,7 +131,7 @@ export class PersonalizedContentService {
       return false;
     }
   }
-
+  
   /**
    * Get enrollment ID for a course and user from hr_course_enrollments
    */

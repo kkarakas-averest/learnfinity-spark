@@ -211,8 +211,9 @@ const CourseView: React.FC<CourseViewProps> = ({
       const contentId = uuidv4();
       
       // Create simplified personalized content record
+      // Use ai_course_content table instead of course_ai_content
       const { error: contentError } = await supabase
-        .from('course_ai_content')
+        .from('ai_course_content')
         .insert({
           id: contentId,
           course_id: courseId,
@@ -223,12 +224,18 @@ const CourseView: React.FC<CourseViewProps> = ({
             "Apply knowledge to your specific role",
             "Develop practical skills relevant to your position"
           ],
-          created_for: employeeId,
-          is_personalized: true,
-          model: 'client-fallback'
+          created_for_user_id: employeeId,
+          is_active: true,
+          version: '1.0',
+          metadata: {
+            generation_method: 'client-fallback',
+            modules: 3,
+            sections_per_module: 3
+          }
         });
       
       if (contentError) {
+        console.error('Error creating ai_course_content record:', contentError);
         throw contentError;
       }
       
@@ -249,10 +256,10 @@ const CourseView: React.FC<CourseViewProps> = ({
             created_for: employeeId
           });
         
-        // Create 3 sections per module
+        // Create 3 sections per module using ai_course_content_sections table
         for (let j = 0; j < 3; j++) {
           await supabase
-            .from('course_content_sections')
+            .from('ai_course_content_sections')
             .insert({
               content_id: contentId,
               title: `Section ${i+1}.${j+1}: ${["Introduction", "Core Concepts", "Practical Application"][j]}`,
@@ -272,9 +279,7 @@ const CourseView: React.FC<CourseViewProps> = ({
                   <p>The content is generated as a fallback since the AI content generation service is currently unavailable.</p>
                 </blockquote>
               </div>`,
-              order_index: j,
-              created_for: employeeId,
-              is_personalized: true
+              order_index: j
             });
         }
       }
