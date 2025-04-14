@@ -1,3 +1,4 @@
+
 #!/bin/bash
 
 # Stop any running dev servers
@@ -11,13 +12,13 @@ rm -rf node_modules/.vite
 
 # Clear package manager cache
 echo "Clearing package manager cache..."
-pnpm store prune
+pnpm store prune || npm cache clean --force || yarn cache clean
 
 # Reinstall dependencies
 echo "Reinstalling dependencies..."
 rm -rf node_modules
-pnpm install
+pnpm install --no-frozen-lockfile || npm install || yarn
 
 # Start dev server
 echo "Starting development server..."
-pnpm run dev 
+pnpm run dev || npm run dev || yarn dev

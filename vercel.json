@@ -1,8 +1,9 @@
+
 {
   "version": 2,
   "buildCommand": "pnpm run vercel-build",
   "outputDirectory": "dist",
-  "installCommand": "pnpm install",
+  "installCommand": "pnpm install --no-frozen-lockfile",
   "github": {
     "enabled": true,
     "silent": false
@@ -37,4 +38,4 @@
     "VERCEL_DEPLOYMENT": "true",
     "DEPLOYMENT_TIMESTAMP": "2025-04-04-force-deploy-3"
   }
-} 
+}

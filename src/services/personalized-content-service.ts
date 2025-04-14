@@ -242,7 +242,7 @@ export class PersonalizedContentService {
             // Use the Supabase API to insert a section
             const { data, error } = await supabase
               .from('ai_course_content_sections')
-              .insert(newSection)
+              .insert([newSection])
               .select();
             
             if (error) {
