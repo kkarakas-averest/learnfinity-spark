@@ -23,8 +23,8 @@ export interface AICourseContentSection {
   title: string;
   content: string;
   content_id: string;
-  module_id: string;
-  section_id: string;
+  module_id: string; // This is a UUID now, not a string format
+  section_id: string; // This is a UUID now, not a string format
   order_index: number;
   created_at?: string;
   updated_at?: string;

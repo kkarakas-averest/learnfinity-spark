@@ -108,24 +108,20 @@ export class PersonalizedContentService {
    */
   private async generateBasicSections(content: AICourseContent): Promise<AICourseContentSection[]> {
     const sections: AICourseContentSection[] = [];
-    const moduleIds: string[] = [];
-    
-    // Create module IDs
-    for (let i = 1; i <= 2; i++) {
-      const moduleId = `module-${i}-personalized-${content.id.substring(0, 8)}`;
-      moduleIds.push(moduleId);
-    }
     
     try {
       // Helper function to create a section and handle insertion
-      const createSection = async (moduleId: string, sectionIndex: number, title: string, content: string): Promise<AICourseContentSection> => {
+      const createSection = async (moduleId: string, sectionIndex: number, title: string, sectionContent: string): Promise<AICourseContentSection> => {
+        // Generate proper UUIDs for module_id and section_id
         const sectionId = uuidv4();
+        const sectionModuleId = uuidv4(); // Using UUID instead of string format
+        
         const section: AICourseContentSection = {
           id: sectionId,
           title: title,
-          module_id: moduleId,
-          section_id: `section-${sectionIndex + 1}`,
-          content: content,
+          module_id: sectionModuleId, // Using proper UUID
+          section_id: sectionId, // Using the same UUID as id for section_id
+          content: sectionContent,
           content_id: content.id,
           order_index: sectionIndex
         };
@@ -136,7 +132,7 @@ export class PersonalizedContentService {
             .insert(section);
             
           if (error) {
-            console.error(`Error inserting section: ${error.message}`, error);
+            console.error(`Error inserting section:`, error);
             // Return the section object even if insertion failed - user will still see something
           }
         } catch (err) {
@@ -145,6 +141,10 @@ export class PersonalizedContentService {
         
         return section;
       };
+      
+      // Module one UUID
+      const moduleOneId = uuidv4();
+      const moduleTwoId = uuidv4();
       
       // For first module (Introduction)
       const introContent = `<div class="prose max-w-none">
@@ -225,12 +225,12 @@ export class PersonalizedContentService {
       
       // Create and save sections
       const contents = [
-        { moduleId: moduleIds[0], title: "Introduction", content: introContent },
-        { moduleId: moduleIds[0], title: "Course Overview", content: overviewContent },
-        { moduleId: moduleIds[1], title: "Key Concepts", content: conceptsContent },
-        { moduleId: moduleIds[1], title: "Practical Applications", content: applicationsContent },
-        { moduleId: moduleIds[1], title: "Learning Activities", content: activitiesContent },
-        { moduleId: moduleIds[1], title: "Additional Resources", content: resourcesContent }
+        { moduleId: moduleOneId, title: "Module 1: Introduction", content: introContent },
+        { moduleId: moduleOneId, title: "Module 1: Course Overview", content: overviewContent },
+        { moduleId: moduleTwoId, title: "Module 2: Key Concepts", content: conceptsContent },
+        { moduleId: moduleTwoId, title: "Module 2: Practical Applications", content: applicationsContent },
+        { moduleId: moduleTwoId, title: "Module 2: Learning Activities", content: activitiesContent },
+        { moduleId: moduleTwoId, title: "Module 2: Additional Resources", content: resourcesContent }
       ];
       
       let index = 0;
