@@ -364,11 +364,15 @@ export default async function handler(req, res) {
                 3. Contextual to their industry and department
                 4. Personalized with specific examples related to their role
                 
-                For each section below, provide detailed, informative content:
+                For each section below, provide comprehensive, informative content (500-800 words per section):
                 ${moduleOutline.sections.map(section => `- ${section.title}`).join('\n')}
                 
                 Include practical examples, case studies, and actionable advice throughout.
                 For each section, structure the content with clear headings, subheadings, and bullet points where appropriate.
+                
+                Since you have a large context window, please provide rich, detailed content with multiple examples, 
+                explanations, practical applications, and visual descriptions where helpful. Don't be concerned about
+                length as long as the content remains high quality and valuable to the learner.
                 
                 MODULE CONTENT:
               `;
@@ -384,7 +388,7 @@ export default async function handler(req, res) {
               LEARNING OBJECTIVES:
               ${moduleOutline.objectives.map(obj => `- ${obj}`).join('\n')}
               
-              Please generate detailed content for the following sections:
+              Please generate comprehensive, detailed content for the following sections (aim for 500-800 words per section):
               ${moduleOutline.sections.map(section => `- ${section.title}`).join('\n')}
               
               The content should be written for someone in the role of ${employeeData?.position || personalizationOptions.userRole || 'professional'}.
@@ -392,6 +396,10 @@ export default async function handler(req, res) {
               
               Include specific examples, case studies, and actionable advice throughout.
               For each section, structure the content with clear headings, subheadings, and bullet points where appropriate.
+              
+              Since you have a large context window, don't be concerned about length constraints. Focus on creating 
+              high-quality, comprehensive content with multiple practical examples, detailed explanations, and 
+              visual descriptions where helpful. The goal is to provide maximum value to the learner.
             `;
           }
           
@@ -401,7 +409,7 @@ export default async function handler(req, res) {
           try {
             // Make the API call directly for this module
             const completion = await groq.chat.completions.create({
-              model: "llama3-70b-8192",
+              model: "llama-3.3-70b-versatile",
               messages: [
                 {
                   role: "system",
@@ -413,7 +421,7 @@ export default async function handler(req, res) {
                 }
               ],
               temperature: 0.7,
-              max_tokens: 4096,
+              max_tokens: 8192,
             });
             
             const responseTime = Date.now() - startTime;
