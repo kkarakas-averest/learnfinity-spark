@@ -1,36 +1,44 @@
 
-/**
- * Interface for AI generated course content
- */
+// Add or update the content type definitions
 export interface AICourseContent {
   id: string;
-  course_id: string;
   title: string;
-  description?: string;
-  created_at: string;
-  updated_at: string;
+  description: string;
+  course_id: string;
   is_active: boolean;
-  version: string;
   created_for_user_id?: string;
-  employee_id?: string; // Added to match database schema
+  employee_id?: string;
+  created_at?: string;
+  updated_at?: string;
+  version?: string;
   learning_objectives?: string[];
-  personalization_context?: any;
-  personalization_params?: any;
-  metadata?: any;
-  content?: any; // Added to match database schema
+  metadata?: Record<string, any>;
+  personalization_context?: Record<string, any>;
+  personalization_params?: Record<string, any>;
+  content?: Record<string, any>;
 }
 
-/**
- * Interface for AI generated course content sections
- */
 export interface AICourseContentSection {
   id: string;
+  title: string;
+  content: string;
   content_id: string;
   module_id: string;
   section_id: string;
-  title: string;
-  content: string;
   order_index: number;
-  created_at: string;
-  updated_at: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface PersonalizationParams {
+  userId: string;
+  employeeId?: string;
+  learningStyle?: string;
+  skillLevel?: string;
+  role?: string;
+  department?: string;
+  interests?: string[];
+  priorExperience?: string;
+  moduleCount?: number;
+  sectionsPerModule?: number;
 }

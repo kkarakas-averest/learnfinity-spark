@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent } from '@/components/ui/card';
@@ -9,6 +8,32 @@ import PersonalizedCourseContent from '../learner/PersonalizedCourseContent';
 import PersonalizedContentGenerationStatus from './PersonalizedContentGenerationStatus';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/lib/supabase';
+import { 
+  CheckCircle2, 
+  XCircle, 
+  User, 
+  Zap, 
+  FileText, 
+  Sparkles, 
+  LoaderCircle
+} from 'lucide-react';
+
+interface PersonalizedContentGenerationStatusProps {
+  steps: GenerationStep[];
+  currentStep: number;
+  isGenerating: boolean;
+  estimatedTimeRemaining?: number; // in seconds
+  onGenerateContent: () => void;
+  error?: string;
+}
+
+export interface GenerationStep {
+  id: string;
+  title: string;
+  description: string;
+  status: 'pending' | 'loading' | 'complete' | 'error';
+  icon: React.ElementType;
+}
 
 interface PersonalizedContentViewProps {
   content: AICourseContent | null;
