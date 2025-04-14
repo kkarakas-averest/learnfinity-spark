@@ -55,7 +55,9 @@ module.exports = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: 'Successfully assigned course to employee (static endpoint)',
-      enrollmentId
+      enrollmentId,
+      // Add personalization flag to indicate content should be generated
+      personalizationQueued: true
     });
   } catch (error) {
     console.error('Static course assignment error:', error);
