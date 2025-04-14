@@ -1,6 +1,7 @@
 import { NextResponse, NextRequest } from 'next/server';
 import CourseContentService from '@/services/CourseContentService';
 import { getSupabase } from '@/lib/supabase';
+import { v4 as uuidv4 } from 'uuid';
 
 export async function POST(
   request: NextRequest,
@@ -43,12 +44,71 @@ export async function POST(
       }
     }
     
-    // Get course content service
-    const courseContentService = new CourseContentService();
-    
     // Force regeneration by clearing existing content (optional)
     if (body?.forceRegenerate) {
-      // Find and delete existing content
+      // First, check for personalized content (ai_course_content)
+      const { data: personalizedContent } = await supabase
+        .from('ai_course_content')
+        .select('id')
+        .eq('course_id', courseId)
+        .eq('created_for_user_id', userId);
+      
+      if (personalizedContent && personalizedContent.length > 0) {
+        console.log('Found personalized content to regenerate:', personalizedContent);
+        
+        // Mark existing content sections for regeneration
+        const contentIds = personalizedContent.map(item => item.id);
+        
+        for (const contentId of contentIds) {
+          // Update content sections instead of deleting them
+          const { error } = await supabase
+            .from('ai_course_content_sections')
+            .update({
+              content: '<div class="prose max-w-none"><p>Content will be regenerated.</p></div>',
+              updated_at: new Date().toISOString()
+            })
+            .eq('content_id', contentId);
+          
+          if (error) {
+            console.error('Error updating content sections:', error);
+          }
+          
+          // Update the main content record with regeneration status
+          await supabase
+            .from('ai_course_content')
+            .update({
+              is_regenerating: true,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', contentId);
+        }
+        
+        // Trigger async content regeneration here
+        // This could be a server action, scheduled task, or call to an AI service
+        try {
+          // Simulated call to regeneration service
+          const response = await fetch(`${request.nextUrl.origin}/api/hr/courses/generate-content`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              courseId,
+              employeeId: userId,
+              regenerateExisting: true
+            })
+          });
+          
+          if (!response.ok) {
+            console.warn('Regeneration service returned non-OK status:', response.status);
+          }
+        } catch (regenerateError) {
+          console.error('Error calling regeneration service:', regenerateError);
+          // Continue - we've already marked content for regeneration
+        }
+      }
+      
+      // Also check for classic AI-generated content
       const { data: existingContent } = await supabase
         .from('ai_generated_course_content')
         .select('id')
@@ -78,6 +138,7 @@ export async function POST(
     }
     
     // Generate new course content
+    const courseContentService = new CourseContentService();
     const generatedCourse = await courseContentService.getCourseById(courseId, userId);
     
     if (!generatedCourse) {
@@ -86,7 +147,7 @@ export async function POST(
     
     return NextResponse.json({
       success: true,
-      message: 'Course content regenerated successfully',
+      message: 'Course content regeneration started successfully',
       course: generatedCourse
     });
   } catch (error) {
