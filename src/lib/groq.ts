@@ -3,17 +3,17 @@ const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
 // Environment variables - access both browser and server environments
 const getEnv = () => {
-  // Check for browser environment
-  if (typeof window !== 'undefined' && (window as any).env) {
-    return (window as any).env;
-  }
+  // Client-side environment variables must start with VITE_
+  const VITE_GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY;
+  const VITE_ENABLE_LLM = import.meta.env.VITE_ENABLE_LLM === 'true';
+
+  // TEMPORARY FIX: Hardcoded API key (remove after troubleshooting)
+  const HARDCODED_GROQ_API_KEY = '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';
   
-  // Check for Node.js environment
-  if (typeof process !== 'undefined' && process.env) {
-    return process.env;
-  }
-  
-  return {};
+  return {
+    GROQ_API_KEY: HARDCODED_GROQ_API_KEY || VITE_GROQ_API_KEY,
+    ENABLE_LLM: VITE_ENABLE_LLM
+  };
 };
 
 /**
@@ -192,7 +192,10 @@ export async function generatePersonalizedCourse(
 ): Promise<any> {
   console.log('Generating personalized course for employee:', { employeeId, employeeName, position, department });
   
-  const apiKey = getEnv().GROQ_API_KEY || process.env.GROQ_API_KEY;
+  // TEMPORARY FIX: Hardcoded API key (remove after troubleshooting)
+  const HARDCODED_GROQ_API_KEY = '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';
+  
+  const apiKey = HARDCODED_GROQ_API_KEY || getEnv().GROQ_API_KEY || process.env.GROQ_API_KEY;
   
   if (!apiKey) {
     console.error('GROQ_API_KEY is missing in environment variables');
@@ -373,7 +376,10 @@ export async function enhanceCourseContent(
     employeeName 
   });
   
-  const apiKey = getEnv().GROQ_API_KEY || process.env.GROQ_API_KEY;
+  // TEMPORARY FIX: Hardcoded API key (remove after troubleshooting)
+  const HARDCODED_GROQ_API_KEY = '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';
+  
+  const apiKey = HARDCODED_GROQ_API_KEY || getEnv().GROQ_API_KEY || process.env.GROQ_API_KEY;
   
   if (!apiKey) {
     console.error('GROQ_API_KEY is missing in environment variables');

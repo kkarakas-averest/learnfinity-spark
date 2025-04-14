@@ -28,12 +28,15 @@ function generateUUID() {
   }
 }
 
-// GROQ API configuration
+// Groq API configuration
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
-const GROQ_MODEL = 'llama3-70b-8192';
+const GROQ_MODEL = 'llama-3.1-70b-8192';
+
+// TEMPORARY FIX: Hardcoded API key (remove after troubleshooting)
+const HARDCODED_GROQ_API_KEY = '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';
 
 // Import GROQ API key from environment
-const GROQ_API_KEY = process.env.GROQ_API_KEY;
+const GROQ_API_KEY = HARDCODED_GROQ_API_KEY || process.env.GROQ_API_KEY;
 
 // Request validation schema
 const requestSchema = z.object({
@@ -178,8 +181,8 @@ export default async function handler(req, res) {
     console.log(`Found ${enrolledCourses.length} enrolled courses for enhancement`);
     
     // Check GROQ API key - similar to the implementation in Profile Summary feature
-    if (!GROQ_API_KEY) {
-      console.error('GROQ_API_KEY is not configured in process.env');
+    if (!GROQ_API_KEY && !HARDCODED_GROQ_API_KEY) {
+      console.error('GROQ_API_KEY is not configured in process.env and no hardcoded key is available');
       
       // Print all available environment variables (excluding sensitive values)
       const safeEnvVars = Object.keys(process.env)
@@ -197,7 +200,7 @@ export default async function handler(req, res) {
       });
     }
     
-    console.log('GROQ_API_KEY found with prefix:', GROQ_API_KEY.substring(0, 5) + '...');
+    console.log('GROQ_API_KEY found with prefix:', GROQ_API_KEY?.substring(0, 5) + '...');
     
     // 3. Process each enrolled course to enhance content
     const results = [];
@@ -411,6 +414,16 @@ export default async function handler(req, res) {
  */
 async function generatePersonalizedCourseContent(apiKey, course, profile, enrollment) {
   console.log('----------- GROQ DIRECT CALL START -----------');
+  
+  // TEMPORARY: Force use of hardcoded key
+  apiKey = HARDCODED_GROQ_API_KEY || apiKey;
+  
+  const headers = {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${apiKey}`
+  };
+  
+  console.log('----------- GROQ DIRECT CALL START -----------');
   console.log(`Course: "${course.title}" (${course.id})`);
   console.log(`Employee: ${profile.name}, Department: ${profile.department || 'Unknown'}, Role: ${profile.role || 'Unknown'}`);
   
@@ -523,10 +536,7 @@ Respond ONLY with the JSON object, no additional text.`;
         console.log(`Groq API attempt ${2-retries+1} of 3`);
         response = await fetch(GROQ_API_URL, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`
-          },
+          headers: headers,
           body: JSON.stringify({
             model: GROQ_MODEL,
             messages: [
