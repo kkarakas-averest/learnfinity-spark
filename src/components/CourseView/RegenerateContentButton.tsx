@@ -1,3 +1,4 @@
+
 import React, { useState } from '@/lib/react-helpers';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
@@ -16,15 +17,13 @@ export function RegenerateContentButton({ courseId, onSuccess }: RegenerateConte
     try {
       setIsLoading(true);
       
-      // Call the API to regenerate content
-      // Using HR courses endpoint which is more likely to be deployed
-      const response = await fetch(`/api/hr/courses/regenerate-content`, {
+      // Call the App Router API endpoint instead of the older API route
+      const response = await fetch(`/api/courses/${courseId}/regenerate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          courseId: courseId,
           forceRegenerate: true,
           personalizationOptions: {
             learning_preferences: {
@@ -83,4 +82,4 @@ export function RegenerateContentButton({ courseId, onSuccess }: RegenerateConte
       {isLoading ? 'Generating...' : 'Regenerate Content'}
     </Button>
   );
-} 
+}
