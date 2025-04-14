@@ -1,56 +1,63 @@
-// Adapter file for course assignment API requests in Vercel serverless environment
-import { createClient } from '@supabase/supabase-js';
-import { v4 as uuidv4 } from 'uuid';
+// Simple adapter for course assignment API that works reliably in Vercel
+const { createClient } = require('@supabase/supabase-js');
+const { v4: uuidv4 } = require('uuid');
 
-// Initialize Supabase client for server environment
-const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY || process.env.VITE_SUPABASE_SERVICE_KEY;
-const supabase = createClient(supabaseUrl, supabaseServiceKey, {
-  auth: {
-    persistSession: false,
-    autoRefreshToken: false
-  }
-});
+// Initialize Supabase with explicit credentials to avoid env issues
+const SUPABASE_URL = "https://ujlqzkkkfatehxeqtbdl.supabase.co";
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.VITE_SUPABASE_SERVICE_KEY;
 
-/**
- * Course assignment API endpoint for HR
- * Handles HR course assignment requests in Vercel serverless environment
- */
-export default async function handler(req, res) {
-  // Set CORS headers
+module.exports = async (req, res) => {
+  // Enable CORS
+  res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  
-  // Handle preflight requests
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
+  res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version');
+
+  // Handle OPTIONS request
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
 
-  // Only allow POST method
+  // Only accept POST requests
   if (req.method !== 'POST') {
-    return res.status(405).json({ 
+    return res.status(405).json({
       success: false,
       error: 'Method not allowed',
-      message: 'Only POST requests are allowed'
+      message: 'Only POST requests are accepted'
     });
   }
 
   try {
-    // Parse request body
-    const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
-    const { courseId, employeeId } = body;
+    // Initialize Supabase client
+    const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+    if (!supabase) {
+      throw new Error('Failed to initialize Supabase client');
+    }
 
-    // Validate required fields
-    if (!courseId || !employeeId) {
-      return res.status(400).json({ 
+    // Parse request body
+    let body;
+    try {
+      body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+    } catch (parseError) {
+      console.error('Error parsing request body:', parseError);
+      return res.status(400).json({
         success: false,
-        error: 'Missing required fields', 
-        message: 'Both courseId and employeeId are required'
+        error: 'Invalid request body',
+        message: 'Could not parse JSON request body'
       });
     }
 
-    // Check if the employee is already enrolled
+    // Validate required fields
+    const { courseId, employeeId } = body || {};
+    if (!courseId || !employeeId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing fields',
+        message: 'courseId and employeeId are required'
+      });
+    }
+
+    // Check if employee is already enrolled
     const { data: existingEnrollment, error: checkError } = await supabase
       .from('hr_course_enrollments')
       .select('id')
@@ -58,11 +65,7 @@ export default async function handler(req, res) {
       .eq('employee_id', employeeId)
       .maybeSingle();
 
-    if (checkError && checkError.code !== 'PGRST116') {
-      // An error occurred (not a "no rows returned" error)
-      throw checkError;
-    }
-
+    // Handle existing enrollment
     if (existingEnrollment) {
       return res.status(200).json({
         success: true,
@@ -71,64 +74,59 @@ export default async function handler(req, res) {
       });
     }
 
-    // Create enrollment record
+    // Create a new enrollment
     const enrollmentId = uuidv4();
-    const enrollmentData = {
-      id: enrollmentId,
-      course_id: courseId,
-      employee_id: employeeId,
-      status: 'assigned',
-      progress: 0,
-      score: null,
-      enrollment_date: new Date().toISOString(),
-      completion_date: null
-    };
-
-    // Insert the enrollment with service role client
     const { error: insertError } = await supabase
       .from('hr_course_enrollments')
-      .insert([enrollmentData]);
+      .insert([{
+        id: enrollmentId,
+        course_id: courseId,
+        employee_id: employeeId,
+        status: 'assigned',
+        progress: 0,
+        score: null,
+        enrollment_date: new Date().toISOString(),
+        completion_date: null
+      }]);
 
     if (insertError) {
       console.error('Error inserting enrollment:', insertError);
-      return res.status(500).json({ 
-        success: false, 
+      return res.status(500).json({
+        success: false,
         error: insertError.message,
         message: 'Failed to create enrollment'
       });
     }
 
-    // Record activity in the employee_activities table
-    const { error: activityError } = await supabase
-      .from('hr_employee_activities')
-      .insert({
-        id: uuidv4(),
-        employee_id: employeeId,
-        activity_type: 'course_assigned',
-        description: `Assigned to course: ${courseId}`,
-        course_id: courseId,
-        timestamp: new Date().toISOString()
-      });
-
-    if (activityError) {
-      console.error('Error recording activity:', activityError);
-      // Continue even if activity recording fails
+    // Record activity (non-critical, don't fail if this errors)
+    try {
+      await supabase
+        .from('hr_employee_activities')
+        .insert({
+          id: uuidv4(),
+          employee_id: employeeId,
+          activity_type: 'course_assigned',
+          description: `Assigned to course: ${courseId}`,
+          course_id: courseId,
+          timestamp: new Date().toISOString()
+        });
+    } catch (activityError) {
+      console.error('Error recording activity (non-critical):', activityError);
     }
 
-    // Return success response
+    // Return success
     return res.status(200).json({
       success: true,
       message: 'Successfully assigned course to employee',
-      enrollmentId: enrollmentId
+      enrollmentId
     });
   } catch (error) {
     console.error('Course assignment error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
-    
-    return res.status(500).json({ 
-      success: false, 
-      error: errorMessage,
+    // Always return a proper JSON response
+    return res.status(500).json({
+      success: false,
+      error: error.message || 'Unknown error',
       message: 'An error occurred during course assignment'
     });
   }
-} 
+}; 
