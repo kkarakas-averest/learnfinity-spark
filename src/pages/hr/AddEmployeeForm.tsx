@@ -329,7 +329,7 @@ export default function AddEmployeeForm() {
         try {
           for (const courseId of selectedCourses) {
             // Use the server API endpoint
-            const response = await fetch('/api/hr/course-assignment', {
+            const response = await fetch('/api/hr/courses/assign', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',

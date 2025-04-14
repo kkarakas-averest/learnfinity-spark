@@ -86,8 +86,8 @@ const CourseAssignmentDialog: React.FC<CourseAssignmentDialogProps> = ({
     setError(null);
     
     try {
-      // Call our server-side API endpoint for course assignment
-      const response = await fetch('/api/hr/course-assignment', {
+      // Call our server-side API endpoint for course assignment with corrected path
+      const response = await fetch('/api/hr/courses/assign', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
