@@ -47,17 +47,17 @@ export async function POST(
     // Force regeneration by clearing existing content (optional)
     if (body?.forceRegenerate) {
       // First, check for personalized content (ai_course_content)
-      const { data: personalizedContent } = await supabase
+      const { data: existingAiCourseContent } = await supabase
         .from('ai_course_content')
         .select('id')
         .eq('course_id', courseId)
         .eq('created_for_user_id', userId);
       
-      if (personalizedContent && personalizedContent.length > 0) {
-        console.log('Found personalized content to regenerate:', personalizedContent);
+      if (existingAiCourseContent && existingAiCourseContent.length > 0) {
+        console.log('Found personalized content to regenerate:', existingAiCourseContent);
         
         // Mark existing content sections for regeneration
-        const contentIds = personalizedContent.map(item => item.id);
+        const contentIds = existingAiCourseContent.map(item => item.id);
         
         for (const contentId of contentIds) {
           // Update content sections instead of deleting them

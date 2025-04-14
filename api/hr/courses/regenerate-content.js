@@ -239,15 +239,15 @@ async function processContentGenerationJob(jobId, authHeader) {
       .eq('id', jobId);
     
     // Clear from hr_personalized_course_content
-    const { data: personalizedContent } = await supabase
+    const { data: existingPersonalizedContent } = await supabase
       .from('hr_personalized_course_content')
       .select('id')
       .eq('course_id', courseId)
       .eq('employee_id', targetEmployeeId);
     
-    if (personalizedContent?.length > 0) {
-      console.log(`[background-job:${jobId}] Removing ${personalizedContent.length} entries from hr_personalized_course_content`);
-      for (const content of personalizedContent) {
+    if (existingPersonalizedContent?.length > 0) {
+      console.log(`[background-job:${jobId}] Removing ${existingPersonalizedContent.length} entries from hr_personalized_course_content`);
+      for (const content of existingPersonalizedContent) {
         await supabase
           .from('hr_personalized_course_content')
           .delete()
