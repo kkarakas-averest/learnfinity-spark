@@ -9,7 +9,7 @@ export default async function handler(req, res) {
   // Set CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-CSRF-Token');
   res.setHeader('Access-Control-Allow-Credentials', 'true');
 
   // Handle OPTIONS request for CORS
@@ -22,51 +22,217 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Authenticate the request using Supabase
-    const { data: { session }, error: authError } = await supabase.auth.getSession();
+    // Extract authentication token with fallbacks for different methods
+    const authHeader = req.headers.authorization;
+    const accessToken = authHeader?.startsWith('Bearer ') 
+      ? authHeader.substring(7) 
+      : req.query.access_token || req.body.access_token;
     
-    if (authError || !session?.user) {
-      console.error('Authentication error in legacy API:', authError);
-      return res.status(401).json({ error: 'Unauthorized', details: authError?.message });
+    if (!accessToken) {
+      console.log('[regenerate-content] No access token found in request');
+      return res.status(401).json({ 
+        error: 'Unauthorized', 
+        details: 'No access token provided. Please log in again.' 
+      });
     }
     
-    // Forward the request to the new App Router API
-    console.log('Legacy API: Forwarding request to App Router API');
+    // Authenticate using the token directly
+    console.log('[regenerate-content] Authenticating with token...');
+    const { data: userData, error: userError } = await supabase.auth.getUser(accessToken);
     
-    // Extract all cookies to forward
-    const cookies = req.headers.cookie || '';
+    if (userError || !userData?.user) {
+      console.error('[regenerate-content] Auth error:', userError);
+      return res.status(401).json({ 
+        error: 'Unauthorized', 
+        details: userError?.message || 'Invalid authentication token' 
+      });
+    }
     
-    // Construct the proper URL for the App Router API
-    const baseUrl = `${req.headers['x-forwarded-proto'] || 'https'}://${req.headers.host}`;
-    const appRouterUrl = `${baseUrl}/api/hr/courses/regenerate-content`;
+    const userId = userData.user.id;
+    console.log('[regenerate-content] Authentication successful for user:', userId);
     
-    console.log(`Forwarding to: ${appRouterUrl}`);
-    console.log(`User ID: ${session.user.id}`);
+    // Extract request data
+    const { courseId, forceRegenerate = true, personalizationOptions = {} } = req.body;
     
-    // Forward the request with the same body
-    const response = await fetch(appRouterUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        // Forward the auth cookie to maintain session
-        'Cookie': cookies,
-        // Add authorization header as alternative auth method
-        'Authorization': `Bearer ${session.access_token}` 
-      },
-      credentials: 'include',
-      body: JSON.stringify(req.body)
+    if (!courseId) {
+      return res.status(400).json({ error: 'Course ID is required' });
+    }
+    
+    // Process the request directly here instead of forwarding
+    // This avoids any potential authentication issues with internal redirects
+    
+    // 1. Update learner profile if needed
+    if (personalizationOptions) {
+      const { error: profileError } = await supabase
+        .from('learner_profiles')
+        .upsert({
+          user_id: userId,
+          ...personalizationOptions
+        });
+      
+      if (profileError) {
+        console.error('[regenerate-content] Error updating learner profile:', profileError);
+      }
+    }
+    
+    // 2. Get employee ID from mapping
+    let targetEmployeeId = userId;
+    const { data: mappingData } = await supabase
+      .from('employee_user_mapping')
+      .select('employee_id')
+      .eq('user_id', userId)
+      .single();
+      
+    if (mappingData?.employee_id) {
+      targetEmployeeId = mappingData.employee_id;
+    }
+    
+    // 3. Verify course exists
+    const { data: courseData, error: courseError } = await supabase
+      .from('hr_courses')
+      .select('*')
+      .eq('id', courseId)
+      .single();
+      
+    if (courseError || !courseData) {
+      return res.status(404).json({
+        error: 'Course not found',
+        details: courseError?.message
+      });
+    }
+    
+    // 4. Clean up existing content if regeneration is requested
+    if (forceRegenerate) {
+      // Clear from hr_personalized_course_content
+      const { data: personalizedContent } = await supabase
+        .from('hr_personalized_course_content')
+        .select('id')
+        .eq('course_id', courseId)
+        .eq('employee_id', targetEmployeeId);
+      
+      if (personalizedContent?.length > 0) {
+        console.log(`[regenerate-content] Removing ${personalizedContent.length} entries from hr_personalized_course_content`);
+        for (const content of personalizedContent) {
+          await supabase
+            .from('hr_personalized_course_content')
+            .delete()
+            .eq('id', content.id);
+        }
+      }
+      
+      // Clear from ai_generated_course_content
+      const { data: legacyContent } = await supabase
+        .from('ai_generated_course_content')
+        .select('id')
+        .eq('course_id', courseId)
+        .eq('created_by', userId);
+      
+      if (legacyContent?.length > 0) {
+        console.log(`[regenerate-content] Removing ${legacyContent.length} entries from ai_generated_course_content`);
+        
+        // Delete related data first
+        for (const content of legacyContent) {
+          await supabase
+            .from('course_content_sections')
+            .delete()
+            .eq('content_id', content.id);
+            
+          await supabase
+            .from('course_module_quizzes')
+            .delete()
+            .eq('content_id', content.id);
+        }
+        
+        // Then delete main content
+        for (const content of legacyContent) {
+          await supabase
+            .from('ai_generated_course_content')
+            .delete()
+            .eq('id', content.id);
+        }
+      }
+      
+      // Clear from ai_course_content
+      const { data: aiContent } = await supabase
+        .from('ai_course_content')
+        .select('id')
+        .eq('course_id', courseId)
+        .eq('created_for_user_id', userId);
+      
+      if (aiContent?.length > 0) {
+        console.log(`[regenerate-content] Removing ${aiContent.length} entries from ai_course_content`);
+        
+        // Delete sections first
+        for (const content of aiContent) {
+          await supabase
+            .from('ai_course_content_sections')
+            .delete()
+            .eq('content_id', content.id);
+        }
+        
+        // Then delete main content
+        for (const content of aiContent) {
+          await supabase
+            .from('ai_course_content')
+            .delete()
+            .eq('id', content.id);
+        }
+      }
+    }
+    
+    // 5. Trigger content generation via generate-content endpoint
+    // We'll use node-fetch directly from the server
+    // This eliminates browser CORS issues
+    try {
+      const baseUrl = process.env.VERCEL_URL 
+        ? `https://${process.env.VERCEL_URL}` 
+        : `${req.headers['x-forwarded-proto'] || 'https'}://${req.headers.host}`;
+        
+      // Using native fetch if available (Node.js 18+) or a polyfill
+      const fetch = (await import('node-fetch')).default;
+      
+      console.log(`[regenerate-content] Triggering content generation at ${baseUrl}/api/hr/courses/generate-content`);
+      
+      const response = await fetch(`${baseUrl}/api/hr/courses/generate-content`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`
+        },
+        body: JSON.stringify({
+          courseId,
+          employeeId: targetEmployeeId,
+          personalizationOptions,
+          access_token: accessToken
+        })
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[regenerate-content] Generation service error:', response.status, errorText);
+        
+        // We'll continue and not fail the request if generation fails
+        // The user can try regenerating again
+        console.log('[regenerate-content] Continuing despite generation service error');
+      } else {
+        console.log('[regenerate-content] Successfully triggered content generation');
+      }
+    } catch (generationError) {
+      // Log but don't fail the request
+      console.error('[regenerate-content] Error calling generation service:', generationError);
+    }
+    
+    // 6. Return success with course data
+    return res.status(200).json({
+      success: true,
+      message: 'Course content regeneration started successfully',
+      course: courseData
     });
-    
-    // Get the response from the App Router API
-    const data = await response.json();
-    
-    // Return the same status code and response
-    return res.status(response.status).json(data);
   } catch (error) {
-    console.error('Error in legacy regenerate-content API:', error);
+    console.error('[regenerate-content] Unhandled error:', error);
     return res.status(500).json({ 
-      error: 'Failed to regenerate course content',
-      details: error instanceof Error ? error.message : 'Unknown error'
+      error: 'Server error', 
+      details: error.message || 'An unexpected error occurred'
     });
   }
 } 

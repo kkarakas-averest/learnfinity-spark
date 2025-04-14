@@ -1,150 +1,241 @@
 import React, { useState, useEffect } from '@/lib/react-helpers';
 import { Button } from '@/components/ui/button';
-import { Spinner } from '@/components/ui/spinner';
-import { toast } from '@/components/ui/use-toast';
-import { RefreshCw } from 'lucide-react';
+import { useToast } from '@/components/ui/use-toast';
+import { Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
 interface RegenerateContentButtonProps {
   courseId: string;
-  onSuccess?: (course: any) => void;
+  onSuccess?: () => void;
+  onError?: (error: Error) => void;
 }
 
-export function RegenerateContentButton({ courseId, onSuccess }: RegenerateContentButtonProps) {
+export function RegenerateContentButton({ courseId, onSuccess, onError }: RegenerateContentButtonProps) {
+  const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
-  const [token, setToken] = useState<string | null>(null);
-  
-  // Get auth token on component mount
-  useEffect(() => {
-    async function getToken() {
-      try {
-        const { data } = await supabase.auth.getSession();
-        if (data?.session?.access_token) {
-          setToken(data.session.access_token);
-        }
-      } catch (error) {
-        console.error('Error getting auth token:', error);
-      }
-    }
-    
-    getToken();
-  }, []);
-  
+
   const handleRegenerate = async () => {
+    setIsLoading(true);
+    const requestId = `regen_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    
     try {
-      setIsLoading(true);
+      console.log(`[${requestId}] 🔄 Starting content regeneration for course:`, courseId);
       
-      // Call the API to regenerate content
-      // Use the new App Router API endpoint
-      const response = await fetch(`/api/hr/courses/regenerate-content`, {
+      // Get Supabase token directly - first approach
+      console.log(`[${requestId}] 🔐 Retrieving Supabase auth session`);
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        console.error(`[${requestId}] ❌ Auth Error: Failed to get Supabase session:`, {
+          error: sessionError,
+          errorCode: sessionError.code,
+          errorMessage: sessionError.message,
+          stack: sessionError.stack
+        });
+      }
+      
+      // Authentication with multiple fallbacks
+      const authToken = 
+        sessionData?.session?.access_token || 
+        localStorage.getItem('supabase.auth.token');
+      
+      if (!authToken) {
+        console.error(`[${requestId}] ❌ Auth Error: No authentication token available`, {
+          sessionExists: !!sessionData?.session,
+          localStorageTokenExists: !!localStorage.getItem('supabase.auth.token'),
+          courseId
+        });
+        throw new Error('Authentication error: No valid session found. Please sign in again.');
+      }
+      
+      console.log(`[${requestId}] ✅ Authentication token retrieved successfully`);
+      
+      // Try the legacy API endpoint first - more reliable in production
+      const legacyEndpoint = '/api/hr/courses/regenerate-content';
+      console.log(`[${requestId}] 🚀 Calling ${legacyEndpoint} with auth token`, {
+        method: 'POST',
+        courseId,
+        endpoint: legacyEndpoint,
+        authTokenLength: authToken.length,
+        authTokenPrefix: authToken.substring(0, 10) + '...'
+      });
+      
+      const requestStartTime = Date.now();
+      const response = await fetch(legacyEndpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+          'Authorization': `Bearer ${authToken}`
         },
-        // Add credentials to ensure auth cookies are sent
-        credentials: 'include',
         body: JSON.stringify({
-          courseId: courseId,
+          courseId,
           forceRegenerate: true,
-          personalizationOptions: {
-            learning_preferences: {
-              includeExamples: true,
-              includeQuizzes: true,
-              contentFormat: 'mixed'
-            }
-          }
-        })
+          access_token: authToken,  // Include in body as fallback
+        }),
+        credentials: 'include',
       });
+      const requestDuration = Date.now() - requestStartTime;
       
-      // Alternative approach using URL parameter if CORS is an issue
-      if (!response.ok && response.status === 401) {
-        console.log('Trying alternative authentication method with URL parameter');
-        
-        // Try again with token as URL parameter
-        const responseWithUrlParam = await fetch(`/api/hr/courses/regenerate-content?access_token=${token}`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          credentials: 'include',
-          body: JSON.stringify({
-            courseId: courseId,
-            forceRegenerate: true,
-            personalizationOptions: {
-              learning_preferences: {
-                includeExamples: true,
-                includeQuizzes: true,
-                contentFormat: 'mixed'
-              }
-            }
-          })
+      // Detailed error logging
+      if (!response.ok) {
+        const errorDetails = await response.text();
+        console.error(`[${requestId}] ❌ API Error (${response.status}):`, {
+          status: response.status,
+          statusText: response.statusText,
+          responseBody: errorDetails,
+          endpoint: legacyEndpoint,
+          courseId,
+          requestDuration: `${requestDuration}ms`,
+          headers: Object.fromEntries([...response.headers.entries()].map(([k, v]) => 
+            [k, k.toLowerCase().includes('auth') ? '***' : v]
+          )),
+          contentType: response.headers.get('content-type')
         });
         
-        if (!responseWithUrlParam.ok) {
-          const errorData = await responseWithUrlParam.json().catch(() => ({}));
-          console.error('Failed after retry:', errorData.error || responseWithUrlParam.statusText);
-          throw new Error(errorData.error || errorData.details || 'Failed to regenerate content');
+        // For 401 errors, try alternative auth method
+        if (response.status === 401) {
+          console.log(`[${requestId}] 🔄 Authentication failed (401), trying alternative approach...`);
+          
+          // Get a fresh token if available
+          console.log(`[${requestId}] 🔐 Requesting fresh auth token`);
+          const { data: tokenData, error: freshTokenError } = await supabase.auth.getSession();
+          
+          if (freshTokenError) {
+            console.error(`[${requestId}] ❌ Fresh token retrieval failed:`, {
+              error: freshTokenError,
+              errorCode: freshTokenError.code,
+              errorMessage: freshTokenError.message,
+              stack: freshTokenError.stack
+            });
+          }
+          
+          const freshToken = tokenData?.session?.access_token || authToken;
+          
+          // Try the API with token in query parameter as fallback
+          const fallbackUrl = `/api/hr/courses/regenerate-content?access_token=${encodeURIComponent(freshToken)}`;
+          console.log(`[${requestId}] 🚀 Attempting fallback request to:`, {
+            endpoint: fallbackUrl,
+            method: 'POST',
+            courseId,
+            usingFreshToken: !!tokenData?.session?.access_token,
+            tokenLength: freshToken.length,
+            tokenPrefix: freshToken.substring(0, 10) + '...'
+          });
+          
+          const fallbackStartTime = Date.now();
+          const fallbackResponse = await fetch(fallbackUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              courseId,
+              forceRegenerate: true,
+            }),
+            credentials: 'include',
+          });
+          const fallbackDuration = Date.now() - fallbackStartTime;
+          
+          if (!fallbackResponse.ok) {
+            const routerErrorDetails = await fallbackResponse.text();
+            console.error(`[${requestId}] ❌ Fallback API Error (${fallbackResponse.status}):`, {
+              status: fallbackResponse.status,
+              statusText: fallbackResponse.statusText,
+              responseBody: routerErrorDetails,
+              endpoint: fallbackUrl,
+              courseId,
+              requestDuration: `${fallbackDuration}ms`,
+              headers: Object.fromEntries([...fallbackResponse.headers.entries()].map(([k, v]) => 
+                [k, k.toLowerCase().includes('auth') ? '***' : v]
+              )),
+              contentType: fallbackResponse.headers.get('content-type')
+            });
+            throw new Error(`Failed to regenerate content: ${fallbackResponse.statusText}`);
+          }
+          
+          const responseData = await fallbackResponse.json();
+          console.log(`[${requestId}] ✅ Content regeneration successful via fallback approach:`, {
+            response: responseData,
+            endpoint: fallbackUrl,
+            requestDuration: `${fallbackDuration}ms`,
+            courseId
+          });
+          
+          toast({
+            title: 'Course content regenerating',
+            description: 'Your personalized course content is being generated. This may take a moment.',
+          });
+          
+          if (onSuccess) {
+            onSuccess();
+          }
+          
+          return;
         }
         
-        const data = await responseWithUrlParam.json();
-        handleSuccess(data);
-        return;
+        throw new Error(`Failed to regenerate content: ${response.statusText}`);
       }
       
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('Failed to regenerate content:', errorData.error || response.statusText);
-        throw new Error(errorData.error || errorData.details || 'Failed to regenerate content');
+      const responseData = await response.json();
+      console.log(`[${requestId}] ✅ Content regeneration successful:`, {
+        response: responseData,
+        endpoint: legacyEndpoint,
+        requestDuration: `${requestDuration}ms`,
+        courseId
+      });
+      
+      toast({
+        title: 'Course content regenerating',
+        description: 'Your personalized course content is being generated. This may take a moment.',
+      });
+      
+      if (onSuccess) {
+        onSuccess();
       }
-      
-      const data = await response.json();
-      handleSuccess(data);
-      
     } catch (error) {
-      console.error('Error regenerating content:', error);
+      console.error(`[${requestId}] ❌ Error regenerating course content:`, {
+        error: error instanceof Error ? {
+          name: error.name,
+          message: error.message,
+          stack: error.stack,
+        } : error,
+        courseId,
+        timestamp: new Date().toISOString(),
+        browserInfo: {
+          userAgent: navigator.userAgent,
+          language: navigator.language,
+        }
+      });
       
-      // Show error toast
       toast({
         title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to regenerate course content. Please try again.',
+        description: error instanceof Error 
+          ? error.message 
+          : 'Failed to regenerate course content. Please try again.',
         variant: 'destructive',
-        duration: 3000
       });
+      
+      if (onError && error instanceof Error) {
+        onError(error);
+      }
     } finally {
+      console.log(`[${requestId}] 🏁 Content regeneration process completed`);
       setIsLoading(false);
     }
   };
-  
-  const handleSuccess = (data: any) => {
-    // Show success toast
-    toast({
-      title: 'Content Regeneration Started',
-      description: 'Your personalized course content is being regenerated. This may take a moment.',
-      duration: 5000
-    });
-    
-    // Call the onSuccess callback if provided
-    if (onSuccess && data.course) {
-      onSuccess(data.course);
-    } else {
-      // Wait briefly, then force page refresh
-      setTimeout(() => {
-        window.location.reload();
-      }, 3000);
-    }
-  };
-  
+
   return (
-    <Button
-      variant="outline"
-      size="sm"
+    <Button 
+      variant="outline" 
+      size="sm" 
       onClick={handleRegenerate}
       disabled={isLoading}
-      className="flex items-center gap-1"
+      className="flex items-center gap-2"
     >
-      {isLoading ? <Spinner size="sm" /> : <RefreshCw className="h-4 w-4" />}
-      {isLoading ? 'Generating...' : 'Regenerate Content'}
+      {isLoading ? (
+        <Loader2 className="h-4 w-4 animate-spin" />
+      ) : null}
+      {isLoading ? 'Regenerating...' : 'Regenerate Content'}
     </Button>
   );
 } 
