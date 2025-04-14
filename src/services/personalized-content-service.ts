@@ -72,10 +72,15 @@ export class PersonalizedContentService {
         .eq('is_active', true)
         .order('created_at', { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle(); // Changed from single() to maybeSingle() to prevent errors
 
       if (contentError) {
         console.log(`No personalized content found: ${contentError.message}`);
+        return { content: null, sections: [] };
+      }
+
+      if (!contentData) {
+        console.log('No personalized content found for this course and user');
         return { content: null, sections: [] };
       }
 
@@ -195,6 +200,7 @@ export class PersonalizedContentService {
           title: courseTitle,
           description: courseDescription,
           created_for_user_id: userId,
+          employee_id: userData?.id, // Use employee_id from hr_employees
           personalization_context: personalizationContext,
           learning_objectives: [
             `Understand the core concepts of ${courseTitle}`,
@@ -290,10 +296,10 @@ export class PersonalizedContentService {
         .select('id, personalized_content_id')
         .eq('course_id', courseId)
         .eq('employee_id', employeeId)
-        .single();
+        .maybeSingle(); // Changed from single() to maybeSingle() to prevent errors
 
-      if (error) {
-        console.log(`No enrollment found: ${error.message}`);
+      if (error || !data) {
+        console.log(`No enrollment found: ${error?.message || 'No data returned'}`);
         return null;
       }
 
@@ -310,14 +316,14 @@ export class PersonalizedContentService {
    */
   private async updateEnrollmentStatus(courseId: string, userId: string, contentId: string): Promise<void> {
     try {
-      const { data: employeeData } = await supabase
+      const { data: employeeData, error: employeeError } = await supabase
         .from('hr_employees')
         .select('id')
         .eq('user_id', userId)
-        .single();
+        .maybeSingle(); // Changed from single() to maybeSingle()
       
-      if (!employeeData) {
-        console.error("Could not find employee record for user:", userId);
+      if (employeeError || !employeeData) {
+        console.error("Could not find employee record for user:", userId, employeeError);
         return;
       }
       
@@ -357,7 +363,7 @@ export class PersonalizedContentService {
         .from('hr_course_enrollments')
         .select('personalized_content_generation_status, personalized_content_started_at')
         .eq('id', enrollmentId)
-        .single();
+        .maybeSingle(); // Changed from single() to maybeSingle()
         
       if (error || !data) {
         return { isGenerating: false };

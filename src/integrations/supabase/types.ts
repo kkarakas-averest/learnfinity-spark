@@ -398,7 +398,7 @@ export type Database = {
             foreignKeyName: "ai_course_content_course_id_fkey"
             columns: ["course_id"]
             isOneToOne: false
-            referencedRelation: "courses"
+            referencedRelation: "hr_courses"
             referencedColumns: ["id"]
           },
           {
