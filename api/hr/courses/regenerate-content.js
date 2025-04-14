@@ -192,6 +192,27 @@ export default async function handler(req, res) {
       const hasGroqApiKey = !!process.env.GROQ_API_KEY;
       console.log(`[regenerate-content] GROQ_API_KEY is ${hasGroqApiKey ? 'set' : 'NOT set'} in environment`);
       
+      // Fetch employee data for personalization
+      console.log(`[regenerate-content] Fetching employee data for ID: ${targetEmployeeId}`);
+      const { data: employeeData, error: employeeError } = await supabase
+        .from('hr_employees')
+        .select('*')
+        .eq('id', targetEmployeeId)
+        .single();
+      
+      if (employeeError) {
+        console.error('[regenerate-content] Error fetching employee data:', employeeError);
+      }
+      
+      // Get CV extracted data for deeper personalization
+      let cvExtractedData = null;
+      if (employeeData?.cv_extracted_data) {
+        cvExtractedData = employeeData.cv_extracted_data;
+        console.log(`[regenerate-content] CV extracted data found for employee (${typeof cvExtractedData === 'object' ? 'structured' : 'text'} format)`);
+      } else {
+        console.log(`[regenerate-content] No CV extracted data found for employee`);
+      }
+      
       // Let's use the Groq API directly from this serverless function
       try {
         const { Groq } = await import('groq-sdk');
@@ -201,74 +222,267 @@ export default async function handler(req, res) {
         
         console.log(`[regenerate-content] Initialized Groq client directly`);
         
-        // Get or create a prompt template for course content
-        const promptTemplate = `
-        You are an expert educational content creator tasked with creating personalized learning content.
+        // Process outlines for modules
+        const moduleOutlines = [
+          {
+            id: 'module-1',
+            title: `Introduction to ${courseData.title}`,
+            description: 'An overview of the key concepts and principles',
+            orderIndex: 1,
+            objectives: ['Understand the fundamentals', 'Identify key terms and concepts'],
+            sections: [
+              { title: 'Overview and Fundamentals', type: 'text', duration: 20 },
+              { title: 'Key Concepts and Terminology', type: 'text', duration: 15 }
+            ]
+          },
+          {
+            id: 'module-2',
+            title: `Core ${courseData.title} Principles`,
+            description: 'Detailed exploration of the main principles',
+            orderIndex: 2,
+            objectives: ['Understand core principles', 'Apply principles to real scenarios'],
+            sections: [
+              { title: 'Principle Exploration', type: 'text', duration: 25 },
+              { title: 'Real-world Applications', type: 'text', duration: 20 }
+            ]
+          },
+          {
+            id: 'module-3',
+            title: `Practical ${courseData.title} Applications`,
+            description: 'Hands-on application and implementation',
+            orderIndex: 3,
+            objectives: ['Apply knowledge in practical settings', 'Develop implementation skills'],
+            sections: [
+              { title: 'Practical Implementation', type: 'text', duration: 30 },
+              { title: 'Case Studies', type: 'text', duration: 20 },
+              { title: 'Hands-on Exercise', type: 'interactive', duration: 30 }
+            ]
+          }
+        ];
         
-        COURSE TITLE: ${courseData.title}
-        COURSE DESCRIPTION: ${courseData.description || 'No description available'}
-        
-        Please generate a complete course structure with:
-        - 3 modules
-        - Each module should have:
-          - A clear title
-          - 2-3 sections with educational content
-          - Learning objectives
-          - A short quiz
-        
-        The content should be written for someone in the role of ${personalizationOptions.userRole || 'professional'}.
-        Make the content practical and applicable to real-world scenarios.
-        `;
-        
-        console.log(`[regenerate-content] Sending request to Groq API directly`);
-        const startTime = Date.now();
-        
-        // Make the API call directly
-        const completion = await groq.chat.completions.create({
-          model: "llama3-70b-8192",
-          messages: [
-            {
-              role: "system",
-              content: "You are an expert educational content creator specialized in creating personalized learning materials."
-            },
-            {
-              role: "user",
-              content: promptTemplate
-            }
-          ],
-          temperature: 0.7,
-          max_tokens: 4096,
-        });
-        
-        const responseTime = Date.now() - startTime;
-        console.log(`[regenerate-content] Groq API responded in ${responseTime}ms`);
-        
-        // Extract and save the content
-        const generatedContent = completion.choices[0]?.message.content;
-        
-        if (generatedContent) {
-          console.log(`[regenerate-content] Successfully generated content with Groq (${generatedContent.length} chars)`);
+        // Generate content for each module
+        const generatedModules = [];
+        for (const moduleOutline of moduleOutlines) {
+          console.log(`[regenerate-content] Generating content for module: ${moduleOutline.title}`);
           
-          // Store the generated content in the database
-          const contentId = uuidv4();
-          const { error: contentError } = await supabase
-            .from('ai_course_content')
-            .insert({
-              id: contentId,
-              course_id: courseId,
-              content: generatedContent,
-              created_for_user_id: userId,
-              created_at: new Date().toISOString()
+          // Create a personalization prefix for the prompt using CV data
+          let promptTemplate = '';
+          
+          if (cvExtractedData) {
+            // Extract profile summary from CV data
+            const profileSummary = typeof cvExtractedData === 'object' ? 
+              cvExtractedData.summary : 
+              cvExtractedData;
+              
+              // Create comprehensive prompt with CV data
+              promptTemplate = `
+                I'm generating course content for ${employeeData.name || 'an employee'}, who works as a ${employeeData.position || 'professional'} 
+                in the ${employeeData.department || 'organization'}.
+                
+                Here is their professional profile based on their CV:
+                ${profileSummary}
+                
+                Please tailor the following module content to be especially relevant to their background, 
+                skills, and professional context. Make references to how this content applies specifically 
+                to their role and experience level where appropriate.
+                
+                COURSE TOPIC: ${courseData.title}
+                MODULE TOPIC: ${moduleOutline.title}
+                
+                Generate content that is:
+                1. Relevant to their professional background
+                2. Aligned with their skill level
+                3. Contextual to their industry and department
+                4. Personalized with specific examples related to their role
+                
+                For each section below, provide detailed, informative content:
+                ${moduleOutline.sections.map(section => `- ${section.title}`).join('\n')}
+                
+                Include practical examples, case studies, and actionable advice throughout.
+                For each section, structure the content with clear headings, subheadings, and bullet points where appropriate.
+                
+                MODULE CONTENT:
+              `;
+          } else {
+            // Create standard prompt without CV data
+            promptTemplate = `
+              You are an expert educational content creator tasked with creating personalized learning content.
+              
+              COURSE TITLE: ${courseData.title}
+              MODULE TITLE: ${moduleOutline.title}
+              DESCRIPTION: ${moduleOutline.description}
+              
+              LEARNING OBJECTIVES:
+              ${moduleOutline.objectives.map(obj => `- ${obj}`).join('\n')}
+              
+              Please generate detailed content for the following sections:
+              ${moduleOutline.sections.map(section => `- ${section.title}`).join('\n')}
+              
+              The content should be written for someone in the role of ${employeeData?.position || personalizationOptions.userRole || 'professional'}.
+              Make the content practical and applicable to real-world scenarios.
+              
+              Include specific examples, case studies, and actionable advice throughout.
+              For each section, structure the content with clear headings, subheadings, and bullet points where appropriate.
+            `;
+          }
+          
+          console.log(`[regenerate-content] Sending request to Groq API for module: ${moduleOutline.title}`);
+          const startTime = Date.now();
+          
+          try {
+            // Make the API call directly for this module
+            const completion = await groq.chat.completions.create({
+              model: "llama3-70b-8192",
+              messages: [
+                {
+                  role: "system",
+                  content: "You are an expert educational content creator specialized in creating personalized learning materials."
+                },
+                {
+                  role: "user",
+                  content: promptTemplate
+                }
+              ],
+              temperature: 0.7,
+              max_tokens: 4096,
             });
             
-          if (contentError) {
-            console.error('[regenerate-content] Error saving generated content:', contentError);
-          } else {
-            console.log(`[regenerate-content] Content saved to database with ID: ${contentId}`);
+            const responseTime = Date.now() - startTime;
+            console.log(`[regenerate-content] Groq API responded in ${responseTime}ms for module: ${moduleOutline.title}`);
+            
+            // Extract and process the content
+            const generatedContent = completion.choices[0]?.message.content;
+            
+            // Process sections based on the generated content
+            const sections = [];
+            if (generatedContent) {
+              // Split the content into sections based on headings
+              const contentParts = generatedContent.split(/^##\s+/m);
+              
+              for (let i = 0; i < moduleOutline.sections.length; i++) {
+                const sectionOutline = moduleOutline.sections[i];
+                let sectionContent = '';
+                
+                // Try to match section title to content part
+                const matchingPart = contentParts.find(part => 
+                  part.toLowerCase().includes(sectionOutline.title.toLowerCase())
+                );
+                
+                if (matchingPart) {
+                  sectionContent = `## ${matchingPart}`;
+                } else if (contentParts.length > i + 1) {
+                  // Fall back to position-based matching
+                  sectionContent = `## ${contentParts[i + 1]}`;
+                } else {
+                  // Last resort - create basic content
+                  sectionContent = `## ${sectionOutline.title}\n\nContent for ${moduleOutline.title} - ${sectionOutline.title}`;
+                }
+                
+                // Add the section
+                sections.push({
+                  id: `${moduleOutline.id}-section-${i + 1}`,
+                  title: sectionOutline.title,
+                  content: sectionContent,
+                  contentType: sectionOutline.type || 'text',
+                  orderIndex: i + 1,
+                  duration: sectionOutline.duration || 20
+                });
+              }
+            } else {
+              console.warn(`[regenerate-content] No content generated for module: ${moduleOutline.title}`);
+              
+              // Create fallback sections
+              for (let i = 0; i < moduleOutline.sections.length; i++) {
+                const sectionOutline = moduleOutline.sections[i];
+                sections.push({
+                  id: `${moduleOutline.id}-section-${i + 1}`,
+                  title: sectionOutline.title,
+                  content: `## ${sectionOutline.title}\n\nBasic content for ${moduleOutline.title} - ${sectionOutline.title}`,
+                  contentType: sectionOutline.type || 'text',
+                  orderIndex: i + 1,
+                  duration: sectionOutline.duration || 20
+                });
+              }
+            }
+            
+            // Add the completed module
+            generatedModules.push({
+              id: moduleOutline.id,
+              title: moduleOutline.title,
+              description: moduleOutline.description,
+              orderIndex: moduleOutline.orderIndex,
+              sections,
+              resources: []
+            });
+            
+          } catch (moduleError) {
+            console.error(`[regenerate-content] Error generating content for module ${moduleOutline.title}:`, moduleError);
+            
+            // Create fallback module with basic content
+            const fallbackSections = moduleOutline.sections.map((sectionOutline, index) => ({
+              id: `${moduleOutline.id}-section-${index + 1}`,
+              title: sectionOutline.title,
+              content: `## ${sectionOutline.title}\n\nBasic content for ${moduleOutline.title} - ${sectionOutline.title}`,
+              contentType: sectionOutline.type || 'text',
+              orderIndex: index + 1,
+              duration: sectionOutline.duration || 20
+            }));
+            
+            generatedModules.push({
+              id: moduleOutline.id,
+              title: moduleOutline.title,
+              description: moduleOutline.description,
+              orderIndex: moduleOutline.orderIndex,
+              sections: fallbackSections,
+              resources: []
+            });
           }
-        } else {
-          console.error('[regenerate-content] Groq API returned empty content');
         }
+        
+        // Create the complete personalized course content
+        const personalizedContent = {
+          id: uuidv4(),
+          course_id: courseId,
+          employee_id: targetEmployeeId,
+          title: courseData.title,
+          description: courseData.description || 'No description available',
+          level: courseData.difficulty_level || 'Intermediate',
+          modules: generatedModules,
+          metadata: {
+            generated_at: new Date().toISOString(),
+            generated_for: {
+              employee_id: targetEmployeeId,
+              name: employeeData?.name,
+              position: employeeData?.position,
+              department: employeeData?.department
+            },
+            personalization_options: personalizationOptions,
+            used_cv_data: !!cvExtractedData
+          }
+        };
+        
+        // Store the personalized content in the database
+        console.log(`[regenerate-content] Storing personalized content with ID: ${personalizedContent.id}`);
+        const { data: storedContent, error: storageError } = await supabase
+          .from('hr_personalized_course_content')
+          .insert({
+            id: personalizedContent.id,
+            course_id: courseId,
+            employee_id: targetEmployeeId,
+            content: personalizedContent,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            is_active: true
+          })
+          .select()
+          .single();
+        
+        if (storageError) {
+          console.error('[regenerate-content] Error storing personalized content:', storageError);
+        } else {
+          console.log(`[regenerate-content] Successfully stored personalized content`);
+        }
+        
       } catch (groqError) {
         console.error('[regenerate-content] Error using Groq API directly:', {
           message: groqError.message,
@@ -276,7 +490,7 @@ export default async function handler(req, res) {
           code: groqError.code
         });
         
-        // Instead of calling the failing API, create fallback mock content directly here
+        // Use fallback mock content but now with a better approach
         console.log('[regenerate-content] Using fallback mock content generator');
         
         // Generate simple mock content
