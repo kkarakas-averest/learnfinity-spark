@@ -1,3 +1,4 @@
+
 // Simplified API endpoint for enhancing HR course content
 // This version focuses on not crashing and handling basic operations
 
@@ -27,19 +28,29 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Invalid JSON in request body' });
     }
     
-    console.log('Request received for employee data:', body.employeeId);
+    console.log('Request received for content enhancement:', body);
+    
+    // Extract required parameters
+    const { courseId, employeeId } = body;
+    
+    if (!courseId || !employeeId) {
+      return res.status(400).json({ 
+        error: 'Missing required parameters',
+        details: 'Both courseId and employeeId are required'
+      });
+    }
     
     // Placeholder for actual content generation logic
     // In a real implementation, this would call the Groq API
     
-    // For now, this always succeeds to prevent blocking the UI
+    // Return a successful response that won't break the UI
     return res.status(200).json({
       success: true,
       message: 'Content generation started successfully.',
       details: 'The content is being generated and will be available soon.',
       contentInfo: {
-        employeeId: body.employeeId,
-        courseId: body.courseId,
+        employeeId: employeeId,
+        courseId: courseId,
         timestamp: new Date().toISOString(),
         isPlaceholder: true
       }
@@ -55,4 +66,4 @@ export default async function handler(req, res) {
       message: 'An error occurred while processing the request'
     });
   }
-} 
+}

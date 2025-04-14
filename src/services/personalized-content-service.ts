@@ -31,9 +31,6 @@ export class PersonalizedContentService {
     console.log(`Checking if personalized content exists for course ${courseId} and user ${userId}`);
     
     try {
-      // First check if the user is an employee
-      let employeeId = userId; // Default to userId if no employee record found
-      
       // First check if personalized content exists
       const { data: contentData, error: contentError } = await supabase
         .from('ai_course_content')
@@ -205,12 +202,14 @@ export class PersonalizedContentService {
       // Create 2 modules with 3 sections each
       for (let moduleIndex = 0; moduleIndex < 2; moduleIndex++) {
         // Generate a proper UUID for module_id
-        const moduleId = uuidv4(); // Use UUID format for module_id
+        const moduleId = uuidv4(); // This generates a proper UUID string
         
         for (let sectionIndex = 0; sectionIndex < 3; sectionIndex++) {
           // Section content with placeholder text
           const sectionTitle = `Module ${moduleIndex + 1}: ${sectionIndex === 0 ? 'Introduction' : 
             sectionIndex === 1 ? 'Key Concepts' : 'Application'}`;
+          
+          const sectionId = uuidv4(); // Generate proper UUID for section_id
           
           const sectionContent = `
             <div class="prose max-w-none">
@@ -229,16 +228,16 @@ export class PersonalizedContentService {
           `;
           
           try {
-            // Insert the section into the database
+            // Use the Supabase API to insert a section
             const { data, error } = await supabase
               .from('ai_course_content_sections')
               .insert({
-                id: uuidv4(),
+                id: uuidv4(), // Use UUID for id field
                 content_id: contentId,
                 title: sectionTitle,
                 content: sectionContent,
-                module_id: moduleId, // Use the UUID here
-                section_id: uuidv4(), // Also use UUID for section_id
+                module_id: moduleId,
+                section_id: sectionId,
                 order_index: sectionIndex
               })
               .select();
@@ -259,43 +258,6 @@ export class PersonalizedContentService {
     } catch (error) {
       console.error('Error generating basic sections:', error);
       return [];
-    }
-  }
-
-  /**
-   * Check if HR tables have been initialized properly
-   */
-  public async checkHRTablesExist(): Promise<boolean> {
-    try {
-      // Check if essential tables exist
-      const essentialTables = [
-        'hr_employees',
-        'hr_courses',
-        'hr_course_enrollments',
-        'ai_course_content',
-        'ai_course_content_sections'
-      ];
-      
-      let allExist = true;
-      
-      for (const tableName of essentialTables) {
-        try {
-          // Just query for a single row to see if the table exists
-          await supabase
-            .from(tableName)
-            .select('id')
-            .limit(1);
-        } catch (error) {
-          console.error(`Table ${tableName} does not exist or is not accessible`, error);
-          allExist = false;
-        }
-      }
-      
-      console.log('HR tables essential check:', allExist ? 'All exist' : 'Some missing');
-      return allExist;
-    } catch (error) {
-      console.error('Error checking HR tables:', error);
-      return false;
     }
   }
 }

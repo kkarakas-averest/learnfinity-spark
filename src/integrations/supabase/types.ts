@@ -1452,6 +1452,44 @@ export type Database = {
           },
         ]
       }
+      course_modules: {
+        Row: {
+          course_id: string | null
+          created_for: string | null
+          description: string | null
+          is_personalized: boolean | null
+          module_id: string
+          order_index: number | null
+          title: string
+        }
+        Insert: {
+          course_id?: string | null
+          created_for?: string | null
+          description?: string | null
+          is_personalized?: boolean | null
+          module_id: string
+          order_index?: number | null
+          title: string
+        }
+        Update: {
+          course_id?: string | null
+          created_for?: string | null
+          description?: string | null
+          is_personalized?: boolean | null
+          module_id?: string
+          order_index?: number | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "course_modules_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "hr_courses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       course_templates: {
         Row: {
           created_at: string | null

@@ -1,162 +1,162 @@
 
-import React, { useState } from 'react';
+import React from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
-import { BookOpen, FileText } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { AICourseContent, AICourseContentSection } from '@/lib/types/content';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface PersonalizedCourseContentProps {
   content: AICourseContent | null;
   sections: AICourseContentSection[];
-  isLoading: boolean;
+  isLoading?: boolean;
 }
 
-const PersonalizedCourseContent: React.FC<PersonalizedCourseContentProps> = ({
-  content,
-  sections,
-  isLoading
+const PersonalizedCourseContent: React.FC<PersonalizedCourseContentProps> = ({ 
+  content, 
+  sections, 
+  isLoading = false 
 }) => {
-  const [activeTab, setActiveTab] = useState<string>('modules');
-  const [selectedModuleId, setSelectedModuleId] = useState<string | null>(null);
-
+  console.log(`Rendering PersonalizedCourseContent with: ${content ? `contentId: ${content.id}, sectionsCount: ${sections.length}` : 'null content'}, sections: ${sections}`);
+  
+  // Group sections by module_id
+  const moduleMap = React.useMemo(() => {
+    const map = new Map<string, AICourseContentSection[]>();
+    
+    sections.forEach(section => {
+      if (!section.module_id) return;
+      
+      if (!map.has(section.module_id)) {
+        map.set(section.module_id, []);
+      }
+      
+      map.get(section.module_id)!.push(section);
+    });
+    
+    // Sort sections within each module by order_index
+    map.forEach((moduleSections) => {
+      moduleSections.sort((a, b) => 
+        (a.order_index || 0) - (b.order_index || 0)
+      );
+    });
+    
+    return map;
+  }, [sections]);
+  
+  // Extract module info for tabs
+  const modules = React.useMemo(() => {
+    return Array.from(moduleMap.keys()).map(moduleId => {
+      const moduleSections = moduleMap.get(moduleId) || [];
+      // Use the first section's title to derive module title
+      const firstSection = moduleSections[0];
+      let moduleTitle = `Module ${moduleId.slice(-1)}`;
+      
+      if (firstSection && firstSection.title) {
+        const titleParts = firstSection.title.split(':');
+        if (titleParts.length > 0) {
+          moduleTitle = titleParts[0].trim();
+        }
+      }
+      
+      return {
+        id: moduleId,
+        title: moduleTitle,
+        sections: moduleSections
+      };
+    });
+  }, [moduleMap]);
+  
   if (isLoading) {
     return (
       <div className="space-y-4">
         <Skeleton className="h-8 w-3/4" />
         <Skeleton className="h-4 w-full" />
         <Skeleton className="h-4 w-full" />
-        <Skeleton className="h-[400px] w-full" />
+        <Skeleton className="h-64 w-full" />
       </div>
     );
   }
-
-  if (!content) {
+  
+  if (!content || sections.length === 0) {
     return (
       <Card>
         <CardContent className="p-6">
-          <div className="text-center py-8">
-            <BookOpen className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-            <h3 className="text-xl font-medium mb-2">No Personalized Content</h3>
-            <p className="text-muted-foreground">
-              No personalized content is available for this course.
-            </p>
+          <div className="text-center space-y-2">
+            <h3 className="text-lg font-medium">No personalized content available</h3>
+            <p className="text-muted-foreground">Try generating personalized content first.</p>
           </div>
         </CardContent>
       </Card>
     );
   }
-
-  // Log content and sections for debugging
-  console.log('Rendering PersonalizedCourseContent with:', { 
-    contentId: content?.id, 
-    sectionsCount: sections?.length,
-    sections: sections
-  });
-
-  // Group sections by module_id
-  const moduleMap = sections.reduce<Record<string, AICourseContentSection[]>>(
-    (acc, section) => {
-      if (!acc[section.module_id]) {
-        acc[section.module_id] = [];
-      }
-      acc[section.module_id].push(section);
-      return acc;
-    },
-    {}
-  );
-
-  const modules = Object.keys(moduleMap);
-
-  if (modules.length > 0 && !selectedModuleId) {
-    setSelectedModuleId(modules[0]);
-  }
-
-  const renderModuleContent = () => {
-    if (!selectedModuleId) {
-      return (
-        <div className="p-4 text-center">
-          <p className="text-muted-foreground">Select a module to view its content</p>
-        </div>
-      );
-    }
-    
-    const moduleSections = moduleMap[selectedModuleId]?.sort((a, b) => a.order_index - b.order_index) || [];
-    
-    if (moduleSections.length === 0) {
-      return (
-        <div className="p-4 text-center">
-          <p className="text-muted-foreground">No content available for this module</p>
-        </div>
-      );
-    }
-    
-    return (
-      <div className="space-y-6">
-        {moduleSections.map(section => (
-          <Card key={section.id} className="overflow-hidden">
-            <CardHeader className="bg-muted/30">
-              <CardTitle className="text-lg">{section.title}</CardTitle>
-            </CardHeader>
-            <CardContent className="pt-6">
-              <div 
-                className="prose max-w-none dark:prose-invert" 
-                dangerouslySetInnerHTML={{ __html: section.content }}
-              />
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    );
-  };
-
+  
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold mb-2">{content.title}</h2>
-        <p className="text-muted-foreground">{content.description}</p>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        {/* Module Navigation */}
-        <div className="md:col-span-1">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Modules</CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <nav className="divide-y">
-                {modules.map((moduleId) => {
-                  const moduleFirstSection = moduleMap[moduleId][0];
-                  const moduleTitle = moduleFirstSection?.title.split(':')[0] || 'Module';
-                  
-                  return (
-                    <button
-                      key={moduleId}
-                      onClick={() => setSelectedModuleId(moduleId)}
-                      className={`w-full text-left px-4 py-3 flex items-center hover:bg-muted/50 transition-colors ${
-                        moduleId === selectedModuleId ? 'bg-muted/50 font-medium' : ''
-                      }`}
-                    >
-                      <FileText className="w-4 h-4 mr-2 flex-shrink-0" />
-                      <span className="truncate">{moduleTitle}</span>
-                    </button>
-                  );
-                })}
-              </nav>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Content Area */}
-        <div className="md:col-span-3">
-          <Card>
-            <CardContent className="p-6">
-              {renderModuleContent()}
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle>Personalized Learning: {content.title}</CardTitle>
+            <Badge variant="outline">Personalized</Badge>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <p>{content.description}</p>
+          
+          {content.learning_objectives && content.learning_objectives.length > 0 && (
+            <div className="mt-4">
+              <h3 className="text-sm font-medium mb-2">Learning Objectives:</h3>
+              <ul className="list-disc list-inside text-sm text-muted-foreground">
+                {Array.isArray(content.learning_objectives) ? (
+                  content.learning_objectives.map((objective, index) => (
+                    <li key={index} className="ml-2">{objective}</li>
+                  ))
+                ) : (
+                  <li className="ml-2">Understand core concepts with personalized examples</li>
+                )}
+              </ul>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+      
+      {modules.length > 0 ? (
+        <Tabs defaultValue={modules[0].id} className="w-full">
+          <TabsList className="mb-4 w-full">
+            {modules.map(module => (
+              <TabsTrigger key={module.id} value={module.id} className="flex-1">
+                {module.title}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+          
+          {modules.map(module => (
+            <TabsContent key={module.id} value={module.id} className="space-y-4">
+              {module.sections.map((section, index) => (
+                <Card key={index}>
+                  <CardHeader>
+                    <CardTitle className="text-lg">{section.title}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div 
+                      className="prose max-w-none" 
+                      dangerouslySetInnerHTML={{ __html: section.content }} 
+                    />
+                  </CardContent>
+                </Card>
+              ))}
+            </TabsContent>
+          ))}
+        </Tabs>
+      ) : (
+        <Card>
+          <CardContent className="p-6">
+            <div className="text-center space-y-2">
+              <h3 className="text-lg font-medium">Content structure is being prepared</h3>
+              <p className="text-muted-foreground">Please check back in a few moments.</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };
