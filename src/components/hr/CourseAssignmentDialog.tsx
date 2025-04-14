@@ -86,19 +86,27 @@ const CourseAssignmentDialog: React.FC<CourseAssignmentDialogProps> = ({
     setError(null);
     
     try {
-      // Use the hrEmployeeService to assign the course
-      const { success, error: assignError } = await hrEmployeeService.assignCourseToEmployee(
-        employeeId, 
-        selectedCourse
-      );
+      // Call our server-side API endpoint for course assignment
+      const response = await fetch('/api/hr/course-assignment', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          courseId: selectedCourse,
+          employeeId: employeeId
+        })
+      });
       
-      if (!success) {
-        console.error('Error assigning course:', assignError);
-        setError('Error creating enrollment: ' + assignError);
+      const result = await response.json();
+      
+      if (!response.ok || !result.success) {
+        console.error('Error assigning course:', result.error || 'Unknown error');
+        setError(result.message || 'Failed to assign course');
         toast({
           variant: 'destructive',
           title: 'Assignment Failed',
-          description: assignError || 'Failed to assign course'
+          description: result.message || 'Failed to assign course'
         });
         return;
       }

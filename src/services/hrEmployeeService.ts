@@ -1330,12 +1330,9 @@ const hrEmployeeService: EmployeeService = {
 
       console.log('Assigning course to employee:', { employeeId, courseId, enrollmentData });
 
-      // Try to use supabaseAdmin first if available
-      const { supabaseAdmin, supabase } = await import('@/lib/supabase-client');
-      const client = supabaseAdmin || supabase;
-
+      // Use supabase directly without dynamic imports
       // Check if enrollment already exists
-      const { data: existingEnrollment, error: checkError } = await client
+      const { data: existingEnrollment, error: checkError } = await supabase
         .from('hr_course_enrollments')
         .select('id')
         .eq('employee_id', employeeId)
@@ -1360,7 +1357,7 @@ const hrEmployeeService: EmployeeService = {
       }
 
       // Insert the enrollment
-      const { data, error } = await client
+      const { data, error } = await supabase
         .from('hr_course_enrollments')
         .insert([enrollmentData])
         .select()

@@ -328,12 +328,24 @@ export default function AddEmployeeForm() {
       if (selectedCourses.length > 0) {
         try {
           for (const courseId of selectedCourses) {
-            const courseResponse = await (hrEmployeeService as any).assignCourseToEmployee(employeeId, courseId);
+            // Use the server API endpoint
+            const response = await fetch('/api/hr/course-assignment', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                courseId,
+                employeeId
+              })
+            });
             
-            if (!courseResponse.error) {
+            const result = await response.json();
+            
+            if (result.success) {
               coursesAssigned++;
             } else {
-              console.warn('Failed to assign course:', courseId, courseResponse.error);
+              console.warn('Failed to assign course:', courseId, result.error);
             }
           }
           console.log(`Assigned ${coursesAssigned} of ${selectedCourses.length} courses`);
