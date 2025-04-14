@@ -17,12 +17,14 @@ export function RegenerateContentButton({ courseId, onSuccess }: RegenerateConte
       setIsLoading(true);
       
       // Call the API to regenerate content
-      const response = await fetch(`/api/courses/${courseId}/regenerate`, {
+      // Using HR courses endpoint which is more likely to be deployed
+      const response = await fetch(`/api/hr/courses/regenerate-content`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
+          courseId: courseId,
           forceRegenerate: true,
           personalizationOptions: {
             learning_preferences: {
