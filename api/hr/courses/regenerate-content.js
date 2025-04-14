@@ -184,10 +184,6 @@ export default async function handler(req, res) {
     // We'll use node-fetch directly from the server
     // This eliminates browser CORS issues
     try {
-      const baseUrl = process.env.VERCEL_URL 
-        ? `https://${process.env.VERCEL_URL}` 
-        : `${req.headers['x-forwarded-proto'] || 'https'}://${req.headers.host}`;
-        
       // Using native fetch if available (Node.js 18+) or a polyfill
       const fetch = (await import('node-fetch')).default;
       
@@ -195,6 +191,8 @@ export default async function handler(req, res) {
       const hasGroqApiKey = !!process.env.GROQ_API_KEY;
       console.log(`[regenerate-content] GROQ_API_KEY is ${hasGroqApiKey ? 'set' : 'NOT set'} in environment`);
       
+      // Use the production URL directly instead of relying on VERCEL_URL, which might be a preview deployment
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://learnfinity-spark.vercel.app';
       const generateContentEndpoint = `${baseUrl}/api/hr/courses/generate-content`;
       console.log(`[regenerate-content] Triggering content generation at ${generateContentEndpoint}`, {
         courseId,
