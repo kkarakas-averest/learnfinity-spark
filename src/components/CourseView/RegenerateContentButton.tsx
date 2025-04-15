@@ -30,6 +30,29 @@ export function RegenerateContentButton({ courseId, onSuccess, onError }: Regene
       const authToken = session?.access_token;
       if (!authToken) throw new Error('No valid session found');
       
+      // First try with GET method (which may work better in production)
+      try {
+        console.log(`Attempting to process job ${jobId} using GET method`);
+        const getResponse = await fetch(`${apiUrl}?job_id=${encodeURIComponent(jobId)}`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${authToken}`,
+          }
+        });
+        
+        if (getResponse.ok) {
+          const responseData = await getResponse.json();
+          console.log('Job processing successful via GET:', responseData);
+          return responseData;
+        } else {
+          console.log(`GET method failed with status ${getResponse.status}, falling back to POST`);
+        }
+      } catch (getError) {
+        console.log('GET request failed, falling back to POST:', getError);
+      }
+      
+      // Fall back to POST method if GET fails
+      console.log(`Attempting to process job ${jobId} using POST method`);
       const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {

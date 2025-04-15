@@ -15,14 +15,30 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
-  // Only allow POST method
-  if (req.method !== 'POST') {
+  // Allow both GET and POST methods
+  if (req.method !== 'POST' && req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
-    // Get request body
-    const body = req.body;
+    // Get request data (body for POST, query for GET)
+    let requestData;
+    let jobId;
+
+    if (req.method === 'POST') {
+      requestData = req.body;
+      jobId = requestData?.job_id;
+    } else {
+      // Handle GET request
+      requestData = req.query;
+      jobId = requestData?.job_id;
+    }
+
+    if (!jobId) {
+      return res.status(400).json({ error: 'Missing job_id parameter' });
+    }
+
+    console.log(`Processing job: ${jobId} via ${req.method} request`);
     
     // Properly construct the forward URL for both development and production
     let forwardUrl;
@@ -39,14 +55,27 @@ export default async function handler(req, res) {
     
     console.log(`Proxying request to: ${forwardUrl}`);
     
-    const response = await fetch(forwardUrl, {
-      method: 'POST',
+    // For GET requests, append job_id as query parameter
+    const targetUrl = req.method === 'GET' 
+      ? `${forwardUrl}?job_id=${encodeURIComponent(jobId)}`
+      : forwardUrl;
+      
+    // Build request options
+    const fetchOptions = {
+      method: req.method,
       headers: {
         'Content-Type': 'application/json',
         'Authorization': req.headers.authorization || '',
-      },
-      body: JSON.stringify(body),
-    });
+      }
+    };
+    
+    // Add body only for POST requests
+    if (req.method === 'POST') {
+      fetchOptions.body = JSON.stringify({ job_id: jobId });
+    }
+    
+    // Make the request
+    const response = await fetch(targetUrl, fetchOptions);
     
     // Check if the response is valid
     if (!response.ok) {
