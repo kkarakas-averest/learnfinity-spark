@@ -6,22 +6,58 @@ import { AgentFactory } from '@/agents/AgentFactory';
 import { cookies } from 'next/headers';
 import { v4 as uuidv4 } from 'uuid';
 
+// Logging helper function to standardize log format
+const logWithTimestamp = (message: string, data?: any, requestId?: string) => {
+  const timestamp = new Date().toISOString();
+  const reqIdText = requestId ? `[ReqID:${requestId}] ` : '';
+  const logPrefix = `[${timestamp}] [REGENERATE-CONTENT] ${reqIdText}`;
+  
+  if (data) {
+    console.log(`${logPrefix} ${message}`, typeof data === 'string' ? data : JSON.stringify(data, null, 2));
+  } else {
+    console.log(`${logPrefix} ${message}`);
+  }
+};
+
 /**
  * API endpoint to regenerate personalized course content
  * POST /api/hr/courses/regenerate-content
  */
 export async function POST(req: NextRequest) {
+  const requestId = uuidv4().slice(0, 8); // Generate a short request ID for tracing
+  logWithTimestamp(`📩 Request received from ${req.url}`, undefined, requestId);
+  logWithTimestamp(`📝 Request method: ${req.method}`, undefined, requestId);
+  logWithTimestamp(`🔑 Request headers:`, Object.fromEntries(req.headers), requestId);
+  
   // Emergency placeholder method - generates minimal course content without API calls
-  console.log('[EMERGENCY-PLACEHOLDER] Using rapid content generation without external API calls');
+  logWithTimestamp(`⚠️ [EMERGENCY-PLACEHOLDER] Using rapid content generation without external API calls`, undefined, requestId);
+  
+  // Ensure only allowed methods
+  if (req.method !== 'POST' && req.method !== 'OPTIONS') {
+    logWithTimestamp(`❌ Method not allowed: ${req.method}`, undefined, requestId);
+    return NextResponse.json(
+      { error: `Method ${req.method} not allowed` },
+      { 
+        status: 405,
+        headers: {
+          'Allow': 'POST, OPTIONS',
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'POST, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-CSRF-Token',
+        }
+      }
+    );
+  }
   
   try {
     // CORS headers for preflight requests
     if (req.method === 'OPTIONS') {
+      logWithTimestamp(`↩️ Responding to OPTIONS request with CORS headers`, undefined, requestId);
       return new NextResponse(null, {
         status: 204,
         headers: {
           'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+          'Access-Control-Allow-Methods': 'POST, OPTIONS',
           'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-CSRF-Token',
           'Access-Control-Allow-Credentials': 'true',
           'Access-Control-Max-Age': '86400',
@@ -36,73 +72,86 @@ export async function POST(req: NextRequest) {
     const authHeader = req.headers.get('authorization') || '';
     
     // Log debugging info
-    console.log('Received regenerate-content request on App Router API');
-    console.log('Cookie header length:', cookieHeader.length);
-    console.log('Has auth header:', !!authHeader);
+    logWithTimestamp(`🔐 Authentication info`, {
+      cookieHeaderLength: cookieHeader.length,
+      hasAuthHeader: !!authHeader,
+      authHeaderPrefix: authHeader ? authHeader.substring(0, 15) + '...' : 'none'
+    }, requestId);
     
     // Initialize user ID and session variables
     let userId: string | undefined;
     let session: any;
     
     // Try cookie-based auth first
+    logWithTimestamp(`🍪 Attempting cookie-based authentication`, undefined, requestId);
     try {
       const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
       
       if (!sessionError && sessionData.session?.user) {
         session = sessionData.session;
         userId = session.user.id;
-        console.log('Authenticated via cookie session for user:', userId);
+        logWithTimestamp(`✅ Authenticated via cookie session for user: ${userId?.substring(0, 8)}...`, undefined, requestId);
       } else if (sessionError) {
-        console.error('Session error:', sessionError);
+        logWithTimestamp(`❌ Session error:`, sessionError, requestId);
+      } else {
+        logWithTimestamp(`⚠️ No session data found in cookies`, undefined, requestId);
       }
     } catch (sessionError) {
-      console.error('Error getting session:', sessionError);
+      logWithTimestamp(`❌ Exception during cookie auth:`, sessionError, requestId);
     }
     
     // If no session from cookie, try JWT token from auth header
     if (!userId && authHeader) {
+      logWithTimestamp(`🔑 Cookie auth failed, attempting Bearer token auth`, undefined, requestId);
       if (authHeader.startsWith('Bearer ')) {
         const token = authHeader.replace('Bearer ', '');
-        console.log('Attempting authentication with Bearer token');
+        logWithTimestamp(`🔐 Extracted Bearer token (length: ${token.length})`, undefined, requestId);
         
         try {
           const { data, error } = await supabase.auth.getUser(token);
           if (!error && data.user) {
             userId = data.user.id;
-            console.log('Authenticated with Bearer token for user:', userId);
+            logWithTimestamp(`✅ Authenticated with Bearer token for user: ${userId?.substring(0, 8)}...`, undefined, requestId);
           } else {
-            console.error('Bearer token auth failed:', error);
+            logWithTimestamp(`❌ Bearer token auth failed:`, error, requestId);
           }
         } catch (tokenError) {
-          console.error('Error authenticating with token:', tokenError);
+          logWithTimestamp(`❌ Exception during Bearer token auth:`, tokenError, requestId);
         }
+      } else {
+        logWithTimestamp(`⚠️ Auth header present but not in Bearer format: ${authHeader.substring(0, 10)}...`, undefined, requestId);
       }
     }
     
     // Last resort: try to extract auth from request URL
     if (!userId) {
+      logWithTimestamp(`🔍 Previous auth methods failed, checking URL params`, undefined, requestId);
       try {
         // Some Supabase clients append the token in the URL
         const url = new URL(req.url);
         const accessToken = url.searchParams.get('access_token');
         
         if (accessToken) {
-          console.log('Attempting authentication with URL token');
+          logWithTimestamp(`🔐 Found access_token in URL (length: ${accessToken.length})`, undefined, requestId);
           const { data, error } = await supabase.auth.getUser(accessToken);
           
           if (!error && data.user) {
             userId = data.user.id;
-            console.log('Authenticated with URL token for user:', userId);
+            logWithTimestamp(`✅ Authenticated with URL token for user: ${userId?.substring(0, 8)}...`, undefined, requestId);
+          } else {
+            logWithTimestamp(`❌ URL token auth failed:`, error, requestId);
           }
+        } else {
+          logWithTimestamp(`⚠️ No access_token found in URL params`, undefined, requestId);
         }
       } catch (urlError) {
-        console.error('Error with URL token auth:', urlError);
+        logWithTimestamp(`❌ Exception during URL token auth:`, urlError, requestId);
       }
     }
     
     // If still no authentication, return unauthorized
     if (!userId) {
-      console.error('Authentication failed on regenerate-content route');
+      logWithTimestamp(`❌ All authentication methods failed`, undefined, requestId);
       return NextResponse.json({ 
         error: 'Unauthorized', 
         details: 'No valid authentication found. Please log in again.'
@@ -115,32 +164,45 @@ export async function POST(req: NextRequest) {
       });
     }
     
-    console.log('Successfully authenticated user:', userId);
+    logWithTimestamp(`✅ Authentication successful for user ${userId.substring(0, 8)}...`, undefined, requestId);
     
     // Get request body
-    const body = await req.json();
+    let body;
+    try {
+      logWithTimestamp(`📦 Parsing request body...`, undefined, requestId);
+      body = await req.json();
+      logWithTimestamp(`📄 Request body:`, body, requestId);
+    } catch (parseError) {
+      logWithTimestamp(`❌ Failed to parse request body:`, parseError, requestId);
+      return NextResponse.json(
+        { error: 'Invalid JSON in request body' },
+        { status: 400 }
+      );
+    }
+    
     const { 
       courseId, 
       forceRegenerate = true,
       personalizationOptions = {} 
     } = body;
     
-    console.log('Request data:', { 
+    logWithTimestamp(`📋 Processed request parameters:`, { 
       courseId, 
       forceRegenerate,
       hasPersonalizationOptions: !!personalizationOptions,
-    });
+      personalizationOptionsKeys: Object.keys(personalizationOptions)
+    }, requestId);
     
     if (!courseId) {
-      console.log('Missing courseId in request');
+      logWithTimestamp(`❌ Missing courseId in request`, undefined, requestId);
       return NextResponse.json({ error: 'Course ID is required' }, { status: 400 });
     }
     
-    console.log('Starting content regeneration process for course:', courseId);
+    logWithTimestamp(`🚀 Starting content regeneration process for course: ${courseId}`, undefined, requestId);
     
     // Create or update learner profile with these options
     if (personalizationOptions) {
-      console.log('Updating learner profile for user:', userId);
+      logWithTimestamp(`📝 Updating learner profile for user: ${userId.substring(0, 8)}...`, undefined, requestId);
       // Update or create learner profile
       const { error } = await supabase
         .from('learner_profiles')
@@ -150,29 +212,35 @@ export async function POST(req: NextRequest) {
         });
       
       if (error) {
-        console.error('Error updating learner profile:', error);
+        logWithTimestamp(`❌ Error updating learner profile:`, error, requestId);
+      } else {
+        logWithTimestamp(`✅ Learner profile updated successfully`, undefined, requestId);
       }
     }
     
     let targetEmployeeId = userId;
     
     // If user is linked to an employee, get that ID
-    console.log('Looking up employee mapping for user:', userId);
-    const { data: mappingData } = await supabase
+    logWithTimestamp(`🔍 Looking up employee mapping for user: ${userId.substring(0, 8)}...`, undefined, requestId);
+    const { data: mappingData, error: mappingError } = await supabase
       .from('employee_user_mapping')
       .select('employee_id')
       .eq('user_id', userId)
       .single();
+    
+    if (mappingError) {
+      logWithTimestamp(`⚠️ Error looking up employee mapping:`, mappingError, requestId);
+    }
         
     if (mappingData?.employee_id) {
       targetEmployeeId = mappingData.employee_id;
-      console.log('Found employee mapping:', targetEmployeeId);
+      logWithTimestamp(`✅ Found employee mapping: ${targetEmployeeId.substring(0, 8)}...`, undefined, requestId);
     } else {
-      console.log('No employee mapping found, using user ID as employee ID');
+      logWithTimestamp(`⚠️ No employee mapping found, using user ID as employee ID`, undefined, requestId);
     }
     
     // Get the HR course data
-    console.log('Verifying course exists:', courseId);
+    logWithTimestamp(`🔍 Verifying course exists: ${courseId}`, undefined, requestId);
     const { data: courseData, error: courseError } = await supabase
       .from('hr_courses')
       .select('*')
@@ -180,22 +248,26 @@ export async function POST(req: NextRequest) {
       .single();
       
     if (courseError || !courseData) {
-      console.error('Error fetching course:', courseError);
+      logWithTimestamp(`❌ Error fetching course:`, courseError, requestId);
       return NextResponse.json(
         { error: 'Course not found', details: courseError?.message }, 
         { status: 404 }
       );
     }
     
-    console.log('Course verified:', courseData.title);
+    logWithTimestamp(`✅ Course verified: ${courseData.title}`, undefined, requestId);
     
     // Create job record with ID for tracking this regeneration request
     const jobId = uuidv4();
-    console.log('Creating job record with ID:', jobId);
+    logWithTimestamp(`📝 Creating job record with ID: ${jobId}`, undefined, requestId);
     
     // Check if we should use the admin client or regular client
     const adminSupabase = supabaseAdmin || supabase;
-    console.log('Using adminSupabase client:', !!adminSupabase, 'Has service role key:', !!process.env.SUPABASE_SERVICE_ROLE_KEY);
+    logWithTimestamp(`🔐 Client info:`, {
+      usingAdminClient: !!supabaseAdmin,
+      hasServiceRoleKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+      usingFallback: !supabaseAdmin
+    }, requestId);
     
     // Insert job record
     const { error: jobError } = await adminSupabase
@@ -217,17 +289,17 @@ export async function POST(req: NextRequest) {
       });
       
     if (jobError) {
-      console.error('Error creating job record:', jobError);
+      logWithTimestamp(`❌ Error creating job record:`, jobError, requestId);
       return NextResponse.json(
         { error: 'Failed to create job record', details: jobError.message },
         { status: 500 }
       );
     }
     
-    console.log('Job record created successfully, ID:', jobId);
+    logWithTimestamp(`✅ Job record created successfully, ID: ${jobId}`, undefined, requestId);
     
     // Check if the employee is already enrolled in the course
-    console.log('Checking for existing enrollment for employee and course');
+    logWithTimestamp(`🔍 Checking for existing enrollment`, undefined, requestId);
     const { data: existingEnrollment, error: enrollmentCheckError } = await supabase
       .from('hr_course_enrollments')
       .select('id')
@@ -236,12 +308,12 @@ export async function POST(req: NextRequest) {
       .maybeSingle();
     
     if (enrollmentCheckError && enrollmentCheckError.code !== 'PGRST116') {
-      console.error('Error checking for enrollment:', enrollmentCheckError);
+      logWithTimestamp(`❌ Error checking for enrollment:`, enrollmentCheckError, requestId);
     }
     
     if (existingEnrollment) {
       // Update the existing enrollment record
-      console.log('Updating course enrollment record');
+      logWithTimestamp(`📝 Updating existing course enrollment record`, undefined, requestId);
       const { error: updateError } = await supabase
         .from('hr_course_enrollments')
         .update({
@@ -253,12 +325,12 @@ export async function POST(req: NextRequest) {
         .eq('id', existingEnrollment.id);
       
       if (updateError) {
-        console.error('Error updating enrollment:', updateError);
+        logWithTimestamp(`❌ Error updating enrollment:`, updateError, requestId);
         // Continue anyway as this is not fatal to the process
       }
     } else {
       // Create a new enrollment record
-      console.log('Creating new enrollment record');
+      logWithTimestamp(`📝 Creating new enrollment record`, undefined, requestId);
       const { error: insertError } = await supabase
         .from('hr_course_enrollments')
         .insert({
@@ -273,7 +345,7 @@ export async function POST(req: NextRequest) {
         });
       
       if (insertError) {
-        console.error('Error updating enrollment:', insertError);
+        logWithTimestamp(`❌ Error updating enrollment:`, insertError, requestId);
         // Continue anyway as this is not fatal to the process
       }
     }
@@ -288,7 +360,7 @@ export async function POST(req: NextRequest) {
         .eq('employee_id', targetEmployeeId);
       
       if (existingPersonalizedContent && existingPersonalizedContent.length > 0) {
-        console.log('Found personalized content to regenerate:', existingPersonalizedContent);
+        logWithTimestamp(`🔍 Found personalized content to regenerate:`, existingPersonalizedContent, requestId);
         
         // Delete existing personalized content
         for (const content of existingPersonalizedContent) {
@@ -362,7 +434,7 @@ export async function POST(req: NextRequest) {
     const apiUrl = new URL(req.url);
     const baseUrl = `${apiUrl.protocol}//${apiUrl.host}`;
     
-    console.log('[SYNC-PROCESS] Starting synchronous content generation process');
+    logWithTimestamp(`[SYNC-PROCESS] Starting synchronous content generation process`, undefined, requestId);
     
     try {
       // Update job status to indicate synchronous processing
@@ -377,7 +449,7 @@ export async function POST(req: NextRequest) {
       
       // ------------------- EMERGENCY PLACEHOLDER CONTENT ---------------------
       // Create minimal placeholder content without any API calls
-      console.log('[SYNC-PROCESS] Creating EMERGENCY placeholder content (no API calls)');
+      logWithTimestamp(`[SYNC-PROCESS] Creating EMERGENCY placeholder content (no API calls)`, undefined, requestId);
       
       // Generate simple placeholder content for each module
       const generatedModules = [];
@@ -489,10 +561,10 @@ After reviewing this section, proceed to the next section to build on these conc
         });
       });
       
-      console.log('[SYNC-PROCESS] Successfully created placeholder content for all modules');
+      logWithTimestamp(`[SYNC-PROCESS] Successfully created placeholder content for all modules`, undefined, requestId);
       
       // Create the complete personalized course content
-      console.log('[SYNC-PROCESS] Creating full personalized course content');
+      logWithTimestamp(`[SYNC-PROCESS] Creating full personalized course content`, undefined, requestId);
       
       // Prepare to store content
       await adminSupabase
@@ -530,7 +602,7 @@ After reviewing this section, proceed to the next section to build on these conc
       };
       
       // Store the personalized content in the database
-      console.log('[SYNC-PROCESS] Storing content in database');
+      logWithTimestamp(`[SYNC-PROCESS] Storing content in database`, undefined, requestId);
       
       await adminSupabase
         .from('content_generation_jobs')
@@ -557,11 +629,11 @@ After reviewing this section, proceed to the next section to build on these conc
         .single();
         
       if (storageError) {
-        console.error('[SYNC-PROCESS] Error storing personalized content:', storageError);
+        logWithTimestamp(`❌ Error storing personalized content:`, storageError, requestId);
         throw new Error(`Failed to store content: ${storageError.message}`);
       }
       
-      console.log('[SYNC-PROCESS] Content stored successfully');
+      logWithTimestamp(`[SYNC-PROCESS] Content stored successfully`, undefined, requestId);
       
       // Update the enrollment record
       await adminSupabase
@@ -575,7 +647,7 @@ After reviewing this section, proceed to the next section to build on these conc
         .eq('id', jobId);
       
       if (existingEnrollment) {
-        console.log('[SYNC-PROCESS] Updating enrollment record');
+        logWithTimestamp(`[SYNC-PROCESS] Updating enrollment record`, undefined, requestId);
         await supabase
           .from('hr_course_enrollments')
           .update({
@@ -600,7 +672,7 @@ After reviewing this section, proceed to the next section to build on these conc
         })
         .eq('id', jobId);
       
-      console.log('[SYNC-PROCESS] Content generation process completed successfully');
+      logWithTimestamp(`[SYNC-PROCESS] Content generation process completed successfully`, undefined, requestId);
       
       // Return success response with the course data
       return NextResponse.json(
@@ -623,7 +695,7 @@ After reviewing this section, proceed to the next section to build on these conc
         }
       );
     } catch (error: any) {
-      console.error('[SYNC-PROCESS] Error in content generation process:', error);
+      logWithTimestamp(`❌ Error in content generation process:`, error, requestId);
       
       // Update job status to failed
       await adminSupabase
@@ -651,7 +723,7 @@ After reviewing this section, proceed to the next section to build on these conc
       );
     }
   } catch (error: any) {
-    console.error('Error in course regeneration:', error);
+    logWithTimestamp(`❌ Error in course regeneration:`, error, requestId);
     return NextResponse.json(
       { error: 'Failed to regenerate course content', details: error.message }, 
       { 
