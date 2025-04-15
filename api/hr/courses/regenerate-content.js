@@ -217,7 +217,8 @@ export default async function handler(req, res) {
             employee_id: targetEmployeeId,
             personalized_content_generation_status: 'in_progress',
             personalized_content_generation_job_id: jobId,
-            updated_at: new Date().toISOString()
+            updated_at: new Date().toISOString(),
+            personalized_content_started_at: new Date().toISOString()
           });
           
         if (enrollmentError) {
@@ -773,7 +774,8 @@ async function processContentGenerationJob(jobId, authHeader) {
       .update({
         personalized_content_generation_status: 'completed',
         personalized_content_id: personalizedContent.id,
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
+        personalized_content_completed_at: new Date().toISOString()
       })
       .eq('course_id', courseId)
       .eq('employee_id', targetEmployeeId);
