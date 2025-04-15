@@ -4,7 +4,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import PersonalizedContentGenerationStatus from '@/components/courses/PersonalizedContentGenerationStatus';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 
 interface RegenerateContentButtonProps {
   courseId: string;
@@ -21,8 +21,8 @@ export function RegenerateContentButton({ courseId, onSuccess, onError }: Regene
   // Function to manually trigger job processing
   const triggerJobProcessing = async (jobId: string) => {
     try {
-      const baseUrl = typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBLIC_VERCEL_URL || '';
-      const apiUrl = `${baseUrl}/api/hr/courses/personalize-content/process`;
+      // Use relative URL instead of constructing with origin to avoid cross-domain issues
+      const apiUrl = '/api/hr/courses/personalize-content/process';
       
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       if (sessionError) throw sessionError;
@@ -306,8 +306,11 @@ export function RegenerateContentButton({ courseId, onSuccess, onError }: Regene
 
       <Dialog open={showProgressDialog} onOpenChange={setShowProgressDialog}>
         <DialogContent className="sm:max-w-md">
+          <DialogTitle>Regenerating Course Content</DialogTitle>
+          <DialogDescription>
+            Your personalized course content is being generated. This may take a few moments.
+          </DialogDescription>
           <div className="p-2">
-            <h2 className="text-xl font-semibold mb-4">Regenerating Course Content</h2>
             <PersonalizedContentGenerationStatus 
               initialIsGenerating={true}
               jobId={jobId}

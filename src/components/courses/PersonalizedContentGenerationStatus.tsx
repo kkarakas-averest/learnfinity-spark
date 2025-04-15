@@ -187,26 +187,18 @@ export default function PersonalizedContentGenerationStatus({
         try {
           console.log(`🔄 Manually triggering job processing for job ID: ${data.job_id}`);
           
-          // First try with relative URL
-          let processResponse = await fetch('/api/hr/courses/personalize-content/process', {
+          // Use relative URL to avoid cross-domain issues
+          const processResponse = await fetch('/api/hr/courses/personalize-content/process', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
+              // Add Authorization header if needed
+              ...(typeof window !== 'undefined' && localStorage.getItem('supabase.auth.token') ? {
+                'Authorization': `Bearer ${localStorage.getItem('supabase.auth.token')}` 
+              } : {})
             },
             body: JSON.stringify({ job_id: data.job_id }),
           });
-          
-          // If that fails, try the full URL with current origin
-          if (!processResponse.ok && typeof window !== 'undefined') {
-            const baseUrl = window.location.origin;
-            processResponse = await fetch(`${baseUrl}/api/hr/courses/personalize-content/process`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({ job_id: data.job_id }),
-            });
-          }
           
           if (processResponse.ok) {
             const processResult = await processResponse.json();
@@ -349,6 +341,12 @@ export default function PersonalizedContentGenerationStatus({
   React.useEffect(() => {
     async function checkExistingJob() {
       try {
+        // Skip the check if courseId or employeeId is missing
+        if (!courseId || !employeeId) {
+          console.log('Skipping enrollment check - missing courseId or employeeId');
+          return;
+        }
+
         // First, check if there's an active job in the course enrollment
         const { data: enrollmentData, error: enrollmentError } = await supabase
           .from('hr_course_enrollments')
