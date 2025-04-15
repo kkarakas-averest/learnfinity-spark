@@ -1,10 +1,13 @@
-import React, { useState, useEffect } from '@/lib/react-helpers';
+'use client';
+
+import React, { useState, useEffect, useCallback } from '@/lib/react-helpers';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import PersonalizedContentGenerationStatus from '@/components/courses/PersonalizedContentGenerationStatus';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { useSupabase } from '@/components/providers/supabase-provider';
 
 interface RegenerateContentButtonProps {
   courseId: string;
@@ -17,61 +20,113 @@ export function RegenerateContentButton({ courseId, onSuccess, onError }: Regene
   const [isLoading, setIsLoading] = useState(false);
   const [jobId, setJobId] = useState<string | undefined>(undefined);
   const [showProgressDialog, setShowProgressDialog] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const { supabase } = useSupabase();
 
-  // Function to manually trigger job processing
-  const triggerJobProcessing = async (jobId: string) => {
+  const triggerJobProcessing = useCallback(async (jobId: string) => {
+    console.log(`🔄 Attempting to trigger job processing for: ${jobId}`);
+    setIsProcessing(true);
+
     try {
-      // Use the new proxy endpoint which will handle cross-domain issues
-      const apiUrl = '/api/proxy-process-job';
-      
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError) throw sessionError;
-      
-      const authToken = session?.access_token;
-      if (!authToken) throw new Error('No valid session found');
-      
-      // First try with GET method (which may work better in production)
+      // Get Supabase session for auth token
+      const session = await supabase.auth.getSession();
+      const authToken = session?.data?.session?.access_token;
+
+      if (!authToken) {
+        console.error('❌ No authentication token available');
+        throw new Error('Authentication required');
+      }
+
+      // First try the proxy endpoint
       try {
-        console.log(`Attempting to process job ${jobId} using GET method`);
-        const getResponse = await fetch(`${apiUrl}?job_id=${encodeURIComponent(jobId)}`, {
-          method: 'GET',
+        console.log(`📡 Calling proxy endpoint for job ${jobId}`);
+        const proxyResponse = await fetch(`/api/proxy-process-job?job_id=${jobId}`, {
+          method: 'GET', // Use GET as the primary method
           headers: {
-            'Authorization': `Bearer ${authToken}`,
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
           }
         });
-        
-        if (getResponse.ok) {
-          const responseData = await getResponse.json();
-          console.log('Job processing successful via GET:', responseData);
-          return responseData;
-        } else {
-          console.log(`GET method failed with status ${getResponse.status}, falling back to POST`);
+
+        if (proxyResponse.ok) {
+          const result = await proxyResponse.json();
+          console.log(`✅ Proxy endpoint response:`, result);
+          setIsProcessing(false);
+          return;
         }
-      } catch (getError) {
-        console.log('GET request failed, falling back to POST:', getError);
+        
+        console.warn(`⚠️ Proxy endpoint failed with status ${proxyResponse.status}. Trying POST method...`);
+        
+        // If GET fails, try with POST to the proxy
+        const proxyPostResponse = await fetch(`/api/proxy-process-job`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({ job_id: jobId })
+        });
+        
+        if (proxyPostResponse.ok) {
+          const result = await proxyPostResponse.json();
+          console.log(`✅ Proxy POST endpoint response:`, result);
+          setIsProcessing(false);
+          return;
+        }
+        
+        console.warn(`⚠️ Proxy POST endpoint failed with status ${proxyPostResponse.status}. Trying direct API...`);
+      } catch (proxyError) {
+        console.error(`❌ Error with proxy endpoint:`, proxyError);
+        // Continue to try the direct endpoint
       }
+
+      // Fallback to the direct API endpoint
+      console.log(`📡 Calling direct API endpoint for job ${jobId}`);
       
-      // Fall back to POST method if GET fails
-      console.log(`Attempting to process job ${jobId} using POST method`);
-      const response = await fetch(apiUrl, {
+      // First attempt with POST (the correct method per route.ts)
+      const directResponse = await fetch('/api/hr/courses/personalize-content/process', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authToken}`,
+          'Authorization': `Bearer ${authToken}`
         },
-        body: JSON.stringify({ job_id: jobId }),
+        body: JSON.stringify({ job_id: jobId })
       });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error: ${response.status} - ${await response.text()}`);
+
+      if (!directResponse.ok) {
+        console.warn(`⚠️ Direct API endpoint failed with status ${directResponse.status}: ${directResponse.statusText}`);
+        
+        // Try one more time with GET in case the endpoint supports both methods
+        const directGetResponse = await fetch(`/api/hr/courses/personalize-content/process?job_id=${jobId}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          }
+        });
+        
+        if (!directGetResponse.ok) {
+          throw new Error(`Failed to process job: ${directGetResponse.status} ${directGetResponse.statusText}`);
+        }
+        
+        const result = await directGetResponse.json();
+        console.log(`✅ Direct GET API response:`, result);
+      } else {
+        const result = await directResponse.json();
+        console.log(`✅ Direct POST API response:`, result);
       }
-      
-      return await response.json();
+
     } catch (error) {
-      console.error('Job processing error:', error);
-      throw error;
+      console.error('❌ Error processing job:', error);
+      toast({
+        title: "Error",
+        description: `Failed to process job: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessing(false);
     }
-  };
+  }, [courseId, supabase]);
 
   const handleRegenerate = async () => {
     setIsLoading(true);

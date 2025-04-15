@@ -6,14 +6,21 @@ const getEnv = () => {
   // Client-side environment variables must start with VITE_
   const VITE_GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY;
   const VITE_ENABLE_LLM = import.meta.env.VITE_ENABLE_LLM === 'true';
-
-  // TEMPORARY FIX: Hardcoded API key (remove after troubleshooting)
-  const HARDCODED_GROQ_API_KEY = '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';
+  
+  // Check for server-side environment variables as fallback
+  const SERVER_API_KEY = typeof process !== 'undefined' ? process.env.GROQ_API_KEY : undefined;
   
   return {
-    GROQ_API_KEY: HARDCODED_GROQ_API_KEY || VITE_GROQ_API_KEY,
+    GROQ_API_KEY: VITE_GROQ_API_KEY || SERVER_API_KEY || '',
     ENABLE_LLM: VITE_ENABLE_LLM
   };
+};
+
+/**
+ * Logging helper to track API calls
+ */
+const logApiCall = (action: string, details?: any) => {
+  console.log(`[GROQ API] ${action}`, details ? details : '');
 };
 
 /**
@@ -26,7 +33,7 @@ export async function generateCourseWithGroq(
   sectionsPerModule: number = 3,
   includeQuiz: boolean = true
 ): Promise<any> {
-  console.log('GroqAPI function called with params:', { topic, targetAudience, modules, sectionsPerModule, includeQuiz });
+  logApiCall('generateCourseWithGroq called', { topic, targetAudience, modules, sectionsPerModule, includeQuiz });
   
   const apiKey = getEnv().GROQ_API_KEY || process.env.GROQ_API_KEY;
   
@@ -34,7 +41,7 @@ export async function generateCourseWithGroq(
     console.error('GROQ_API_KEY is missing in environment variables');
     throw new Error('GROQ_API_KEY is not configured');
   } else {
-    console.log('GROQ_API_KEY found:', apiKey.substring(0, 5) + '...');
+    logApiCall('API key loaded successfully');
   }
 
   // Create a structured prompt for course generation
@@ -96,11 +103,11 @@ export async function generateCourseWithGroq(
   
   Ensure all content is professionally written and educational.`;
 
-  console.log('Preparing to call GroqAPI with prompts');
+  logApiCall('Preparing to call GroqAPI with prompts');
 
   try {
     // Call GroqAPI with the structured prompt
-    console.log('Sending request to GroqAPI...');
+    logApiCall('Sending request to GroqAPI...');
     const response = await fetch(GROQ_API_URL, {
       method: 'POST',
       headers: {
@@ -128,9 +135,9 @@ export async function generateCourseWithGroq(
       throw new Error(`GroqAPI request failed: ${response.status} ${errorText}`);
     }
 
-    console.log('GroqAPI response received with status:', response.status);
+    logApiCall('GroqAPI response received with status:', response.status);
     const data = await response.json();
-    console.log('GroqAPI response data received:', { 
+    logApiCall('GroqAPI response data received:', { 
       choices: data.choices?.length,
       model: data.model,
       usage: data.usage
@@ -140,16 +147,16 @@ export async function generateCourseWithGroq(
     try {
       // Extract the content from the response
       const generatedContent = data.choices[0].message.content;
-      console.log('Generated content received, length:', generatedContent.length);
+      logApiCall('Generated content received, length:', generatedContent.length);
       
       // Find the JSON object in the text
       const jsonMatch = generatedContent.match(/\{[\s\S]*\}/);
       
       if (jsonMatch) {
-        console.log('JSON match found, attempting to parse');
+        logApiCall('JSON match found, attempting to parse');
         try {
           const courseData = JSON.parse(jsonMatch[0]);
-          console.log('Successfully parsed course data:', {
+          logApiCall('Successfully parsed course data:', {
             title: courseData.title,
             moduleCount: courseData.modules?.length,
             objectivesCount: courseData.learningObjectives?.length

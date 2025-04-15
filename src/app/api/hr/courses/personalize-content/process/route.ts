@@ -15,65 +15,191 @@ export enum JobStatus {
 
 // Create local stub implementations for the missing AI functions
 const generateInitialCourseContent = async (provider: any, params: any) => {
-  console.log('Simulating initial course content generation...');
-  return {
-    modules: [
-      {
-        title: params.courseTitle,
-        description: params.courseDescription,
-        sections: [
-          {
-            title: 'Introduction',
-            type: 'lesson',
-            content: `Introduction to ${params.courseTitle}`,
-            html_content: `<div><h1>Introduction</h1><p>This is the introduction to ${params.courseTitle}</p></div>`,
-            objectives: ['Understand the basics'],
-            hasAssessment: true,
-            assessment: null,
-            keyTakeaways: [],
-            exercises: []
-          }
-        ]
-      }
-    ]
-  };
+  console.log('Generating initial course content...');
+  return await provider.generateStructuredContent(
+    `Create a personalized course structure for a ${params.courseTitle} course.
+    The course should be tailored for someone with the following background:
+    - Knowledge: ${params.userKnowledge}
+    - Aspirations: ${params.userAspirations}
+    - Learning style: ${params.userPreferences.learning_style}
+    - Content depth: ${params.userPreferences.content_depth}
+    
+    Return the response as a structured JSON with modules and sections.`,
+    'course_structure'
+  );
 };
 
 const generateLessonContent = async (provider: any, params: any) => {
-  console.log(`Simulating lesson content generation for ${params.lessonTitle}...`);
-  return {
-    content: `Content for ${params.lessonTitle}`,
-    html_content: `<div><h1>${params.lessonTitle}</h1><p>This is the content for ${params.lessonTitle}</p></div>`
-  };
+  console.log(`Generating lesson content for ${params.lessonTitle}...`);
+  return await provider.generateStructuredContent(
+    `Create detailed content for the ${params.lessonTitle} lesson in the ${params.moduleTitle} module.
+    This is for a course titled "${params.courseTitle}".
+    Include practical examples and clear explanations.
+    Format using HTML tags for rich text display.`,
+    'lesson_content'
+  );
 };
 
 const generateAssessmentQuestions = async (provider: any, params: any) => {
-  return [
-    {
-      question: `Sample question about ${params.lessonTitle}?`,
-      options: ['Option A', 'Option B', 'Option C', 'Option D'],
-      correctOption: 0
-    }
-  ];
+  return await provider.generateStructuredContent(
+    `Create ${params.questionCount || 3} multiple-choice assessment questions for the lesson: ${params.lessonTitle}.
+    These questions should test understanding of key concepts from the content: 
+    ${params.lessonContent.substring(0, 500)}...
+    
+    Return as a JSON array of question objects.`,
+    'assessment_questions'
+  );
 };
 
 const generateKey = async (provider: any, params: any) => {
-  return [`Key takeaway for ${params.lessonTitle}`];
+  return await provider.generateStructuredContent(
+    `Identify the key takeaways from this lesson on ${params.lessonTitle}.
+    Content: ${params.lessonContent.substring(0, 500)}...
+    
+    Return as a JSON array of strings.`,
+    'key_takeaways'
+  );
 };
 
 const generateExercises = async (provider: any, params: any) => {
-  return [
-    {
-      title: `Exercise for ${params.lessonTitle}`,
-      description: 'Try this exercise to practice what you learned'
-    }
-  ];
+  return await provider.generateStructuredContent(
+    `Create ${params.exerciseCount || 2} practical exercises for the lesson on ${params.lessonTitle}.
+    The exercises should help apply concepts from: 
+    ${params.lessonContent.substring(0, 500)}...
+    
+    Return as a JSON array of exercise objects with title and description.`,
+    'exercises'
+  );
 };
 
-// Simple mock for the AI provider
+// Real implementation of the Groq AI provider
 class GroqAIProvider {
-  async generateContent(prompt: string) {
-    return `Generated content for: ${prompt}`;
+  private apiKey: string;
+  
+  constructor() {
+    // Use environment variable or fallback to hardcoded key (temporary)
+    this.apiKey = process.env.GROQ_API_KEY || 'YOUR_FALLBACK_KEY_HERE';
+    
+    if (!this.apiKey) {
+      console.error('No Groq API key available');
+      throw new Error('Groq API key is required');
+    }
+  }
+  
+  async generateContent(prompt: string): Promise<string> {
+    logWithTimestamp('Calling Groq API with prompt', prompt.substring(0, 100) + '...');
+    
+    try {
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.apiKey}`
+        },
+        body: JSON.stringify({
+          model: 'llama-3.1-70b-versatile',
+          messages: [
+            { 
+              role: 'system', 
+              content: 'You are an expert educational content creator. Generate detailed, accurate, and engaging educational content.' 
+            },
+            { role: 'user', content: prompt }
+          ],
+          temperature: 0.7,
+          max_tokens: 4000
+        })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.text();
+        console.error('Groq API error:', errorData);
+        throw new Error(`Groq API error: ${response.status} - ${errorData}`);
+      }
+      
+      const data = await response.json();
+      return data.choices[0].message.content;
+    } catch (error) {
+      console.error('Error calling Groq API:', error);
+      throw new Error(`Failed to generate content with Groq: ${error.message}`);
+    }
+  }
+  
+  async generateStructuredContent(prompt: string, contentType: string): Promise<any> {
+    const structuredPrompt = `${prompt}
+    
+    IMPORTANT: Return ONLY valid JSON without any explanations or markdown formatting.`;
+    
+    try {
+      const content = await this.generateContent(structuredPrompt);
+      
+      // Extract JSON from the response
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      const jsonArrayMatch = content.match(/\[[\s\S]*\]/);
+      
+      let jsonContent;
+      if (jsonMatch) {
+        jsonContent = JSON.parse(jsonMatch[0]);
+      } else if (jsonArrayMatch) {
+        jsonContent = JSON.parse(jsonArrayMatch[0]);
+      } else {
+        console.error(`No JSON found in response for ${contentType}`);
+        throw new Error(`Failed to extract structured content for ${contentType}`);
+      }
+      
+      return jsonContent;
+    } catch (error) {
+      console.error(`Error generating structured content for ${contentType}:`, error);
+      
+      // Return fallback content based on content type
+      switch (contentType) {
+        case 'course_structure':
+          return {
+            modules: [
+              {
+                title: "Getting Started",
+                description: "Introduction to the course",
+                sections: [
+                  {
+                    title: "Introduction",
+                    type: "lesson",
+                    content: "Introduction content",
+                    html_content: "<div><h1>Introduction</h1><p>This is the introduction to the course.</p></div>",
+                    objectives: ["Understand the basics"],
+                    hasAssessment: true,
+                    assessment: null,
+                    keyTakeaways: [],
+                    exercises: []
+                  }
+                ]
+              }
+            ]
+          };
+        case 'lesson_content':
+          return {
+            content: "Lesson content",
+            html_content: "<div><h1>Lesson</h1><p>This is the lesson content.</p></div>"
+          };
+        case 'assessment_questions':
+          return [
+            {
+              question: "Sample question?",
+              options: ['Option A', 'Option B', 'Option C', 'Option D'],
+              correctOption: 0
+            }
+          ];
+        case 'key_takeaways':
+          return ["Key takeaway 1", "Key takeaway 2"];
+        case 'exercises':
+          return [
+            {
+              title: "Exercise",
+              description: "Try this exercise to practice what you learned"
+            }
+          ];
+        default:
+          return {};
+      }
+    }
   }
 }
 

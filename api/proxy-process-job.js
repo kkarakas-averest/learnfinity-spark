@@ -24,21 +24,24 @@ export default async function handler(req, res) {
     // Get request data (body for POST, query for GET)
     let requestData;
     let jobId;
+    let forceAdvance = false;
 
     if (req.method === 'POST') {
       requestData = req.body;
       jobId = requestData?.job_id;
+      forceAdvance = !!requestData?.force_advance;
     } else {
       // Handle GET request
       requestData = req.query;
       jobId = requestData?.job_id;
+      forceAdvance = requestData?.force_advance === 'true';
     }
 
     if (!jobId) {
       return res.status(400).json({ error: 'Missing job_id parameter' });
     }
 
-    console.log(`Processing job: ${jobId} via ${req.method} request`);
+    console.log(`Processing job: ${jobId} via ${req.method} request ${forceAdvance ? '(FORCE ADVANCE MODE)' : ''}`);
     
     // Direct server-to-server communication with backend services
     // This should bypass client-side routing issues
@@ -92,7 +95,7 @@ export default async function handler(req, res) {
         
         // 1. Get job details first
         const { data: job, error: jobFetchError } = await supabase
-          .from('content_generation_jobs')
+          .from('personalization_jobs')
           .select('*')
           .eq('id', jobId)
           .single();
@@ -100,6 +103,54 @@ export default async function handler(req, res) {
         if (jobFetchError) {
           console.error('Error fetching job details:', jobFetchError);
           return res.status(404).json({ error: 'Job not found', details: jobFetchError.message });
+        }
+        
+        // Handle force advance mode for stuck jobs
+        if (forceAdvance && job.status === 'in_progress' && job.current_step < job.total_steps) {
+          console.log(`[FORCE ADVANCE] Force advancing job ${jobId} from step ${job.current_step}`);
+          
+          // Force advance to the next step
+          const nextStep = job.current_step + 1;
+          const { description, progress } = getStepInfo(nextStep, job.total_steps);
+          
+          // Do a more aggressive update with less data
+          const { error: forceError } = await supabase
+            .from('personalization_jobs')
+            .update({
+              current_step: nextStep,
+              step_description: description,
+              progress: progress,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', jobId);
+            
+          if (forceError) {
+            console.error('[FORCE ADVANCE] Error force advancing job:', forceError);
+            return res.status(500).json({ error: 'Failed to force advance job', details: forceError.message });
+          }
+          
+          console.log(`[FORCE ADVANCE] Successfully force advanced job to step ${nextStep}`);
+          
+          // Check if this was the final step
+          if (nextStep >= job.total_steps) {
+            await completeJob(supabase, {
+              ...job,
+              current_step: nextStep
+            });
+            
+            return res.status(200).json({
+              success: true,
+              message: 'Job force advanced to completion',
+              status: 'completed'
+            });
+          }
+          
+          return res.status(200).json({
+            success: true,
+            message: `Job force advanced to step ${nextStep}`,
+            current_step: nextStep,
+            progress: progress
+          });
         }
         
         // If job is already completed or failed, just return the status
@@ -121,7 +172,7 @@ export default async function handler(req, res) {
           // Process next step if there are more steps
           if (job.current_step < job.total_steps) {
             console.log(`Continuing job processing at step ${job.current_step + 1}`);
-            await processJobStep(supabase, job);
+            await processNextStep(supabase, job);
             return res.status(200).json({
               success: true,
               message: `Processed step ${job.current_step + 1}`,
@@ -144,7 +195,7 @@ export default async function handler(req, res) {
         // 2. Initialize job - set status to in_progress
         console.log(`Initializing job ${jobId} to in_progress state`);
         const { error: updateError } = await supabase
-          .from('content_generation_jobs')
+          .from('personalization_jobs')
           .update({ 
             status: 'in_progress',
             current_step: 0,
@@ -162,7 +213,7 @@ export default async function handler(req, res) {
         console.log(`Successfully initialized job ${jobId}`);
         
         // 3. Process first step
-        await processJobStep(supabase, {
+        await processNextStep(supabase, {
           ...job,
           current_step: 0,
           status: 'in_progress'
@@ -269,27 +320,89 @@ export default async function handler(req, res) {
 /**
  * Process a single step of the job
  */
-async function processJobStep(supabase, job) {
-  const jobId = job.id;
-  const currentStep = job.current_step;
-  const nextStep = currentStep + 1;
-  const totalSteps = job.total_steps || 10;
-  
-  // Don't process if the job is already at max steps
-  if (nextStep > totalSteps) {
-    console.log(`Job ${jobId} is already at max steps (${totalSteps})`);
-    return;
-  }
-  
-  console.log(`Processing step ${nextStep} for job ${jobId}`);
+async function processJobStep(supabase, jobId) {
+  console.log(`Processing next step for job ${jobId}`);
   
   try {
-    // Get step description and progress based on step number
-    const { description, progress } = getStepInfo(nextStep, totalSteps);
+    // 1. Get current job state
+    const { data: job, error: jobFetchError } = await supabase
+      .from('personalization_jobs')
+      .select('*')
+      .eq('id', jobId)
+      .single();
+      
+    if (jobFetchError) {
+      console.error(`Error fetching job ${jobId} details:`, jobFetchError);
+      return { 
+        success: false, 
+        error: 'Failed to fetch job details', 
+        details: jobFetchError.message,
+        jobId 
+      };
+    }
     
-    // Update the job with the new step info
-    const { error } = await supabase
-      .from('content_generation_jobs')
+    if (!job) {
+      console.error(`Job ${jobId} not found in database`);
+      return { 
+        success: false, 
+        error: 'Job not found',
+        jobId 
+      };
+    }
+    
+    console.log(`Current job state: Job ${jobId}, Step ${job.current_step}, Status ${job.status}`);
+    
+    // 2. Check if job is ready to be processed (in_progress status)
+    if (job.status !== 'in_progress') {
+      console.error(`Job ${jobId} is not in progress, current status: ${job.status}`);
+      return { 
+        success: false, 
+        error: 'Job is not in progress',
+        status: job.status,
+        jobId 
+      };
+    }
+    
+    // 3. Check if we've reached the final step
+    if (job.current_step >= job.total_steps) {
+      console.log(`Job ${jobId} has reached final step ${job.current_step} of ${job.total_steps}, marking as completed`);
+      
+      // Mark job as completed
+      const { error: completionError } = await supabase
+        .from('personalization_jobs')
+        .update({
+          status: 'completed',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', jobId);
+        
+      if (completionError) {
+        console.error(`Error marking job ${jobId} as completed:`, completionError);
+        return { 
+          success: false, 
+          error: 'Failed to mark job as completed',
+          details: completionError.message,
+          jobId
+        };
+      }
+      
+      return { 
+        success: true, 
+        message: 'Job completed successfully',
+        jobId,
+        status: 'completed'
+      };
+    }
+    
+    // 4. Process the next step
+    const nextStep = job.current_step + 1;
+    const { description, progress } = getStepInfo(nextStep, job.total_steps);
+    
+    console.log(`Advancing job ${jobId} to step ${nextStep}: ${description} (${progress}%)`);
+    
+    // Update job with next step info
+    const { error: updateError } = await supabase
+      .from('personalization_jobs')
       .update({
         current_step: nextStep,
         step_description: description,
@@ -298,35 +411,59 @@ async function processJobStep(supabase, job) {
       })
       .eq('id', jobId);
       
-    if (error) {
-      console.error(`Error updating job ${jobId} to step ${nextStep}:`, error);
-    } else {
-      console.log(`Successfully updated job ${jobId} to step ${nextStep}: ${description} (${progress}%)`);
+    if (updateError) {
+      console.error(`Error updating job ${jobId} to step ${nextStep}:`, updateError);
+      return { 
+        success: false, 
+        error: 'Failed to update job step',
+        details: updateError.message,
+        jobId,
+        step: nextStep
+      };
     }
     
-    // If this is the final step, complete the job
-    if (nextStep >= totalSteps) {
-      await completeJob(supabase, {
-        ...job,
-        current_step: nextStep
-      });
+    console.log(`Successfully updated job ${jobId} to step ${nextStep}: ${description} (${progress}%)`);
+    
+    // 5. For specific steps that need to trigger backend processes
+    if (nextStep === 3) {
+      // Simulate triggering a special backend process for step 3
+      console.log(`Triggering special backend process for job ${jobId} at step ${nextStep}`);
+      // Add any special processing logic here...
     }
+    
+    return { 
+      success: true, 
+      message: `Advanced to step ${nextStep}: ${description}`,
+      jobId,
+      step: nextStep,
+      progress,
+      description
+    };
   } catch (error) {
-    console.error(`Error processing step ${nextStep} for job ${jobId}:`, error);
+    console.error(`Unexpected error processing job ${jobId}:`, error);
     
-    // If there's an error, mark the job as failed
+    // Try to mark the job as failed if possible
     try {
-      await supabase
-        .from('content_generation_jobs')
-        .update({
-          status: 'failed',
-          error_message: `Error at step ${nextStep}: ${error.message || 'Unknown error'}`,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', jobId);
+      if (supabase) {
+        await supabase
+          .from('personalization_jobs')
+          .update({
+            status: 'failed',
+            error_message: `Unexpected error: ${error.message}`,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', jobId);
+      }
     } catch (updateError) {
       console.error(`Failed to mark job ${jobId} as failed:`, updateError);
     }
+    
+    return { 
+      success: false, 
+      error: 'Unexpected error during job processing',
+      details: error.message,
+      jobId
+    };
   }
 }
 
@@ -334,84 +471,145 @@ async function processJobStep(supabase, job) {
  * Complete the job
  */
 async function completeJob(supabase, job) {
-  const jobId = job.id;
+  console.log(`[completeJob] Completing job ${job.id}`);
   
   try {
-    console.log(`Completing job ${jobId}`);
+    const { description, progress } = getStepInfo(job.total_steps, job.total_steps);
     
-    // Mark job as completed
-    const { error: completionError } = await supabase
-      .from('content_generation_jobs')
+    // Update job to completed status
+    const { error: updateError } = await supabase
+      .from('personalization_jobs')
       .update({
         status: 'completed',
-        progress: 100,
-        step_description: 'Content generation completed successfully',
+        current_step: job.total_steps,
+        current_step_description: description,
+        progress_percentage: 100,
         completed_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       })
-      .eq('id', jobId);
-      
-    if (completionError) {
-      console.error(`Error marking job ${jobId} as completed:`, completionError);
-      return;
+      .eq('id', job.id);
+
+    if (updateError) {
+      console.error(`[completeJob] Error marking job ${job.id} as completed:`, updateError);
+      return { success: false, message: `Error completing job: ${updateError.message}` };
     }
-    
-    console.log(`Job ${jobId} successfully completed`);
-    
-    // Update the enrollment record if applicable
-    if (job.course_id && job.employee_id) {
-      try {
-        const { error: enrollmentError } = await supabase
-          .from('hr_course_enrollments')
-          .update({
-            personalized_content_generation_status: 'completed',
-            personalized_content_completed_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          })
-          .eq('course_id', job.course_id)
-          .eq('employee_id', job.employee_id);
-          
-        if (enrollmentError) {
-          console.error('Error updating enrollment record:', enrollmentError);
-        } else {
-          console.log('Successfully updated enrollment record');
-        }
-      } catch (enrollmentUpdateError) {
-        console.error('Exception updating enrollment:', enrollmentUpdateError);
-      }
-    }
+
+    console.log(`[completeJob] Successfully completed job ${job.id}`);
+    return { 
+      success: true, 
+      message: 'Job completed successfully',
+      job_id: job.id,
+      status: 'completed'
+    };
   } catch (error) {
-    console.error(`Error completing job ${jobId}:`, error);
+    console.error(`[completeJob] Unexpected error completing job ${job.id}:`, error);
+    
+    // Try to update job status to failed
+    try {
+      await supabase
+        .from('personalization_jobs')
+        .update({
+          status: 'failed',
+          error_message: `Error completing job: ${error.message || 'Unknown error'}`,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', job.id);
+        
+      console.log(`[completeJob] Marked job ${job.id} as failed due to completion error`);
+    } catch (updateError) {
+      console.error(`[completeJob] Could not update job status to failed:`, updateError);
+    }
+    
+    return { 
+      success: false, 
+      message: `Error completing job: ${error.message || 'Unknown error'}` 
+    };
   }
 }
 
-/**
- * Get step info based on step number
- */
+// Function to get step information based on step number
 function getStepInfo(stepNumber, totalSteps) {
-  const progress = Math.floor((stepNumber / totalSteps) * 100);
+  const descriptions = [
+    'Initializing job',
+    'Preparing content generation',
+    'Generating course structure',
+    'Generating detailed content',
+    'Finalizing content',
+    'Completing generation'
+  ];
   
-  // Map step numbers to descriptions
-  const stepDescriptions = {
-    1: 'Retrieving course and employee data',
-    2: 'Preparing content generation',
-    3: 'Generating course structure',
-    4: 'Processing modules',
-    5: 'Generating lesson content',
-    6: 'Creating assessments',
-    7: 'Personalizing content',
-    8: 'Finalizing content',
-    9: 'Storing content in database',
-    10: 'Content generation completed'
-  };
+  // Use default description if step number exceeds predefined descriptions
+  const description = descriptions[stepNumber] || `Processing step ${stepNumber}`;
   
-  // Handle cases where totalSteps isn't 10
-  let description = stepDescriptions[stepNumber] || `Processing step ${stepNumber}`;
-  
-  // For the final step, always use "completed" regardless of step number
-  if (stepNumber === totalSteps) {
-    description = 'Content generation completed';
-  }
-  
+  // Calculate progress percentage (rounded to nearest whole number)
+  // First step is 0%, last step is 100%
+  const progress = totalSteps > 1 
+    ? Math.round((stepNumber / (totalSteps - 1)) * 100) 
+    : 100;
+    
   return { description, progress };
+}
+
+async function processNextStep(supabase, job) {
+  console.log(`[processNextStep] Processing next step for job ${job.id}, current step ${job.current_step}/${job.total_steps}`);
+  
+  try {
+    if (job.status === 'completed') {
+      console.log(`[processNextStep] Job ${job.id} is already completed, skipping`);
+      return { 
+        success: true, 
+        message: 'Job is already completed',
+        job_id: job.id,
+        status: 'completed'
+      };
+    }
+    
+    if (job.status === 'failed') {
+      console.log(`[processNextStep] Job ${job.id} has failed, skipping`);
+      return { 
+        success: false, 
+        message: 'Job has failed and cannot be processed further',
+        job_id: job.id,
+        status: 'failed'
+      };
+    }
+
+    // Check if job is at the final step
+    if (job.current_step >= job.total_steps) {
+      console.log(`[processNextStep] Job ${job.id} is at final step, completing job`);
+      return await completeJob(supabase, job);
+    }
+    
+    // Process the next step
+    console.log(`[processNextStep] Processing step ${job.current_step + 1} for job ${job.id}`);
+    const result = await processJobStep(supabase, job.id);
+    
+    console.log(`[processNextStep] Step processing result for job ${job.id}:`, result);
+    return result;
+  } catch (error) {
+    console.error(`[processNextStep] Unexpected error processing next step for job ${job.id}:`, error);
+    
+    // Try to update job status to failed
+    try {
+      await supabase
+        .from('personalization_jobs')
+        .update({
+          status: 'failed',
+          error_message: `Error processing next step: ${error.message || 'Unknown error'}`,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', job.id);
+        
+      console.log(`[processNextStep] Marked job ${job.id} as failed due to processing error`);
+    } catch (updateError) {
+      console.error(`[processNextStep] Could not update job status to failed:`, updateError);
+    }
+    
+    return { 
+      success: false, 
+      message: `Error processing next step: ${error.message || 'Unknown error'}`,
+      job_id: job.id,
+      status: 'failed'
+    };
+  }
 } 

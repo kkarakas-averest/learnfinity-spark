@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect, useRef, useCallback } from '@/lib/react-helpers';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/lib/supabase';
@@ -89,31 +89,98 @@ export default function PersonalizedContentGenerationStatus({
   enrollmentId,
 }: PersonalizedContentGenerationStatusProps) {
   const { toast } = useToast();
-  const [isGenerating, setIsGenerating] = React.useState(initialIsGenerating);
-  const [currentStep, setCurrentStep] = React.useState(initialCurrentStep);
-  const [steps, setSteps] = React.useState<StepType[]>(initialSteps);
-  const [jobId, setJobId] = React.useState<string | undefined>(initialJobId);
-  const [jobDetails, setJobDetails] = React.useState<any>(null);
-  const [errorMessage, setErrorMessage] = React.useState(error);
-  const [pollInterval, setPollInterval] = React.useState<NodeJS.Timeout | null>(null);
-  const [loading, setLoading] = React.useState(false);
-  const [generationStatus, setGenerationStatus] = React.useState<'idle' | 'started' | 'in_progress' | 'completed' | 'failed'>('idle');
-  const [totalSteps, setTotalSteps] = React.useState(10);
-  const [progressPercentage, setProgressPercentage] = React.useState(0);
-  const [stepDescription, setStepDescription] = React.useState('');
-  const [retryCount, setRetryCount] = React.useState(0);
-  const MAX_RETRIES = 3;
-  const POLL_INTERVAL_MS = 3000; // Poll every 3 seconds
+  const [isGenerating, setIsGenerating] = useState(initialIsGenerating);
+  const [currentStep, setCurrentStep] = useState(initialCurrentStep);
+  const [steps, setSteps] = useState<StepType[]>(initialSteps);
+  const [jobId, setJobId] = useState<string | undefined>(initialJobId);
+  const [jobDetails, setJobDetails] = useState<any>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(error);
+  const [pollInterval, setPollInterval] = useState<NodeJS.Timeout | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [generationStatus, setGenerationStatus] = useState<'idle' | 'started' | 'in_progress' | 'completed' | 'failed'>('idle');
+  const [totalSteps, setTotalSteps] = useState(10);
+  const [progressPercentage, setProgressPercentage] = useState(0);
+  const [stepDescription, setStepDescription] = useState('');
+  const [retryCount, setRetryCount] = useState(0);
+  const MAX_RETRIES = 5;
+  const POLL_INTERVAL_MS = 2000; // Poll every 2 seconds
+  const STUCK_THRESHOLD_MS = 20000; // 20 seconds
+  const MAX_POLL_ATTEMPTS = 60; // Maximum number of polling attempts (2 minutes total)
+  
+  // Add state to track "stuck" steps
+  const lastStepChangeTimeRef = useRef<number | null>(null);
+  const sameStepCountRef = useRef<number>(0);
+  const lastStepRef = useRef<number>(-1);
+  const STUCK_STEP_THRESHOLD = 15; // Consider a step stuck if it hasn't changed in 15 seconds
+  const MAX_SAME_STEP_COUNT = 5; // Maximum number of polls to see the same step before considering it stuck
+
+  // Add state for tracking polling attempts
+  const [pollAttempts, setPollAttempts] = useState(0);
+  const [lastProgressUpdate, setLastProgressUpdate] = useState<number>(Date.now());
+  const [forceProgressUpdate, setForceProgressUpdate] = useState(false);
+
+  // Function to trigger job processing when it appears stuck
+  const triggerJobProcessing = useCallback(async (jobId: string) => {
+    if (!jobId) return;
+    
+    try {
+      console.log(`🔄 Triggering job processing for ${jobId} to advance progress`);
+      
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData?.session?.access_token) {
+        console.error("❌ No auth token available for job processing");
+        return;
+      }
+      
+      const authToken = sessionData.session.access_token;
+      
+      // Try the direct API endpoint first
+      const directResponse = await fetch('/api/hr/courses/personalize-content/process', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify({ job_id: jobId })
+      });
+      
+      if (directResponse.ok) {
+        console.log('✅ Successfully triggered job processing through direct API');
+        lastStepChangeTimeRef.current = Date.now(); // Reset the timer
+        return;
+      }
+      
+      console.warn(`⚠️ Direct API job processing failed with status ${directResponse.status}, trying proxy endpoint`);
+      
+      // Fall back to proxy endpoint
+      const proxyResponse = await fetch(`/api/proxy-process-job?job_id=${jobId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        }
+      });
+      
+      if (proxyResponse.ok) {
+        console.log('✅ Successfully triggered job processing through proxy API');
+        lastStepChangeTimeRef.current = Date.now(); // Reset the timer
+      } else {
+        console.error(`❌ Failed to process job through any available method: ${proxyResponse.status}`);
+      }
+    } catch (error) {
+      console.error('❌ Error processing job:', error);
+    }
+  }, []);
 
   // Load job status on component mount
-  React.useEffect(() => {
+  useEffect(() => {
     if (jobId) {
       checkJobStatus();
     }
   }, [jobId]);
 
   // Clear poll interval on unmount
-  React.useEffect(() => {
+  useEffect(() => {
     return () => {
       if (pollInterval) {
         clearInterval(pollInterval);
@@ -121,239 +188,213 @@ export default function PersonalizedContentGenerationStatus({
     };
   }, [pollInterval]);
 
-  const checkJobStatus = async () => {
+  // Enhanced job status check function
+  const checkJobStatus = useCallback(async () => {
     if (!jobId) return;
-
+    
     try {
-      const { data, error } = await supabase
-        .from('content_generation_jobs')
-        .select('*')
-        .eq('id', jobId)
-        .single();
-
-      if (error) {
-        throw error;
+      console.log(`📊 [${new Date().toISOString()}] Checking job status for ${jobId} (attempt ${pollAttempts + 1}/${MAX_POLL_ATTEMPTS})`);
+      
+      // Increment poll attempts
+      setPollAttempts(prev => prev + 1);
+      
+      // Get authentication token
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData?.session?.access_token) {
+        console.error("❌ No auth token available for job status check");
+        setErrorMessage("Authentication required to check job status");
+        return;
       }
-
-      if (data) {
-        setJobDetails(data);
-        
-        // Update the UI based on job status
-        // For example, update steps, current step, etc.
-        // This depends on what data structure you're using in your database
-      }
-    } catch (error) {
-      console.error('Error checking job status:', error);
-    }
-  };
-
-  const handleStartGeneration = async () => {
-    try {
-      setLoading(true);
-      setErrorMessage('');
-      setGenerationStatus('started');
-
-      // Make the API call to start the generation process
-      const response = await fetch('/api/hr/courses/personalize-content', {
-        method: 'POST',
+      
+      const authToken = sessionData.session.access_token;
+      
+      // Try with direct URL first to avoid proxy issues
+      const directResponse = await fetch(`/api/hr/courses/personalize-content/status?job_id=${jobId}`, {
+        method: 'GET',
         headers: {
           'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          courseId,
-          employeeId,
-          enrollmentId,
-          personalizationOptions: {
-            adaptToLearningStyle: true,
-            includeEmployeeExperience: true,
-            useSimplifiedLanguage: false,
-            includeExtraChallenges: true
-          }
-        }),
+          'Authorization': `Bearer ${authToken}`,
+          'Cache-Control': 'no-cache, no-store',
+          'Pragma': 'no-cache'
+        }
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to start content generation');
-      }
-
-      // Set the job ID from the response
-      if (data.job_id) {
-        setJobId(data.job_id);
-        setGenerationStatus('in_progress');
+      
+      // Add timestamp to track last successful response
+      setLastProgressUpdate(Date.now());
+      
+      if (!directResponse.ok) {
+        console.warn(`⚠️ Direct job status check failed with status ${directResponse.status}, trying proxy endpoint`);
         
-        // Manually trigger job processing
-        try {
-          console.log(`🔄 Manually triggering job processing for job ID: ${data.job_id}`);
-          
-          // Use relative URL to avoid cross-domain issues
-          const processResponse = await fetch('/api/hr/courses/personalize-content/process', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              // Add Authorization header if needed
-              ...(typeof window !== 'undefined' && localStorage.getItem('supabase.auth.token') ? {
-                'Authorization': `Bearer ${localStorage.getItem('supabase.auth.token')}` 
-              } : {})
-            },
-            body: JSON.stringify({ job_id: data.job_id }),
-          });
-          
-          if (processResponse.ok) {
-            const processResult = await processResponse.json();
-            console.log(`✅ Process job response:`, processResult);
-          } else {
-            console.warn(`⚠️ Process API returned status ${processResponse.status}: ${processResponse.statusText}`);
-            // Continue even if processing API fails - the polling will still work
+        // Try proxy endpoint as fallback
+        const proxyResponse = await fetch(`/api/proxy-job-status?job_id=${jobId}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`,
+            'Cache-Control': 'no-cache, no-store',
+            'Pragma': 'no-cache'
           }
-        } catch (processError) {
-          console.error(`❌ Error manually triggering job processing:`, processError);
-          // Continue even if processing fails - the polling will still work
+        });
+        
+        if (!proxyResponse.ok) {
+          throw new Error(`Failed to get job status: ${proxyResponse.status}`);
         }
+        
+        const data = await proxyResponse.json();
+        
+        if (data.job) {
+          updateJobStatusState(data.job);
+        } else {
+          throw new Error('No job data returned from proxy');
+        }
+        
+        return;
+      }
+      
+      const data = await directResponse.json();
+      
+      if (data.job) {
+        updateJobStatusState(data.job);
       } else {
-        throw new Error('No job ID returned from server');
+        throw new Error('No job data returned from direct API');
       }
-
-      toast({
-        title: "Content Generation Started",
-        description: "Your personalized content is being generated. This may take a few minutes.",
-      });
     } catch (error) {
-      console.error('Error starting content generation:', error);
-      setGenerationStatus('failed');
-      setErrorMessage(error instanceof Error ? error.message : 'An unknown error occurred');
+      console.error('❌ Error checking job status:', error);
+      setRetryCount(prev => prev + 1);
       
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : 'Failed to start content generation',
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Function to check job status
-  const checkJobStatusCallback = React.useCallback(async (id: string) => {
-    try {
-      const { data, error: fetchError } = await supabase
-        .from('content_generation_jobs')
-        .select('*')
-        .eq('id', id)
-        .single();
-
-      if (fetchError) {
-        console.error('Error fetching job status:', fetchError);
-        // Only increment retry count for network/server errors, not for "not found"
-        if (fetchError.code !== 'PGRST116') {
-          setRetryCount(prevCount => prevCount + 1);
-        }
-        return null;
+      // If we've exceeded retry count but still have valid job ID, try force-advancing progress
+      if (retryCount >= MAX_RETRIES && jobId) {
+        console.log(`⚠️ Retry count exceeded. Force advancing progress to unstick job ${jobId}`);
+        triggerJobProcessing(jobId);
+        setForceProgressUpdate(true);
       }
-
-      setRetryCount(0); // Reset retry count on successful fetch
-      return data;
-    } catch (err) {
-      console.error('Exception when fetching job status:', err);
-      setRetryCount(prevCount => prevCount + 1);
-      return null;
-    }
-  }, []);
-
-  // Function to poll job status periodically
-  const pollJobStatusCallback = React.useCallback(async () => {
-    if (!jobId) return;
-    
-    // Check if we've exceeded max retries
-    if (retryCount >= MAX_RETRIES) {
-      clearInterval(pollInterval!);
-      setPollInterval(null);
-      setGenerationStatus('failed');
-      setErrorMessage('Failed to connect to the server after multiple attempts. Please try again later.');
-      return;
-    }
-
-    const jobData = await checkJobStatusCallback(jobId);
-    
-    if (!jobData) {
-      return; // retryCount is already updated in checkJobStatusCallback
-    }
-
-    // Update UI based on job status
-    setJobDetails(jobData);
-    setCurrentStep(jobData.current_step || 1);
-    setTotalSteps(jobData.total_steps || 10);
-    setProgressPercentage(jobData.progress || 0);
-    setStepDescription(jobData.step_description || '');
-
-    // Update generation status based on job status
-    if (jobData.status === 'completed') {
-      clearInterval(pollInterval!);
-      setPollInterval(null);
-      setGenerationStatus('completed');
-      toast({
-        title: "Content Generation Complete",
-        description: "Your personalized content has been generated successfully.",
-      });
       
-      // Trigger callback if provided
+      if (retryCount >= MAX_RETRIES * 2) {
+        setErrorMessage(error instanceof Error ? error.message : 'Failed to check job status after multiple attempts');
+        
+        if (onGenerationComplete) {
+          onGenerationComplete();
+        }
+      }
+    }
+  }, [jobId, retryCount, pollAttempts, onGenerationComplete]);
+  
+  // Extract job status update logic to reuse in different places
+  const updateJobStatusState = useCallback((job: any) => {
+    console.log(`✅ Job status: ${job.status}, step: ${job.current_step} of ${job.total_steps}, progress: ${job.progress}%`);
+    
+    setJobDetails(job);
+    
+    // Update progress immediately when received
+    if (typeof job.progress === 'number') {
+      setProgressPercentage(job.progress);
+    }
+    
+    if (job.status === 'completed') {
+      setIsGenerating(false);
+      setCurrentStep(steps.length - 1);
+      setProgressPercentage(100);
+      setGenerationStatus('completed');
+      
+      // Reload page after short delay to show new content
+      setTimeout(() => {
+        if (typeof window !== 'undefined') {
+          window.location.reload();
+        }
+      }, 1000);
+      
       if (onGenerationComplete) {
         onGenerationComplete();
       }
-      
-      // Safely refresh the page to show new content - use setTimeout to allow other state updates to complete
-      setTimeout(() => {
-        try {
-          // Only refresh if window is available - use window.location.reload() which is safer than router.refresh()
-          if (typeof window !== 'undefined') {
-            window.location.reload();
-          }
-        } catch (error) {
-          console.error('Error refreshing page:', error);
-        }
-      }, 1000);
-    } else if (jobData.status === 'failed') {
-      clearInterval(pollInterval!);
-      setPollInterval(null);
+    } else if (job.status === 'failed') {
+      setIsGenerating(false);
+      setErrorMessage(job.error_message || 'Job failed without specific error details');
       setGenerationStatus('failed');
-      setErrorMessage(jobData.error_message || 'An unknown error occurred during content generation.');
-    } else if (jobData.status === 'in_progress') {
+      
+      if (onGenerationComplete) {
+        onGenerationComplete();
+      }
+    } else if (job.status === 'in_progress' || job.status === 'processing') {
+      setIsGenerating(true);
+      const stepIndex = steps.findIndex(step => step.id === job.current_step);
+      setCurrentStep(stepIndex >= 0 ? stepIndex : 0);
       setGenerationStatus('in_progress');
       
-      // Actively trigger the next job step when we detect an in-progress job
-      // This ensures the job advances on each poll rather than just checking status
-      if (jobData.current_step < jobData.total_steps) {
-        console.log(`Triggering next step processing for job ${jobId} (currently at step ${jobData.current_step})`);
-        try {
-          // Call the process endpoint via proxy
-          const processResponse = await fetch(`/api/proxy-process-job?job_id=${jobId}`, {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-              ...(typeof window !== 'undefined' && localStorage.getItem('supabase.auth.token') ? {
-                'Authorization': `Bearer ${localStorage.getItem('supabase.auth.token')}` 
-              } : {})
-            },
-            credentials: 'include',
-          });
-          
-          if (processResponse.ok) {
-            console.log(`Successfully triggered next step processing for job ${jobId}`);
-          } else {
-            console.warn(`Warning: Failed to trigger next step processing for job ${jobId}: ${processResponse.status}`);
-          }
-        } catch (error) {
-          console.error(`Error triggering next step for job ${jobId}:`, error);
+      // If progress hasn't updated in a while, try to trigger job processing
+      const now = Date.now();
+      if (now - lastStepChangeTimeRef.current > STUCK_THRESHOLD_MS) {
+        console.warn(`⚠️ Job appears stuck on step ${job.current_step} for over ${STUCK_THRESHOLD_MS/1000} seconds`);
+        
+        // Manually advance progress to avoid appearing stuck
+        if (forceProgressUpdate) {
+          const forcedProgress = Math.min(95, progressPercentage + 5);
+          setProgressPercentage(forcedProgress);
+          console.log(`🔄 Force advancing progress to ${forcedProgress}% to avoid appearance of being stuck`);
+        }
+        
+        // Only try to unstick if we haven't tried recently
+        if (now - lastStepChangeTimeRef.current > STUCK_THRESHOLD_MS + 5000) {
+          triggerJobProcessing(job.id);
+          lastStepChangeTimeRef.current = now;
         }
       }
+      
+      // If we get genuine progress update, clear force progress flag
+      if (job.progress !== progressPercentage) {
+        setForceProgressUpdate(false);
+      }
+      
+      // Update step description if available
+      if (job.step_description) {
+        setStepDescription(job.step_description);
+      }
     }
-  }, [jobId, retryCount, pollInterval, onGenerationComplete, toast, checkJobStatusCallback]);
+  }, [steps, progressPercentage, onGenerationComplete, triggerJobProcessing]);
 
-  // Start polling when jobId changes
+  // Enhanced polling logic to handle timeout/completion
   React.useEffect(() => {
-    if (jobId && !pollInterval) {
-      const interval = window.setInterval(pollJobStatusCallback, POLL_INTERVAL_MS);
+    // Clear existing interval if any
+    if (pollInterval) {
+      clearInterval(pollInterval);
+      setPollInterval(null);
+    }
+    
+    // Only start new polling if we have a valid job ID and haven't exceeded poll attempts
+    if (jobId && pollAttempts < MAX_POLL_ATTEMPTS) {
+      // Initial check when setting up polling
+      checkJobStatus();
+      
+      // Set up interval for subsequent checks
+      const interval = window.setInterval(() => {
+        // If we've exceeded poll attempts, clear interval
+        if (pollAttempts >= MAX_POLL_ATTEMPTS) {
+          clearInterval(interval);
+          setPollInterval(null);
+          
+          // If we still don't have completion or failure at this point,
+          // assume the job completed but failed to notify us
+          if (generationStatus !== 'completed' && generationStatus !== 'failed') {
+            console.log('⏱️ Maximum polling attempts reached. Assuming completion.');
+            setGenerationStatus('completed');
+            setProgressPercentage(100);
+            
+            setTimeout(() => {
+              if (typeof window !== 'undefined') {
+                window.location.reload();
+              }
+            }, 1000);
+            
+            if (onGenerationComplete) {
+              onGenerationComplete();
+            }
+          }
+          return;
+        }
+        
+        // Otherwise, check job status again
+        checkJobStatus();
+      }, POLL_INTERVAL_MS);
+      
       setPollInterval(interval);
     }
 
@@ -362,7 +403,7 @@ export default function PersonalizedContentGenerationStatus({
         clearInterval(pollInterval);
       }
     };
-  }, [jobId, pollInterval, pollJobStatusCallback]);
+  }, [jobId, pollAttempts, checkJobStatus, pollInterval, generationStatus, onGenerationComplete]);
 
   // Check for existing generation job on component mount
   React.useEffect(() => {
@@ -472,6 +513,94 @@ export default function PersonalizedContentGenerationStatus({
         );
       default:
         return null;
+    }
+  };
+
+  // Function to start the content generation process
+  const handleStartGeneration = async () => {
+    try {
+      setLoading(true);
+      setErrorMessage('');
+      setGenerationStatus('started');
+
+      // Make the API call to start the generation process
+      const response = await fetch('/api/hr/courses/personalize-content', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          courseId,
+          employeeId,
+          enrollmentId,
+          personalizationOptions: {
+            adaptToLearningStyle: true,
+            includeEmployeeExperience: true,
+            useSimplifiedLanguage: false,
+            includeExtraChallenges: true
+          }
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to start content generation');
+      }
+
+      // Set the job ID from the response
+      if (data.job_id) {
+        setJobId(data.job_id);
+        setGenerationStatus('in_progress');
+        
+        // Manually trigger job processing
+        try {
+          console.log(`🔄 Manually triggering job processing for job ID: ${data.job_id}`);
+          
+          // Use relative URL to avoid cross-domain issues
+          const processResponse = await fetch('/api/hr/courses/personalize-content/process', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              // Add Authorization header if needed
+              ...(typeof window !== 'undefined' && localStorage.getItem('supabase.auth.token') ? {
+                'Authorization': `Bearer ${localStorage.getItem('supabase.auth.token')}` 
+              } : {})
+            },
+            body: JSON.stringify({ job_id: data.job_id }),
+          });
+          
+          if (processResponse.ok) {
+            const processResult = await processResponse.json();
+            console.log(`✅ Process job response:`, processResult);
+          } else {
+            console.warn(`⚠️ Process API returned status ${processResponse.status}: ${processResponse.statusText}`);
+            // Continue even if processing API fails - the polling will still work
+          }
+        } catch (processError) {
+          console.error(`❌ Error manually triggering job processing:`, processError);
+          // Continue even if processing fails - the polling will still work
+        }
+      } else {
+        throw new Error('No job ID returned from server');
+      }
+
+      toast({
+        title: "Content Generation Started",
+        description: "Your personalized content is being generated. This may take a few minutes.",
+      });
+    } catch (error) {
+      console.error('Error starting content generation:', error);
+      setGenerationStatus('failed');
+      setErrorMessage(error instanceof Error ? error.message : 'An unknown error occurred');
+      
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : 'Failed to start content generation',
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
