@@ -113,14 +113,43 @@ export default async function handler(req, res) {
           });
         }
         
-        // 2. Update job status to in_progress
+        console.log('Current job status:', job.status);
+        console.log('Current step:', job.current_step);
+        
+        // If the job is already in progress, process the next step
+        if (job.status === 'in_progress' && job.current_step > 0) {
+          // Process next step if there are more steps
+          if (job.current_step < job.total_steps) {
+            console.log(`Continuing job processing at step ${job.current_step + 1}`);
+            await processJobStep(supabase, job);
+            return res.status(200).json({
+              success: true,
+              message: `Processed step ${job.current_step + 1}`,
+              job_id: jobId,
+              status: 'in_progress'
+            });
+          } else {
+            // Job is at the final step, mark as completed
+            console.log(`Job ${jobId} is at final step, marking as completed`);
+            await completeJob(supabase, job);
+            return res.status(200).json({
+              success: true,
+              message: 'Job completed',
+              job_id: jobId,
+              status: 'completed'
+            });
+          }
+        }
+        
+        // 2. Initialize job - set status to in_progress
+        console.log(`Initializing job ${jobId} to in_progress state`);
         const { error: updateError } = await supabase
           .from('content_generation_jobs')
           .update({ 
             status: 'in_progress',
-            current_step: 1,
-            step_description: 'Starting content generation process',
-            progress: 10,
+            current_step: 0,
+            step_description: 'Initializing content generation process',
+            progress: 0,
             updated_at: new Date().toISOString()
           })
           .eq('id', jobId);
@@ -130,22 +159,23 @@ export default async function handler(req, res) {
           return res.status(500).json({ error: 'Failed to update job status', details: updateError.message });
         }
         
-        console.log(`Successfully updated job ${jobId} to in_progress`);
+        console.log(`Successfully initialized job ${jobId}`);
         
-        // Respond immediately to client while we continue processing in the background
-        res.status(200).json({
+        // 3. Process first step
+        await processJobStep(supabase, {
+          ...job,
+          current_step: 0,
+          status: 'in_progress'
+        });
+        
+        // Respond to client
+        console.log(`Responding to client for job ${jobId}`);
+        return res.status(200).json({
           success: true,
           message: 'Job processing started',
           job_id: jobId,
-          note: 'Processing will continue in the background'
+          note: 'Job is being processed one step at a time'
         });
-        
-        // 3. Process the job asynchronously (don't await this)
-        processJobInBackground(supabase, job)
-          .catch(error => console.error(`Background job processing error for ${jobId}:`, error));
-        
-        // Return to avoid executing the rest of the function
-        return;
       }
     } catch (dbError) {
       console.log('Direct database access failed, falling back to HTTP request:', dbError);
@@ -237,70 +267,96 @@ export default async function handler(req, res) {
 }
 
 /**
- * Process the job in the background with a series of steps
- * This mimics the behavior of the real content generation process
+ * Process a single step of the job
  */
-async function processJobInBackground(supabase, job) {
+async function processJobStep(supabase, job) {
   const jobId = job.id;
+  const currentStep = job.current_step;
+  const nextStep = currentStep + 1;
   const totalSteps = job.total_steps || 10;
-  const stepDelay = 1000; // 1 second between steps
+  
+  // Don't process if the job is already at max steps
+  if (nextStep > totalSteps) {
+    console.log(`Job ${jobId} is already at max steps (${totalSteps})`);
+    return;
+  }
+  
+  console.log(`Processing step ${nextStep} for job ${jobId}`);
   
   try {
-    console.log(`Starting background processing for job ${jobId} with ${totalSteps} steps`);
+    // Get step description and progress based on step number
+    const { description, progress } = getStepInfo(nextStep, totalSteps);
     
-    // Step 1: Retrieve course and employee data
-    await updateJobProgress(supabase, jobId, 1, 'Retrieving course and employee data', 10);
-    await new Promise(resolve => setTimeout(resolve, stepDelay));
+    // Update the job with the new step info
+    const { error } = await supabase
+      .from('content_generation_jobs')
+      .update({
+        current_step: nextStep,
+        step_description: description,
+        progress: progress,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', jobId);
+      
+    if (error) {
+      console.error(`Error updating job ${jobId} to step ${nextStep}:`, error);
+    } else {
+      console.log(`Successfully updated job ${jobId} to step ${nextStep}: ${description} (${progress}%)`);
+    }
     
-    // Step 2: Preparing content generation
-    await updateJobProgress(supabase, jobId, 2, 'Preparing content generation', 20);
-    await new Promise(resolve => setTimeout(resolve, stepDelay));
+    // If this is the final step, complete the job
+    if (nextStep >= totalSteps) {
+      await completeJob(supabase, {
+        ...job,
+        current_step: nextStep
+      });
+    }
+  } catch (error) {
+    console.error(`Error processing step ${nextStep} for job ${jobId}:`, error);
     
-    // Step 3: Generating course structure
-    await updateJobProgress(supabase, jobId, 3, 'Generating course structure', 30);
-    await new Promise(resolve => setTimeout(resolve, stepDelay));
-    
-    // Step 4: Processing modules
-    await updateJobProgress(supabase, jobId, 4, 'Processing modules', 40);
-    await new Promise(resolve => setTimeout(resolve, stepDelay));
-    
-    // Step 5: Generating lesson content
-    await updateJobProgress(supabase, jobId, 5, 'Generating lesson content', 50);
-    await new Promise(resolve => setTimeout(resolve, stepDelay));
-    
-    // Step 6: Creating assessments
-    await updateJobProgress(supabase, jobId, 6, 'Creating assessments', 60);
-    await new Promise(resolve => setTimeout(resolve, stepDelay));
-    
-    // Step 7: Personalizing content
-    await updateJobProgress(supabase, jobId, 7, 'Personalizing content', 70);
-    await new Promise(resolve => setTimeout(resolve, stepDelay));
-    
-    // Step 8: Finalizing content
-    await updateJobProgress(supabase, jobId, 8, 'Finalizing content', 80);
-    await new Promise(resolve => setTimeout(resolve, stepDelay));
-    
-    // Step 9: Storing content in database
-    await updateJobProgress(supabase, jobId, 9, 'Storing content in database', 90);
-    await new Promise(resolve => setTimeout(resolve, stepDelay));
-    
-    // Step 10: Completing job
-    await updateJobProgress(supabase, jobId, totalSteps, 'Content generation completed successfully', 100);
+    // If there's an error, mark the job as failed
+    try {
+      await supabase
+        .from('content_generation_jobs')
+        .update({
+          status: 'failed',
+          error_message: `Error at step ${nextStep}: ${error.message || 'Unknown error'}`,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', jobId);
+    } catch (updateError) {
+      console.error(`Failed to mark job ${jobId} as failed:`, updateError);
+    }
+  }
+}
+
+/**
+ * Complete the job
+ */
+async function completeJob(supabase, job) {
+  const jobId = job.id;
+  
+  try {
+    console.log(`Completing job ${jobId}`);
     
     // Mark job as completed
     const { error: completionError } = await supabase
       .from('content_generation_jobs')
       .update({
         status: 'completed',
+        progress: 100,
+        step_description: 'Content generation completed successfully',
         completed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       })
       .eq('id', jobId);
       
     if (completionError) {
       console.error(`Error marking job ${jobId} as completed:`, completionError);
-    } else {
-      console.log(`Job ${jobId} successfully completed`);
+      return;
     }
+    
+    console.log(`Job ${jobId} successfully completed`);
     
     // Update the enrollment record if applicable
     if (job.course_id && job.employee_id) {
@@ -325,45 +381,37 @@ async function processJobInBackground(supabase, job) {
       }
     }
   } catch (error) {
-    console.error(`Error in background processing for job ${jobId}:`, error);
-    
-    // Mark job as failed
-    try {
-      await supabase
-        .from('content_generation_jobs')
-        .update({
-          status: 'failed',
-          error_message: error.message || 'Unknown error in background processing',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', jobId);
-    } catch (updateError) {
-      console.error(`Failed to mark job ${jobId} as failed:`, updateError);
-    }
+    console.error(`Error completing job ${jobId}:`, error);
   }
 }
 
 /**
- * Helper function to update job progress
+ * Get step info based on step number
  */
-async function updateJobProgress(supabase, jobId, currentStep, stepDescription, progress) {
-  try {
-    console.log(`Updating job ${jobId} to step ${currentStep}: ${stepDescription}`);
-    
-    const { error } = await supabase
-      .from('content_generation_jobs')
-      .update({
-        current_step: currentStep,
-        step_description: stepDescription,
-        progress: progress,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', jobId);
-      
-    if (error) {
-      console.error(`Error updating job ${jobId} progress:`, error);
-    }
-  } catch (error) {
-    console.error(`Exception updating job ${jobId} progress:`, error);
+function getStepInfo(stepNumber, totalSteps) {
+  const progress = Math.floor((stepNumber / totalSteps) * 100);
+  
+  // Map step numbers to descriptions
+  const stepDescriptions = {
+    1: 'Retrieving course and employee data',
+    2: 'Preparing content generation',
+    3: 'Generating course structure',
+    4: 'Processing modules',
+    5: 'Generating lesson content',
+    6: 'Creating assessments',
+    7: 'Personalizing content',
+    8: 'Finalizing content',
+    9: 'Storing content in database',
+    10: 'Content generation completed'
+  };
+  
+  // Handle cases where totalSteps isn't 10
+  let description = stepDescriptions[stepNumber] || `Processing step ${stepNumber}`;
+  
+  // For the final step, always use "completed" regardless of step number
+  if (stepNumber === totalSteps) {
+    description = 'Content generation completed';
   }
+  
+  return { description, progress };
 } 
