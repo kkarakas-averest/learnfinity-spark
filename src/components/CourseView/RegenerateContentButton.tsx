@@ -3,6 +3,8 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import PersonalizedContentGenerationStatus from '@/components/courses/PersonalizedContentGenerationStatus';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 
 interface RegenerateContentButtonProps {
   courseId: string;
@@ -13,6 +15,8 @@ interface RegenerateContentButtonProps {
 export function RegenerateContentButton({ courseId, onSuccess, onError }: RegenerateContentButtonProps) {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [jobId, setJobId] = useState<string | undefined>(undefined);
+  const [showProgressDialog, setShowProgressDialog] = useState(false);
 
   const handleRegenerate = async () => {
     setIsLoading(true);
@@ -161,6 +165,12 @@ export function RegenerateContentButton({ courseId, onSuccess, onError }: Regene
             courseId
           });
           
+          // Show progress tracking
+          if (responseData.job_id) {
+            setJobId(responseData.job_id);
+            setShowProgressDialog(true);
+          }
+          
           toast({
             title: 'Course content regenerating',
             description: 'Your personalized course content is being generated. This may take a moment.',
@@ -183,6 +193,12 @@ export function RegenerateContentButton({ courseId, onSuccess, onError }: Regene
         requestDuration: `${requestDuration}ms`,
         courseId
       });
+      
+      // Show progress tracking
+      if (responseData.job_id) {
+        setJobId(responseData.job_id);
+        setShowProgressDialog(true);
+      }
       
       toast({
         title: 'Course content regenerating',
@@ -224,18 +240,41 @@ export function RegenerateContentButton({ courseId, onSuccess, onError }: Regene
     }
   };
 
+  const handleGenerationComplete = () => {
+    setShowProgressDialog(false);
+    if (onSuccess) {
+      onSuccess();
+    }
+  };
+
   return (
-    <Button 
-      variant="outline" 
-      size="sm" 
-      onClick={handleRegenerate}
-      disabled={isLoading}
-      className="flex items-center gap-2"
-    >
-      {isLoading ? (
-        <Loader2 className="h-4 w-4 animate-spin" />
-      ) : null}
-      {isLoading ? 'Regenerating...' : 'Regenerate Content'}
-    </Button>
+    <>
+      <Button 
+        variant="outline" 
+        size="sm" 
+        onClick={handleRegenerate}
+        disabled={isLoading}
+        className="flex items-center gap-2"
+      >
+        {isLoading ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : null}
+        {isLoading ? 'Regenerating...' : 'Regenerate Content'}
+      </Button>
+
+      <Dialog open={showProgressDialog} onOpenChange={setShowProgressDialog}>
+        <DialogContent className="sm:max-w-md">
+          <div className="p-2">
+            <h2 className="text-xl font-semibold mb-4">Regenerating Course Content</h2>
+            <PersonalizedContentGenerationStatus 
+              initialIsGenerating={true}
+              jobId={jobId}
+              courseId={courseId}
+              onGenerationComplete={handleGenerationComplete}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 } 

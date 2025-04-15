@@ -11,6 +11,9 @@ import { v4 as uuidv4 } from 'uuid';
  * POST /api/hr/courses/regenerate-content
  */
 export async function POST(req: NextRequest) {
+  // Emergency placeholder method - generates minimal course content without API calls
+  console.log('[EMERGENCY-PLACEHOLDER] Using rapid content generation without external API calls');
+  
   try {
     // CORS headers for preflight requests
     if (req.method === 'OPTIONS') {
@@ -372,18 +375,25 @@ export async function POST(req: NextRequest) {
         })
         .eq('id', jobId);
       
-      // ------------------- SYNCHRONOUS PROCESS ---------------------
-      // Instead of using API calls, we'll generate content directly in this function
-      console.log('[SYNC-PROCESS] Generating course content directly');
+      // ------------------- EMERGENCY PLACEHOLDER CONTENT ---------------------
+      // Create minimal placeholder content without any API calls
+      console.log('[SYNC-PROCESS] Creating EMERGENCY placeholder content (no API calls)');
       
-      // Try to get API key
-      const groqApiKey = process.env.GROQ_API_KEY || process.env.OPENAI_API_KEY;
-      if (!groqApiKey) {
-        console.error('[SYNC-PROCESS] No Groq API key found');
-        throw new Error('Missing Groq API key. Please set GROQ_API_KEY in environment variables.');
-      }
+      // Generate simple placeholder content for each module
+      const generatedModules = [];
       
-      // Create content outline based on course (similar to generate-content)
+      // Report progress
+      await adminSupabase
+        .from('content_generation_jobs')
+        .update({
+          current_step: 3,
+          step_description: 'Creating placeholder content',
+          progress: 30,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', jobId);
+      
+      // Create simple placeholder content for each module
       const contentOutline = {
         title: courseData.title,
         description: courseData.description || 'No description available',
@@ -434,160 +444,52 @@ export async function POST(req: NextRequest) {
         ]
       };
       
-      // Report progress
-      await adminSupabase
-        .from('content_generation_jobs')
-        .update({
-          current_step: 3,
-          step_description: 'Generating module content',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', jobId);
-      
-      // Direct Groq API call function
-      async function callGroqApi(prompt: string) {
-        console.log('[SYNC-PROCESS] Making Groq API call');
-        try {
-          const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${groqApiKey}`
-            },
-            body: JSON.stringify({
-              model: 'llama3-8b-8192',
-              messages: [
-                {
-                  role: 'system',
-                  content: 'You are an expert educational content creator and learning designer. Your task is to create personalized, professional course content based on the provided topic and learner information.'
-                },
-                {
-                  role: 'user',
-                  content: prompt
-                }
-              ],
-              temperature: 0.7,
-              max_tokens: 4000
-            })
-          });
-          
-          if (!response.ok) {
-            console.error(`[SYNC-PROCESS] Groq API error: ${response.status}`);
-            const errorText = await response.text();
-            console.error(`[SYNC-PROCESS] Error details: ${errorText}`);
-            throw new Error(`Groq API error: ${response.status} - ${errorText}`);
-          }
-          
-          const data = await response.json();
-          console.log('[SYNC-PROCESS] Groq API response received');
-          return data.choices[0].message.content;
-        } catch (error) {
-          console.error('[SYNC-PROCESS] Error calling Groq API:', error);
-          throw error;
-        }
-      }
-      
-      // Generate content for each module
-      const generatedModules = [];
-      let moduleCount = 0;
-      
-      for (const moduleOutline of contentOutline.modules) {
-        moduleCount++;
-        console.log(`[SYNC-PROCESS] Generating content for module ${moduleCount}/${contentOutline.modules.length}`);
+      contentOutline.modules.forEach((moduleOutline, moduleIndex) => {
+        const sections = moduleOutline.sections.map((sectionOutline: any, sectionIndex: number) => ({
+          id: `${moduleOutline.id}-section-${sectionIndex + 1}`,
+          title: sectionOutline.title,
+          content: `# ${sectionOutline.title}
+
+## Overview
+
+This is placeholder content for ${courseData.title} - ${moduleOutline.title} - ${sectionOutline.title}.
+
+The content will be fully generated in a subsequent update. This is a temporary placeholder.
+
+## Key Points
+
+* ${courseData.title} is an important skill in the professional context
+* ${moduleOutline.title} covers essential concepts within this topic
+* Understanding these principles will help you in your role
+
+## Applications
+
+As a ${employeeData.position || 'professional'} in ${employeeData.department || 'your organization'}, 
+you can apply these concepts by:
+
+* Recognizing opportunities for effective communication
+* Implementing key strategies in your daily interactions
+* Improving your effectiveness through structured approaches
+
+## Next Steps
+
+After reviewing this section, proceed to the next section to build on these concepts.`,
+          contentType: sectionOutline.type || 'text',
+          orderIndex: sectionIndex + 1,
+          duration: sectionOutline.duration || 20
+        }));
         
-        try {
-          // Update job status for this module
-          await adminSupabase
-            .from('content_generation_jobs')
-            .update({
-              current_step: 3 + moduleCount,
-              step_description: `Generating content for module: ${moduleOutline.title}`,
-              progress: Math.round(((3 + moduleCount) / 10) * 100),
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', jobId);
-          
-          // Create personalized prompt for this module
-          let modulePrompt = `
-            Generate educational content for a module titled "${moduleOutline.title}" 
-            for a course on "${courseData.title}".
-            
-            This is for ${employeeData.name || 'a learner'}, who works as a ${employeeData.position || 'professional'} 
-            in the ${employeeData.department || 'organization'}.
-            
-            Module description: ${moduleOutline.description}
-            
-            Learning objectives:
-            ${moduleOutline.objectives.map((obj: string) => `- ${obj}`).join('\n')}
-            
-            The module should include the following sections:
-            ${moduleOutline.sections.map((section: any) => `- ${section.title}`).join('\n')}
-            
-            Generate comprehensive content for each section, formatted in Markdown.
-            Include practical examples relevant to their role.
-          `;
-          
-          // Call Groq API directly
-          const generatedContent = await callGroqApi(modulePrompt);
-          
-          // Process and format the content for each section
-          const contentParts = generatedContent.split(/(?:^|\n)#{1,2}\s+/);
-          const sections = [];
-          
-          for (let i = 0; i < moduleOutline.sections.length; i++) {
-            const sectionOutline = moduleOutline.sections[i];
-            let sectionContent;
-            
-            if (i < contentParts.length - 1) {
-              // Use the matching content part if available (+1 because first split is usually empty)
-              sectionContent = `# ${sectionOutline.title}\n\n${contentParts[i + 1].trim()}`;
-            } else {
-              // Fallback content
-              sectionContent = `# ${sectionOutline.title}\n\nGenerated content for ${moduleOutline.title} - ${sectionOutline.title}\n\nThis section covers important aspects of ${courseData.title} relevant to your role.`;
-            }
-            
-            sections.push({
-              id: `${moduleOutline.id}-section-${i + 1}`,
-              title: sectionOutline.title,
-              content: sectionContent,
-              contentType: sectionOutline.type || 'text',
-              orderIndex: i + 1,
-              duration: sectionOutline.duration || 20
-            });
-          }
-          
-          // Create module with sections
-          generatedModules.push({
-            id: moduleOutline.id,
-            title: moduleOutline.title,
-            description: moduleOutline.description,
-            orderIndex: moduleOutline.orderIndex,
-            sections,
-            resources: moduleOutline.resources || []
-          });
-          
-          console.log(`[SYNC-PROCESS] Successfully generated content for module: ${moduleOutline.title}`);
-        } catch (error) {
-          console.error(`[SYNC-PROCESS] Error generating content for module ${moduleOutline.title}:`, error);
-          
-          // Add module with basic content as fallback
-          generatedModules.push({
-            id: moduleOutline.id,
-            title: moduleOutline.title,
-            description: moduleOutline.description,
-            orderIndex: moduleOutline.orderIndex,
-            sections: moduleOutline.sections.map((sectionOutline: any, index: number) => ({
-              id: `${moduleOutline.id}-section-${index + 1}`,
-              title: sectionOutline.title,
-              content: `# ${sectionOutline.title}\n\nThis is placeholder content for ${courseData.title}.\n\n## Key Points\n\n* ${courseData.title} is important for professionals\n* These concepts apply to your work in ${employeeData.department || 'your organization'}`,
-              contentType: sectionOutline.type || 'text',
-              orderIndex: index + 1,
-              duration: sectionOutline.duration || 20
-            })),
-            resources: moduleOutline.resources || []
-          });
-        }
-      }
+        generatedModules.push({
+          id: moduleOutline.id,
+          title: moduleOutline.title,
+          description: moduleOutline.description,
+          orderIndex: moduleOutline.orderIndex,
+          sections,
+          resources: moduleOutline.resources || []
+        });
+      });
+      
+      console.log('[SYNC-PROCESS] Successfully created placeholder content for all modules');
       
       // Create the complete personalized course content
       console.log('[SYNC-PROCESS] Creating full personalized course content');
@@ -621,7 +523,9 @@ export async function POST(req: NextRequest) {
             position: employeeData.position,
             department: employeeData.department
           },
-          personalization_options: personalizationOptions
+          personalization_options: personalizationOptions,
+          is_placeholder: true,
+          content_version: 'emergency-placeholder-1.0'
         }
       };
       
@@ -708,7 +612,8 @@ export async function POST(req: NextRequest) {
             id: personalizedContent.id,
             title: personalizedContent.title,
             moduleCount: personalizedContent.modules.length
-          }
+          },
+          job_id: jobId,
         },
         {
           headers: {
