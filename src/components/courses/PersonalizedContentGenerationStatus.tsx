@@ -320,6 +320,33 @@ export default function PersonalizedContentGenerationStatus({
       setErrorMessage(jobData.error_message || 'An unknown error occurred during content generation.');
     } else if (jobData.status === 'in_progress') {
       setGenerationStatus('in_progress');
+      
+      // Actively trigger the next job step when we detect an in-progress job
+      // This ensures the job advances on each poll rather than just checking status
+      if (jobData.current_step < jobData.total_steps) {
+        console.log(`Triggering next step processing for job ${jobId} (currently at step ${jobData.current_step})`);
+        try {
+          // Call the process endpoint via proxy
+          const processResponse = await fetch(`/api/proxy-process-job?job_id=${jobId}`, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(typeof window !== 'undefined' && localStorage.getItem('supabase.auth.token') ? {
+                'Authorization': `Bearer ${localStorage.getItem('supabase.auth.token')}` 
+              } : {})
+            },
+            credentials: 'include',
+          });
+          
+          if (processResponse.ok) {
+            console.log(`Successfully triggered next step processing for job ${jobId}`);
+          } else {
+            console.warn(`Warning: Failed to trigger next step processing for job ${jobId}: ${processResponse.status}`);
+          }
+        } catch (error) {
+          console.error(`Error triggering next step for job ${jobId}:`, error);
+        }
+      }
     }
   }, [jobId, retryCount, pollInterval, onGenerationComplete, toast, checkJobStatusCallback]);
 
