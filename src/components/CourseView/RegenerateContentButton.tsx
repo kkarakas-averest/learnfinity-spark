@@ -21,8 +21,8 @@ export function RegenerateContentButton({ courseId, onSuccess, onError }: Regene
   // Function to manually trigger job processing
   const triggerJobProcessing = async (jobId: string) => {
     try {
-      // Use relative URL instead of constructing with origin to avoid cross-domain issues
-      const apiUrl = '/api/hr/courses/personalize-content/process';
+      // Use the new proxy endpoint which will handle cross-domain issues
+      const apiUrl = '/api/proxy-process-job';
       
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       if (sessionError) throw sessionError;
