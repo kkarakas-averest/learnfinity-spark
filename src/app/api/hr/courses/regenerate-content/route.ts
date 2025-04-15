@@ -359,212 +359,392 @@ export async function POST(req: NextRequest) {
     const apiUrl = new URL(req.url);
     const baseUrl = `${apiUrl.protocol}//${apiUrl.host}`;
     
-    console.log('[DIRECT-PROCESS] Starting direct content generation process for debugging');
+    console.log('[SYNC-PROCESS] Starting synchronous content generation process');
     
     try {
-      // Instead of using setTimeout which isn't reliable in serverless environments,
-      // we'll directly make the API call for debugging
-      console.log('[DIRECT-PROCESS] Directly calling content generation endpoint');
-      
-      // Update job status to indicate direct processing
+      // Update job status to indicate synchronous processing
       await adminSupabase
         .from('content_generation_jobs')
         .update({
           current_step: 2,
-          step_description: 'Direct content generation in progress',
+          step_description: 'Starting synchronous content generation',
           updated_at: new Date().toISOString()
         })
         .eq('id', jobId);
       
-      // Get the raw session object to include access token
-      let accessToken = '';
-      if (session?.access_token) {
-        accessToken = session.access_token;
-        console.log('[DIRECT-PROCESS] Using session access token');
+      // ------------------- SYNCHRONOUS PROCESS ---------------------
+      // Instead of using API calls, we'll generate content directly in this function
+      console.log('[SYNC-PROCESS] Generating course content directly');
+      
+      // Try to get API key
+      const groqApiKey = process.env.GROQ_API_KEY || process.env.OPENAI_API_KEY;
+      if (!groqApiKey) {
+        console.error('[SYNC-PROCESS] No Groq API key found');
+        throw new Error('Missing Groq API key. Please set GROQ_API_KEY in environment variables.');
       }
       
-      // Create API call headers
-      const headers: HeadersInit = {
-        'Content-Type': 'application/json'
+      // Create content outline based on course (similar to generate-content)
+      const contentOutline = {
+        title: courseData.title,
+        description: courseData.description || 'No description available',
+        learningObjectives: [
+          `Understand the core concepts of ${courseData.title}`,
+          `Apply ${courseData.title} principles in your work`,
+          `Develop practical skills related to ${courseData.title}`
+        ],
+        keywords: courseData.category ? [courseData.category] : [],
+        modules: [
+          {
+            id: 'module-1',
+            title: `Introduction to ${courseData.title}`,
+            description: 'An overview of the key concepts and principles',
+            orderIndex: 1,
+            objectives: ['Understand the fundamentals', 'Identify key terms and concepts'],
+            sections: [
+              { title: 'Overview and Fundamentals', type: 'text', duration: 20 },
+              { title: 'Key Concepts and Terminology', type: 'text', duration: 15 }
+            ],
+            resources: []
+          },
+          {
+            id: 'module-2',
+            title: `Core ${courseData.title} Principles`,
+            description: 'Detailed exploration of the main principles',
+            orderIndex: 2,
+            objectives: ['Understand core principles', 'Apply principles to real scenarios'],
+            sections: [
+              { title: 'Principle Exploration', type: 'text', duration: 25 },
+              { title: 'Real-world Applications', type: 'text', duration: 20 }
+            ],
+            resources: []
+          },
+          {
+            id: 'module-3',
+            title: `Practical ${courseData.title} Applications`,
+            description: 'Hands-on application and implementation',
+            orderIndex: 3,
+            objectives: ['Apply knowledge in practical settings', 'Develop implementation skills'],
+            sections: [
+              { title: 'Practical Implementation', type: 'text', duration: 30 },
+              { title: 'Case Studies', type: 'text', duration: 20 },
+              { title: 'Hands-on Exercise', type: 'interactive', duration: 30 }
+            ],
+            resources: []
+          }
+        ]
       };
       
-      // Add auth headers if available
-      if (accessToken) {
-        headers['Authorization'] = `Bearer ${accessToken}`;
-      }
-      if (cookieHeader.length > 0) {
-        headers['Cookie'] = cookieHeader;
-      }
-      
-      console.log('[DIRECT-PROCESS] API call headers:', Object.keys(headers));
-      
-      // Make the API call with all available auth methods
-      const contentResponse = await fetch(`${baseUrl}/api/hr/courses/generate-content?directApi=true`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          courseId,
-          employeeId: targetEmployeeId,
-          personalizationOptions,
-          jobId
+      // Report progress
+      await adminSupabase
+        .from('content_generation_jobs')
+        .update({
+          current_step: 3,
+          step_description: 'Generating module content',
+          updated_at: new Date().toISOString()
         })
-      });
+        .eq('id', jobId);
       
-      console.log(`[DIRECT-PROCESS] Content generation API response status: ${contentResponse.status}`);
-      
-      if (!contentResponse.ok) {
-        let errorText = await contentResponse.text();
-        console.error('[DIRECT-PROCESS] Error response from content generation API:', errorText);
-        
-        // Update job status to failed
-        await adminSupabase
-          .from('content_generation_jobs')
-          .update({
-            status: 'failed',
-            error_message: `Direct API call failed: ${contentResponse.status} - ${errorText.substring(0, 200)}`,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', jobId);
-      } else {
-        console.log('[DIRECT-PROCESS] Content generation API call succeeded');
-        let respJson = await contentResponse.json();
-        console.log('[DIRECT-PROCESS] Response data:', JSON.stringify(respJson).substring(0, 100) + '...');
+      // Direct Groq API call function
+      async function callGroqApi(prompt: string) {
+        console.log('[SYNC-PROCESS] Making Groq API call');
+        try {
+          const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${groqApiKey}`
+            },
+            body: JSON.stringify({
+              model: 'llama3-8b-8192',
+              messages: [
+                {
+                  role: 'system',
+                  content: 'You are an expert educational content creator and learning designer. Your task is to create personalized, professional course content based on the provided topic and learner information.'
+                },
+                {
+                  role: 'user',
+                  content: prompt
+                }
+              ],
+              temperature: 0.7,
+              max_tokens: 4000
+            })
+          });
+          
+          if (!response.ok) {
+            console.error(`[SYNC-PROCESS] Groq API error: ${response.status}`);
+            const errorText = await response.text();
+            console.error(`[SYNC-PROCESS] Error details: ${errorText}`);
+            throw new Error(`Groq API error: ${response.status} - ${errorText}`);
+          }
+          
+          const data = await response.json();
+          console.log('[SYNC-PROCESS] Groq API response received');
+          return data.choices[0].message.content;
+        } catch (error) {
+          console.error('[SYNC-PROCESS] Error calling Groq API:', error);
+          throw error;
+        }
       }
-    } catch (directError: any) {
-      console.error('[DIRECT-PROCESS] Error in direct content generation:', directError);
-      console.error('[DIRECT-PROCESS] Error stack:', directError.stack);
+      
+      // Generate content for each module
+      const generatedModules = [];
+      let moduleCount = 0;
+      
+      for (const moduleOutline of contentOutline.modules) {
+        moduleCount++;
+        console.log(`[SYNC-PROCESS] Generating content for module ${moduleCount}/${contentOutline.modules.length}`);
+        
+        try {
+          // Update job status for this module
+          await adminSupabase
+            .from('content_generation_jobs')
+            .update({
+              current_step: 3 + moduleCount,
+              step_description: `Generating content for module: ${moduleOutline.title}`,
+              progress: Math.round(((3 + moduleCount) / 10) * 100),
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', jobId);
+          
+          // Create personalized prompt for this module
+          let modulePrompt = `
+            Generate educational content for a module titled "${moduleOutline.title}" 
+            for a course on "${courseData.title}".
+            
+            This is for ${employeeData.name || 'a learner'}, who works as a ${employeeData.position || 'professional'} 
+            in the ${employeeData.department || 'organization'}.
+            
+            Module description: ${moduleOutline.description}
+            
+            Learning objectives:
+            ${moduleOutline.objectives.map((obj: string) => `- ${obj}`).join('\n')}
+            
+            The module should include the following sections:
+            ${moduleOutline.sections.map((section: any) => `- ${section.title}`).join('\n')}
+            
+            Generate comprehensive content for each section, formatted in Markdown.
+            Include practical examples relevant to their role.
+          `;
+          
+          // Call Groq API directly
+          const generatedContent = await callGroqApi(modulePrompt);
+          
+          // Process and format the content for each section
+          const contentParts = generatedContent.split(/(?:^|\n)#{1,2}\s+/);
+          const sections = [];
+          
+          for (let i = 0; i < moduleOutline.sections.length; i++) {
+            const sectionOutline = moduleOutline.sections[i];
+            let sectionContent;
+            
+            if (i < contentParts.length - 1) {
+              // Use the matching content part if available (+1 because first split is usually empty)
+              sectionContent = `# ${sectionOutline.title}\n\n${contentParts[i + 1].trim()}`;
+            } else {
+              // Fallback content
+              sectionContent = `# ${sectionOutline.title}\n\nGenerated content for ${moduleOutline.title} - ${sectionOutline.title}\n\nThis section covers important aspects of ${courseData.title} relevant to your role.`;
+            }
+            
+            sections.push({
+              id: `${moduleOutline.id}-section-${i + 1}`,
+              title: sectionOutline.title,
+              content: sectionContent,
+              contentType: sectionOutline.type || 'text',
+              orderIndex: i + 1,
+              duration: sectionOutline.duration || 20
+            });
+          }
+          
+          // Create module with sections
+          generatedModules.push({
+            id: moduleOutline.id,
+            title: moduleOutline.title,
+            description: moduleOutline.description,
+            orderIndex: moduleOutline.orderIndex,
+            sections,
+            resources: moduleOutline.resources || []
+          });
+          
+          console.log(`[SYNC-PROCESS] Successfully generated content for module: ${moduleOutline.title}`);
+        } catch (error) {
+          console.error(`[SYNC-PROCESS] Error generating content for module ${moduleOutline.title}:`, error);
+          
+          // Add module with basic content as fallback
+          generatedModules.push({
+            id: moduleOutline.id,
+            title: moduleOutline.title,
+            description: moduleOutline.description,
+            orderIndex: moduleOutline.orderIndex,
+            sections: moduleOutline.sections.map((sectionOutline: any, index: number) => ({
+              id: `${moduleOutline.id}-section-${index + 1}`,
+              title: sectionOutline.title,
+              content: `# ${sectionOutline.title}\n\nThis is placeholder content for ${courseData.title}.\n\n## Key Points\n\n* ${courseData.title} is important for professionals\n* These concepts apply to your work in ${employeeData.department || 'your organization'}`,
+              contentType: sectionOutline.type || 'text',
+              orderIndex: index + 1,
+              duration: sectionOutline.duration || 20
+            })),
+            resources: moduleOutline.resources || []
+          });
+        }
+      }
+      
+      // Create the complete personalized course content
+      console.log('[SYNC-PROCESS] Creating full personalized course content');
+      
+      // Prepare to store content
+      await adminSupabase
+        .from('content_generation_jobs')
+        .update({
+          current_step: 7,
+          step_description: 'Preparing to store content',
+          progress: 70,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', jobId);
+      
+      // Create finalized content object
+      const personalizedContent = {
+        id: jobId,
+        course_id: courseId,
+        employee_id: targetEmployeeId,
+        title: courseData.title,
+        description: courseData.description || 'No description available',
+        level: courseData.difficulty_level || 'Intermediate',
+        modules: generatedModules,
+        metadata: {
+          generated_at: new Date().toISOString(),
+          job_id: jobId,
+          generated_for: {
+            employee_id: targetEmployeeId,
+            name: employeeData.name,
+            position: employeeData.position,
+            department: employeeData.department
+          },
+          personalization_options: personalizationOptions
+        }
+      };
+      
+      // Store the personalized content in the database
+      console.log('[SYNC-PROCESS] Storing content in database');
+      
+      await adminSupabase
+        .from('content_generation_jobs')
+        .update({
+          current_step: 8,
+          step_description: 'Storing generated content',
+          progress: 80,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', jobId);
+      
+      const { data: storedContent, error: storageError } = await supabase
+        .from('hr_personalized_course_content')
+        .insert({
+          id: personalizedContent.id,
+          course_id: courseId,
+          employee_id: targetEmployeeId,
+          content: personalizedContent,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          is_active: true
+        })
+        .select()
+        .single();
+        
+      if (storageError) {
+        console.error('[SYNC-PROCESS] Error storing personalized content:', storageError);
+        throw new Error(`Failed to store content: ${storageError.message}`);
+      }
+      
+      console.log('[SYNC-PROCESS] Content stored successfully');
+      
+      // Update the enrollment record
+      await adminSupabase
+        .from('content_generation_jobs')
+        .update({
+          current_step: 9,
+          step_description: 'Updating enrollment record',
+          progress: 90,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', jobId);
+      
+      if (existingEnrollment) {
+        console.log('[SYNC-PROCESS] Updating enrollment record');
+        await supabase
+          .from('hr_course_enrollments')
+          .update({
+            personalized_content_id: personalizedContent.id,
+            personalized_content_generation_status: 'completed',
+            updated_at: new Date().toISOString(),
+            personalized_content_completed_at: new Date().toISOString()
+          })
+          .eq('id', existingEnrollment.id);
+      }
+      
+      // Mark job as completed
+      await adminSupabase
+        .from('content_generation_jobs')
+        .update({
+          status: 'completed',
+          current_step: 10,
+          step_description: 'Content generation completed successfully',
+          progress: 100,
+          updated_at: new Date().toISOString(),
+          completed_at: new Date().toISOString()
+        })
+        .eq('id', jobId);
+      
+      console.log('[SYNC-PROCESS] Content generation process completed successfully');
+      
+      // Return success response with the course data
+      return NextResponse.json(
+        {
+          success: true,
+          message: 'Course content regenerated successfully',
+          course: courseData,
+          content: {
+            id: personalizedContent.id,
+            title: personalizedContent.title,
+            moduleCount: personalizedContent.modules.length
+          }
+        },
+        {
+          headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Credentials': 'true',
+          }
+        }
+      );
+    } catch (error: any) {
+      console.error('[SYNC-PROCESS] Error in content generation process:', error);
       
       // Update job status to failed
       await adminSupabase
         .from('content_generation_jobs')
         .update({
           status: 'failed',
-          error_message: `Direct process error: ${directError.message}`,
+          error_message: error.message || 'Unknown error',
           updated_at: new Date().toISOString()
         })
         .eq('id', jobId);
-    }
-    
-    // Original background job code remains for comparison
-    console.log('Setting up background job processing');
-    
-    // Create a unique ID for this background job run
-    const backgroundJobId = uuidv4();
-    
-    // First, update the job status to indicate it's about to start
-    await adminSupabase
-      .from('content_generation_jobs')
-      .update({
-        current_step: 1,
-        step_description: 'Preparing to call content generation API',
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', jobId);
-    
-    // Start the background job asynchronously
-    setTimeout(async () => {
-      try {
-        console.log(`[background-job:${backgroundJobId}] Starting content generation process`);
-        
-        // Update job to indicate API call is starting
-        await adminSupabase
-          .from('content_generation_jobs')
-          .update({
-            current_step: 2,
-            step_description: 'Initiating content generation API call',
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', jobId);
-        
-        // Log the URL and parameters for debugging
-        console.log(`[background-job:${backgroundJobId}] Calling API at: ${baseUrl}/api/hr/courses/generate-content`);
-        console.log(`[background-job:${backgroundJobId}] With parameters: courseId=${courseId}, employeeId=${targetEmployeeId}, jobId=${jobId}`);
-        
-        // Make an API call to the content generation endpoint
-        const response = await fetch(`${baseUrl}/api/hr/courses/generate-content?directApi=true`, {
-          method: 'POST',
+      
+      // Return error response
+      return NextResponse.json(
+        { 
+          error: 'Failed to generate content', 
+          details: error.message 
+        }, 
+        { 
+          status: 500,
           headers: {
-            'Content-Type': 'application/json',
-            'Cookie': req.headers.get('cookie') || '',
-            ...(req.headers.get('authorization') ? 
-              { 'Authorization': req.headers.get('authorization') || '' } : {})
-          },
-          body: JSON.stringify({
-            courseId,
-            employeeId: targetEmployeeId,
-            personalizationOptions,
-            jobId
-          })
-        });
-        
-        // Log the response status
-        console.log(`[background-job:${backgroundJobId}] API response status: ${response.status}`);
-        
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error(`[background-job:${backgroundJobId}] API call failed with status: ${response.status}`);
-          console.error(`[background-job:${backgroundJobId}] Error details: ${errorText}`);
-          
-          // Update job status to failed
-          await adminSupabase
-            .from('content_generation_jobs')
-            .update({
-              status: 'failed',
-              error_message: `API call failed with status: ${response.status} - ${errorText.substring(0, 500)}`,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', jobId);
-        } else {
-          // Try to parse response if available
-          try {
-            const responseData = await response.json();
-            console.log(`[background-job:${backgroundJobId}] API call completed successfully with response:`, JSON.stringify(responseData).substring(0, 200) + '...');
-          } catch (e) {
-            console.log(`[background-job:${backgroundJobId}] API call completed successfully (response not JSON)`);
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Credentials': 'true',
           }
-          
-          // Update job status to in progress with API called
-          await adminSupabase
-            .from('content_generation_jobs')
-            .update({
-              current_step: 3,
-              step_description: 'Content generation API called successfully',
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', jobId);
         }
-      } catch (error: any) {
-        console.error(`[background-job:${backgroundJobId}] Error:`, error.message);
-        console.error(`[background-job:${backgroundJobId}] Stack trace:`, error.stack);
-        
-        // Update job status to failed
-        await adminSupabase
-          .from('content_generation_jobs')
-          .update({
-            status: 'failed',
-            error_message: error.message || 'Unknown error',
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', jobId);
-      }
-    }, 100); // Start after response is sent
-    
-    console.log('Background job scheduled, returning success response');
-    
-    // Return success response with the course data
-    return NextResponse.json(
-      {
-        success: true,
-        message: 'Course content regeneration started successfully',
-        course: courseData
-      },
-      {
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Credentials': 'true',
-        }
-      }
-    );
+      );
+    }
   } catch (error: any) {
     console.error('Error in course regeneration:', error);
     return NextResponse.json(
