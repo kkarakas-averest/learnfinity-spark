@@ -21,29 +21,32 @@ export function RegenerateContentButton({ courseId, onSuccess, onError }: Regene
   // Function to manually trigger job processing
   const triggerJobProcessing = async (jobId: string) => {
     try {
-      console.log(`🔄 Manually triggering job processing for job ID: ${jobId}`);
+      const baseUrl = typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBLIC_VERCEL_URL || '';
+      const apiUrl = `${baseUrl}/api/hr/courses/personalize-content/process`;
       
-      // Call the process endpoint with relative URL
-      const processResponse = await fetch('/api/hr/courses/personalize-content/process', {
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) throw sessionError;
+      
+      const authToken = session?.access_token;
+      if (!authToken) throw new Error('No valid session found');
+      
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`,
         },
         body: JSON.stringify({ job_id: jobId }),
       });
       
-      if (!processResponse.ok) {
-        throw new Error(`Error processing job (status ${processResponse.status}): ${processResponse.statusText}`);
+      if (!response.ok) {
+        throw new Error(`HTTP error: ${response.status} - ${await response.text()}`);
       }
       
-      const processResult = await processResponse.json();
-      console.log(`✅ Process job response:`, processResult);
-      
-      return processResult;
+      return await response.json();
     } catch (error) {
-      console.error(`❌ Error manually triggering job processing:`, error);
-      // Don't let this error stop the UI flow - job polling will still work
-      return null;
+      console.error('Job processing error:', error);
+      throw error;
     }
   };
 

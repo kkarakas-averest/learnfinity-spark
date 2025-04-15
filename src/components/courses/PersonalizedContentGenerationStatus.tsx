@@ -189,8 +189,8 @@ export default function PersonalizedContentGenerationStatus({
         try {
           console.log(`🔄 Manually triggering job processing for job ID: ${data.job_id}`);
           
-          // Call the process endpoint directly with relative URL
-          const processResponse = await fetch('/api/hr/courses/personalize-content/process', {
+          // First try with relative URL
+          let processResponse = await fetch('/api/hr/courses/personalize-content/process', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -198,12 +198,24 @@ export default function PersonalizedContentGenerationStatus({
             body: JSON.stringify({ job_id: data.job_id }),
           });
           
-          if (!processResponse.ok) {
-            console.warn(`⚠️ Process API returned status ${processResponse.status}: ${processResponse.statusText}`);
-            // Continue even if processing API fails - the polling will still work
-          } else {
+          // If that fails, try the full URL with current origin
+          if (!processResponse.ok && typeof window !== 'undefined') {
+            const baseUrl = window.location.origin;
+            processResponse = await fetch(`${baseUrl}/api/hr/courses/personalize-content/process`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ job_id: data.job_id }),
+            });
+          }
+          
+          if (processResponse.ok) {
             const processResult = await processResponse.json();
             console.log(`✅ Process job response:`, processResult);
+          } else {
+            console.warn(`⚠️ Process API returned status ${processResponse.status}: ${processResponse.statusText}`);
+            // Continue even if processing API fails - the polling will still work
           }
         } catch (processError) {
           console.error(`❌ Error manually triggering job processing:`, processError);
@@ -303,7 +315,7 @@ export default function PersonalizedContentGenerationStatus({
       // Safely refresh the page to show new content - use setTimeout to allow other state updates to complete
       setTimeout(() => {
         try {
-          // Only refresh if window is available
+          // Only refresh if window is available - use window.location.reload() which is safer than router.refresh()
           if (typeof window !== 'undefined') {
             window.location.reload();
           }
