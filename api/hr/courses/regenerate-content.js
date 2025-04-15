@@ -61,132 +61,218 @@ export default async function handler(req, res) {
     
     // Extract request data
     const { courseId, forceRegenerate = true, personalizationOptions = {} } = req.body;
+    console.log('[regenerate-content] Request data:', { 
+      courseId, 
+      forceRegenerate,
+      hasPersonalizationOptions: !!personalizationOptions,
+    });
     
     if (!courseId) {
+      console.log('[regenerate-content] Missing courseId in request');
       return res.status(400).json({ error: 'Course ID is required' });
     }
     
     // Process the request directly here instead of forwarding
     // This avoids any potential authentication issues with internal redirects
+    console.log('[regenerate-content] Starting content regeneration process for course:', courseId);
     
     // 1. Update learner profile if needed
-    if (personalizationOptions) {
-      const { error: profileError } = await supabase
-        .from('learner_profiles')
-        .upsert({
-          user_id: userId,
-          preferences: personalizationOptions.preferences || {},
-          ...personalizationOptions
-        });
-      
-      if (profileError) {
-        console.error('[regenerate-content] Error updating learner profile:', profileError);
+    try {
+      if (personalizationOptions) {
+        console.log('[regenerate-content] Updating learner profile for user:', userId);
+        const { error: profileError } = await supabase
+          .from('learner_profiles')
+          .upsert({
+            user_id: userId,
+            preferences: personalizationOptions.preferences || {},
+            ...personalizationOptions
+          });
+        
+        if (profileError) {
+          console.error('[regenerate-content] Error updating learner profile:', profileError);
+        }
       }
+    } catch (profileError) {
+      console.error('[regenerate-content] Exception updating learner profile:', profileError);
+      // Continue despite error
     }
     
     // 2. Get employee ID from mapping
     let targetEmployeeId = userId;
-    const { data: mappingData } = await supabase
-      .from('employee_user_mapping')
-      .select('employee_id')
-      .eq('user_id', userId)
-      .single();
-      
-    if (mappingData?.employee_id) {
-      targetEmployeeId = mappingData.employee_id;
+    try {
+      console.log('[regenerate-content] Looking up employee mapping for user:', userId);
+      const { data: mappingData } = await supabase
+        .from('employee_user_mapping')
+        .select('employee_id')
+        .eq('user_id', userId)
+        .single();
+        
+      if (mappingData?.employee_id) {
+        targetEmployeeId = mappingData.employee_id;
+        console.log('[regenerate-content] Found employee mapping:', targetEmployeeId);
+      } else {
+        console.log('[regenerate-content] No employee mapping found, using user ID as employee ID');
+      }
+    } catch (mappingError) {
+      console.error('[regenerate-content] Exception looking up employee mapping:', mappingError);
+      // Continue with user ID as employee ID
     }
     
     // 3. Verify course exists
-    const { data: courseData, error: courseError } = await supabase
-      .from('hr_courses')
-      .select('*')
-      .eq('id', courseId)
-      .single();
-      
-    if (courseError || !courseData) {
-      return res.status(404).json({
-        error: 'Course not found',
-        details: courseError?.message
-      });
-    }
-    
-    // 4. Create or update a content generation job
-    const jobId = uuidv4();
-    const moduleCount = 3; // Default module count
-    
-    // Create a job record
-    const { error: jobError } = await adminSupabase
-      .from('content_generation_jobs')
-      .insert({
-        id: jobId,
-        course_id: courseId,
-        employee_id: targetEmployeeId,
-        status: 'pending',
-        progress: 0,
-        total_steps: moduleCount * 2 + 3, // data prep + module generation + storage
-        current_step: 0,
-        step_description: 'Initializing content generation',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        initiated_by: userId,
-        metadata: {
-          course_title: courseData.title,
-          employee_name: '',
-          force_regenerate: forceRegenerate,
-          personalization_options: personalizationOptions
-        }
-      });
-    
-    if (jobError) {
-      console.error('[regenerate-content] Error creating job record:', jobError);
-      return res.status(500).json({ 
-        error: 'Failed to create generation job', 
-        details: jobError.message 
-      });
-    }
-    
-    // Update course enrollment to reference the job
-    await supabase
-      .from('hr_course_enrollments')
-      .upsert({
-        course_id: courseId,
-        employee_id: targetEmployeeId,
-        personalized_content_generation_status: 'in_progress',
-        personalized_content_generation_job_id: jobId,
-        updated_at: new Date().toISOString()
-      });
-    
-    // Instead of processing synchronously, enqueue a background job
-    // This could be done with a message queue, but for simplicity we'll use a database table
-    // and a cron job/worker process
-    
-    // 5. Initiate background processing (in production this would be a queue)
-    // For this demo, we'll start the process asynchronously
-    setTimeout(async () => {
-      try {
-        await processContentGenerationJob(jobId, req.headers.authorization);
-      } catch (error) {
-        console.error(`[regenerate-content] Background job ${jobId} failed:`, error);
+    try {
+      console.log('[regenerate-content] Verifying course exists:', courseId);
+      const { data: courseData, error: courseError } = await supabase
+        .from('hr_courses')
+        .select('*')
+        .eq('id', courseId)
+        .single();
         
-        // Update job status on failure
-        await adminSupabase
-          .from('content_generation_jobs')
-          .update({
-            status: 'failed',
-            error_message: error.message || 'Unknown error',
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', jobId);
+      if (courseError) {
+        console.error('[regenerate-content] Error fetching course:', courseError);
+        return res.status(404).json({
+          error: 'Course not found',
+          details: courseError?.message
+        });
       }
-    }, 100); // Start after response is sent
-    
-    // 6. Return success with job information
-    return res.status(200).json({
-      success: true,
-      message: 'Course content regeneration started in background',
-      job_id: jobId,
-      course: courseData
-    });
+      
+      if (!courseData) {
+        console.log('[regenerate-content] Course not found:', courseId);
+        return res.status(404).json({
+          error: 'Course not found',
+          details: 'No course data returned'
+        });
+      }
+      
+      console.log('[regenerate-content] Course verified:', courseData.title);
+      
+      // 4. Create or update a content generation job
+      const jobId = uuidv4();
+      const moduleCount = 3; // Default module count
+      
+      console.log('[regenerate-content] Creating job record with ID:', jobId);
+      // Log what client we're using
+      console.log('[regenerate-content] Using adminSupabase client:', !!adminSupabase, 'Has service role key:', !!serviceRoleKey);
+      
+      // Create a job record
+      const { error: jobError } = await adminSupabase
+        .from('content_generation_jobs')
+        .insert({
+          id: jobId,
+          course_id: courseId,
+          employee_id: targetEmployeeId,
+          status: 'pending',
+          progress: 0,
+          total_steps: moduleCount * 2 + 3, // data prep + module generation + storage
+          current_step: 0,
+          step_description: 'Initializing content generation',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          initiated_by: userId,
+          metadata: {
+            course_title: courseData.title,
+            employee_name: '',
+            force_regenerate: forceRegenerate,
+            personalization_options: personalizationOptions
+          }
+        });
+      
+      if (jobError) {
+        console.error('[regenerate-content] Error creating job record:', jobError);
+        
+        // Enhanced error logging
+        console.error('[regenerate-content] Job creation error details:', {
+          code: jobError.code,
+          message: jobError.message,
+          details: jobError.details,
+          hint: jobError.hint
+        });
+        
+        // Check for RLS policies explicitly
+        if (jobError.code === '42501' || jobError.message?.includes('violates row-level security policy')) {
+          console.error('[regenerate-content] RLS error detected - validate that service role key is correctly set and has proper permissions');
+          console.log('[regenerate-content] Environment inspection:', {
+            hasServiceRoleKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+            serviceKeyPrefix: process.env.SUPABASE_SERVICE_ROLE_KEY 
+              ? process.env.SUPABASE_SERVICE_ROLE_KEY.substring(0, 5) + '...' 
+              : 'none',
+            isAdminClientFallback: adminSupabase === supabase
+          });
+        }
+        
+        return res.status(500).json({ 
+          error: 'Failed to create generation job', 
+          details: jobError.message 
+        });
+      }
+      
+      console.log('[regenerate-content] Job record created successfully, ID:', jobId);
+      
+      // Update course enrollment to reference the job
+      try {
+        console.log('[regenerate-content] Updating course enrollment record');
+        const { error: enrollmentError } = await supabase
+          .from('hr_course_enrollments')
+          .upsert({
+            course_id: courseId,
+            employee_id: targetEmployeeId,
+            personalized_content_generation_status: 'in_progress',
+            personalized_content_generation_job_id: jobId,
+            updated_at: new Date().toISOString()
+          });
+          
+        if (enrollmentError) {
+          console.error('[regenerate-content] Error updating enrollment:', enrollmentError);
+          // Continue despite error - this is not fatal
+        } else {
+          console.log('[regenerate-content] Enrollment record updated successfully');
+        }
+      } catch (enrollmentError) {
+        console.error('[regenerate-content] Exception updating enrollment:', enrollmentError);
+        // Continue despite error - this is not fatal
+      }
+      
+      // Instead of processing synchronously, enqueue a background job
+      // This could be done with a message queue, but for simplicity we'll use a database table
+      // and a cron job/worker process
+      
+      // 5. Initiate background processing (in production this would be a queue)
+      // For this demo, we'll start the process asynchronously
+      console.log('[regenerate-content] Setting up background job processing');
+      setTimeout(async () => {
+        try {
+          console.log(`[regenerate-content] Starting background job ${jobId} processing`);
+          await processContentGenerationJob(jobId, req.headers.authorization);
+        } catch (error) {
+          console.error(`[regenerate-content] Background job ${jobId} failed:`, error);
+          
+          // Update job status on failure
+          await adminSupabase
+            .from('content_generation_jobs')
+            .update({
+              status: 'failed',
+              error_message: error.message || 'Unknown error',
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', jobId);
+        }
+      }, 100); // Start after response is sent
+      
+      console.log('[regenerate-content] Background job scheduled, returning success response');
+      
+      // 6. Return success with job information
+      return res.status(200).json({
+        success: true,
+        message: 'Course content regeneration started in background',
+        job_id: jobId,
+        course: courseData
+      });
+    } catch (error) {
+      console.error('[regenerate-content] Unhandled error:', error);
+      return res.status(500).json({ 
+        error: 'Server error', 
+        details: error.message || 'An unexpected error occurred'
+      });
+    }
   } catch (error) {
     console.error('[regenerate-content] Unhandled error:', error);
     return res.status(500).json({ 

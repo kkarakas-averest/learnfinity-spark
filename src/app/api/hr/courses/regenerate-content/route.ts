@@ -121,12 +121,22 @@ export async function POST(req: NextRequest) {
       personalizationOptions = {} 
     } = body;
     
+    console.log('Request data:', { 
+      courseId, 
+      forceRegenerate,
+      hasPersonalizationOptions: !!personalizationOptions,
+    });
+    
     if (!courseId) {
+      console.log('Missing courseId in request');
       return NextResponse.json({ error: 'Course ID is required' }, { status: 400 });
     }
     
+    console.log('Starting content regeneration process for course:', courseId);
+    
     // Create or update learner profile with these options
     if (personalizationOptions) {
+      console.log('Updating learner profile for user:', userId);
       // Update or create learner profile
       const { error } = await supabase
         .from('learner_profiles')
@@ -143,6 +153,7 @@ export async function POST(req: NextRequest) {
     let targetEmployeeId = userId;
     
     // If user is linked to an employee, get that ID
+    console.log('Looking up employee mapping for user:', userId);
     const { data: mappingData } = await supabase
       .from('employee_user_mapping')
       .select('employee_id')
@@ -151,9 +162,13 @@ export async function POST(req: NextRequest) {
         
     if (mappingData?.employee_id) {
       targetEmployeeId = mappingData.employee_id;
+      console.log('Found employee mapping:', targetEmployeeId);
+    } else {
+      console.log('No employee mapping found, using user ID as employee ID');
     }
     
     // Get the HR course data
+    console.log('Verifying course exists:', courseId);
     const { data: courseData, error: courseError } = await supabase
       .from('hr_courses')
       .select('*')
@@ -161,11 +176,14 @@ export async function POST(req: NextRequest) {
       .single();
       
     if (courseError || !courseData) {
+      console.error('Error fetching course:', courseError);
       return NextResponse.json(
         { error: 'Course not found', details: courseError?.message }, 
         { status: 404 }
       );
     }
+    
+    console.log('Course verified:', courseData.title);
     
     // Force regeneration by clearing existing content (if requested)
     if (forceRegenerate) {
@@ -260,6 +278,18 @@ export async function POST(req: NextRequest) {
     const baseUrl = `${apiUrl.protocol}//${apiUrl.host}`;
     
     try {
+      console.log('Calling content generation endpoint with parameters:', {
+        url: `${baseUrl}/api/hr/courses/generate-content`,
+        method: 'POST',
+        hasCookieHeader: !!cookieHeader,
+        cookieHeaderLength: cookieHeader.length,
+        hasAuthHeader: !!authHeader,
+        courseId,
+        employeeId: targetEmployeeId,
+        hasPersonalizationOptions: !!personalizationOptions,
+        hasAccessToken: !!session?.access_token
+      });
+      
       // Call the content generation endpoint with all authentication methods
       const response = await fetch(`${baseUrl}/api/hr/courses/generate-content`, {
         method: 'POST',
@@ -279,8 +309,20 @@ export async function POST(req: NextRequest) {
         })
       });
       
+      console.log('Content generation API response status:', response.status);
+      
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
+        const errorData = await response.json().catch((err) => {
+          console.error('Error parsing error response:', err);
+          return { error: 'Failed to parse error response' };
+        });
+        
+        console.error('Error calling content generation service:', {
+          status: response.status,
+          statusText: response.statusText,
+          errorData
+        });
+        
         return NextResponse.json(
           { 
             error: 'Error calling content generation service', 
@@ -295,6 +337,8 @@ export async function POST(req: NextRequest) {
           }
         );
       }
+      
+      console.log('Content generation API call successful');
       
       // Return success response with the course data
       return NextResponse.json(
