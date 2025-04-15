@@ -18,6 +18,30 @@ export function RegenerateContentButton({ courseId, onSuccess, onError }: Regene
   const [jobId, setJobId] = useState<string | undefined>(undefined);
   const [showProgressDialog, setShowProgressDialog] = useState(false);
 
+  // Function to manually trigger job processing
+  const triggerJobProcessing = async (jobId: string) => {
+    try {
+      console.log(`🔄 Manually triggering job processing for job ID: ${jobId}`);
+      
+      // Call the process endpoint directly
+      const processResponse = await fetch('/api/hr/courses/personalize-content/process', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ job_id: jobId }),
+      });
+      
+      const processResult = await processResponse.json();
+      console.log(`✅ Process job response:`, processResult);
+      
+      return processResult;
+    } catch (error) {
+      console.error(`❌ Error manually triggering job processing:`, error);
+      return null;
+    }
+  };
+
   const handleRegenerate = async () => {
     setIsLoading(true);
     const requestId = `regen_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
@@ -169,6 +193,11 @@ export function RegenerateContentButton({ courseId, onSuccess, onError }: Regene
           if (responseData.job_id) {
             setJobId(responseData.job_id);
             setShowProgressDialog(true);
+            
+            // Manually trigger job processing
+            setTimeout(async () => {
+              await triggerJobProcessing(responseData.job_id);
+            }, 500);
           }
           
           toast({
@@ -198,6 +227,11 @@ export function RegenerateContentButton({ courseId, onSuccess, onError }: Regene
       if (responseData.job_id) {
         setJobId(responseData.job_id);
         setShowProgressDialog(true);
+        
+        // Manually trigger job processing
+        setTimeout(async () => {
+          await triggerJobProcessing(responseData.job_id);
+        }, 500);
       }
       
       toast({

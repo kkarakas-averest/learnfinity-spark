@@ -3,6 +3,7 @@ import { getSupabase } from '@/lib/supabase';
 import { PersonalizedContentService } from '@/services/personalized-content-service';
 import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
+import { GroqAPI } from '@/lib/llm/groq-api';  // Correct import path
 
 // Request schema validation
 const requestSchema = z.object({
@@ -76,7 +77,7 @@ export async function POST(req: NextRequest) {
         throw new Error(`Course not found: ${courseError?.message || 'Unknown error'}`);
       }
       
-      // Fetch employee data
+      // Fetch employee data - trying first in hr_employees
       const { data: employee, error: employeeError } = await supabase
         .from('hr_employees')
         .select(`
@@ -86,9 +87,27 @@ export async function POST(req: NextRequest) {
         `)
         .eq('id', job.employee_id)
         .single();
-        
+      
+      // If no employee record, check users table
+      let employeeInfo: any = employee;
       if (employeeError || !employee) {
-        throw new Error(`Employee not found: ${employeeError?.message || 'Unknown error'}`);
+        // Try getting user data as fallback
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', job.employee_id)
+          .single();
+          
+        if (userError || !userData) {
+          console.log('Could not find employee or user record, using placeholder data');
+          employeeInfo = {
+            name: "User",
+            email: "user@example.com",
+            position: "Learner"
+          };
+        } else {
+          employeeInfo = userData;
+        }
       }
       
       // Update job status
@@ -137,65 +156,147 @@ export async function POST(req: NextRequest) {
       
       await updateJobStatus(supabase, job_id, {
         current_step: 5,
-        step_description: 'Generating module content',
+        step_description: 'Generating module content with AI',
         progress: 40
       });
       
-      // Create placeholder content for modules
-      // This would typically be done by an AI service in a real implementation
-      // For now, we'll create basic placeholder content that will be replaced later
+      // Setup for AI content generation
+      const groq = new GroqAPI(process.env.GROQ_API_KEY || '');
       
-      // Assume we'll create 3 modules with 3 sections each
-      const moduleCount = 3;
-      const sectionsPerModule = 3;
+      // Extract personalization options from job
+      const personalizationOptions = job.options || {};
       
-      for (let i = 0; i < moduleCount; i++) {
+      // Prepare employee profile for the AI
+      const employeeProfile = {
+        name: employeeInfo.name || 'User',
+        position: employeeInfo.position || employeeInfo.hr_positions?.title || 'Learner',
+        department: employeeInfo.department || employeeInfo.hr_departments?.name || 'General',
+        experience_level: 'intermediate'
+      };
+      
+      // Define module structure
+      const moduleTopics = [
+        'Introduction and Fundamentals',
+        'Core Concepts and Principles',
+        'Advanced Applications and Case Studies'
+      ];
+      
+      // Generate content for each module using Groq
+      const generatedModules = [];
+      
+      for (let i = 0; i < moduleTopics.length; i++) {
         const moduleId = `module-${i + 1}`;
-        const moduleTitle = `Module ${i + 1}: ${['Introduction', 'Core Concepts', 'Advanced Topics'][i]}`;
+        const moduleTitle = `Module ${i + 1}: ${moduleTopics[i]}`;
         
         await updateJobStatus(supabase, job_id, {
           step_description: `Generating content for ${moduleTitle}`,
-          progress: 40 + (i * 20 / moduleCount)
+          progress: 40 + (i * 20 / moduleTopics.length)
         });
         
-        for (let j = 0; j < sectionsPerModule; j++) {
-          const sectionId = `section-${j + 1}`;
-          const sectionTitle = `${moduleTitle}: ${['Overview', 'Key Points', 'Application'][j]}`;
+        // Generate module content with Groq
+        const modulePrompt = `
+          Generate educational content for a module titled "${moduleTitle}" 
+          for course "${course.title}" with description "${course.description}".
           
-          // Create placeholder content
-          const contentHtml = `
-            <div class="prose max-w-none">
-              <h2>${sectionTitle}</h2>
-              <p>This is a personalized section for ${employee.name} in the role of ${employee.hr_positions?.title || 'Employee'}.</p>
-              <p>The content will be tailored to your experience level and role requirements.</p>
-              <ul>
-                <li>Personalized learning point 1</li>
-                <li>Role-specific examples</li>
-                <li>Experience-based insights</li>
-              </ul>
-              <blockquote>
-                <p>This content will be regenerated with more specific information tailored to your profile.</p>
-              </blockquote>
-            </div>
-          `;
+          The content should be tailored for ${employeeProfile.name} who is a ${employeeProfile.position} 
+          in the ${employeeProfile.department} department with ${employeeProfile.experience_level} level experience.
           
-          // Insert section content
-          const { error: sectionError } = await supabase
-            .from('ai_course_content_sections')
-            .insert({
-              id: uuidv4(),
-              content_id: aiContentId,
-              title: sectionTitle,
-              content: contentHtml,
-              module_id: moduleId,
-              section_id: sectionId,
-              order_index: j
-            });
-            
-          if (sectionError) {
-            console.error(`Error creating section ${sectionId}:`, sectionError);
-            // Continue with other sections
+          Personalization preferences:
+          - Adapt to learning style: ${personalizationOptions.adaptToLearningStyle ? 'Yes' : 'No'}
+          - Include employee experience context: ${personalizationOptions.includeEmployeeExperience ? 'Yes' : 'No'}
+          - Use simplified language: ${personalizationOptions.useSimplifiedLanguage ? 'Yes' : 'No'}
+          - Include extra challenges: ${personalizationOptions.includeExtraChallenges ? 'Yes' : 'No'}
+          
+          Create content for three sections:
+          1. Overview - Introduction to the topic
+          2. Key Points - Main concepts and theories
+          3. Application - Practical examples and exercises
+          
+          Format the content as structured HTML with headings, paragraphs, lists, and blockquotes.
+          Include specific examples relevant to ${employeeProfile.position} role.
+        `;
+        
+        try {
+          // Call Groq API
+          const aiResponse = await groq.complete(modulePrompt, {
+            system: "You are an expert educational content creator specialized in creating personalized learning materials.",
+            temperature: 0.7,
+            maxTokens: 4000
+          });
+          
+          // Extract content from the response
+          const moduleContent = aiResponse.text;
+          
+          if (!moduleContent) {
+            throw new Error('Empty response from AI service');
           }
+          
+          // Process AI response to extract sections
+          const sectionContents = extractSectionsFromAIResponse(moduleContent, moduleTitle);
+          
+          // Insert each section
+          for (let j = 0; j < sectionContents.length; j++) {
+            const section = sectionContents[j];
+            const sectionId = `section-${j + 1}`;
+            
+            // Insert section content
+            const { error: sectionError } = await supabase
+              .from('ai_course_content_sections')
+              .insert({
+                id: uuidv4(),
+                content_id: aiContentId,
+                title: section.title,
+                content: section.content,
+                module_id: moduleId,
+                section_id: sectionId,
+                order_index: j
+              });
+              
+            if (sectionError) {
+              console.error(`Error creating section ${sectionId}:`, sectionError);
+              // Continue with other sections
+            }
+          }
+          
+          generatedModules.push({
+            id: moduleId,
+            title: moduleTitle,
+            sections: sectionContents
+          });
+          
+        } catch (aiError) {
+          console.error(`Error generating content with AI for module ${moduleTitle}:`, aiError);
+          
+          // Fallback content if AI fails
+          const fallbackSections = createFallbackSections(moduleTitle, employeeProfile, course.title);
+          
+          for (let j = 0; j < fallbackSections.length; j++) {
+            const section = fallbackSections[j];
+            const sectionId = `section-${j + 1}`;
+            
+            // Insert fallback section content
+            const { error: sectionError } = await supabase
+              .from('ai_course_content_sections')
+              .insert({
+                id: uuidv4(),
+                content_id: aiContentId,
+                title: section.title,
+                content: section.content,
+                module_id: moduleId,
+                section_id: sectionId,
+                order_index: j
+              });
+              
+            if (sectionError) {
+              console.error(`Error creating fallback section ${sectionId}:`, sectionError);
+            }
+          }
+          
+          generatedModules.push({
+            id: moduleId,
+            title: moduleTitle,
+            sections: fallbackSections
+          });
         }
       }
       
@@ -260,11 +361,12 @@ export async function POST(req: NextRequest) {
     }
     
   } catch (error: any) {
-    console.error('Error in personalization process:', error);
-    return NextResponse.json(
-      { error: 'Failed to process content personalization', details: error.message },
-      { status: 500 }
-    );
+    console.error('Error processing job:', error);
+    return NextResponse.json({
+      success: false,
+      message: 'Error processing job',
+      error: error.message
+    }, { status: 500 });
   }
 }
 
@@ -283,4 +385,115 @@ async function updateJobStatus(supabase: any, job_id: string, updates: any) {
   if (error) {
     console.error('Error updating job status:', error);
   }
+}
+
+/**
+ * Extract sections from AI-generated content
+ */
+function extractSectionsFromAIResponse(aiResponse: string, moduleTitle: string): Array<{title: string, content: string}> {
+  try {
+    // Try to identify sections in the content
+    const overviewMatch = aiResponse.match(/<h[23]>.*?overview.*?<\/h[23]>/i);
+    const keyPointsMatch = aiResponse.match(/<h[23]>.*?key points.*?<\/h[23]>/i);
+    const applicationMatch = aiResponse.match(/<h[23]>.*?application.*?<\/h[23]>/i);
+    
+    if (overviewMatch && keyPointsMatch) {
+      // We can split the content into sections
+      const overviewStart = aiResponse.indexOf(overviewMatch[0]);
+      const keyPointsStart = aiResponse.indexOf(keyPointsMatch[0]);
+      let applicationStart = applicationMatch ? aiResponse.indexOf(applicationMatch[0]) : aiResponse.length;
+      
+      // Extract sections
+      const overview = aiResponse.substring(overviewStart, keyPointsStart);
+      const keyPoints = applicationMatch 
+        ? aiResponse.substring(keyPointsStart, applicationStart)
+        : aiResponse.substring(keyPointsStart);
+      const application = applicationMatch 
+        ? aiResponse.substring(applicationStart)
+        : '';
+      
+      return [
+        { 
+          title: `${moduleTitle}: Overview`, 
+          content: `<div class="prose max-w-none">${overview}</div>` 
+        },
+        { 
+          title: `${moduleTitle}: Key Points`, 
+          content: `<div class="prose max-w-none">${keyPoints}</div>` 
+        },
+        { 
+          title: `${moduleTitle}: Application`, 
+          content: application ? `<div class="prose max-w-none">${application}</div>` : null
+        }
+      ].filter(section => section.content !== null) as Array<{title: string, content: string}>;
+    } else {
+      // Can't easily split, treat as a single section
+      return [
+        { 
+          title: `${moduleTitle}: Complete Content`, 
+          content: `<div class="prose max-w-none">${aiResponse}</div>` 
+        }
+      ];
+    }
+  } catch (error) {
+    console.error('Error parsing AI response into sections:', error);
+    // Return the entire content as one section
+    return [
+      { 
+        title: `${moduleTitle}: Content`, 
+        content: `<div class="prose max-w-none">${aiResponse}</div>` 
+      }
+    ];
+  }
+}
+
+/**
+ * Create fallback sections if AI generation fails
+ */
+function createFallbackSections(
+  moduleTitle: string, 
+  employeeProfile: any, 
+  courseTitle: string
+): Array<{title: string, content: string}> {
+  const overview = `
+    <div class="prose max-w-none">
+      <h2>Overview</h2>
+      <p>This is a personalized section for ${employeeProfile.name} in the role of ${employeeProfile.position}.</p>
+      <p>This overview introduces the key concepts of ${moduleTitle} as part of the course on ${courseTitle}.</p>
+      <p>The content is tailored to your experience level and role requirements.</p>
+    </div>
+  `;
+  
+  const keyPoints = `
+    <div class="prose max-w-none">
+      <h2>Key Points</h2>
+      <ul>
+        <li>Important concept 1 relevant to ${employeeProfile.position} in ${employeeProfile.department}</li>
+        <li>Critical understanding of ${courseTitle} principles and their application</li>
+        <li>Best practices for implementing these concepts in your role</li>
+      </ul>
+      <blockquote>
+        <p>"Mastering these concepts will enhance your effectiveness as a ${employeeProfile.position}."</p>
+      </blockquote>
+    </div>
+  `;
+  
+  const application = `
+    <div class="prose max-w-none">
+      <h2>Application</h2>
+      <p>This section provides practical examples and exercises to apply the concepts from ${moduleTitle}.</p>
+      <h3>Exercise 1: Applying to Your Role</h3>
+      <p>Consider how you would implement these concepts in your daily work as a ${employeeProfile.position}.</p>
+      <h3>Case Study</h3>
+      <p>Review this case study relevant to the ${employeeProfile.department} department.</p>
+      <h3>Next Steps</h3>
+      <p>After completing this module, you'll be ready to put these concepts into practice.</p>
+    </div>
+  `;
+  
+  return [
+    { title: `${moduleTitle}: Overview`, content: overview },
+    { title: `${moduleTitle}: Key Points`, content: keyPoints },
+    { title: `${moduleTitle}: Application`, content: application }
+  ];
 } 

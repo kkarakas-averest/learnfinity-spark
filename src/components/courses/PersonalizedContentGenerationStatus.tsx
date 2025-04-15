@@ -184,6 +184,26 @@ export default function PersonalizedContentGenerationStatus({
       if (data.job_id) {
         setJobId(data.job_id);
         setGenerationStatus('in_progress');
+        
+        // Manually trigger job processing
+        try {
+          console.log(`🔄 Manually triggering job processing for job ID: ${data.job_id}`);
+          
+          // Call the process endpoint directly
+          const processResponse = await fetch('/api/hr/courses/personalize-content/process', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ job_id: data.job_id }),
+          });
+          
+          const processResult = await processResponse.json();
+          console.log(`✅ Process job response:`, processResult);
+        } catch (processError) {
+          console.error(`❌ Error manually triggering job processing:`, processError);
+          // Continue even if processing fails - the polling will pick up status updates
+        }
       } else {
         throw new Error('No job ID returned from server');
       }
@@ -275,8 +295,17 @@ export default function PersonalizedContentGenerationStatus({
         onGenerationComplete();
       }
       
-      // Refresh the page to show new content
-      router.refresh();
+      // Safely refresh the page to show new content - use setTimeout to allow other state updates to complete
+      setTimeout(() => {
+        try {
+          // Only refresh if window is available
+          if (typeof window !== 'undefined') {
+            window.location.reload();
+          }
+        } catch (error) {
+          console.error('Error refreshing page:', error);
+        }
+      }, 1000);
     } else if (jobData.status === 'failed') {
       clearInterval(pollInterval!);
       setPollInterval(null);
