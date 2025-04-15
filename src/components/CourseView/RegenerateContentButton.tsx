@@ -23,7 +23,7 @@ export function RegenerateContentButton({ courseId, onSuccess, onError }: Regene
     try {
       console.log(`🔄 Manually triggering job processing for job ID: ${jobId}`);
       
-      // Call the process endpoint directly
+      // Call the process endpoint with relative URL
       const processResponse = await fetch('/api/hr/courses/personalize-content/process', {
         method: 'POST',
         headers: {
@@ -32,12 +32,17 @@ export function RegenerateContentButton({ courseId, onSuccess, onError }: Regene
         body: JSON.stringify({ job_id: jobId }),
       });
       
+      if (!processResponse.ok) {
+        throw new Error(`Error processing job (status ${processResponse.status}): ${processResponse.statusText}`);
+      }
+      
       const processResult = await processResponse.json();
       console.log(`✅ Process job response:`, processResult);
       
       return processResult;
     } catch (error) {
       console.error(`❌ Error manually triggering job processing:`, error);
+      // Don't let this error stop the UI flow - job polling will still work
       return null;
     }
   };

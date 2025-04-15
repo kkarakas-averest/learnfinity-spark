@@ -5,6 +5,24 @@ import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
 import { GroqAPI } from '@/lib/llm/groq-api';  // Correct import path
 
+// Configure CORS options
+export const runtime = 'edge';
+export const dynamic = 'force-dynamic';
+
+// Define allowed HTTP methods
+export async function OPTIONS(request: NextRequest) {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      'Access-Control-Allow-Credentials': 'true',
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      'Access-Control-Max-Age': '86400',
+    },
+  });
+}
+
 // Request schema validation
 const requestSchema = z.object({
   job_id: z.string().uuid()
@@ -15,6 +33,20 @@ const requestSchema = z.object({
  * This endpoint is intended to be called by a background process or a webhook
  */
 export async function POST(req: NextRequest) {
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new NextResponse(null, {
+      status: 204,
+      headers: {
+        'Access-Control-Allow-Credentials': 'true',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        'Access-Control-Max-Age': '86400',
+      },
+    });
+  }
+  
   try {
     // Parse request body
     const body = await req.json();
@@ -24,7 +56,14 @@ export async function POST(req: NextRequest) {
     if (!validationResult.success) {
       return NextResponse.json(
         { error: 'Invalid request data', details: validationResult.error.format() },
-        { status: 400 }
+        { 
+          status: 400,
+          headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+          }
+        }
       );
     }
     
@@ -46,7 +85,14 @@ export async function POST(req: NextRequest) {
       console.error('Error fetching job data:', jobError);
       return NextResponse.json(
         { error: 'Job not found', details: jobError?.message },
-        { status: 404 }
+        { 
+          status: 404,
+          headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+          }
+        }
       );
     }
     
@@ -55,6 +101,12 @@ export async function POST(req: NextRequest) {
         success: true,
         message: `Job is already in ${job.status} state`,
         status: job.status
+      }, {
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        }
       });
     }
     
@@ -333,6 +385,12 @@ export async function POST(req: NextRequest) {
         success: true,
         message: 'Content personalization completed successfully',
         content_id: aiContentId
+      }, {
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        }
       });
       
     } catch (processingError: any) {
@@ -357,7 +415,14 @@ export async function POST(req: NextRequest) {
         success: false,
         message: 'Content personalization failed',
         error: processingError.message
-      }, { status: 500 });
+      }, { 
+        status: 500,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        }
+      });
     }
     
   } catch (error: any) {
@@ -366,7 +431,14 @@ export async function POST(req: NextRequest) {
       success: false,
       message: 'Error processing job',
       error: error.message
-    }, { status: 500 });
+    }, { 
+      status: 500,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      }
+    });
   }
 }
 

@@ -189,7 +189,7 @@ export default function PersonalizedContentGenerationStatus({
         try {
           console.log(`🔄 Manually triggering job processing for job ID: ${data.job_id}`);
           
-          // Call the process endpoint directly
+          // Call the process endpoint directly with relative URL
           const processResponse = await fetch('/api/hr/courses/personalize-content/process', {
             method: 'POST',
             headers: {
@@ -198,11 +198,16 @@ export default function PersonalizedContentGenerationStatus({
             body: JSON.stringify({ job_id: data.job_id }),
           });
           
-          const processResult = await processResponse.json();
-          console.log(`✅ Process job response:`, processResult);
+          if (!processResponse.ok) {
+            console.warn(`⚠️ Process API returned status ${processResponse.status}: ${processResponse.statusText}`);
+            // Continue even if processing API fails - the polling will still work
+          } else {
+            const processResult = await processResponse.json();
+            console.log(`✅ Process job response:`, processResult);
+          }
         } catch (processError) {
           console.error(`❌ Error manually triggering job processing:`, processError);
-          // Continue even if processing fails - the polling will pick up status updates
+          // Continue even if processing fails - the polling will still work
         }
       } else {
         throw new Error('No job ID returned from server');
@@ -314,7 +319,7 @@ export default function PersonalizedContentGenerationStatus({
     } else if (jobData.status === 'in_progress') {
       setGenerationStatus('in_progress');
     }
-  }, [jobId, retryCount, pollInterval, onGenerationComplete, toast, router, checkJobStatusCallback]);
+  }, [jobId, retryCount, pollInterval, onGenerationComplete, toast, checkJobStatusCallback]);
 
   // Start polling when jobId changes
   React.useEffect(() => {
