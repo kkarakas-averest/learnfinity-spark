@@ -212,14 +212,14 @@ export default async function handler(req, res) {
         console.log('[regenerate-content] Updating course enrollment record');
         const { error: enrollmentError } = await supabase
           .from('hr_course_enrollments')
-          .upsert({
-            course_id: courseId,
-            employee_id: targetEmployeeId,
+          .update({
             personalized_content_generation_status: 'in_progress',
             personalized_content_generation_job_id: jobId,
             updated_at: new Date().toISOString(),
             personalized_content_started_at: new Date().toISOString()
-          });
+          })
+          .eq('course_id', courseId)
+          .eq('employee_id', targetEmployeeId);
           
         if (enrollmentError) {
           console.error('[regenerate-content] Error updating enrollment:', enrollmentError);

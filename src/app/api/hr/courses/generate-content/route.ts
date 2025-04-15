@@ -24,7 +24,8 @@ export async function POST(req: NextRequest) {
     const { 
       courseId, 
       employeeId = null, 
-      personalizationOptions = {} 
+      personalizationOptions = {},
+      jobId = null
     } = body;
     
     if (!courseId) {
@@ -296,7 +297,7 @@ export async function POST(req: NextRequest) {
     
     // Create the complete personalized course content
     const personalizedContent = {
-      id: uuidv4(),
+      id: jobId || uuidv4(),
       course_id: courseId,
       employee_id: targetEmployeeId,
       title: courseData.title,
@@ -305,6 +306,7 @@ export async function POST(req: NextRequest) {
       modules: generatedModules,
       metadata: {
         generated_at: new Date().toISOString(),
+        job_id: jobId,
         generated_for: {
           employee_id: targetEmployeeId,
           name: employeeData.name,

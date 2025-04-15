@@ -4,6 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getEmployeeDataForPersonalization } from '@/lib/api/hr/employee-data';
 import { AgentFactory } from '@/agents/AgentFactory';
 import { cookies } from 'next/headers';
+import { v4 as uuidv4 } from 'uuid';
 
 /**
  * API endpoint to regenerate personalized course content
@@ -185,6 +186,95 @@ export async function POST(req: NextRequest) {
     
     console.log('Course verified:', courseData.title);
     
+    // Create job record with ID for tracking this regeneration request
+    const jobId = uuidv4();
+    console.log('Creating job record with ID:', jobId);
+    
+    // Check if we should use the admin client or regular client
+    const adminSupabase = supabaseAdmin || supabase;
+    console.log('Using adminSupabase client:', !!adminSupabase, 'Has service role key:', !!process.env.SUPABASE_SERVICE_ROLE_KEY);
+    
+    // Insert job record
+    const { error: jobError } = await adminSupabase
+      .from('content_generation_jobs')
+      .insert({
+        id: jobId,
+        course_id: courseId,
+        employee_id: targetEmployeeId,
+        status: 'in_progress',
+        total_steps: 10, // Default total steps
+        current_step: 1,  // Start at step 1
+        progress: 0,      // 0% progress
+        step_description: 'Initializing content generation process',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        metadata: {
+          personalization_options: personalizationOptions
+        }
+      });
+      
+    if (jobError) {
+      console.error('Error creating job record:', jobError);
+      return NextResponse.json(
+        { error: 'Failed to create job record', details: jobError.message },
+        { status: 500 }
+      );
+    }
+    
+    console.log('Job record created successfully, ID:', jobId);
+    
+    // Check if the employee is already enrolled in the course
+    console.log('Checking for existing enrollment for employee and course');
+    const { data: existingEnrollment, error: enrollmentCheckError } = await supabase
+      .from('hr_course_enrollments')
+      .select('id')
+      .eq('course_id', courseId)
+      .eq('employee_id', targetEmployeeId)
+      .maybeSingle();
+    
+    if (enrollmentCheckError && enrollmentCheckError.code !== 'PGRST116') {
+      console.error('Error checking for enrollment:', enrollmentCheckError);
+    }
+    
+    if (existingEnrollment) {
+      // Update the existing enrollment record
+      console.log('Updating course enrollment record');
+      const { error: updateError } = await supabase
+        .from('hr_course_enrollments')
+        .update({
+          personalized_content_generation_status: 'in_progress',
+          personalized_content_generation_job_id: jobId,
+          updated_at: new Date().toISOString(),
+          personalized_content_started_at: new Date().toISOString()
+        })
+        .eq('id', existingEnrollment.id);
+      
+      if (updateError) {
+        console.error('Error updating enrollment:', updateError);
+        // Continue anyway as this is not fatal to the process
+      }
+    } else {
+      // Create a new enrollment record
+      console.log('Creating new enrollment record');
+      const { error: insertError } = await supabase
+        .from('hr_course_enrollments')
+        .insert({
+          employee_id: targetEmployeeId,
+          course_id: courseId,
+          status: 'assigned',
+          progress: 0,
+          enrollment_date: new Date().toISOString(),
+          personalized_content_generation_status: 'in_progress',
+          personalized_content_generation_job_id: jobId,
+          personalized_content_started_at: new Date().toISOString()
+        });
+      
+      if (insertError) {
+        console.error('Error updating enrollment:', insertError);
+        // Continue anyway as this is not fatal to the process
+      }
+    }
+    
     // Force regeneration by clearing existing content (if requested)
     if (forceRegenerate) {
       // First, check for personalized content in hr_personalized_course_content
@@ -262,14 +352,6 @@ export async function POST(req: NextRequest) {
       }
     }
     
-    // Get course enrollment data
-    const { data: enrollmentData } = await supabase
-      .from('hr_course_enrollments')
-      .select('*')
-      .eq('course_id', courseId)
-      .eq('employee_id', targetEmployeeId)
-      .single();
-    
     // Get employee data for personalization
     const employeeData = await getEmployeeDataForPersonalization(userId);
     
@@ -277,96 +359,78 @@ export async function POST(req: NextRequest) {
     const apiUrl = new URL(req.url);
     const baseUrl = `${apiUrl.protocol}//${apiUrl.host}`;
     
-    try {
-      console.log('Calling content generation endpoint with parameters:', {
-        url: `${baseUrl}/api/hr/courses/generate-content`,
-        method: 'POST',
-        hasCookieHeader: !!cookieHeader,
-        cookieHeaderLength: cookieHeader.length,
-        hasAuthHeader: !!authHeader,
-        courseId,
-        employeeId: targetEmployeeId,
-        hasPersonalizationOptions: !!personalizationOptions,
-        hasAccessToken: !!session?.access_token
-      });
-      
-      // Call the content generation endpoint with all authentication methods
-      const response = await fetch(`${baseUrl}/api/hr/courses/generate-content`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          // Pass along the auth header
-          'Cookie': cookieHeader,
-          // Include Authorization header if it exists
-          ...(authHeader ? { 'Authorization': authHeader } : {})
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          courseId,
-          employeeId: targetEmployeeId,
-          personalizationOptions,
-          access_token: session?.access_token // Include token in request body as fallback
-        })
-      });
-      
-      console.log('Content generation API response status:', response.status);
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch((err) => {
-          console.error('Error parsing error response:', err);
-          return { error: 'Failed to parse error response' };
+    // Set up background job processing
+    console.log('Setting up background job processing');
+    
+    // Create a unique ID for this background job run
+    const backgroundJobId = uuidv4();
+    
+    // Start the background job asynchronously
+    setTimeout(async () => {
+      try {
+        console.log(`[background-job:${backgroundJobId}] Starting content generation process`);
+        
+        // Make an API call to the content generation endpoint
+        const response = await fetch(`${baseUrl}/api/hr/courses/generate-content`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Cookie': req.headers.get('cookie') || '',
+            ...(req.headers.get('authorization') ? 
+              { 'Authorization': req.headers.get('authorization') || '' } : {})
+          },
+          body: JSON.stringify({
+            courseId,
+            employeeId: targetEmployeeId,
+            personalizationOptions,
+            jobId
+          })
         });
         
-        console.error('Error calling content generation service:', {
-          status: response.status,
-          statusText: response.statusText,
-          errorData
-        });
-        
-        return NextResponse.json(
-          { 
-            error: 'Error calling content generation service', 
-            details: errorData.error || response.statusText 
-          }, 
-          { 
-            status: 500,
-            headers: {
-              'Access-Control-Allow-Origin': '*',
-              'Access-Control-Allow-Credentials': 'true',
-            }
-          }
-        );
+        if (!response.ok) {
+          console.error(`[background-job:${backgroundJobId}] API call failed with status: ${response.status}`);
+          // Update job status to failed
+          await adminSupabase
+            .from('content_generation_jobs')
+            .update({
+              status: 'failed',
+              error_message: `API call failed with status: ${response.status}`,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', jobId);
+        } else {
+          console.log(`[background-job:${backgroundJobId}] API call completed successfully`);
+        }
+      } catch (error: any) {
+        console.error(`[background-job:${backgroundJobId}] Error:`, error);
+        // Update job status to failed
+        await adminSupabase
+          .from('content_generation_jobs')
+          .update({
+            status: 'failed',
+            error_message: error.message || 'Unknown error',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', jobId);
       }
-      
-      console.log('Content generation API call successful');
-      
-      // Return success response with the course data
-      return NextResponse.json(
-        {
-          success: true,
-          message: 'Course content regeneration started successfully',
-          course: courseData
-        },
-        {
-          headers: {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Credentials': 'true',
-          }
+    }, 100); // Start after response is sent
+    
+    console.log('Background job scheduled, returning success response');
+    
+    // Return success response with the course data
+    return NextResponse.json(
+      {
+        success: true,
+        message: 'Course content regeneration started successfully',
+        course: courseData
+      },
+      {
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Credentials': 'true',
         }
-      );
-    } catch (regenerateError: any) {
-      console.error('Error calling regeneration service:', regenerateError);
-      return NextResponse.json(
-        { error: 'Failed to regenerate course content', details: regenerateError.message }, 
-        { 
-          status: 500,
-          headers: {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Credentials': 'true',
-          }
-        }
-      );
-    }
+      }
+    );
   } catch (error: any) {
     console.error('Error in course regeneration:', error);
     return NextResponse.json(
