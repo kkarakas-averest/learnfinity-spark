@@ -267,13 +267,8 @@ export async function POST(req: NextRequest) {
       async function callGroqApi(prompt: string) {
         console.log('[generate-content] Preparing direct Groq API call');
         
-        // Try to get API key from environment variables
-        const groqApiKey = process.env.GROQ_API_KEY || process.env.OPENAI_API_KEY;
-        
-        if (!groqApiKey) {
-          console.error('[generate-content] Missing Groq API key');
-          throw new Error('No Groq API key found in environment variables');
-        }
+        // Use hardcoded API key instead of environment variables
+        const groqApiKey = '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';
         
         // Attempt direct API call to Groq
         try {
