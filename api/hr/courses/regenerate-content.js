@@ -4,7 +4,14 @@ import { v4 as uuidv4 } from 'uuid';
 // Initialize Supabase client
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+// Create two clients - one for user operations and one for admin operations
 const supabase = createClient(supabaseUrl, supabaseKey);
+// Use service role key if available for admin operations (bypasses RLS)
+const adminSupabase = serviceRoleKey 
+  ? createClient(supabaseUrl, serviceRoleKey)
+  : supabase; // Fall back to standard client if service role key not available
 
 export default async function handler(req, res) {
   // Set CORS headers
@@ -108,7 +115,7 @@ export default async function handler(req, res) {
     const moduleCount = 3; // Default module count
     
     // Create a job record
-    const { error: jobError } = await supabase
+    const { error: jobError } = await adminSupabase
       .from('content_generation_jobs')
       .insert({
         id: jobId,
@@ -162,7 +169,7 @@ export default async function handler(req, res) {
         console.error(`[regenerate-content] Background job ${jobId} failed:`, error);
         
         // Update job status on failure
-        await supabase
+        await adminSupabase
           .from('content_generation_jobs')
           .update({
             status: 'failed',
@@ -193,7 +200,7 @@ async function processContentGenerationJob(jobId, authHeader) {
   console.log(`[background-job:${jobId}] Starting content generation process`);
   
   // 1. Get job details
-  const { data: jobData, error: jobError } = await supabase
+  const { data: jobData, error: jobError } = await adminSupabase
     .from('content_generation_jobs')
     .select('*')
     .eq('id', jobId)
@@ -207,7 +214,7 @@ async function processContentGenerationJob(jobId, authHeader) {
   const { course_id: courseId, employee_id: targetEmployeeId } = jobData;
   
   // Update job status to in_progress
-  await supabase
+  await adminSupabase
     .from('content_generation_jobs')
     .update({
       status: 'in_progress',
@@ -228,7 +235,7 @@ async function processContentGenerationJob(jobId, authHeader) {
     if (courseError) throw new Error(`Failed to retrieve course: ${courseError.message}`);
     
     // 3. Clean up existing content if regeneration is requested
-    await supabase
+    await adminSupabase
       .from('content_generation_jobs')
       .update({
         current_step: 2,
@@ -256,7 +263,7 @@ async function processContentGenerationJob(jobId, authHeader) {
     }
     
     // 4. Fetch employee data for personalization
-    await supabase
+    await adminSupabase
       .from('content_generation_jobs')
       .update({
         current_step: 3,
@@ -277,7 +284,7 @@ async function processContentGenerationJob(jobId, authHeader) {
       console.error(`[background-job:${jobId}] Error fetching employee data:`, employeeError);
     } else {
       // Update job with employee name
-      await supabase
+      await adminSupabase
         .from('content_generation_jobs')
         .update({
           metadata: {
@@ -299,7 +306,7 @@ async function processContentGenerationJob(jobId, authHeader) {
     }
     
     // 5. Initialize LLM client
-    await supabase
+    await adminSupabase
       .from('content_generation_jobs')
       .update({
         current_step: 4,
@@ -408,7 +415,7 @@ async function processContentGenerationJob(jobId, authHeader) {
     
     for (const moduleOutline of moduleOutlines) {
       // Update job status with current module
-      await supabase
+      await adminSupabase
         .from('content_generation_jobs')
         .update({
           current_step: baseStep,
@@ -619,7 +626,7 @@ async function processContentGenerationJob(jobId, authHeader) {
     
     // 7. Create the complete personalized course content
     const finalStep = baseStep;
-    await supabase
+    await adminSupabase
       .from('content_generation_jobs')
       .update({
         current_step: finalStep,
@@ -686,7 +693,7 @@ async function processContentGenerationJob(jobId, authHeader) {
       .eq('employee_id', targetEmployeeId);
     
     // 9. Mark job as completed
-    await supabase
+    await adminSupabase
       .from('content_generation_jobs')
       .update({
         status: 'completed',
@@ -704,7 +711,7 @@ async function processContentGenerationJob(jobId, authHeader) {
     console.error(`[background-job:${jobId}] Error in content generation process:`, error);
     
     // Update job status on failure
-    await supabase
+    await adminSupabase
       .from('content_generation_jobs')
       .update({
         status: 'failed',

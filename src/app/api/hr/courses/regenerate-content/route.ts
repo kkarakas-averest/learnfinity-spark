@@ -1,5 +1,6 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getEmployeeDataForPersonalization } from '@/lib/api/hr/employee-data';
 import { AgentFactory } from '@/agents/AgentFactory';
 import { cookies } from 'next/headers';
