@@ -359,7 +359,93 @@ export async function POST(req: NextRequest) {
     const apiUrl = new URL(req.url);
     const baseUrl = `${apiUrl.protocol}//${apiUrl.host}`;
     
-    // Set up background job processing
+    console.log('[DIRECT-PROCESS] Starting direct content generation process for debugging');
+    
+    try {
+      // Instead of using setTimeout which isn't reliable in serverless environments,
+      // we'll directly make the API call for debugging
+      console.log('[DIRECT-PROCESS] Directly calling content generation endpoint');
+      
+      // Update job status to indicate direct processing
+      await adminSupabase
+        .from('content_generation_jobs')
+        .update({
+          current_step: 2,
+          step_description: 'Direct content generation in progress',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', jobId);
+      
+      // Get the raw session object to include access token
+      let accessToken = '';
+      if (session?.access_token) {
+        accessToken = session.access_token;
+        console.log('[DIRECT-PROCESS] Using session access token');
+      }
+      
+      // Create API call headers
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json'
+      };
+      
+      // Add auth headers if available
+      if (accessToken) {
+        headers['Authorization'] = `Bearer ${accessToken}`;
+      }
+      if (cookieHeader.length > 0) {
+        headers['Cookie'] = cookieHeader;
+      }
+      
+      console.log('[DIRECT-PROCESS] API call headers:', Object.keys(headers));
+      
+      // Make the API call with all available auth methods
+      const contentResponse = await fetch(`${baseUrl}/api/hr/courses/generate-content`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          courseId,
+          employeeId: targetEmployeeId,
+          personalizationOptions,
+          jobId
+        })
+      });
+      
+      console.log(`[DIRECT-PROCESS] Content generation API response status: ${contentResponse.status}`);
+      
+      if (!contentResponse.ok) {
+        let errorText = await contentResponse.text();
+        console.error('[DIRECT-PROCESS] Error response from content generation API:', errorText);
+        
+        // Update job status to failed
+        await adminSupabase
+          .from('content_generation_jobs')
+          .update({
+            status: 'failed',
+            error_message: `Direct API call failed: ${contentResponse.status} - ${errorText.substring(0, 200)}`,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', jobId);
+      } else {
+        console.log('[DIRECT-PROCESS] Content generation API call succeeded');
+        let respJson = await contentResponse.json();
+        console.log('[DIRECT-PROCESS] Response data:', JSON.stringify(respJson).substring(0, 100) + '...');
+      }
+    } catch (directError: any) {
+      console.error('[DIRECT-PROCESS] Error in direct content generation:', directError);
+      console.error('[DIRECT-PROCESS] Error stack:', directError.stack);
+      
+      // Update job status to failed
+      await adminSupabase
+        .from('content_generation_jobs')
+        .update({
+          status: 'failed',
+          error_message: `Direct process error: ${directError.message}`,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', jobId);
+    }
+    
+    // Original background job code remains for comparison
     console.log('Setting up background job processing');
     
     // Create a unique ID for this background job run
