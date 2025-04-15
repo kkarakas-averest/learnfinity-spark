@@ -95,7 +95,7 @@ export default async function handler(req, res) {
         
         // 1. Get job details first
         const { data: job, error: jobFetchError } = await supabase
-          .from('personalization_jobs')
+          .from('content_generation_jobs')
           .select('*')
           .eq('id', jobId)
           .single();
@@ -115,7 +115,7 @@ export default async function handler(req, res) {
           
           // Do a more aggressive update with less data
           const { error: forceError } = await supabase
-            .from('personalization_jobs')
+            .from('content_generation_jobs')
             .update({
               current_step: nextStep,
               step_description: description,
@@ -195,7 +195,7 @@ export default async function handler(req, res) {
         // 2. Initialize job - set status to in_progress
         console.log(`Initializing job ${jobId} to in_progress state`);
         const { error: updateError } = await supabase
-          .from('personalization_jobs')
+          .from('content_generation_jobs')
           .update({ 
             status: 'in_progress',
             current_step: 0,
@@ -326,7 +326,7 @@ async function processJobStep(supabase, jobId) {
   try {
     // 1. Get current job state
     const { data: job, error: jobFetchError } = await supabase
-      .from('personalization_jobs')
+      .from('content_generation_jobs')
       .select('*')
       .eq('id', jobId)
       .single();
@@ -369,7 +369,7 @@ async function processJobStep(supabase, jobId) {
       
       // Mark job as completed
       const { error: completionError } = await supabase
-        .from('personalization_jobs')
+        .from('content_generation_jobs')
         .update({
           status: 'completed',
           updated_at: new Date().toISOString()
@@ -402,7 +402,7 @@ async function processJobStep(supabase, jobId) {
     
     // Update job with next step info
     const { error: updateError } = await supabase
-      .from('personalization_jobs')
+      .from('content_generation_jobs')
       .update({
         current_step: nextStep,
         step_description: description,
@@ -446,7 +446,7 @@ async function processJobStep(supabase, jobId) {
     try {
       if (supabase) {
         await supabase
-          .from('personalization_jobs')
+          .from('content_generation_jobs')
           .update({
             status: 'failed',
             error_message: `Unexpected error: ${error.message}`,
@@ -478,12 +478,12 @@ async function completeJob(supabase, job) {
     
     // Update job to completed status
     const { error: updateError } = await supabase
-      .from('personalization_jobs')
+      .from('content_generation_jobs')
       .update({
         status: 'completed',
         current_step: job.total_steps,
-        current_step_description: description,
-        progress_percentage: 100,
+        step_description: description,
+        progress: 100,
         completed_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       })
@@ -507,7 +507,7 @@ async function completeJob(supabase, job) {
     // Try to update job status to failed
     try {
       await supabase
-        .from('personalization_jobs')
+        .from('content_generation_jobs')
         .update({
           status: 'failed',
           error_message: `Error completing job: ${error.message || 'Unknown error'}`,
@@ -592,7 +592,7 @@ async function processNextStep(supabase, job) {
     // Try to update job status to failed
     try {
       await supabase
-        .from('personalization_jobs')
+        .from('content_generation_jobs')
         .update({
           status: 'failed',
           error_message: `Error processing next step: ${error.message || 'Unknown error'}`,
