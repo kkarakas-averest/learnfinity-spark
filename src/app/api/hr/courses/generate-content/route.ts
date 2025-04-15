@@ -28,6 +28,9 @@ export async function POST(req: NextRequest) {
       jobId = null
     } = body;
     
+    // Log request parameters with jobId if present
+    console.log(`[generate-content] Received request with: courseId=${courseId}, employeeId=${employeeId}, hasJobId=${!!jobId}`);
+    
     if (!courseId) {
       return NextResponse.json({ error: 'Course ID is required' }, { status: 400 });
     }
@@ -296,8 +299,11 @@ export async function POST(req: NextRequest) {
     }
     
     // Create the complete personalized course content
+    const contentId = jobId || uuidv4(); // Use the provided job ID or generate a new one
+    console.log(`[generate-content] Creating personalized content with ID: ${contentId} ${jobId ? '(from jobId)' : '(newly generated)'}`);
+    
     const personalizedContent = {
-      id: jobId || uuidv4(),
+      id: contentId,
       course_id: courseId,
       employee_id: targetEmployeeId,
       title: courseData.title,
@@ -306,7 +312,7 @@ export async function POST(req: NextRequest) {
       modules: generatedModules,
       metadata: {
         generated_at: new Date().toISOString(),
-        job_id: jobId,
+        job_id: jobId, // Store the job ID if provided
         generated_for: {
           employee_id: targetEmployeeId,
           name: employeeData.name,
@@ -318,6 +324,7 @@ export async function POST(req: NextRequest) {
     };
     
     // Store the personalized content in the database
+    console.log(`[generate-content] Storing personalized content in database for: course=${courseId}, employee=${targetEmployeeId}`);
     const { data: storedContent, error: storageError } = await supabase
       .from('hr_personalized_course_content')
       .insert({
@@ -333,24 +340,59 @@ export async function POST(req: NextRequest) {
       .single();
       
     if (storageError) {
-      console.error('Error storing personalized content:', storageError);
+      console.error('[generate-content] Error storing personalized content:', storageError);
       return NextResponse.json(
         { error: 'Failed to store personalized content', details: storageError.message }, 
         { status: 500 }
       );
     }
     
+    console.log('[generate-content] Content stored successfully');
+    
     // Update the enrollment record to indicate content has been personalized
     if (enrollmentData) {
-      await supabase
+      console.log(`[generate-content] Updating enrollment record with ID: ${enrollmentData.id}`);
+      const { error: updateError } = await supabase
         .from('hr_course_enrollments')
         .update({
           personalized_content_id: personalizedContent.id,
-          updated_at: new Date().toISOString()
+          personalized_content_generation_status: 'completed',
+          updated_at: new Date().toISOString(),
+          personalized_content_completed_at: new Date().toISOString()
         })
         .eq('id', enrollmentData.id);
+      
+      if (updateError) {
+        console.error('[generate-content] Error updating enrollment record:', updateError);
+      } else {
+        console.log('[generate-content] Enrollment record updated successfully');
+      }
+    } else {
+      console.log('[generate-content] No enrollment record found to update');
     }
     
+    // If a job ID was provided, update the job status
+    if (jobId) {
+      console.log(`[generate-content] Updating job status for ID: ${jobId}`);
+      try {
+        await supabase
+          .from('content_generation_jobs')
+          .update({
+            status: 'completed',
+            current_step: 10, // Final step
+            progress: 100,
+            step_description: 'Content generation completed successfully',
+            updated_at: new Date().toISOString(),
+            completed_at: new Date().toISOString()
+          })
+          .eq('id', jobId);
+        console.log(`[generate-content] Job ${jobId} marked as completed`);
+      } catch (jobError) {
+        console.error(`[generate-content] Error updating job status:`, jobError);
+      }
+    }
+    
+    console.log('[generate-content] Returning success response');
     return NextResponse.json({
       success: true,
       message: 'Personalized course content generated successfully',

@@ -365,10 +365,34 @@ export async function POST(req: NextRequest) {
     // Create a unique ID for this background job run
     const backgroundJobId = uuidv4();
     
+    // First, update the job status to indicate it's about to start
+    await adminSupabase
+      .from('content_generation_jobs')
+      .update({
+        current_step: 1,
+        step_description: 'Preparing to call content generation API',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', jobId);
+    
     // Start the background job asynchronously
     setTimeout(async () => {
       try {
         console.log(`[background-job:${backgroundJobId}] Starting content generation process`);
+        
+        // Update job to indicate API call is starting
+        await adminSupabase
+          .from('content_generation_jobs')
+          .update({
+            current_step: 2,
+            step_description: 'Initiating content generation API call',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', jobId);
+        
+        // Log the URL and parameters for debugging
+        console.log(`[background-job:${backgroundJobId}] Calling API at: ${baseUrl}/api/hr/courses/generate-content`);
+        console.log(`[background-job:${backgroundJobId}] With parameters: courseId=${courseId}, employeeId=${targetEmployeeId}, jobId=${jobId}`);
         
         // Make an API call to the content generation endpoint
         const response = await fetch(`${baseUrl}/api/hr/courses/generate-content`, {
@@ -387,22 +411,46 @@ export async function POST(req: NextRequest) {
           })
         });
         
+        // Log the response status
+        console.log(`[background-job:${backgroundJobId}] API response status: ${response.status}`);
+        
         if (!response.ok) {
+          const errorText = await response.text();
           console.error(`[background-job:${backgroundJobId}] API call failed with status: ${response.status}`);
+          console.error(`[background-job:${backgroundJobId}] Error details: ${errorText}`);
+          
           // Update job status to failed
           await adminSupabase
             .from('content_generation_jobs')
             .update({
               status: 'failed',
-              error_message: `API call failed with status: ${response.status}`,
+              error_message: `API call failed with status: ${response.status} - ${errorText.substring(0, 500)}`,
               updated_at: new Date().toISOString()
             })
             .eq('id', jobId);
         } else {
-          console.log(`[background-job:${backgroundJobId}] API call completed successfully`);
+          // Try to parse response if available
+          try {
+            const responseData = await response.json();
+            console.log(`[background-job:${backgroundJobId}] API call completed successfully with response:`, JSON.stringify(responseData).substring(0, 200) + '...');
+          } catch (e) {
+            console.log(`[background-job:${backgroundJobId}] API call completed successfully (response not JSON)`);
+          }
+          
+          // Update job status to in progress with API called
+          await adminSupabase
+            .from('content_generation_jobs')
+            .update({
+              current_step: 3,
+              step_description: 'Content generation API called successfully',
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', jobId);
         }
       } catch (error: any) {
-        console.error(`[background-job:${backgroundJobId}] Error:`, error);
+        console.error(`[background-job:${backgroundJobId}] Error:`, error.message);
+        console.error(`[background-job:${backgroundJobId}] Stack trace:`, error.stack);
+        
         // Update job status to failed
         await adminSupabase
           .from('content_generation_jobs')
