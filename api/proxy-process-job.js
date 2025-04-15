@@ -48,10 +48,64 @@ export default async function handler(req, res) {
       body: JSON.stringify(body),
     });
     
-    // Get the response data
-    const responseData = await response.json();
+    // Check if the response is valid
+    if (!response.ok) {
+      console.log(`Received error response: ${response.status} ${response.statusText}`);
+      
+      // Try to get the error message from response if possible
+      let errorMessage;
+      try {
+        const errorData = await response.text();
+        console.log(`Error response body: ${errorData}`);
+        
+        // Try to parse as JSON if it looks like JSON
+        if (errorData && errorData.trim().startsWith('{')) {
+          try {
+            const errorJson = JSON.parse(errorData);
+            errorMessage = errorJson.error || errorJson.message || errorData;
+          } catch (parseError) {
+            errorMessage = errorData;
+          }
+        } else {
+          errorMessage = errorData || response.statusText;
+        }
+      } catch (textError) {
+        errorMessage = response.statusText;
+      }
+      
+      return res.status(response.status).json({ 
+        error: `Target API responded with error ${response.status}`,
+        message: errorMessage
+      });
+    }
     
-    // Return the response
+    // Get the response text first to validate
+    const responseText = await response.text();
+    
+    // Skip parsing if empty
+    if (!responseText || responseText.trim() === '') {
+      console.log('Empty response received from target API');
+      return res.status(200).json({ 
+        success: true,
+        message: "Process initiated successfully",
+        warning: "Target API returned empty response"
+      });
+    }
+    
+    // Try to parse JSON
+    let responseData;
+    try {
+      responseData = JSON.parse(responseText);
+    } catch (jsonError) {
+      console.error('Invalid JSON in response:', responseText);
+      return res.status(200).json({
+        success: true,
+        message: "Process initiated but response could not be parsed",
+        raw_response: responseText.substring(0, 100) // Include part of the raw response for debugging
+      });
+    }
+    
+    // Return the parsed response
     return res.status(response.status).json(responseData);
   } catch (error) {
     console.error('Error in proxy endpoint:', error);
