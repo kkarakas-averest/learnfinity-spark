@@ -18,7 +18,6 @@ import {
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/components/ui/use-toast';
-import { useRouter } from 'next/navigation';
 import ReactMarkdown from 'react-markdown';
 import HtmlContentRenderer from './HtmlContentRenderer';
 
@@ -90,7 +89,6 @@ export default function PersonalizedContentGenerationStatus({
   enrollmentId,
 }: PersonalizedContentGenerationStatusProps) {
   const { toast } = useToast();
-  const router = useRouter();
   const [isGenerating, setIsGenerating] = React.useState(initialIsGenerating);
   const [currentStep, setCurrentStep] = React.useState(initialCurrentStep);
   const [steps, setSteps] = React.useState<StepType[]>(initialSteps);

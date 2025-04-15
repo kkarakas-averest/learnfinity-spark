@@ -122,40 +122,7 @@ const requestSchema = z.object({
 export async function POST(req: NextRequest) {
   const requestId = uuidv4().slice(0, 8); // Generate a short request ID for tracing
   logWithTimestamp(`[ReqID:${requestId}] POST request received from ${req.url}`);
-  logWithTimestamp(`[ReqID:${requestId}] Request method: ${req.method}`);
   logWithTimestamp(`[ReqID:${requestId}] Request headers:`, Object.fromEntries(req.headers));
-  
-  // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
-    logWithTimestamp(`[ReqID:${requestId}] Handling OPTIONS preflight request`);
-    return new NextResponse(null, {
-      status: 204,
-      headers: {
-        'Access-Control-Allow-Credentials': 'true',
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-        'Access-Control-Max-Age': '86400',
-      },
-    });
-  }
-  
-  // Ensure only allowed methods
-  if (req.method !== 'POST') {
-    logWithTimestamp(`[ReqID:${requestId}] ❌ Method not allowed: ${req.method}`);
-    return NextResponse.json(
-      { error: `Method ${req.method} not allowed` },
-      { 
-        status: 405,
-        headers: {
-          'Allow': 'POST, OPTIONS',
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-        }
-      }
-    );
-  }
   
   try {
     // Parse request body

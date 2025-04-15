@@ -39,3 +39,6 @@ dist-ssr
 *password*.txt
 .vite/
 .vite/
+
+# Sentry Config File
+.env.sentry-build-plugin
