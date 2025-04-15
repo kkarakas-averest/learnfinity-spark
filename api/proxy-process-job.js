@@ -1,9 +1,9 @@
 // Proxy endpoint to forward requests to the personalize-content/process endpoint
 // This is needed to avoid cross-domain issues with deployed environments
 
-const fetch = require('node-fetch');
+import fetch from 'node-fetch';
 
-module.exports = async (req, res) => {
+export default async function handler(req, res) {
   // Add CORS headers
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -23,8 +23,19 @@ module.exports = async (req, res) => {
   try {
     // Get request body
     const body = req.body;
-    // Forward the request to the actual process endpoint
-    const forwardUrl = `${process.env.VERCEL_URL || 'http://localhost:3000'}/api/hr/courses/personalize-content/process`;
+    
+    // Properly construct the forward URL for both development and production
+    let forwardUrl;
+    
+    if (process.env.VERCEL_URL) {
+      // For production: ensure we use https protocol
+      forwardUrl = `https://${process.env.VERCEL_URL}/api/hr/courses/personalize-content/process`;
+      // Remove any potential double slashes (except in protocol)
+      forwardUrl = forwardUrl.replace(/:\/\/+/g, '://').replace(/([^:])\/+/g, '$1/');
+    } else {
+      // For local development
+      forwardUrl = 'http://localhost:3000/api/hr/courses/personalize-content/process';
+    }
     
     console.log(`Proxying request to: ${forwardUrl}`);
     
@@ -46,7 +57,8 @@ module.exports = async (req, res) => {
     console.error('Error in proxy endpoint:', error);
     return res.status(500).json({ 
       error: 'Internal server error',
-      message: error.message
+      message: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
-}; 
+} 

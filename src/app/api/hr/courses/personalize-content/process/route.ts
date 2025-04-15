@@ -173,7 +173,7 @@ export async function POST(req: NextRequest) {
     
     // Get the job info from the database
     const { data: job, error: jobError } = await supabase
-      .from('jobs')
+      .from('content_generation_jobs')
       .select('*')
       .eq('id', job_id)
       .single();
@@ -222,7 +222,7 @@ export async function POST(req: NextRequest) {
     // Update the job status to PROCESSING
     logWithTimestamp(`[ReqID:${requestId}] 🔄 Updating job status to PROCESSING...`);
     const { error: updateError } = await supabase
-      .from('jobs')
+      .from('content_generation_jobs')
       .update({ status: JobStatus.PROCESSING })
       .eq('id', job_id);
       
@@ -248,7 +248,7 @@ export async function POST(req: NextRequest) {
     if (!parameters) {
       logWithTimestamp(`[ReqID:${requestId}] ❌ Invalid job parameters: null or undefined`);
       await supabase
-        .from('jobs')
+        .from('content_generation_jobs')
         .update({ 
           status: JobStatus.FAILED, 
           result: { error: "Invalid job parameters" } 
@@ -284,7 +284,7 @@ export async function POST(req: NextRequest) {
     if (!course_id || !user_id) {
       logWithTimestamp(`[ReqID:${requestId}] ❌ Missing required parameters: course_id=${course_id}, user_id=${user_id}`);
       await supabase
-        .from('jobs')
+        .from('content_generation_jobs')
         .update({ 
           status: JobStatus.FAILED, 
           result: { error: "Missing course ID or user ID" } 
@@ -469,7 +469,7 @@ export async function POST(req: NextRequest) {
       // Update job status to COMPLETED
       logWithTimestamp(`[ReqID:${requestId}] 🏁 Marking job as COMPLETED`);
       const { error: completeError } = await supabase
-        .from('jobs')
+        .from('content_generation_jobs')
         .update({ 
           status: JobStatus.COMPLETED, 
           result: { success: true, message: "Content generation completed successfully" },
@@ -503,7 +503,7 @@ export async function POST(req: NextRequest) {
       
       // Update job status to FAILED
       await supabase
-        .from('jobs')
+        .from('content_generation_jobs')
         .update({
           status: JobStatus.FAILED, 
           result: { 
