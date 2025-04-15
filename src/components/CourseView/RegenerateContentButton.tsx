@@ -164,6 +164,63 @@ export function RegenerateContentButton({ courseId, onSuccess, onError }: Regene
       
       console.log(`[${requestId}] ✅ Authentication token retrieved successfully`);
       
+      // Check for existing pending or in-progress jobs first
+      try {
+        console.log(`[${requestId}] 🔍 Checking for existing jobs for this course`);
+        
+        // Get current user info to find employee ID
+        const { data: userData } = await supabase.auth.getUser();
+        const userId = userData?.user?.id;
+        
+        if (userId) {
+          // First try to get employee ID from user_employee_mappings
+          const { data: employeeMapping } = await supabase
+            .from('user_employee_mappings')
+            .select('employee_id')
+            .eq('user_id', userId)
+            .maybeSingle();
+            
+          const employeeId = employeeMapping?.employee_id || userId;
+          
+          // Check for existing pending or in-progress jobs
+          const { data: existingJobs, error: jobCheckError } = await supabase
+            .from('content_generation_jobs')
+            .select('*')
+            .eq('course_id', courseId)
+            .eq('employee_id', employeeId)
+            .in('status', ['pending', 'in_progress'])
+            .order('created_at', { ascending: false })
+            .limit(1);
+            
+          if (jobCheckError) {
+            console.warn(`[${requestId}] ⚠️ Error checking existing jobs:`, jobCheckError);
+          } else if (existingJobs && existingJobs.length > 0) {
+            const existingJob = existingJobs[0];
+            console.log(`[${requestId}] ✅ Found existing ${existingJob.status} job: ${existingJob.id}`);
+            
+            // Show progress dialog for existing job
+            setJobId(existingJob.id);
+            setShowProgressDialog(true);
+            
+            // Trigger job processing to ensure it continues
+            setTimeout(async () => {
+              await triggerJobProcessing(existingJob.id);
+            }, 500);
+            
+            toast({
+              title: 'Resuming Content Generation',
+              description: 'Found an existing job in progress. Resuming from where it left off.',
+            });
+            
+            setIsLoading(false);
+            return; // Exit early - no need to create a new job
+          }
+        }
+      } catch (checkError) {
+        console.warn(`[${requestId}] ⚠️ Error checking for existing jobs:`, checkError);
+        // Continue with job creation anyway if check fails
+      }
+      
       // Try the legacy API endpoint first - more reliable in production
       const legacyEndpoint = '/api/hr/courses/regenerate-content';
       console.log(`[${requestId}] 🚀 Calling ${legacyEndpoint} with auth token`, {

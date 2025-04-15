@@ -257,9 +257,8 @@ export async function POST(req: NextRequest) {
     
     logWithTimestamp(`✅ Course verified: ${courseData.title}`, undefined, requestId);
     
-    // Create job record with ID for tracking this regeneration request
-    const jobId = uuidv4();
-    logWithTimestamp(`📝 Creating job record with ID: ${jobId}`, undefined, requestId);
+    // Check for existing pending or in-progress jobs for this course and employee
+    logWithTimestamp(`🔍 Checking for existing jobs for course: ${courseId} and employee: ${targetEmployeeId}`, undefined, requestId);
     
     // Check if we should use the admin client or regular client
     const adminSupabase = supabaseAdmin || supabase;
@@ -268,6 +267,54 @@ export async function POST(req: NextRequest) {
       hasServiceRoleKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
       usingFallback: !supabaseAdmin
     }, requestId);
+    
+    const { data: existingJobs, error: jobQueryError } = await adminSupabase
+      .from('content_generation_jobs')
+      .select('*')
+      .eq('course_id', courseId)
+      .eq('employee_id', targetEmployeeId)
+      .in('status', ['pending', 'in_progress'])
+      .order('created_at', { ascending: false })
+      .limit(1);
+      
+    if (jobQueryError) {
+      logWithTimestamp(`⚠️ Error checking for existing jobs:`, jobQueryError, requestId);
+      // Continue anyway, we'll create a new job
+    } else if (existingJobs && existingJobs.length > 0) {
+      const existingJob = existingJobs[0];
+      logWithTimestamp(`✅ Found existing ${existingJob.status} job: ${existingJob.id}`, undefined, requestId);
+      
+      // Update the job to ensure it's being processed
+      await adminSupabase
+        .from('content_generation_jobs')
+        .update({
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', existingJob.id);
+      
+      // Return the existing job ID instead of creating a new one
+      logWithTimestamp(`🔄 Returning existing job ID: ${existingJob.id}`, undefined, requestId);
+      return NextResponse.json(
+        {
+          success: true,
+          message: `Reusing existing ${existingJob.status} job`,
+          job_id: existingJob.id,
+          status: existingJob.status,
+          current_step: existingJob.current_step,
+          progress: existingJob.progress
+        },
+        {
+          headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Credentials': 'true',
+          }
+        }
+      );
+    }
+    
+    // Create job record with ID for tracking this regeneration request
+    const jobId = uuidv4();
+    logWithTimestamp(`📝 Creating job record with ID: ${jobId}`, undefined, requestId);
     
     // Insert job record
     const { error: jobError } = await adminSupabase

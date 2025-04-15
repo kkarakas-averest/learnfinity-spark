@@ -255,7 +255,7 @@ export default function PersonalizedContentGenerationStatus({
       
       if (data.job) {
         updateJobStatusState(data.job);
-      } else {
+          } else {
         throw new Error('No job data returned from direct API');
       }
     } catch (error) {
@@ -271,11 +271,11 @@ export default function PersonalizedContentGenerationStatus({
       
       if (retryCount >= MAX_RETRIES * 2) {
         setErrorMessage(error instanceof Error ? error.message : 'Failed to check job status after multiple attempts');
-        
-        if (onGenerationComplete) {
-          onGenerationComplete();
-        }
+      
+      if (onGenerationComplete) {
+        onGenerationComplete();
       }
+    }
     }
   }, [jobId, retryCount, pollAttempts, onGenerationComplete]);
   
@@ -375,14 +375,14 @@ export default function PersonalizedContentGenerationStatus({
           // assume the job completed but failed to notify us
           if (generationStatus !== 'completed' && generationStatus !== 'failed') {
             console.log('⏱️ Maximum polling attempts reached. Assuming completion.');
-            setGenerationStatus('completed');
+      setGenerationStatus('completed');
             setProgressPercentage(100);
             
-            setTimeout(() => {
-              if (typeof window !== 'undefined') {
-                window.location.reload();
-              }
-            }, 1000);
+      setTimeout(() => {
+          if (typeof window !== 'undefined') {
+            window.location.reload();
+        }
+      }, 1000);
             
             if (onGenerationComplete) {
               onGenerationComplete();

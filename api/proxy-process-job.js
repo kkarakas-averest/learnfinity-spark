@@ -168,7 +168,22 @@ export default async function handler(req, res) {
         console.log('Current step:', job.current_step);
         
         // If the job is already in progress, process the next step
-        if (job.status === 'in_progress' && job.current_step > 0) {
+        if (job.status === 'in_progress') {
+          console.log(`Job ${jobId} is already in progress at step ${job.current_step} of ${job.total_steps}`);
+          
+          // Check if job appears to be stuck (hasn't been updated in a while)
+          const lastUpdateTime = new Date(job.updated_at).getTime();
+          const currentTime = new Date().getTime();
+          const timeSinceUpdate = currentTime - lastUpdateTime;
+          
+          // If job hasn't been updated in 5 minutes, it might be stuck
+          const JOB_STUCK_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
+          
+          if (timeSinceUpdate > JOB_STUCK_THRESHOLD_MS) {
+            console.log(`Job ${jobId} appears to be stuck (no updates for ${Math.round(timeSinceUpdate/1000/60)} minutes)`);
+            console.log(`Resuming processing from current step: ${job.current_step}`);
+          }
+          
           // Process next step if there are more steps
           if (job.current_step < job.total_steps) {
             console.log(`Continuing job processing at step ${job.current_step + 1}`);
