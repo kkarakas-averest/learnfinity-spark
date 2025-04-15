@@ -173,9 +173,14 @@ export async function POST(req: NextRequest) {
       cvExtractedData = employeeWithCV.cv_extracted_data;
     }
     
-    // Initialize the agent for content generation
-    const agentFactory = AgentFactory.getInstance();
-    const educatorAgent = agentFactory.createAgent('educator') as any;
+    // Check for DEBUG_DIRECT_API flag in query params or env
+    const urlParams = new URL(req.url).searchParams;
+    const useDirectApi = urlParams.get('directApi') === 'true' || process.env.USE_DIRECT_API === 'true';
+    
+    console.log(`[generate-content] Using direct API approach: ${useDirectApi}`);
+    
+    // Generate personalized content
+    const generatedModules = [];
     
     // Create content outline based on course
     const contentOutline = {
@@ -254,91 +259,323 @@ export async function POST(req: NextRequest) {
       }
     };
     
-    // Generate personalized content
-    const generatedModules = [];
-    
-    // Process each module
-    for (const moduleOutline of contentOutline.modules) {
-      // Create a module-specific content request
-      const moduleRequest = {
-        ...contentRequest,
-        topic: moduleOutline.title,
-        learningObjectives: moduleOutline.objectives
-      };
+    if (useDirectApi) {
+      // -------------------- DIRECT API APPROACH --------------------
+      console.log('[generate-content] Using direct Groq API approach');
       
-      try {
-        // Add CV-specific instructions to make content more personalized
-        let modulePromptPrefix = '';
-        if (cvExtractedData) {
-          // Create a personalization prefix for the prompt
-          const profileSummary = typeof cvExtractedData === 'object' ? 
-            cvExtractedData.summary : 
-            cvExtractedData;
-            
-          modulePromptPrefix = `
-            I'm generating course content for ${employeeData.name}, who works as a ${employeeData.position || 'professional'} 
-            in the ${employeeData.department || 'organization'}.
-            
-            Here is their professional profile based on their CV:
-            ${profileSummary}
-            
-            Please tailor the following module content to be especially relevant to their background, 
-            skills, and professional context. Make references to how this content applies specifically 
-            to their role and experience level where appropriate.
-            
-            COURSE TOPIC: ${courseData.title}
-            MODULE TOPIC: ${moduleOutline.title}
-            
-            Generate content that is:
-            1. Relevant to their professional background
-            2. Aligned with their skill level
-            3. Contextual to their industry and department
-            4. Personalized with specific examples related to their role
-            
-            MODULE CONTENT:
-          `;
-          
-          // Override the request to include the personalization prefix
-          (moduleRequest as any).prompt = modulePromptPrefix;
+      // Function to directly call Groq API without using the agent
+      async function callGroqApi(prompt: string) {
+        console.log('[generate-content] Preparing direct Groq API call');
+        
+        // Try to get API key from environment variables
+        const groqApiKey = process.env.GROQ_API_KEY || process.env.OPENAI_API_KEY;
+        
+        if (!groqApiKey) {
+          console.error('[generate-content] Missing Groq API key');
+          throw new Error('No Groq API key found in environment variables');
         }
         
-        // Generate content for this module
-        const generatedContent = await educatorAgent.generateContentForRequest(moduleRequest);
-        
-        // Process sections
-        const sections = [];
-        for (let i = 0; i < moduleOutline.sections.length; i++) {
-          const sectionOutline = moduleOutline.sections[i];
+        // Attempt direct API call to Groq
+        try {
+          console.log('[generate-content] Making direct Groq API call');
           
-          // Get content from the generated content or use default
-          let sectionContent = '';
+          const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${groqApiKey}`
+            },
+            body: JSON.stringify({
+              model: 'llama3-8b-8192',  // Use appropriate model from Groq
+              messages: [
+                {
+                  role: 'system',
+                  content: 'You are an expert educational content creator and learning designer. Your task is to create personalized, professional course content based on the provided topic and learner information.'
+                },
+                {
+                  role: 'user',
+                  content: prompt
+                }
+              ],
+              temperature: 0.7,
+              max_tokens: 4000
+            })
+          });
           
-          // Check if generatedContent exists and has the expected properties
-          if (generatedContent && generatedContent.mainContent) {
-            if (generatedContent.sections && generatedContent.sections.length > i) {
-              sectionContent = generatedContent.sections[i].content;
-            } else {
-              // Otherwise split the main content into parts
-              const contentParts = generatedContent.mainContent.split('\n\n');
-              const partIndex = i % contentParts.length;
-              sectionContent = contentParts[partIndex];
-            }
-          } else {
-            // Fallback content
-            sectionContent = `# ${sectionOutline.title}\n\nGenerated content for ${moduleOutline.title} - ${sectionOutline.title}\n\nThis section covers important aspects of ${courseData.title} relevant to your role as ${employeeData.position} in the ${employeeData.department} department.`;
+          if (!response.ok) {
+            console.error(`[generate-content] Groq API error: ${response.status}`);
+            const errorText = await response.text();
+            console.error(`[generate-content] Error details: ${errorText}`);
+            throw new Error(`Groq API error: ${response.status} - ${errorText}`);
           }
           
-          sections.push({
-            id: `${moduleOutline.id}-section-${i + 1}`,
-            title: sectionOutline.title,
-            content: sectionContent,
-            contentType: sectionOutline.type || 'text',
-            orderIndex: i + 1,
-            duration: sectionOutline.duration || 20
+          const data = await response.json();
+          console.log('[generate-content] Groq API response received');
+          
+          return data.choices[0].message.content;
+        } catch (error) {
+          console.error('[generate-content] Error calling Groq API:', error);
+          throw error;
+        }
+      }
+      
+      // Generate content for each module using direct Groq API
+      for (const moduleOutline of contentOutline.modules) {
+        console.log(`[generate-content] Generating content for module: ${moduleOutline.title}`);
+        
+        try {
+          // Create personalized prompt for this module
+          let modulePrompt = `
+            Please generate educational content for a module titled "${moduleOutline.title}" 
+            for a course on "${courseData.title}".
+            
+            The content should be for ${employeeData.name}, who works as a ${employeeData.position || 'professional'} 
+            in the ${employeeData.department || 'organization'}.
+            
+            Module description: ${moduleOutline.description}
+            
+            Learning objectives:
+            ${moduleOutline.objectives.map(obj => `- ${obj}`).join('\n')}
+            
+            The module should include the following sections:
+            ${moduleOutline.sections.map(section => `- ${section.title}`).join('\n')}
+            
+            Generate comprehensive content for each section, formatted in Markdown.
+            Make the content relevant to a ${courseData.difficulty_level || 'intermediate'} level learner.
+            
+            Focus on making the content practical, applicable, and tailored to someone in the ${employeeData.position || 'professional'} role.
+          `;
+          
+          // Add CV data if available for deeper personalization
+          if (cvExtractedData) {
+            const profileSummary = typeof cvExtractedData === 'object' ? 
+              cvExtractedData.summary : 
+              cvExtractedData;
+              
+            modulePrompt += `
+              Here is additional information about the learner from their CV/profile:
+              ${profileSummary}
+              
+              Please tailor the content to be especially relevant to their background, skills, and professional context.
+              Make specific references to how this knowledge applies to their role and experience level.
+            `;
+          }
+          
+          // Call Groq API directly
+          const generatedContent = await callGroqApi(modulePrompt);
+          
+          // Process and format the content for each section
+          const contentParts = generatedContent.split(/(?:^|\n)#{1,2}\s+/);
+          const sections = [];
+          
+          for (let i = 0; i < moduleOutline.sections.length; i++) {
+            const sectionOutline = moduleOutline.sections[i];
+            let sectionContent;
+            
+            if (i < contentParts.length - 1) {
+              // Use the matching content part if available (+1 because first split is usually empty)
+              sectionContent = `# ${sectionOutline.title}\n\n${contentParts[i + 1].trim()}`;
+            } else {
+              // Fallback content
+              sectionContent = `# ${sectionOutline.title}\n\nGenerated content for ${moduleOutline.title} - ${sectionOutline.title}\n\nThis section covers important aspects of ${courseData.title} relevant to your role as ${employeeData.position} in the ${employeeData.department} department.`;
+            }
+            
+            sections.push({
+              id: `${moduleOutline.id}-section-${i + 1}`,
+              title: sectionOutline.title,
+              content: sectionContent,
+              contentType: sectionOutline.type || 'text',
+              orderIndex: i + 1,
+              duration: sectionOutline.duration || 20
+            });
+          }
+          
+          // Create module with sections
+          generatedModules.push({
+            id: moduleOutline.id,
+            title: moduleOutline.title,
+            description: moduleOutline.description,
+            orderIndex: moduleOutline.orderIndex,
+            sections,
+            resources: moduleOutline.resources || []
+          });
+          
+          console.log(`[generate-content] Successfully generated content for module: ${moduleOutline.title}`);
+        } catch (error) {
+          console.error(`[generate-content] Error generating content for module ${moduleOutline.title}:`, error);
+          
+          // Add module with basic content as fallback
+          generatedModules.push({
+            id: moduleOutline.id,
+            title: moduleOutline.title,
+            description: moduleOutline.description,
+            orderIndex: moduleOutline.orderIndex,
+            sections: moduleOutline.sections.map((sectionOutline: any, index: number) => ({
+              id: `${moduleOutline.id}-section-${index + 1}`,
+              title: sectionOutline.title,
+              content: `# ${sectionOutline.title}\n\nBasic content for ${moduleOutline.title} - ${sectionOutline.title}`,
+              contentType: sectionOutline.type || 'text',
+              orderIndex: index + 1,
+              duration: sectionOutline.duration || 20
+            })),
+            resources: moduleOutline.resources || []
           });
         }
+      }
+    } else {
+      // -------------------- ORIGINAL AGENT APPROACH --------------------
+      // Initialize the agent for content generation
+      console.log('[generate-content] Using AgentFactory approach');
+      const agentFactory = AgentFactory.getInstance();
+      const educatorAgent = agentFactory.createAgent('educator') as any;
+      
+      // Process each module
+      for (const moduleOutline of contentOutline.modules) {
+        // Create a module-specific content request
+        const moduleRequest = {
+          ...contentRequest,
+          topic: moduleOutline.title,
+          learningObjectives: moduleOutline.objectives
+        };
         
-        // Create module with sections
+        try {
+          // Add CV-specific instructions to make content more personalized
+          let modulePromptPrefix = '';
+          if (cvExtractedData) {
+            // Create a personalization prefix for the prompt
+            const profileSummary = typeof cvExtractedData === 'object' ? 
+              cvExtractedData.summary : 
+              cvExtractedData;
+              
+            modulePromptPrefix = `
+              I'm generating course content for ${employeeData.name}, who works as a ${employeeData.position || 'professional'} 
+              in the ${employeeData.department || 'organization'}.
+              
+              Here is their professional profile based on their CV:
+              ${profileSummary}
+              
+              Please tailor the following module content to be especially relevant to their background, 
+              skills, and professional context. Make references to how this content applies specifically 
+              to their role and experience level where appropriate.
+              
+              COURSE TOPIC: ${courseData.title}
+              MODULE TOPIC: ${moduleOutline.title}
+              
+              Generate content that is:
+              1. Relevant to their professional background
+              2. Aligned with their skill level
+              3. Contextual to their industry and department
+              4. Personalized with specific examples related to their role
+              
+              MODULE CONTENT:
+            `;
+            
+            // Override the request to include the personalization prefix
+            (moduleRequest as any).prompt = modulePromptPrefix;
+          }
+          
+          // Generate content for this module
+          const generatedContent = await educatorAgent.generateContentForRequest(moduleRequest);
+          
+          // Process sections
+          const sections = [];
+          for (let i = 0; i < moduleOutline.sections.length; i++) {
+            const sectionOutline = moduleOutline.sections[i];
+            
+            // Get content from the generated content or use default
+            let sectionContent = '';
+            
+            // Check if generatedContent exists and has the expected properties
+            if (generatedContent && generatedContent.mainContent) {
+              if (generatedContent.sections && generatedContent.sections.length > i) {
+                sectionContent = generatedContent.sections[i].content;
+              } else {
+                // Otherwise split the main content into parts
+                const contentParts = generatedContent.mainContent.split('\n\n');
+                const partIndex = i % contentParts.length;
+                sectionContent = contentParts[partIndex];
+              }
+            } else {
+              // Fallback content
+              sectionContent = `# ${sectionOutline.title}\n\nGenerated content for ${moduleOutline.title} - ${sectionOutline.title}\n\nThis section covers important aspects of ${courseData.title} relevant to your role as ${employeeData.position} in the ${employeeData.department} department.`;
+            }
+            
+            sections.push({
+              id: `${moduleOutline.id}-section-${i + 1}`,
+              title: sectionOutline.title,
+              content: sectionContent,
+              contentType: sectionOutline.type || 'text',
+              orderIndex: i + 1,
+              duration: sectionOutline.duration || 20
+            });
+          }
+          
+          // Create module with sections
+          generatedModules.push({
+            id: moduleOutline.id,
+            title: moduleOutline.title,
+            description: moduleOutline.description,
+            orderIndex: moduleOutline.orderIndex,
+            sections,
+            resources: moduleOutline.resources || []
+          });
+        } catch (error) {
+          console.error(`Error generating content for module ${moduleOutline.title}:`, error);
+          // Add module with basic content as fallback
+          generatedModules.push({
+            id: moduleOutline.id,
+            title: moduleOutline.title,
+            description: moduleOutline.description,
+            orderIndex: moduleOutline.orderIndex,
+            sections: moduleOutline.sections.map((sectionOutline: any, index: number) => ({
+              id: `${moduleOutline.id}-section-${index + 1}`,
+              title: sectionOutline.title,
+              content: `# ${sectionOutline.title}\n\nBasic content for ${moduleOutline.title} - ${sectionOutline.title}`,
+              contentType: sectionOutline.type || 'text',
+              orderIndex: index + 1,
+              duration: sectionOutline.duration || 20
+            })),
+            resources: moduleOutline.resources || []
+          });
+        }
+      }
+    }
+    
+    // Fallback: If no content was generated (both approaches failed), create basic content
+    if (generatedModules.length === 0) {
+      console.log('[generate-content] Both API and agent approaches failed. Using fallback content generation.');
+      
+      // Create basic content for each module
+      for (const moduleOutline of contentOutline.modules) {
+        const sections = moduleOutline.sections.map((sectionOutline: any, index: number) => ({
+          id: `${moduleOutline.id}-section-${index + 1}`,
+          title: sectionOutline.title,
+          content: `# ${sectionOutline.title}
+          
+## Overview
+
+This is placeholder content for ${courseData.title} - ${moduleOutline.title} - ${sectionOutline.title}.
+
+The actual personalized content could not be generated at this time, but here's some general information about this topic.
+
+## Key Points
+
+* ${courseData.title} is an important skill in the modern workplace
+* ${moduleOutline.title} is a fundamental aspect of this skill
+* ${sectionOutline.title} helps you apply these concepts in your role as ${employeeData.position || 'a professional'}
+
+## Application
+
+Consider how you might apply these principles in your daily work. As someone working in ${employeeData.department || 'your department'}, you'll find many opportunities to use these skills.
+
+## Next Steps
+
+After reviewing this section, proceed to the next section to learn more about ${courseData.title}.`,
+          contentType: sectionOutline.type || 'text',
+          orderIndex: index + 1,
+          duration: sectionOutline.duration || 20
+        }));
+        
         generatedModules.push({
           id: moduleOutline.id,
           title: moduleOutline.title,
@@ -347,25 +584,9 @@ export async function POST(req: NextRequest) {
           sections,
           resources: moduleOutline.resources || []
         });
-      } catch (error) {
-        console.error(`Error generating content for module ${moduleOutline.title}:`, error);
-        // Add module with basic content as fallback
-        generatedModules.push({
-          id: moduleOutline.id,
-          title: moduleOutline.title,
-          description: moduleOutline.description,
-          orderIndex: moduleOutline.orderIndex,
-          sections: moduleOutline.sections.map((sectionOutline: any, index: number) => ({
-            id: `${moduleOutline.id}-section-${index + 1}`,
-            title: sectionOutline.title,
-            content: `# ${sectionOutline.title}\n\nBasic content for ${moduleOutline.title} - ${sectionOutline.title}`,
-            contentType: sectionOutline.type || 'text',
-            orderIndex: index + 1,
-            duration: sectionOutline.duration || 20
-          })),
-          resources: moduleOutline.resources || []
-        });
       }
+      
+      console.log('[generate-content] Successfully created fallback content.');
     }
     
     // Create the complete personalized course content

@@ -399,7 +399,7 @@ export async function POST(req: NextRequest) {
       console.log('[DIRECT-PROCESS] API call headers:', Object.keys(headers));
       
       // Make the API call with all available auth methods
-      const contentResponse = await fetch(`${baseUrl}/api/hr/courses/generate-content`, {
+      const contentResponse = await fetch(`${baseUrl}/api/hr/courses/generate-content?directApi=true`, {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -481,7 +481,7 @@ export async function POST(req: NextRequest) {
         console.log(`[background-job:${backgroundJobId}] With parameters: courseId=${courseId}, employeeId=${targetEmployeeId}, jobId=${jobId}`);
         
         // Make an API call to the content generation endpoint
-        const response = await fetch(`${baseUrl}/api/hr/courses/generate-content`, {
+        const response = await fetch(`${baseUrl}/api/hr/courses/generate-content?directApi=true`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
