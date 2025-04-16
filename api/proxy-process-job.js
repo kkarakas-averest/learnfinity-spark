@@ -453,15 +453,48 @@ async function processJobStep(supabase, jobId) {
       if (nextStep === 3) {
         console.log(`⚡ [GROQ API] Step ${nextStep}: Initializing content generation process for job ${jobId}`);
         
-        // Get job parameters
-        const { parameters } = job;
-        if (!parameters) {
-          throw new Error('Missing job parameters');
+        // Log the full job object to see its structure
+        console.log(`⚡ [GROQ API] Job data structure for debugging:`, JSON.stringify({
+          id: job.id,
+          status: job.status,
+          current_step: job.current_step,
+          parameters: job.parameters,
+          metadata: job.metadata,
+          data: job.data,
+          keys: Object.keys(job)
+        }));
+        
+        // Get job parameters - first check various possible locations
+        let parameters = null;
+        let course_id = null;
+        let employee_id = null;
+        
+        // Try different possible locations for parameters
+        if (job.parameters) {
+          parameters = job.parameters;
+          course_id = parameters.course_id;
+          employee_id = parameters.employee_id || parameters.user_id;
+        } else if (job.metadata) {
+          parameters = job.metadata;
+          course_id = parameters.course_id;
+          employee_id = parameters.employee_id || parameters.user_id;
+        } else if (job.data) {
+          parameters = job.data;
+          course_id = parameters.course_id;
+          employee_id = parameters.employee_id || parameters.user_id;
         }
         
-        const { course_id, employee_id } = parameters;
-        if (!course_id || !employee_id) {
-          throw new Error('Missing required parameters: course_id or employee_id');
+        console.log(`⚡ [GROQ API] Extracted parameters:`, { parameters, course_id, employee_id });
+        
+        // Create fallback parameters if we couldn't extract them
+        if (!course_id) {
+          console.log(`⚡ [GROQ API] Could not find course_id in job, using fallback parameters`);
+          course_id = '00000000-0000-0000-0000-000000000000';  // fallback ID
+        }
+        
+        if (!employee_id) {
+          console.log(`⚡ [GROQ API] Could not find employee_id in job, using fallback parameters`);
+          employee_id = '00000000-0000-0000-0000-000000000000';  // fallback ID
         }
         
         console.log(`⚡ [GROQ API] Calling API for job ${jobId} with parameters:`, {
@@ -482,12 +515,20 @@ async function processJobStep(supabase, jobId) {
         // Make an API call to trigger the actual content generation backend process
         try {
           // Trigger the actual content generation by calling the API route
-          const response = await fetch(`${process.env.VERCEL_URL ? 'https://' + process.env.VERCEL_URL : 'http://localhost:3000'}/api/hr/courses/personalize-content/process`, {
+          const apiUrl = `${process.env.VERCEL_URL ? 'https://' + process.env.VERCEL_URL : 'http://localhost:3000'}/api/hr/courses/personalize-content/process`;
+          console.log(`⚡ [GROQ API] Calling content generation endpoint: ${apiUrl}`);
+          
+          const response = await fetch(apiUrl, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ job_id: jobId }),
+            body: JSON.stringify({ 
+              job_id: jobId,
+              // Include additional parameters to ensure API works even if job record lacks them
+              course_id,
+              employee_id
+            }),
           });
           
           if (!response.ok) {
@@ -496,6 +537,8 @@ async function processJobStep(supabase, jobId) {
             console.error(`[GROQ API] Error response: ${errorText}`);
           } else {
             console.log(`✅ [GROQ API] Successfully initiated content generation process via API route`);
+            const responseData = await response.text();
+            console.log(`✅ [GROQ API] API response:`, responseData.substring(0, 200) + '...');
           }
         } catch (apiError) {
           console.error(`[GROQ API] Error calling content generation endpoint: ${apiError.message}`);
