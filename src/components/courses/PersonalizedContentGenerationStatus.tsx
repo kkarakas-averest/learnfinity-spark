@@ -119,129 +119,111 @@ export default function PersonalizedContentGenerationStatus({
   const [lastProgressUpdate, setLastProgressUpdate] = useState<number>(Date.now());
   const [forceProgressUpdate, setForceProgressUpdate] = useState(false);
 
-  // Function to trigger job processing when it appears stuck
-  const triggerJobProcessing = useCallback(async (jobId: string) => {
-    if (!jobId) return;
+  // Add state for tracking job processing
+  const [processing, setProcessing] = useState(false);
+  const [stepStuckCount, setStepStuckCount] = useState(0);
+
+  // Extract job status update logic to reuse in different places
+  const updateJobStatusState = useCallback((job: any) => {
+    console.log(`✅ Job status: ${job.status}, step: ${job.current_step} of ${job.total_steps}, progress: ${job.progress}%`);
     
-    try {
-      console.log(`🔄 Triggering job processing for ${jobId} to advance progress`);
+    setJobDetails(job);
       
-      const { data: sessionData } = await supabase.auth.getSession();
-      if (!sessionData?.session?.access_token) {
-        console.error("❌ No auth token available for job processing");
-        return;
-      }
+    // Update progress immediately when received
+    if (typeof job.progress === 'number') {
+      setProgressPercentage(job.progress);
+    }
+    
+    if (job.status === 'completed') {
+      setIsGenerating(false);
+      setCurrentStep(steps.length - 1);
+      setProgressPercentage(100);
+      setGenerationStatus('completed');
       
-      const authToken = sessionData.session.access_token;
-      
-      let apiSuccess = false;
-      
-      // Try the direct API endpoint first
-      try {
-        const directResponse = await fetch('/api/hr/courses/personalize-content/process', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${authToken}`
-          },
-          body: JSON.stringify({ job_id: jobId })
-        });
-        
-        if (directResponse.ok) {
-          console.log('✅ Successfully triggered job processing through direct API');
-          lastStepChangeTimeRef.current = Date.now(); // Reset the timer
-          apiSuccess = true;
-        } else {
-          console.warn(`⚠️ Direct API job processing failed with status ${directResponse.status}, trying proxy endpoint`);
+      // Reload page after short delay to show new content
+      setTimeout(() => {
+        if (typeof window !== 'undefined') {
+          window.location.reload();
         }
-      } catch (directError) {
-        console.warn(`⚠️ Error with direct API:`, directError);
-      }
+      }, 1000);
       
-      // Fall back to proxy endpoint if direct API failed
-      if (!apiSuccess) {
-        try {
-          const proxyResponse = await fetch(`/api/proxy-process-job?job_id=${jobId}`, {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${authToken}`
-            }
-          });
-          
-          if (proxyResponse.ok) {
-            console.log('✅ Successfully triggered job processing through proxy API');
-            lastStepChangeTimeRef.current = Date.now(); // Reset the timer
-            apiSuccess = true;
-          } else {
-            console.warn(`⚠️ Proxy API job processing failed with status ${proxyResponse.status}`);
-          }
-        } catch (proxyError) {
-          console.warn(`⚠️ Error with proxy API:`, proxyError);
-        }
+      if (onGenerationComplete) {
+        onGenerationComplete();
       }
+    } else if (job.status === 'failed') {
+      setIsGenerating(false);
+      setErrorMessage(job.error_message || 'Job failed without specific error details');
+      setGenerationStatus('failed');
       
-      // If both API calls fail, try direct database update as last resort
-      if (!apiSuccess) {
-        console.log(`⚠️ API calls failed, attempting direct database update for job ${jobId}`);
+      if (onGenerationComplete) {
+        onGenerationComplete();
+      }
+    } else if (job.status === 'in_progress' || job.status === 'processing') {
+      setIsGenerating(true);
+      const stepIndex = steps.findIndex(step => step.id === job.current_step);
+      setCurrentStep(stepIndex >= 0 ? stepIndex : 0);
+      setGenerationStatus('in_progress');
+      
+      // Check if step has changed since last check
+      const now = Date.now();
+      
+      if (lastStepRef.current !== job.current_step) {
+        // Step has changed, reset counters
+        console.log(`🔄 Step changed from ${lastStepRef.current} to ${job.current_step}`);
+        lastStepRef.current = job.current_step;
+        sameStepCountRef.current = 0;
+        lastStepChangeTimeRef.current = now;
+      } else {
+        // Step is the same, increment counter
+        sameStepCountRef.current += 1;
         
-        // First, get current job state
-        const { data: job, error: jobError } = await supabase
-          .from('content_generation_jobs')
-          .select('*')
-          .eq('id', jobId)
-          .single();
+        // If we've been at the same step for too many checks, it might be stuck
+        if (sameStepCountRef.current >= STUCK_STEP_THRESHOLD || 
+            (lastStepChangeTimeRef.current && now - lastStepChangeTimeRef.current > STUCK_THRESHOLD_MS)) {
+          console.log(`⚠️ Job appears stuck at step ${job.current_step} for too long (${sameStepCountRef.current} checks)`);
           
-        if (jobError || !job) {
-          console.error(`❌ Could not fetch job for direct database update:`, jobError);
-          return;
-        }
-        
-        // Force advance the job by one step if it's not at the end
-        if (job.status === 'in_progress' && job.current_step < job.total_steps) {
-          const nextStep = job.current_step + 1;
-          const progress = Math.min(Math.round((nextStep / (job.total_steps - 1)) * 100), 100);
-          
-          const { error: updateError } = await supabase
-            .from('content_generation_jobs')
-            .update({
-              current_step: nextStep,
-              progress: progress,
-              step_description: `Processing step ${nextStep}`,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', jobId);
-            
-          if (updateError) {
-            console.error(`❌ Direct database update failed:`, updateError);
-          } else {
-            console.log(`✅ Successfully advanced job via direct database update to step ${nextStep}`);
-            lastStepChangeTimeRef.current = Date.now(); // Reset the timer
+          // Only try unsticking if we haven't tried recently (5 seconds)
+          if (!lastStepChangeTimeRef.current || now - lastStepChangeTimeRef.current > 5000) {
+            console.log(`🔄 Attempting to unstick job ${job.id} from step ${job.current_step}`);
+            triggerJobProcessing();
+            lastStepChangeTimeRef.current = now;
+            // Reset the counter to avoid constant retries
+            sameStepCountRef.current = 0;
           }
         }
       }
-    } catch (error) {
-      console.error('❌ Error processing job:', error);
-    }
-  }, []);
-
-  // Load job status on component mount
-  useEffect(() => {
-    if (jobId) {
-      checkJobStatus();
-    }
-  }, [jobId]);
-
-  // Clear poll interval on unmount
-  useEffect(() => {
-    return () => {
-      if (pollInterval) {
-        clearInterval(pollInterval);
+      
+      // If progress hasn't updated in a while, try to trigger job processing
+      if (now - lastStepChangeTimeRef.current > STUCK_THRESHOLD_MS) {
+        console.warn(`⚠️ Job appears stuck on step ${job.current_step} for over ${STUCK_THRESHOLD_MS/1000} seconds`);
+        
+        // Manually advance progress to avoid appearing stuck
+        if (forceProgressUpdate) {
+          const forcedProgress = Math.min(95, progressPercentage + 5);
+          setProgressPercentage(forcedProgress);
+          console.log(`🔄 Force advancing progress to ${forcedProgress}% to avoid appearance of being stuck`);
+        }
+        
+        // Only try to unstick if we haven't tried recently
+        if (now - lastStepChangeTimeRef.current > STUCK_THRESHOLD_MS + 5000) {
+          triggerJobProcessing();
+          lastStepChangeTimeRef.current = now;
+        }
       }
-    };
-  }, [pollInterval]);
+      
+      // If we get genuine progress update, clear force progress flag
+      if (job.progress !== progressPercentage) {
+        setForceProgressUpdate(false);
+      }
+      
+      // Update step description if available
+      if (job.step_description) {
+        setStepDescription(job.step_description);
+      }
+    }
+  }, [steps, progressPercentage, onGenerationComplete]);
 
-  // Enhanced job status check function
+  // Function to check the job status
   const checkJobStatus = useCallback(async () => {
     if (!jobId) return;
     
@@ -272,14 +254,14 @@ export default function PersonalizedContentGenerationStatus({
             'Pragma': 'no-cache'
           }
         });
-      
+        
         // Add timestamp to track last successful response
         setLastProgressUpdate(Date.now());
-      
+        
         if (directResponse.ok) {
-          const data = await directResponse.json();
-          
-          if (data.job) {
+        const data = await directResponse.json();
+        
+        if (data.job) {
             updateJobStatusState(data.job);
             return;
           }
@@ -302,7 +284,7 @@ export default function PersonalizedContentGenerationStatus({
         
         if (proxyResponse.ok) {
           const data = await proxyResponse.json();
-          
+        
           if (data.job) {
             updateJobStatusState(data.job);
             return;
@@ -340,7 +322,7 @@ export default function PersonalizedContentGenerationStatus({
       // If we've exceeded retry count but still have valid job ID, try force-advancing progress
       if (retryCount >= MAX_RETRIES && jobId) {
         console.log(`⚠️ Retry count exceeded. Force advancing progress to unstick job ${jobId}`);
-        triggerJobProcessing(jobId);
+        triggerJobProcessing();
         setForceProgressUpdate(true);
       }
       
@@ -352,81 +334,117 @@ export default function PersonalizedContentGenerationStatus({
       }
     }
     }
-  }, [jobId, retryCount, pollAttempts, onGenerationComplete]);
-  
-  // Extract job status update logic to reuse in different places
-  const updateJobStatusState = useCallback((job: any) => {
-    console.log(`✅ Job status: ${job.status}, step: ${job.current_step} of ${job.total_steps}, progress: ${job.progress}%`);
-    
-    setJobDetails(job);
-    
-    // Update progress immediately when received
-    if (typeof job.progress === 'number') {
-      setProgressPercentage(job.progress);
-    }
-    
-    if (job.status === 'completed') {
-      setIsGenerating(false);
-      setCurrentStep(steps.length - 1);
-      setProgressPercentage(100);
-      setGenerationStatus('completed');
-      
-      // Reload page after short delay to show new content
-      setTimeout(() => {
-        if (typeof window !== 'undefined') {
-          window.location.reload();
-        }
-      }, 1000);
-      
-      if (onGenerationComplete) {
-        onGenerationComplete();
-      }
-    } else if (job.status === 'failed') {
-      setIsGenerating(false);
-      setErrorMessage(job.error_message || 'Job failed without specific error details');
-      setGenerationStatus('failed');
-      
-      if (onGenerationComplete) {
-        onGenerationComplete();
-      }
-    } else if (job.status === 'in_progress' || job.status === 'processing') {
-      setIsGenerating(true);
-      const stepIndex = steps.findIndex(step => step.id === job.current_step);
-      setCurrentStep(stepIndex >= 0 ? stepIndex : 0);
-      setGenerationStatus('in_progress');
-      
-      // If progress hasn't updated in a while, try to trigger job processing
-      const now = Date.now();
-      if (now - lastStepChangeTimeRef.current > STUCK_THRESHOLD_MS) {
-        console.warn(`⚠️ Job appears stuck on step ${job.current_step} for over ${STUCK_THRESHOLD_MS/1000} seconds`);
-        
-        // Manually advance progress to avoid appearing stuck
-        if (forceProgressUpdate) {
-          const forcedProgress = Math.min(95, progressPercentage + 5);
-          setProgressPercentage(forcedProgress);
-          console.log(`🔄 Force advancing progress to ${forcedProgress}% to avoid appearance of being stuck`);
-        }
-        
-        // Only try to unstick if we haven't tried recently
-        if (now - lastStepChangeTimeRef.current > STUCK_THRESHOLD_MS + 5000) {
-          triggerJobProcessing(job.id);
-          lastStepChangeTimeRef.current = now;
-        }
-      }
-      
-      // If we get genuine progress update, clear force progress flag
-      if (job.progress !== progressPercentage) {
-        setForceProgressUpdate(false);
-      }
-      
-      // Update step description if available
-      if (job.step_description) {
-        setStepDescription(job.step_description);
-      }
-    }
-  }, [steps, progressPercentage, onGenerationComplete, triggerJobProcessing]);
+  }, [jobId, retryCount, pollAttempts, onGenerationComplete, updateJobStatusState]);
 
-  // Enhanced polling logic to handle timeout/completion
+  // Function to trigger job processing when it appears stuck
+  const triggerJobProcessing = useCallback(async () => {
+    if (!jobId || processing) return;
+    
+    setProcessing(true);
+    console.log(`🔄 [${new Date().toISOString()}] Triggering job processing for ${jobId} (stuck count: ${stepStuckCount})`);
+    
+    try {
+      // Determine if we should force advancement or process multiple steps
+      const forceAdvancement = stepStuckCount > 5;
+      const processMultipleSteps = stepStuckCount > 2 && stepStuckCount <= 5;
+      
+      console.log(`⚙️ Processing strategy: ${forceAdvancement ? 'Force advancement' : (processMultipleSteps ? 'Multiple steps' : 'Standard processing')}`);
+      
+      let response;
+      try {
+        // Try the main process job API endpoint first
+        response = await fetch(`/api/hr/courses/personalize-content/process-job`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            job_id: jobId,
+            force_advancement: forceAdvancement,
+            process_multiple_steps: processMultipleSteps
+          }),
+        });
+        
+        // Check for HTML response (indicating routing issue)
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.indexOf('text/html') !== -1) {
+          throw new Error('Received HTML response - possible routing issue');
+        }
+      } catch (error) {
+        console.error('Error using process-job API:', error);
+        console.log('Falling back to server action...');
+        
+        // Try the proxy endpoint as fallback
+        try {
+          response = await fetch(`/api/proxy-process-job`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              job_id: jobId,
+              force_advancement: forceAdvancement,
+              process_multiple_steps: processMultipleSteps
+            }),
+          });
+        } catch (proxyError) {
+          console.error('Error using proxy process-job API:', proxyError);
+          
+          // Fall back to direct database access if all API methods fail
+          const { data, error: dbError } = await supabase
+          .from('content_generation_jobs')
+          .update({
+              last_error: 'Job processing triggered manually',
+            updated_at: new Date().toISOString()
+          })
+            .eq('id', jobId)
+            .select();
+            
+          if (dbError) {
+            console.error('Failed to update job in database:', dbError);
+            throw dbError;
+          }
+          
+          console.log('Job updated directly in database:', data);
+          return;
+        }
+      }
+
+      if (!response.ok) {
+        console.error('Failed to process job with API', response);
+        throw new Error(`Failed to process job: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      console.log('Job processing result:', data);
+      
+      // Check job status after processing
+      checkJobStatus();
+      
+    } catch (error) {
+      console.error('Error processing job:', error);
+    } finally {
+      setProcessing(false);
+    }
+  }, [jobId, processing, stepStuckCount, checkJobStatus]);
+
+  // Load job status on component mount
+  useEffect(() => {
+    if (jobId) {
+      checkJobStatus();
+    }
+  }, [jobId]);
+
+  // Clear poll interval on unmount
+  useEffect(() => {
+    return () => {
+      if (pollInterval) {
+        clearInterval(pollInterval);
+      }
+    };
+  }, [pollInterval]);
+
+  // Enhanced job status check function
   React.useEffect(() => {
     // Clear existing interval if any
     if (pollInterval) {
@@ -445,7 +463,7 @@ export default function PersonalizedContentGenerationStatus({
         if (pollAttempts >= MAX_POLL_ATTEMPTS) {
           clearInterval(interval);
           setPollInterval(null);
-          
+        
           // If we still don't have completion or failure at this point,
           // assume the job completed but failed to notify us
           if (generationStatus !== 'completed' && generationStatus !== 'failed') {
