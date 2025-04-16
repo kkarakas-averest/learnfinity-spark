@@ -558,9 +558,12 @@ function getStepInfo(stepNumber, totalSteps) {
   
   // Calculate progress percentage (rounded to nearest whole number)
   // First step is 0%, last step is 100%
-  const progress = totalSteps > 1 
+  let progress = totalSteps > 1 
     ? Math.round((stepNumber / (totalSteps - 1)) * 100) 
     : 100;
+    
+  // Ensure progress never exceeds 100%
+  progress = Math.min(progress, 100);
     
   return { description, progress };
 }
