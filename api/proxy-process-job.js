@@ -464,24 +464,29 @@ async function processJobStep(supabase, jobId) {
           keys: Object.keys(job)
         }));
         
-        // Get job parameters - first check various possible locations
+        // Get job parameters - first check direct properties, then check nested objects
         let parameters = null;
-        let course_id = null;
-        let employee_id = null;
+        let course_id = job.course_id; // Try direct property first
+        let employee_id = job.employee_id; // Try direct property first
         
-        // Try different possible locations for parameters
-        if (job.parameters) {
-          parameters = job.parameters;
-          course_id = parameters.course_id;
-          employee_id = parameters.employee_id || parameters.user_id;
-        } else if (job.metadata) {
-          parameters = job.metadata;
-          course_id = parameters.course_id;
-          employee_id = parameters.employee_id || parameters.user_id;
-        } else if (job.data) {
-          parameters = job.data;
-          course_id = parameters.course_id;
-          employee_id = parameters.employee_id || parameters.user_id;
+        // If direct properties don't exist, try to extract from nested objects
+        if (!course_id || !employee_id) {
+          console.log(`⚡ [GROQ API] Direct properties not found, checking nested objects`);
+          
+          // Try different possible locations for parameters
+          if (job.parameters) {
+            parameters = job.parameters;
+            course_id = course_id || parameters.course_id;
+            employee_id = employee_id || parameters.employee_id || parameters.user_id;
+          } else if (job.metadata) {
+            parameters = job.metadata;
+            course_id = course_id || parameters.course_id;
+            employee_id = employee_id || parameters.employee_id || parameters.user_id;
+          } else if (job.data) {
+            parameters = job.data;
+            course_id = course_id || parameters.course_id;
+            employee_id = employee_id || parameters.employee_id || parameters.user_id;
+          }
         }
         
         console.log(`⚡ [GROQ API] Extracted parameters:`, { parameters, course_id, employee_id });
@@ -514,34 +519,65 @@ async function processJobStep(supabase, jobId) {
           
         // Make an API call to trigger the actual content generation backend process
         try {
-          // Trigger the actual content generation by calling the API route
-          const apiUrl = `${process.env.VERCEL_URL ? 'https://' + process.env.VERCEL_URL : 'http://localhost:3000'}/api/hr/courses/personalize-content/process`;
-          console.log(`⚡ [GROQ API] Calling content generation endpoint: ${apiUrl}`);
+          // Construct API URL with query parameters for GET request
+          const baseUrl = `${process.env.VERCEL_URL ? 'https://' + process.env.VERCEL_URL : 'http://localhost:3000'}/api/hr/courses/personalize-content/process`;
+          const apiUrl = `${baseUrl}?job_id=${encodeURIComponent(jobId)}&course_id=${encodeURIComponent(course_id)}&employee_id=${encodeURIComponent(employee_id)}`;
+          console.log(`⚡ [GROQ API] Calling content generation endpoint (GET): ${apiUrl}`);
           
+          // Use GET method instead of POST
           const response = await fetch(apiUrl, {
-            method: 'POST',
+            method: 'GET',
             headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ 
-              job_id: jobId,
-              // Include additional parameters to ensure API works even if job record lacks them
-              course_id,
-              employee_id
-            }),
+              'Accept': 'application/json',
+              'Cache-Control': 'no-cache'
+            }
           });
           
+          // Log detailed response information
+          console.log(`⚡ [GROQ API] Response status: ${response.status} ${response.statusText}`);
+          console.log(`⚡ [GROQ API] Response headers:`, JSON.stringify(Object.fromEntries([...response.headers.entries()])));
+          
           if (!response.ok) {
-            console.error(`[GROQ API] API route responded with error ${response.status}`);
-            const errorText = await response.text();
-            console.error(`[GROQ API] Error response: ${errorText}`);
+            let errorDetail = '';
+            try {
+              const errorText = await response.text();
+              errorDetail = errorText;
+              console.error(`[GROQ API] API route responded with error ${response.status}`);
+              console.error(`[GROQ API] Error response: ${errorText}`);
+            } catch (readError) {
+              errorDetail = `Could not read response body: ${readError.message}`;
+              console.error(`[GROQ API] Error reading response: ${readError.message}`);
+            }
+            
+            // Try an alternative approach - make a direct database update instead
+            console.log(`⚡ [GROQ API] API call failed, making direct database update to trigger processing`);
+            const { error: updateError } = await supabase
+              .from('content_generation_jobs')
+              .update({
+                step_description: `Manually triggering content generation via database update`,
+                force_process: true,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', jobId);
+              
+            if (updateError) {
+              console.error(`[GROQ API] Database update failed: ${updateError.message}`);
+            } else {
+              console.log(`✅ [GROQ API] Database updated successfully to trigger processing`);
+            }
           } else {
             console.log(`✅ [GROQ API] Successfully initiated content generation process via API route`);
-            const responseData = await response.text();
-            console.log(`✅ [GROQ API] API response:`, responseData.substring(0, 200) + '...');
+            let responseData;
+            try {
+              responseData = await response.text();
+              console.log(`✅ [GROQ API] API response:`, responseData.substring(0, 200) + '...');
+            } catch (readError) {
+              console.error(`[GROQ API] Error reading successful response: ${readError.message}`);
+            }
           }
         } catch (apiError) {
           console.error(`[GROQ API] Error calling content generation endpoint: ${apiError.message}`);
+          console.error(`[GROQ API] Error stack: ${apiError.stack}`);
           // Continue processing even if the API call failed
           // The job will still progress through the steps
         }
