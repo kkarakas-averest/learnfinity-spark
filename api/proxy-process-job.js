@@ -2,6 +2,7 @@
 // This is needed to avoid cross-domain issues with deployed environments
 
 import fetch from 'node-fetch';
+const crypto = typeof window === 'undefined' ? require('crypto') : null;
 
 export default async function handler(req, res) {
   // Add CORS headers
@@ -627,9 +628,11 @@ async function processJobStep(supabase, jobId) {
                   }
                 } else {
                   // Insert new record without ON CONFLICT
+                  const contentId = generateUUID();
                   const { error: insertContentError } = await supabase
                     .from('hr_personalized_course_content')
                     .insert({
+                      id: contentId,
                       course_id,
                       employee_id,
                       content: { 
@@ -646,7 +649,7 @@ async function processJobStep(supabase, jobId) {
                   if (insertContentError) {
                     console.error(`❌ [GROQ API] Error inserting fallback content: ${insertContentError.message}`);
                   } else {
-                    console.log(`✅ [GROQ API] Created new fallback content entry`);
+                    console.log(`✅ [GROQ API] Created new fallback content entry with ID: ${contentId}`);
                   }
                 }
                 
@@ -1023,5 +1026,18 @@ async function processNextStep(supabase, job) {
       job_id: job.id,
       status: 'failed'
     };
+  }
+}
+
+// A function to generate UUIDs for the server environment
+function generateUUID() {
+  if (crypto) {
+    return crypto.randomUUID();
+  } else {
+    // Fallback for browser environment (though this should be server-side only)
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      const r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
   }
 } 

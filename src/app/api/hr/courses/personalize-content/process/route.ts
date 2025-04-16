@@ -236,6 +236,115 @@ export async function OPTIONS(request: NextRequest) {
   });
 }
 
+/**
+ * GET handler for personalize-content process
+ * This properly handles the job_id parameter and returns a JSON response with proper headers
+ */
+export async function GET(req: NextRequest) {
+  const requestId = uuidv4().slice(0, 8);
+  logWithTimestamp(`[ReqID:${requestId}] GET request received from ${req.url}`);
+
+  try {
+    // Extract job_id from URL params
+    const url = new URL(req.url);
+    const jobId = url.searchParams.get('job_id');
+    const courseId = url.searchParams.get('course_id');
+    const employeeId = url.searchParams.get('employee_id');
+    
+    logWithTimestamp(`[ReqID:${requestId}] Query parameters: job_id=${jobId}, course_id=${courseId}, employee_id=${employeeId}`);
+    
+    // Validate the job_id
+    if (!jobId) {
+      logWithTimestamp(`[ReqID:${requestId}] ❌ Missing job_id parameter`);
+      return NextResponse.json(
+        { error: 'Missing job_id parameter' },
+        { 
+          status: 400,
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+          }
+        }
+      );
+    }
+    
+    // Create a body object mimicking what we'd receive from a POST
+    const requestBody = { 
+      job_id: jobId,
+      course_id: courseId || undefined,
+      employee_id: employeeId || undefined
+    };
+    
+    // Use the same logic as in POST to process the job
+    logWithTimestamp(`[ReqID:${requestId}] Forwarding to POST handler logic with constructed body:`, requestBody);
+    
+    // We're using the imported supabase client instead of createClient()
+    const { data: job, error: jobError } = await supabase
+      .from('content_generation_jobs')
+      .select('*')
+      .eq('id', jobId)
+      .single();
+      
+    if (jobError || !job) {
+      logWithTimestamp(`[ReqID:${requestId}] ❌ Error fetching job:`, jobError);
+      return NextResponse.json(
+        { error: "Job not found", details: jobError ? jobError.message : 'No job found with the provided ID' },
+        { 
+          status: 404,
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+          }
+        }
+      );
+    }
+    
+    // Return the job info with proper headers
+    return NextResponse.json(
+      {
+        success: true,
+        job: {
+          id: job.id,
+          status: job.status,
+          current_step: job.current_step,
+          progress: job.progress,
+          step_description: job.step_description
+        }
+      },
+      {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        }
+      }
+    );
+  } catch (error) {
+    logWithTimestamp(`[ReqID:${requestId}] ❌ Error processing GET request:`, error);
+    return NextResponse.json(
+      { 
+        error: "Failed to process request", 
+        message: error.message || 'Unknown error'
+      },
+      { 
+        status: 500,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        }
+      }
+    );
+  }
+}
+
 // Request schema validation
 const requestSchema = z.object({
   job_id: z.string().uuid()
@@ -272,13 +381,23 @@ export async function POST(req: NextRequest) {
       );
     }
     
-    // Validate the request
-    logWithTimestamp(`[ReqID:${requestId}] 🔍 Validating request schema...`);
-    const validationResult = requestSchema.safeParse(body);
-    if (!validationResult.success) {
-      logWithTimestamp(`[ReqID:${requestId}] ❌ Schema validation failed:`, validationResult.error);
+    // Allow direct requests from the proxy-process-job.js with various parameters
+    // Support both job_id parameter and extended parameters
+    let job_id = body.job_id;
+    const requestCourseId = body.course_id;
+    const employee_id = body.employee_id || body.user_id;
+    const force_regenerate = body.force_regenerate;
+    
+    if (!job_id && req.nextUrl?.searchParams) {
+      // Check if job_id is provided in the query parameters (GET request or URL params)
+      job_id = req.nextUrl.searchParams.get('job_id') || undefined;
+    }
+    
+    // Validate the job_id
+    if (!job_id) {
+      logWithTimestamp(`[ReqID:${requestId}] ❌ Missing job_id parameter`);
       return NextResponse.json(
-        { error: 'Invalid request data', details: validationResult.error.format() },
+        { error: 'Missing job_id parameter' },
         { 
           status: 400,
           headers: {
@@ -290,7 +409,25 @@ export async function POST(req: NextRequest) {
       );
     }
     
-    const { job_id } = validationResult.data;
+    // Validate the request - only check job_id if other parameters are not provided
+    if (!requestCourseId && !employee_id) {
+      logWithTimestamp(`[ReqID:${requestId}] 🔍 Validating request schema (job_id only)...`);
+      const validationResult = requestSchema.safeParse({ job_id });
+      if (!validationResult.success) {
+        logWithTimestamp(`[ReqID:${requestId}] ❌ Schema validation failed:`, validationResult.error);
+        return NextResponse.json(
+          { error: 'Invalid request data', details: validationResult.error.format() },
+          { 
+            status: 400,
+            headers: {
+              'Access-Control-Allow-Origin': '*',
+              'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+              'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+            }
+          }
+        );
+      }
+    }
     
     logWithTimestamp(`[ReqID:${requestId}] 🔄 Processing job ID: ${job_id}`);
     
@@ -397,7 +534,7 @@ export async function POST(req: NextRequest) {
     logWithTimestamp(`[ReqID:${requestId}] ✅ Job parameters:`, parameters);
     
     const {
-      course_id,
+      course_id: paramsCourseId,
       user_id,
       course_title,
       course_description,
@@ -406,9 +543,12 @@ export async function POST(req: NextRequest) {
       is_regeneration
     } = parameters;
     
+    // Use request course_id if available, otherwise use the one from job parameters
+    const effectiveCourseId = requestCourseId || paramsCourseId;
+    
     // Validate the course ID and user ID
-    if (!course_id || !user_id) {
-      logWithTimestamp(`[ReqID:${requestId}] ❌ Missing required parameters: course_id=${course_id}, user_id=${user_id}`);
+    if (!effectiveCourseId || !user_id) {
+      logWithTimestamp(`[ReqID:${requestId}] ❌ Missing required parameters: course_id=${effectiveCourseId}, user_id=${user_id}`);
       await supabase
         .from('content_generation_jobs')
         .update({ 
@@ -445,12 +585,12 @@ export async function POST(req: NextRequest) {
         logWithTimestamp(`[ReqID:${requestId}] ✅ User preferences:`, userPreferences);
       }
       
-      logWithTimestamp(`[ReqID:${requestId}] 🔍 Fetching course details for course_id=${course_id}...`);
+      logWithTimestamp(`[ReqID:${requestId}] 🔍 Fetching course details for course_id=${effectiveCourseId}...`);
       // Get course
       const { data: course, error: courseError } = await supabase
         .from('courses')
         .select('*')
-        .eq('id', course_id)
+        .eq('id', effectiveCourseId)
         .single();
         
       if (courseError) {
@@ -465,7 +605,7 @@ export async function POST(req: NextRequest) {
       
       // Initialize result data structure
       let result = {
-        course_id,
+        course_id: effectiveCourseId,
         html_content: null,
         modules: [],
         generated_at: new Date().toISOString(),
@@ -577,15 +717,23 @@ export async function POST(req: NextRequest) {
       
       // Update personalized_course_content table
       logWithTimestamp(`[ReqID:${requestId}] 💾 Saving personalized course content to database...`);
+      
+      // Check if we should use course_id/user_id or course_id/employee_id as the primary key
+      const contentUserId = employee_id || user_id;
+      
+      // Generate a UUID for the content entry
+      const contentId = uuidv4();
+      
       const { error: contentError } = await supabase
         .from('hr_personalized_course_content')
         .upsert({
-          course_id,
-          user_id,
+          id: contentId, // Add explicit UUID to avoid NOT NULL constraint error
+          course_id: effectiveCourseId,
+          employee_id: contentUserId,
           content: result,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
-        }, { onConflict: 'course_id,user_id' });
+        }, { onConflict: 'course_id,employee_id' });
         
       if (contentError) {
         logWithTimestamp(`[ReqID:${requestId}] ❌ Error saving personalized content:`, contentError);
