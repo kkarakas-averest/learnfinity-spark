@@ -578,7 +578,7 @@ export async function POST(req: NextRequest) {
       // Update personalized_course_content table
       logWithTimestamp(`[ReqID:${requestId}] 💾 Saving personalized course content to database...`);
       const { error: contentError } = await supabase
-        .from('personalized_course_content')
+        .from('hr_personalized_course_content')
         .upsert({
           course_id,
           user_id,

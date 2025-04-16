@@ -524,12 +524,29 @@ async function processJobStep(supabase, jobId) {
           const apiUrl = `${baseUrl}?job_id=${encodeURIComponent(jobId)}&course_id=${encodeURIComponent(course_id)}&employee_id=${encodeURIComponent(employee_id)}`;
           console.log(`⚡ [GROQ API] Calling content generation endpoint (GET): ${apiUrl}`);
           
+          // Use direct path to the server file instead of relying on routing
+          let directApiUrl = null;
+          try {
+            // First try using Next.js API route handler directly
+            if (process.env.VERCEL_URL) {
+              // For production: use the direct path to the API handler
+              directApiUrl = `https://${process.env.VERCEL_URL}/api/hr/courses/personalize-content/process?job_id=${encodeURIComponent(jobId)}&course_id=${encodeURIComponent(course_id)}&employee_id=${encodeURIComponent(employee_id)}`;
+            } else {
+              directApiUrl = `http://localhost:3000/api/hr/courses/personalize-content/process?job_id=${encodeURIComponent(jobId)}&course_id=${encodeURIComponent(course_id)}&employee_id=${encodeURIComponent(employee_id)}`;
+            }
+            
+            console.log(`⚡ [GROQ API] Using direct API URL: ${directApiUrl}`);
+          } catch (e) {
+            console.error(`[GROQ API] Error constructing direct API URL:`, e);
+          }
+          
           // Use GET method instead of POST
-          const response = await fetch(apiUrl, {
+          const response = await fetch(directApiUrl || apiUrl, {
             method: 'GET',
             headers: {
               'Accept': 'application/json',
-              'Cache-Control': 'no-cache'
+              'Cache-Control': 'no-cache',
+              'X-Force-API-Route': 'true' // Custom header to help with routing
             }
           });
           
@@ -537,33 +554,74 @@ async function processJobStep(supabase, jobId) {
           console.log(`⚡ [GROQ API] Response status: ${response.status} ${response.statusText}`);
           console.log(`⚡ [GROQ API] Response headers:`, JSON.stringify(Object.fromEntries([...response.headers.entries()])));
           
-          if (!response.ok) {
-            let errorDetail = '';
-            try {
-              const errorText = await response.text();
-              errorDetail = errorText;
-              console.error(`[GROQ API] API route responded with error ${response.status}`);
-              console.error(`[GROQ API] Error response: ${errorText}`);
-            } catch (readError) {
-              errorDetail = `Could not read response body: ${readError.message}`;
-              console.error(`[GROQ API] Error reading response: ${readError.message}`);
-            }
+          // Check if we got HTML instead of JSON (routing issue)
+          const contentType = response.headers.get('content-type');
+          const isHtmlResponse = contentType && contentType.includes('text/html');
+          
+          if (isHtmlResponse) {
+            console.log(`⚡ [GROQ API] Received HTML response instead of JSON. This indicates a routing issue.`);
             
-            // Try an alternative approach - make a direct database update instead
-            console.log(`⚡ [GROQ API] API call failed, making direct database update to trigger processing`);
-            const { error: updateError } = await supabase
-              .from('content_generation_jobs')
-              .update({
-                step_description: `Manually triggering content generation via database update`,
-                force_process: true,
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', jobId);
+            // Try the server action approach - call directly to database
+            console.log(`⚡ [GROQ API] HTML response detected - falling back to direct database update`);
+            
+            try {
+              // Update job record with necessary info to make it process
+              const { error: updateError } = await supabase
+                .from('content_generation_jobs')
+                .update({
+                  step_description: `Manual Groq API call for content generation`,
+                  updated_at: new Date().toISOString(),
+                  force_process: true
+                })
+                .eq('id', jobId);
               
-            if (updateError) {
-              console.error(`[GROQ API] Database update failed: ${updateError.message}`);
-            } else {
-              console.log(`✅ [GROQ API] Database updated successfully to trigger processing`);
+              if (updateError) {
+                console.error(`❌ [GROQ API] Error updating job: ${updateError.message}`);
+              } else {
+                console.log(`✅ [GROQ API] Successfully triggered manual content generation via database update`);
+              }
+              
+              // Create a fallback entry in the hr_personalized_course_content table
+              // This will be a placeholder that gets updated by the background process
+              try {
+                const fallbackContent = {
+                  modules: [{
+                    title: "Generating Content...",
+                    description: "Your personalized content is being generated",
+                    sections: [{
+                      title: "Please wait",
+                      content: "Content is being generated with Groq API",
+                      html_content: "<div><p>Your personalized content is being generated...</p></div>"
+                    }]
+                  }]
+                };
+                
+                const { error: contentError } = await supabase
+                  .from('hr_personalized_course_content')
+                  .upsert({
+                    course_id,
+                    employee_id,
+                    content: { 
+                      course_id,
+                      modules: fallbackContent.modules,
+                      generated_at: new Date().toISOString(),
+                      is_fallback: true 
+                    },
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString(),
+                    is_active: true
+                  }, { onConflict: 'course_id,employee_id' });
+                  
+                if (contentError) {
+                  console.error(`❌ [GROQ API] Error creating fallback content: ${contentError.message}`);
+                } else {
+                  console.log(`✅ [GROQ API] Created fallback content entry that will be updated by background process`);
+                }
+              } catch (contentError) {
+                console.error(`❌ [GROQ API] Error creating fallback content:`, contentError);
+              }
+            } catch (directError) {
+              console.error(`❌ [GROQ API] Error in direct database approach:`, directError);
             }
           } else {
             console.log(`✅ [GROQ API] Successfully initiated content generation process via API route`);
