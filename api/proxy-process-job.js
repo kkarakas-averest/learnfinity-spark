@@ -560,65 +560,135 @@ async function processJobStep(supabase, jobId) {
           
           if (isHtmlResponse) {
             console.log(`⚡ [GROQ API] Received HTML response instead of JSON. This indicates a routing issue.`);
-            
-            // Try the server action approach - call directly to database
-            console.log(`⚡ [GROQ API] HTML response detected - falling back to direct database update`);
+            console.log(`⚡ [GROQ API] HTML response detected - falling back to direct database updates`);
             
             try {
               // Update job record with necessary info to make it process
               const { error: updateError } = await supabase
                 .from('content_generation_jobs')
                 .update({
-                  step_description: `Manual Groq API call for content generation`,
-                  updated_at: new Date().toISOString(),
-                  force_process: true
+                  step_description: `Manual API call for content generation (HTML routing issue detected)`,
+                  updated_at: new Date().toISOString()
                 })
                 .eq('id', jobId);
               
               if (updateError) {
                 console.error(`❌ [GROQ API] Error updating job: ${updateError.message}`);
               } else {
-                console.log(`✅ [GROQ API] Successfully triggered manual content generation via database update`);
+                console.log(`✅ [GROQ API] Successfully updated job status in database`);
               }
               
               // Create a fallback entry in the hr_personalized_course_content table
-              // This will be a placeholder that gets updated by the background process
               try {
+                // First check if an entry already exists
+                const { data: existingContent, error: checkError } = await supabase
+                  .from('hr_personalized_course_content')
+                  .select('id')
+                  .eq('course_id', course_id)
+                  .eq('employee_id', employee_id)
+                  .maybeSingle();
+                
+                if (checkError) {
+                  console.error(`❌ [GROQ API] Error checking for existing content: ${checkError.message}`);
+                }
+                
                 const fallbackContent = {
                   modules: [{
-                    title: "Generating Content...",
+                    title: "Generating Communication Skills Content...",
                     description: "Your personalized content is being generated",
                     sections: [{
                       title: "Please wait",
                       content: "Content is being generated with Groq API",
-                      html_content: "<div><p>Your personalized content is being generated...</p></div>"
+                      html_content: "<div><p>Your personalized content is being generated with advanced AI...</p><p>This may take a moment to complete.</p></div>"
                     }]
                   }]
                 };
                 
-                const { error: contentError } = await supabase
-                  .from('hr_personalized_course_content')
-                  .upsert({
-                    course_id,
-                    employee_id,
-                    content: { 
-                      course_id,
-                      modules: fallbackContent.modules,
-                      generated_at: new Date().toISOString(),
-                      is_fallback: true 
-                    },
-                    created_at: new Date().toISOString(),
-                    updated_at: new Date().toISOString(),
-                    is_active: true
-                  }, { onConflict: 'course_id,employee_id' });
-                  
-                if (contentError) {
-                  console.error(`❌ [GROQ API] Error creating fallback content: ${contentError.message}`);
+                if (existingContent) {
+                  console.log(`⚡ [GROQ API] Found existing content entry, updating instead of inserting`);
+                  // Update existing record
+                  const { error: updateContentError } = await supabase
+                    .from('hr_personalized_course_content')
+                    .update({
+                      content: { 
+                        course_id,
+                        modules: fallbackContent.modules,
+                        generated_at: new Date().toISOString(),
+                        is_fallback: true 
+                      },
+                      updated_at: new Date().toISOString()
+                    })
+                    .eq('id', existingContent.id);
+                    
+                  if (updateContentError) {
+                    console.error(`❌ [GROQ API] Error updating content: ${updateContentError.message}`);
+                  } else {
+                    console.log(`✅ [GROQ API] Updated fallback content entry`);
+                  }
                 } else {
-                  console.log(`✅ [GROQ API] Created fallback content entry that will be updated by background process`);
+                  // Insert new record without ON CONFLICT
+                  const { error: insertContentError } = await supabase
+                    .from('hr_personalized_course_content')
+                    .insert({
+                      course_id,
+                      employee_id,
+                      content: { 
+                        course_id,
+                        modules: fallbackContent.modules,
+                        generated_at: new Date().toISOString(),
+                        is_fallback: true 
+                      },
+                      created_at: new Date().toISOString(),
+                      updated_at: new Date().toISOString(),
+                      is_active: true
+                    });
+                    
+                  if (insertContentError) {
+                    console.error(`❌ [GROQ API] Error inserting fallback content: ${insertContentError.message}`);
+                  } else {
+                    console.log(`✅ [GROQ API] Created new fallback content entry`);
+                  }
+                }
+                
+                // Now let's call the actual Groq API directly to generate content
+                try {
+                  console.log(`⚡ [GROQ API] Making direct request to app route URL to generate content`);
+                  
+                  // Use the more reliable direct serverless function invocation path
+                  // This bypasses routing issues by using a server-side request
+                  const serverAPIUrl = process.env.VERCEL_URL 
+                    ? `https://${process.env.VERCEL_URL}/api/hr/courses/personalize-content/process`
+                    : 'http://localhost:3000/api/hr/courses/personalize-content/process';
+                    
+                  const serverAPIResponse = await fetch(serverAPIUrl, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Accept': 'application/json',
+                      'X-Force-API-Route': 'true'
+                    },
+                    body: JSON.stringify({
+                      job_id: jobId,
+                      course_id: course_id,
+                      employee_id: employee_id,
+                      force_regenerate: true
+                    })
+                  });
+                  
+                  console.log(`⚡ [GROQ API] Direct API response status: ${serverAPIResponse.status}`);
+                  
+                  try {
+                    const responseText = await serverAPIResponse.text();
+                    console.log(`⚡ [GROQ API] Direct API response: ${responseText.substring(0, 200)}...`);
+                  } catch (e) {
+                    console.error(`❌ [GROQ API] Error reading direct API response: ${e.message}`);
+                  }
+                } catch (directAPIError) {
+                  console.error(`❌ [GROQ API] Error making direct API request: ${directAPIError.message}`);
                 }
               } catch (contentError) {
-                console.error(`❌ [GROQ API] Error creating fallback content:`, contentError);
+                console.error(`❌ [GROQ API] Error handling content: ${contentError.message}`);
+                console.error(contentError);
               }
             } catch (directError) {
               console.error(`❌ [GROQ API] Error in direct database approach:`, directError);
