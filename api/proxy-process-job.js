@@ -2,7 +2,7 @@
 // This is needed to avoid cross-domain issues with deployed environments
 
 import fetch from 'node-fetch';
-const crypto = typeof window === 'undefined' ? require('crypto') : null;
+import { randomUUID } from 'crypto';
 
 export default async function handler(req, res) {
   // Add CORS headers
@@ -1031,10 +1031,11 @@ async function processNextStep(supabase, job) {
 
 // A function to generate UUIDs for the server environment
 function generateUUID() {
-  if (crypto) {
-    return crypto.randomUUID();
-  } else {
-    // Fallback for browser environment (though this should be server-side only)
+  // Use randomUUID from the crypto module
+  try {
+    return randomUUID();
+  } catch (error) {
+    // Fallback for environments where randomUUID is not available
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
       const r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
       return v.toString(16);
