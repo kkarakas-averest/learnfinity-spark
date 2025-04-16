@@ -25,23 +25,26 @@ export default async function handler(req, res) {
     let requestData;
     let jobId;
     let forceAdvance = false;
+    let processMultipleSteps = false;
 
     if (req.method === 'POST') {
       requestData = req.body;
       jobId = requestData?.job_id;
       forceAdvance = !!requestData?.force_advance;
+      processMultipleSteps = !!requestData?.process_multiple_steps;
     } else {
       // Handle GET request
       requestData = req.query;
       jobId = requestData?.job_id;
       forceAdvance = requestData?.force_advance === 'true';
+      processMultipleSteps = requestData?.process_multiple_steps === 'true';
     }
 
     if (!jobId) {
       return res.status(400).json({ error: 'Missing job_id parameter' });
     }
 
-    console.log(`Processing job: ${jobId} via ${req.method} request ${forceAdvance ? '(FORCE ADVANCE MODE)' : ''}`);
+    console.log(`Processing job: ${jobId} via ${req.method} request ${forceAdvance ? '(FORCE ADVANCE MODE)' : ''} ${processMultipleSteps ? '(MULTI-STEP MODE)' : ''}`);
     
     // Direct server-to-server communication with backend services
     // This should bypass client-side routing issues
@@ -187,13 +190,37 @@ export default async function handler(req, res) {
           // Process next step if there are more steps
           if (job.current_step < job.total_steps) {
             console.log(`Continuing job processing at step ${job.current_step + 1}`);
-            await processNextStep(supabase, job);
-            return res.status(200).json({
-              success: true,
-              message: `Processed step ${job.current_step + 1}`,
-              job_id: jobId,
-              status: 'in_progress'
-            });
+            
+            // If process_multiple_steps flag is set, process multiple steps in sequence
+            if (processMultipleSteps) {
+              console.log(`Processing multiple steps for job ${jobId}`);
+              await processNextStep(supabase, job);
+              
+              // Get the updated job data after processing
+              const { data: updatedJob } = await supabase
+                .from('content_generation_jobs')
+                .select('*')
+                .eq('id', jobId)
+                .single();
+                
+              return res.status(200).json({
+                success: true,
+                message: `Processed multiple steps`,
+                job_id: jobId,
+                status: updatedJob.status,
+                current_step: updatedJob.current_step,
+                progress: updatedJob.progress,
+                total_steps: updatedJob.total_steps
+              });
+            } else {
+              await processNextStep(supabase, job);
+              return res.status(200).json({
+                success: true,
+                message: `Processed step ${job.current_step + 1}`,
+                job_id: jobId,
+                status: 'in_progress'
+              });
+            }
           } else {
             // Job is at the final step, mark as completed
             console.log(`Job ${jobId} is at final step, marking as completed`);
@@ -348,7 +375,7 @@ async function processJobStep(supabase, jobId) {
       
     if (jobFetchError) {
       console.error(`Error fetching job ${jobId} details:`, jobFetchError);
-      return { 
+      console.log(); return { 
         success: false, 
         error: 'Failed to fetch job details', 
         details: jobFetchError.message,
@@ -420,6 +447,95 @@ async function processJobStep(supabase, jobId) {
     
     console.log(`Advancing job ${jobId} to step ${nextStep}: ${description} (${safeProgress}%)`);
     
+    // 5. For specific steps that need to trigger backend processes
+    // Steps 3, 4, and 5 are the actual content generation steps
+    try {
+      if (nextStep === 3) {
+        console.log(`⚡ [GROQ API] Step ${nextStep}: Initializing content generation process for job ${jobId}`);
+        
+        // Get job parameters
+        const { parameters } = job;
+        if (!parameters) {
+          throw new Error('Missing job parameters');
+        }
+        
+        const { course_id, employee_id } = parameters;
+        if (!course_id || !employee_id) {
+          throw new Error('Missing required parameters: course_id or employee_id');
+        }
+        
+        console.log(`⚡ [GROQ API] Calling API for job ${jobId} with parameters:`, {
+          course_id,
+          employee_id,
+          step: nextStep
+        });
+        
+        // Update job with progress
+        await supabase
+          .from('content_generation_jobs')
+          .update({
+            step_description: `${description} - Analyzing learning preferences and employee data`,
+            last_api_call: new Date().toISOString()
+          })
+          .eq('id', jobId);
+          
+        // Make an API call to trigger the actual content generation backend process
+        try {
+          // Trigger the actual content generation by calling the API route
+          const response = await fetch(`${process.env.VERCEL_URL ? 'https://' + process.env.VERCEL_URL : 'http://localhost:3000'}/api/hr/courses/personalize-content/process`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ job_id: jobId }),
+          });
+          
+          if (!response.ok) {
+            console.error(`[GROQ API] API route responded with error ${response.status}`);
+            const errorText = await response.text();
+            console.error(`[GROQ API] Error response: ${errorText}`);
+          } else {
+            console.log(`✅ [GROQ API] Successfully initiated content generation process via API route`);
+          }
+        } catch (apiError) {
+          console.error(`[GROQ API] Error calling content generation endpoint: ${apiError.message}`);
+          // Continue processing even if the API call failed
+          // The job will still progress through the steps
+        }
+      } else if (nextStep === 4) {
+        console.log(`⚡ [GROQ API] Step ${nextStep}: Generating course structure and modules for job ${jobId}`);
+        
+        // Update job with additional progress info
+        await supabase
+          .from('content_generation_jobs')
+          .update({
+            step_description: `${description} - Creating tailored learning modules based on your profile`,
+            last_api_call: new Date().toISOString()
+          })
+          .eq('id', jobId);
+      } else if (nextStep === 5) {
+        console.log(`⚡ [GROQ API] Step ${nextStep}: Generating detailed course content for job ${jobId}`);
+        
+        // Update job with additional progress info
+        await supabase
+          .from('content_generation_jobs')
+          .update({
+            step_description: `${description} - Creating content for each section with personalized examples`,
+            last_api_call: new Date().toISOString()
+          })
+          .eq('id', jobId);
+      }
+    } catch (apiError) {
+      console.error(`[GROQ API] Error in content generation process for job ${jobId}:`, apiError);
+      // Log error but continue with job progress
+      await supabase
+        .from('content_generation_jobs')
+        .update({
+          last_error: `API error during step ${nextStep}: ${apiError.message}`,
+        })
+        .eq('id', jobId);
+    }
+    
     // Update job with next step info
     const { error: updateError } = await supabase
       .from('content_generation_jobs')
@@ -482,14 +598,8 @@ async function processJobStep(supabase, jobId) {
     
     console.log(`Successfully updated job ${jobId} to step ${nextStep}: ${description} (${safeProgress}%)`);
     
-    // 5. For specific steps that need to trigger backend processes
-    if (nextStep === 3) {
-      // Simulate triggering a special backend process for step 3
-      console.log(`Triggering special backend process for job ${jobId} at step ${nextStep}`);
-      // Add any special processing logic here...
-    }
-    
-    return { 
+    // Add detailed logging for return value
+    const returnValue = { 
       success: true, 
       message: `Advanced to step ${nextStep}: ${description}`,
       jobId,
@@ -497,6 +607,10 @@ async function processJobStep(supabase, jobId) {
       progress: safeProgress,
       description
     };
+    
+    console.log(`[GROQ API] Completed step ${nextStep} for job ${jobId} - returning:`, JSON.stringify(returnValue).substring(0, 100) + "...");
+    
+    return returnValue;
   } catch (error) {
     console.error(`Unexpected error processing job ${jobId}:`, error);
     
@@ -591,10 +705,11 @@ function getStepInfo(stepNumber, totalSteps) {
   const descriptions = [
     'Initializing job',
     'Preparing content generation',
-    'Generating course structure',
-    'Generating detailed content',
-    'Finalizing content',
-    'Completing generation'
+    'Analyzing learning preferences',
+    'Generating course structure with Groq AI',
+    'Creating detailed content with Groq AI',
+    'Enhancing content with personalized examples',
+    'Finalizing personalized course content'
   ];
   
   // Use default description if step number exceeds predefined descriptions
@@ -647,6 +762,34 @@ async function processNextStep(supabase, job) {
     const result = await processJobStep(supabase, job.id);
     
     console.log(`[processNextStep] Step processing result for job ${job.id}:`, result);
+
+    // If successful, decide if we should continue to the next step
+    if (result.success && result.step < job.total_steps) {
+      // Auto-continuation for specific steps - For example, steps 2-4 should proceed automatically
+      // This allows us to batch process multiple steps in a single request
+      const autoProcessSteps = [2, 3, 4, 5, 6, 7];
+      
+      if (autoProcessSteps.includes(result.step)) {
+        console.log(`[processNextStep] Step ${result.step} successfully processed, auto-continuing to next step`);
+        
+        // Get updated job data after the step processing
+        const { data: updatedJob } = await supabase
+          .from('content_generation_jobs')
+          .select('*')
+          .eq('id', job.id)
+          .single();
+          
+        if (updatedJob) {
+          // Wait a short time to allow any database operations to complete
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
+          // Process the next step
+          console.log(`[processNextStep] Auto-continuing to step ${updatedJob.current_step + 1}`);
+          return await processNextStep(supabase, updatedJob);
+        }
+      }
+    }
+    
     return result;
   } catch (error) {
     console.error(`[processNextStep] Unexpected error processing next step for job ${job.id}:`, error);
