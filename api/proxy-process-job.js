@@ -411,9 +411,14 @@ async function processJobStep(supabase, jobId) {
     
     // 4. Process the next step
     const nextStep = job.current_step + 1;
+    
+    // Get step info (description and progress percentage)
     const { description, progress } = getStepInfo(nextStep, job.total_steps);
     
-    console.log(`Advancing job ${jobId} to step ${nextStep}: ${description} (${progress}%)`);
+    // Ensure progress is capped at 100% to avoid constraint violations
+    const safeProgress = Math.min(progress, 100);
+    
+    console.log(`Advancing job ${jobId} to step ${nextStep}: ${description} (${safeProgress}%)`);
     
     // Update job with next step info
     const { error: updateError } = await supabase
@@ -421,13 +426,51 @@ async function processJobStep(supabase, jobId) {
       .update({
         current_step: nextStep,
         step_description: description,
-        progress: progress,
+        progress: safeProgress,
         updated_at: new Date().toISOString()
       })
       .eq('id', jobId);
       
     if (updateError) {
       console.error(`Error updating job ${jobId} to step ${nextStep}:`, updateError);
+      
+      // Handle constraint violation specifically - try again with progress capped at 100%
+      if (updateError.code === '23514' && updateError.message?.includes('progress_check')) {
+        console.log(`Constraint violation detected, retrying with progress = 100`);
+        
+        const { error: retryError } = await supabase
+          .from('content_generation_jobs')
+          .update({
+            current_step: nextStep,
+            step_description: description,
+            progress: 100, // Hard cap at exactly 100%
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', jobId);
+          
+        if (retryError) {
+          console.error(`Retry update failed:`, retryError);
+          return { 
+            success: false, 
+            error: 'Failed to update job step even with retry',
+            details: retryError.message,
+            jobId,
+            step: nextStep
+          };
+        }
+        
+        console.log(`Successfully updated job ${jobId} to step ${nextStep} with capped progress (100%)`);
+        
+        return { 
+          success: true, 
+          message: `Advanced to step ${nextStep}: ${description} (capped at 100%)`,
+          jobId,
+          step: nextStep,
+          progress: 100,
+          description
+        };
+      }
+      
       return { 
         success: false, 
         error: 'Failed to update job step',
@@ -437,7 +480,7 @@ async function processJobStep(supabase, jobId) {
       };
     }
     
-    console.log(`Successfully updated job ${jobId} to step ${nextStep}: ${description} (${progress}%)`);
+    console.log(`Successfully updated job ${jobId} to step ${nextStep}: ${description} (${safeProgress}%)`);
     
     // 5. For specific steps that need to trigger backend processes
     if (nextStep === 3) {
@@ -451,7 +494,7 @@ async function processJobStep(supabase, jobId) {
       message: `Advanced to step ${nextStep}: ${description}`,
       jobId,
       step: nextStep,
-      progress,
+      progress: safeProgress,
       description
     };
   } catch (error) {
@@ -489,7 +532,8 @@ async function completeJob(supabase, job) {
   console.log(`[completeJob] Completing job ${job.id}`);
   
   try {
-    const { description, progress } = getStepInfo(job.total_steps, job.total_steps);
+    // Get step description but always set progress to exactly 100
+    const { description } = getStepInfo(job.total_steps, job.total_steps);
     
     // Update job to completed status
     const { error: updateError } = await supabase
@@ -498,7 +542,7 @@ async function completeJob(supabase, job) {
         status: 'completed',
         current_step: job.total_steps,
         step_description: description,
-        progress: 100,
+        progress: 100, // Always set to exactly 100% for completed jobs
         completed_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       })
