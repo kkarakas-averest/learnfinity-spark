@@ -219,19 +219,6 @@ const logWithTimestamp = (message: string, data?: any) => {
 export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
 
-// Add more explicit CORS and caching headers to prevent middleware conflicts
-const corsHeaders = {
-  'Access-Control-Allow-Credentials': 'true',
-  'Access-Control-Allow-Origin': '*', 
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS, PUT, DELETE',
-  'Access-Control-Allow-Headers': 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization, Cookie',
-  'Content-Type': 'application/json',
-  'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
-  'Pragma': 'no-cache',
-  'Expires': '0',
-  'Surrogate-Control': 'no-store',
-};
-
 // Define allowed HTTP methods
 export async function OPTIONS(request: NextRequest) {
   logWithTimestamp(`OPTIONS request received from ${request.url}`);
@@ -239,7 +226,13 @@ export async function OPTIONS(request: NextRequest) {
 
   return new NextResponse(null, {
     status: 204,
-    headers: corsHeaders,
+    headers: {
+      'Access-Control-Allow-Credentials': 'true',
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      'Access-Control-Max-Age': '86400',
+    },
   });
 }
 
@@ -248,9 +241,9 @@ export async function OPTIONS(request: NextRequest) {
  * This properly handles the job_id parameter and returns a JSON response with proper headers
  */
 export async function GET(req: NextRequest) {
+  console.log("==== EXECUTION CHECK: process/route.ts GET HANDLER REACHED ===="); // Added for debugging
   const requestId = uuidv4().slice(0, 8);
   logWithTimestamp(`[ReqID:${requestId}] GET request received from ${req.url}`);
-  logWithTimestamp(`[ReqID:${requestId}] Request headers:`, Object.fromEntries(req.headers));
 
   try {
     // Extract job_id from URL params
@@ -268,7 +261,12 @@ export async function GET(req: NextRequest) {
         { error: 'Missing job_id parameter' },
         { 
           status: 400,
-          headers: corsHeaders
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+          }
         }
       );
     }
@@ -296,7 +294,12 @@ export async function GET(req: NextRequest) {
         { error: "Job not found", details: jobError ? jobError.message : 'No job found with the provided ID' },
         { 
           status: 404,
-          headers: corsHeaders
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+          }
         }
       );
     }
@@ -315,7 +318,12 @@ export async function GET(req: NextRequest) {
       },
       {
         status: 200,
-        headers: corsHeaders
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        }
       }
     );
   } catch (error) {
@@ -327,7 +335,12 @@ export async function GET(req: NextRequest) {
       },
       { 
         status: 500,
-        headers: corsHeaders
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        }
       }
     );
   }
@@ -343,6 +356,7 @@ const requestSchema = z.object({
  * This endpoint is intended to be called by a background process or a webhook
  */
 export async function POST(req: NextRequest) {
+  console.log("==== EXECUTION CHECK: process/route.ts POST HANDLER REACHED ===="); // Added for debugging
   const requestId = uuidv4().slice(0, 8); // Generate a short request ID for tracing
   logWithTimestamp(`[ReqID:${requestId}] POST request received from ${req.url}`);
   logWithTimestamp(`[ReqID:${requestId}] Request headers:`, Object.fromEntries(req.headers));
@@ -356,26 +370,17 @@ export async function POST(req: NextRequest) {
       logWithTimestamp(`[ReqID:${requestId}] Request body:`, body);
     } catch (parseError) {
       logWithTimestamp(`[ReqID:${requestId}] ❌ Failed to parse request body:`, parseError);
-      // Check for URL search params as fallback
-      const url = new URL(req.url);
-      const jobId = url.searchParams.get('job_id');
-      
-      if (jobId) {
-        logWithTimestamp(`[ReqID:${requestId}] Found job_id in URL params: ${jobId}`);
-        body = {
-          job_id: jobId,
-          course_id: url.searchParams.get('course_id'),
-          employee_id: url.searchParams.get('employee_id')
-        };
-      } else {
-        return NextResponse.json(
-          { error: 'Invalid JSON in request body and no URL parameters found' },
-          { 
-            status: 400,
-            headers: corsHeaders
+      return NextResponse.json(
+        { error: 'Invalid JSON in request body' },
+        { 
+          status: 400,
+          headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
           }
-        );
-      }
+        }
+      );
     }
     
     // Allow direct requests from the proxy-process-job.js with various parameters
@@ -397,7 +402,11 @@ export async function POST(req: NextRequest) {
         { error: 'Missing job_id parameter' },
         { 
           status: 400,
-          headers: corsHeaders
+          headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+          }
         }
       );
     }
@@ -412,7 +421,11 @@ export async function POST(req: NextRequest) {
           { error: 'Invalid request data', details: validationResult.error.format() },
           { 
             status: 400,
-            headers: corsHeaders
+            headers: {
+              'Access-Control-Allow-Origin': '*',
+              'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+              'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+            }
           }
         );
       }
@@ -436,7 +449,11 @@ export async function POST(req: NextRequest) {
         { error: "Job not found", details: jobError ? jobError.message : 'No job found with the provided ID' },
         { 
           status: 404,
-          headers: corsHeaders
+          headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+          }
         }
       );
     }
@@ -458,7 +475,11 @@ export async function POST(req: NextRequest) {
         },
         { 
           status: 200,
-          headers: corsHeaders
+          headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+          }
         }
       );
     }
@@ -476,7 +497,11 @@ export async function POST(req: NextRequest) {
         { error: "Failed to update job status", details: updateError.message },
         { 
           status: 500,
-          headers: corsHeaders
+          headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+          }
         }
       );
     }
@@ -499,7 +524,11 @@ export async function POST(req: NextRequest) {
         { error: "Invalid job parameters" },
         { 
           status: 400,
-          headers: corsHeaders
+          headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+          }
         }
       );
     }
@@ -534,7 +563,11 @@ export async function POST(req: NextRequest) {
         { error: "Missing course ID or user ID" },
         { 
           status: 400,
-          headers: corsHeaders
+          headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+          }
         }
       );
     }
@@ -733,7 +766,11 @@ export async function POST(req: NextRequest) {
         },
         { 
           status: 200,
-          headers: corsHeaders
+          headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+          }
         }
       );
       
@@ -759,7 +796,11 @@ export async function POST(req: NextRequest) {
         },
         { 
           status: 500,
-          headers: corsHeaders
+          headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+          }
         }
       );
     }
@@ -773,7 +814,11 @@ export async function POST(req: NextRequest) {
       },
       { 
         status: 500,
-        headers: corsHeaders
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        }
       }
     );
   }
