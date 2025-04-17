@@ -287,45 +287,45 @@ async function handleRequest(req: NextRequest, requestId: string) {
     log('↩️ Responding to OPTIONS request', undefined, requestId);
     return new NextResponse(null, {
       status: 204,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+          headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
       },
     });
-  }
-
+    }
+    
   // Extract job_id from request
   const jobId = await getJobId(req);
   log(`🆔 Extracted Job ID: ${jobId}`, undefined, requestId);
 
   if (!jobId) {
     log('❌ Missing or invalid job_id', { method: req.method }, requestId);
-    return NextResponse.json(
+      return NextResponse.json(
       { error: 'Job ID is required either in query parameters (GET) or JSON body (POST)' },
       { status: 400 }
-    );
-  }
-
-  try {
+      );
+    }
+    
+    try {
     // Verify job exists and is in a processable state (e.g., 'pending' or 'in_progress')
     log(`🔍 Verifying job status for job: ${jobId}`, undefined, requestId);
     const { data: jobData, error: jobError } = await supabaseAdmin
       .from('content_generation_jobs')
       .select('status')
       .eq('id', jobId)
-      .single();
-
+        .single();
+        
     if (jobError) {
       log(`❌ Error fetching job: ${jobId}`, { error: jobError.message }, requestId);
       if (jobError.code === 'PGRST116') { // Not found
         return NextResponse.json({ error: 'Job not found' }, { status: 404 });
       }
       return NextResponse.json({ error: 'Failed to fetch job details', details: jobError.message }, { status: 500 });
-    }
-
+      }
+      
     log(`✅ Job ${jobId} found with status: ${jobData.status}`, undefined, requestId);
-
+      
     // Potentially add check here: if jobData.status is 'completed' or 'failed', maybe return early?
     // Example: 
     // if (['completed', 'failed'].includes(jobData.status)) {
@@ -357,19 +357,19 @@ async function handleRequest(req: NextRequest, requestId: string) {
 
     log(`✅ Processing triggered for job: ${jobId}. API responding immediately.`, undefined, requestId);
     // Respond immediately to the client to indicate the trigger was received
-    return NextResponse.json(
-      {
+      return NextResponse.json(
+        { 
         success: true,
         message: 'Job processing triggered successfully.',
         job_id: jobId,
-      },
-      {
-        headers: {
-          'Access-Control-Allow-Origin': '*',
+        },
+        { 
+          headers: {
+            'Access-Control-Allow-Origin': '*',
           'Access-Control-Allow-Credentials': 'true',
+          }
         }
-      }
-    );
+      );
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown server error';
     log(`❌ Unexpected error in handleRequest for job ${jobId}:`, { error: errorMessage, stack: error instanceof Error ? error.stack : undefined }, requestId);
@@ -380,7 +380,7 @@ async function handleRequest(req: NextRequest, requestId: string) {
         headers: {
           'Access-Control-Allow-Origin': '*',
           'Access-Control-Allow-Credentials': 'true',
-        } 
+        }
       }
     );
   }

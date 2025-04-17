@@ -359,92 +359,120 @@ export default function PersonalizedContentGenerationStatus({
     if (!jobId || processing) return;
     
     setProcessing(true);
-    console.log(`🔄 [${new Date().toISOString()}] Triggering job processing for ${jobId} (stuck count: ${stepStuckCount})`);
+    const triggerRequestId = `unstick_${Date.now()}`;
+    console.log(`🔄 [${triggerRequestId}] Triggering job processing for ${jobId} (stuck count: ${stepStuckCount})`);
     
     try {
       // Determine if we should force advancement or process multiple steps
+      // NOTE: The /process endpoint currently doesn't support these flags, 
+      // but keeping the logic here in case it's added later.
       const forceAdvancement = stepStuckCount > 5;
       const processMultipleSteps = stepStuckCount > 2 && stepStuckCount <= 5;
       
-      console.log(`⚙️ Processing strategy: ${forceAdvancement ? 'Force advancement' : (processMultipleSteps ? 'Multiple steps' : 'Standard processing')}`);
+      console.log(`[${triggerRequestId}] ⚙️ Processing strategy: ${forceAdvancement ? 'Force advancement' : (processMultipleSteps ? 'Multiple steps' : 'Standard processing')}`);
       
       let response;
+      const processEndpoint = '/api/hr/courses/personalize-content/process';
+      console.log(`[${triggerRequestId}] 📡 Attempting to call ${processEndpoint} (POST)`);
+      
       try {
-        // Try the main process job API endpoint first
-        response = await fetch(`/api/hr/courses/personalize-content/process-job`, {
+        // Try the main process job API endpoint (POST)
+        response = await fetch(processEndpoint, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            // Add Authorization header if needed (using token from localStorage as example)
+            ...(typeof window !== 'undefined' && localStorage.getItem('supabase.auth.token') ? {
+              'Authorization': `Bearer ${localStorage.getItem('supabase.auth.token')}` 
+            } : {})
           },
           body: JSON.stringify({
             job_id: jobId,
-            force_advancement: forceAdvancement,
+            // Include flags even if backend doesn't use them yet
+            force_advancement: forceAdvancement, 
             process_multiple_steps: processMultipleSteps
           }),
         });
         
+        console.log(`[${triggerRequestId}] 📡 ${processEndpoint} POST response status: ${response.status}`);
+
         // Check for HTML response (indicating routing issue)
         const contentType = response.headers.get('content-type');
         if (contentType && contentType.indexOf('text/html') !== -1) {
+          console.error(`[${triggerRequestId}] ❌ Received HTML response from ${processEndpoint} - possible routing issue.`);
           throw new Error('Received HTML response - possible routing issue');
         }
-      } catch (error) {
-        console.error('Error using process-job API:', error);
-        console.log('Falling back to server action...');
-        
-        // Try the proxy endpoint as fallback
-        try {
-          response = await fetch(`/api/proxy-process-job`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              job_id: jobId,
-              force_advancement: forceAdvancement,
-              process_multiple_steps: processMultipleSteps
-            }),
-          });
-        } catch (proxyError) {
-          console.error('Error using proxy process-job API:', proxyError);
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.warn(`[${triggerRequestId}] ⚠️ ${processEndpoint} POST failed with status ${response.status}: ${errorText}. Trying GET.`);
           
-          // Fall back to direct database access if all API methods fail
+          // Try GET as fallback
+          const processGetEndpoint = `${processEndpoint}?job_id=${jobId}&_t=${Date.now()}`;
+          console.log(`[${triggerRequestId}] 📡 Attempting to call ${processGetEndpoint} (GET)`);
+          response = await fetch(processGetEndpoint, {
+            method: 'GET',
+             headers: {
+              // Add Authorization header if needed
+              ...(typeof window !== 'undefined' && localStorage.getItem('supabase.auth.token') ? {
+                'Authorization': `Bearer ${localStorage.getItem('supabase.auth.token')}` 
+              } : {})
+            }
+          });
+          console.log(`[${triggerRequestId}] 📡 ${processGetEndpoint} GET response status: ${response.status}`);
+          if (!response.ok) {
+             const getErrorText = await response.text();
+             console.error(`[${triggerRequestId}] ❌ ${processGetEndpoint} GET also failed with status ${response.status}: ${getErrorText}`);
+             throw new Error(`Failed to trigger job processing via POST or GET: ${response.statusText}`);
+          }
+        }
+
+      } catch (error) {
+        console.error(`[${triggerRequestId}] 💥 Error calling ${processEndpoint}:`, error);
+        console.log(`[${triggerRequestId}] ⚠️ Falling back to direct database update for job ${jobId}...`);
+        
+        // Fall back to direct database access if API methods fail
+        try {
           const { data, error: dbError } = await supabase
           .from('content_generation_jobs')
           .update({
-              last_error: 'Job processing triggered manually',
-            updated_at: new Date().toISOString()
+              last_error: 'Job processing triggered manually due to API failure',
+              updated_at: new Date().toISOString()
           })
             .eq('id', jobId)
             .select();
             
           if (dbError) {
-            console.error('Failed to update job in database:', dbError);
-            throw dbError;
+            console.error(`[${triggerRequestId}] ❌ Failed to update job ${jobId} directly in database:`, dbError);
+            throw dbError; // Re-throw DB error
           }
           
-          console.log('Job updated directly in database:', data);
-          return;
+          console.log(`[${triggerRequestId}] ✅ Job ${jobId} updated directly in database:`, data);
+          // Even if DB update works, the actual processing might not have been triggered
+          // Consider adding a different state or message for this scenario
+          setProcessing(false);
+          return; // Exit after DB fallback attempt
+        } catch (finalFallbackError) {
+           console.error(`[${triggerRequestId}] 💥 Final fallback DB update also failed for job ${jobId}:`, finalFallbackError);
+           throw finalFallbackError; // Re-throw final error
         }
       }
 
-      if (!response.ok) {
-        console.error('Failed to process job with API', response);
-        throw new Error(`Failed to process job: ${response.statusText}`);
-      }
-      
+      // If fetch was successful (either POST or GET)
       const data = await response.json();
-      console.log('Job processing result:', data);
+      console.log(`[${triggerRequestId}] ✅ Job processing trigger response from ${response.url}:`, data);
       
-      // Check job status after processing
-      checkJobStatus();
+      // Check job status again after processing attempt
+      // Use a slight delay to allow backend potentially start processing
+      setTimeout(() => checkJobStatus(), 500);
       
     } catch (error) {
-      console.error('Error processing job:', error);
+      console.error(`[${triggerRequestId}] 💥 Error in triggerJobProcessing for ${jobId}:`, error);
+      // Potentially set an error state specific to the trigger failure
     } finally {
       setProcessing(false);
     }
-  }, [jobId, processing, stepStuckCount, checkJobStatus]);
+  }, [jobId, processing, stepStuckCount, checkJobStatus, supabase]); // Added supabase dependency
 
   // Load job status on component mount
   useEffect(() => {
@@ -815,3 +843,5 @@ export default function PersonalizedContentGenerationStatus({
     </div>
   );
 }
+
+
