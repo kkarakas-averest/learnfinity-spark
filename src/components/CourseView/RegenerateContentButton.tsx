@@ -41,114 +41,112 @@ export function RegenerateContentButton({ courseId, onSuccess, onError }: Regene
       const baseDomain = window.location.origin;
       console.log(`🌐 Using base domain: ${baseDomain}`);
 
-      // First try the proxy endpoint with POST method (more reliable)
-      try {
-        console.log(`📡 Calling proxy endpoint with POST for job ${jobId}`);
-        const proxyResponse = await fetch(`/api/proxy-process-job`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${authToken}`,
-            'Accept': 'application/json'
-          },
-          body: JSON.stringify({ 
-            job_id: jobId,
-            timestamp: Date.now() // Add timestamp to prevent caching issues
-          })
-        });
-        
-        if (proxyResponse.ok) {
-          const result = await proxyResponse.json();
-          console.log(`✅ Proxy POST response:`, result);
-          setIsProcessing(false);
-          return;
-        }
-        
-        console.warn(`⚠️ Proxy POST endpoint failed with status ${proxyResponse.status}. Trying GET method...`);
-      } catch (proxyError) {
-        console.error(`❌ Error with proxy POST endpoint:`, proxyError);
-        // Continue to try GET method
-      }
-
-      // Try GET method as fallback
-      try {
-        console.log(`📡 Calling proxy endpoint with GET for job ${jobId}`);
-        const getNoCacheParam = `_nocache=${Date.now()}`; // Prevent caching
-        const getProxyResponse = await fetch(`/api/proxy-process-job?job_id=${jobId}&${getNoCacheParam}`, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${authToken}`,
-            'Accept': 'application/json',
-            'Cache-Control': 'no-cache, no-store',
-            'Pragma': 'no-cache'
-          }
-        });
-        
-        if (getProxyResponse.ok) {
-          const result = await getProxyResponse.json();
-          console.log(`✅ Proxy GET endpoint response:`, result);
-          setIsProcessing(false);
-          return;
-        }
-        
-        console.warn(`⚠️ Proxy GET endpoint also failed with status ${getProxyResponse.status}. Trying direct API...`);
-      } catch (getProxyError) {
-        console.error(`❌ Error with proxy GET endpoint:`, getProxyError);
-        // Continue to direct API as last resort
-      }
-
-      // Fallback to the direct API endpoint - try POST method first
-      console.log(`📡 Calling direct API endpoint (POST) for job ${jobId}`);
+      // Add cache-busting timestamp for all requests
+      const timestamp = Date.now();
+      const apiParams = `job_id=${jobId}&_t=${timestamp}`;
       
-      try {
-        const directResponse = await fetch(`${baseDomain}/api/hr/courses/personalize-content/process`, {
+      // Define a function to handle API errors with comprehensive logging
+      const handleApiError = (endpoint: string, method: string, error: any, response?: Response) => {
+        console.error(`❌ Error with ${method} to ${endpoint}:`, error);
+        
+        if (response) {
+          console.warn(`Response status: ${response.status} ${response.statusText}`);
+          console.warn(`Response headers:`, Object.fromEntries([...response.headers.entries()]));
+        }
+        
+        // Return false to indicate failure
+        return false;
+      };
+      
+      // Define all endpoints to try with detailed logging
+      const endpoints = [
+        {
+          name: 'Proxy POST',
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${authToken}`,
-            'Accept': 'application/json',
-            'Cache-Control': 'no-cache, no-store',
-            'Pragma': 'no-cache'
-          },
-          body: JSON.stringify({ 
-            job_id: jobId,
-            timestamp: Date.now() // Add timestamp to prevent caching issues
-          })
-        });
-
-        if (directResponse.ok) {
-          const result = await directResponse.json();
-          console.log(`✅ Direct POST API response:`, result);
-          setIsProcessing(false);
-          return;
-        }
-        
-        console.warn(`⚠️ Direct POST API endpoint failed with status ${directResponse.status}. Trying GET method...`);
-  
-        // Final attempt - try GET method with direct API
-        const directGetResponse = await fetch(`${baseDomain}/api/hr/courses/personalize-content/process?job_id=${jobId}&_t=${Date.now()}`, {
+          url: `/api/proxy-process-job`,
+          body: { job_id: jobId, timestamp }
+        },
+        {
+          name: 'Proxy GET', 
           method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${authToken}`,
-            'Accept': 'application/json',
-            'Cache-Control': 'no-cache, no-store',
-            'Pragma': 'no-cache'
-          }
-        });
-        
-        if (directGetResponse.ok) {
-          const result = await directGetResponse.json();
-          console.log(`✅ Direct GET API response:`, result);
-          setIsProcessing(false);
-          return;
+          url: `/api/proxy-process-job?${apiParams}`
+        },
+        {
+          name: 'Direct API POST',
+          method: 'POST',
+          url: `${baseDomain}/api/hr/courses/personalize-content/process`,
+          body: { job_id: jobId, timestamp }
+        },
+        {
+          name: 'Direct API GET',
+          method: 'GET',
+          url: `${baseDomain}/api/hr/courses/personalize-content/process?${apiParams}`
+        },
+        {
+          name: 'App Router API POST',
+          method: 'POST',
+          url: `${baseDomain}/api/hr/courses/personalize-content/process/route`,
+          body: { job_id: jobId, timestamp }
+        },
+        {
+          name: 'Legacy API POST',
+          method: 'POST',
+          url: `${baseDomain}/api/hr/process-job`,
+          body: { job_id: jobId, timestamp }
         }
-        
-        // If all attempts fail, throw an error
-        throw new Error(`Failed to process job via any method: ${directGetResponse.status} ${directGetResponse.statusText}`);
-      } catch (directError) {
-        console.error('❌ Error with direct API calls:', directError);
-        throw directError; // Re-throw to be caught by the outer catch
+      ];
+      
+      // Try each endpoint until one succeeds
+      for (const endpoint of endpoints) {
+        try {
+          console.log(`📡 Trying ${endpoint.name} endpoint: ${endpoint.url}`);
+          
+          const options: RequestInit = {
+            method: endpoint.method,
+            headers: {
+              'Authorization': `Bearer ${authToken}`,
+              'Accept': 'application/json',
+              'Cache-Control': 'no-cache, no-store',
+              'Pragma': 'no-cache'
+            }
+          };
+          
+          // Add body for POST requests
+          if (endpoint.method === 'POST' && endpoint.body) {
+            options.headers['Content-Type'] = 'application/json';
+            options.body = JSON.stringify(endpoint.body);
+          }
+          
+          // Make the request
+          const response = await fetch(endpoint.url, options);
+          
+          // Check for non-JSON response (like HTML)
+          const contentType = response.headers.get('content-type');
+          if (contentType && !contentType.includes('application/json')) {
+            console.warn(`⚠️ ${endpoint.name} returned non-JSON content type: ${contentType}`);
+            continue; // Skip to next endpoint
+          }
+          
+          if (!response.ok) {
+            console.warn(`⚠️ ${endpoint.name} failed with status ${response.status}`);
+            continue; // Skip to next endpoint
+          }
+          
+          // Try to parse JSON response
+          const result = await response.json();
+          console.log(`✅ ${endpoint.name} succeeded:`, result);
+          setIsProcessing(false);
+          return true; // Success!
+        } catch (error) {
+          // Log error and continue to next endpoint
+          handleApiError(endpoint.url, endpoint.method, error);
+          continue;
+        }
       }
+      
+      // If we reach here, all endpoints failed
+      console.error('❌ All API endpoints failed to process the job');
+      throw new Error('Failed to process job via any API endpoint');
     } catch (error) {
       console.error('❌ Error processing job:', error);
       toast({
@@ -156,6 +154,7 @@ export function RegenerateContentButton({ courseId, onSuccess, onError }: Regene
         description: `Failed to process job: ${error instanceof Error ? error.message : 'Unknown error'}`,
         variant: "destructive",
       });
+      return false;
     } finally {
       setIsProcessing(false);
     }
@@ -265,17 +264,25 @@ export function RegenerateContentButton({ courseId, onSuccess, onError }: Regene
       });
       
       const requestStartTime = Date.now();
+      
+      // Add cache-busting to prevent cached responses
+      const requestBody = {
+        courseId,
+        forceRegenerate: true,
+        access_token: authToken,  // Include in body as fallback
+        _t: Date.now() // Add timestamp to prevent caching
+      };
+      
       const response = await fetch(legacyEndpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authToken}`
+          'Authorization': `Bearer ${authToken}`,
+          'Cache-Control': 'no-cache, no-store',
+          'Pragma': 'no-cache',
+          'Accept': 'application/json'
         },
-        body: JSON.stringify({
-          courseId,
-          forceRegenerate: true,
-          access_token: authToken,  // Include in body as fallback
-        }),
+        body: JSON.stringify(requestBody),
         credentials: 'include',
       });
       const requestDuration = Date.now() - requestStartTime;
@@ -316,7 +323,7 @@ export function RegenerateContentButton({ courseId, onSuccess, onError }: Regene
           const freshToken = tokenData?.session?.access_token || authToken;
           
           // Try the API with token in query parameter as fallback
-          const fallbackUrl = `/api/hr/courses/regenerate-content?access_token=${encodeURIComponent(freshToken)}`;
+          const fallbackUrl = `/api/hr/courses/regenerate-content?access_token=${encodeURIComponent(freshToken)}&_t=${Date.now()}`;
           console.log(`[${requestId}] 🚀 Attempting fallback request to:`, {
             endpoint: fallbackUrl,
             method: 'POST',
@@ -331,10 +338,14 @@ export function RegenerateContentButton({ courseId, onSuccess, onError }: Regene
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
+              'Accept': 'application/json',
+              'Cache-Control': 'no-cache, no-store',
+              'Pragma': 'no-cache'
             },
             body: JSON.stringify({
               courseId,
               forceRegenerate: true,
+              _t: Date.now()
             }),
             credentials: 'include',
           });

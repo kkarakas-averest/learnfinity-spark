@@ -250,6 +250,7 @@ export async function OPTIONS(request: NextRequest) {
 export async function GET(req: NextRequest) {
   const requestId = uuidv4().slice(0, 8);
   logWithTimestamp(`[ReqID:${requestId}] GET request received from ${req.url}`);
+  logWithTimestamp(`[ReqID:${requestId}] Request headers:`, Object.fromEntries(req.headers));
 
   try {
     // Extract job_id from URL params

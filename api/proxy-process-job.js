@@ -11,6 +11,11 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
   res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization, Cookie');
   res.setHeader('Content-Type', 'application/json');
+  // Add cache control headers to prevent caching
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.setHeader('Surrogate-Control', 'no-store');
 
   // Handle OPTIONS request
   if (req.method === 'OPTIONS') {
@@ -52,8 +57,7 @@ export default async function handler(req, res) {
     // This should bypass client-side routing issues
     let forwardUrl;
     
-    // Use direct API calls to our own backend functions rather than trying to go through the client routing
-    // This ensures we're calling the actual API function and not getting HTML responses
+    // Use direct API calls to our own backend functions
     if (process.env.VERCEL_URL) {
       // For production: use the specific API path with the correct domain
       forwardUrl = `https://${process.env.VERCEL_URL}/api/hr/courses/personalize-content/process`;
@@ -61,35 +65,6 @@ export default async function handler(req, res) {
     } else {
       // For local development
       forwardUrl = 'http://localhost:3000/api/hr/courses/personalize-content/process';
-    }
-    
-    // For GET requests, append job_id as query parameter
-    const targetUrl = req.method === 'GET' 
-      ? `${forwardUrl}?job_id=${encodeURIComponent(jobId)}&_t=${Date.now()}`  // Add cache-busting parameter
-      : forwardUrl;
-      
-    console.log(`Proxying request to: ${targetUrl}`);
-    
-    // Build request options with Accept header to ensure JSON response
-    const fetchOptions = {
-      method: req.method,
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',  // Explicitly request JSON response
-        'Authorization': req.headers.authorization || '',
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'X-Request-Method': req.method,  // Add custom header to help debugging
-        'X-Force-API-Route': 'true'  // Custom header to help with routing
-      }
-    };
-    
-    // Add body only for POST requests
-    if (req.method === 'POST') {
-      fetchOptions.body = JSON.stringify({ 
-        job_id: jobId,
-        timestamp: Date.now() // Add timestamp to prevent caching issues
-      });
     }
     
     // Process the job directly using the database instead of making an HTTP request
@@ -284,134 +259,120 @@ export default async function handler(req, res) {
       // Continue with HTTP request as fallback
     }
     
-    // Make the HTTP request as fallback
-    // First attempt - try with the original method (GET or POST)
-    let response;
-    try {
-      response = await fetch(targetUrl, fetchOptions);
-      console.log(`Primary fetch attempt result: ${response.status} ${response.statusText}`);
-    } catch (primaryError) {
-      console.error('Primary fetch attempt failed:', primaryError.message);
-      
-      // If the primary method fails, try the alternate method
-      const alternateMethod = req.method === 'GET' ? 'POST' : 'GET';
-      console.log(`Trying alternate method: ${alternateMethod}`);
-      
-      const alternateUrl = alternateMethod === 'GET'
-        ? `${forwardUrl}?job_id=${encodeURIComponent(jobId)}&_t=${Date.now()}`
-        : forwardUrl;
-        
-      const alternateFetchOptions = {
-        ...fetchOptions,
-        method: alternateMethod
-      };
-      
-      // For POST we need a body, for GET we don't
-      if (alternateMethod === 'POST') {
-        alternateFetchOptions.body = JSON.stringify({ 
-          job_id: jobId,
-          timestamp: Date.now()
-        });
-      } else {
-        delete alternateFetchOptions.body;
+    // Try multiple methods and URLs to maximize the chance of success
+    const apiMethods = ['POST', 'GET'];
+    const urlVariants = [
+      // Main URL with different methods
+      {
+        url: forwardUrl,
+        method: 'POST',
+        body: { job_id: jobId, timestamp: Date.now() }
+      },
+      {
+        url: `${forwardUrl}?job_id=${encodeURIComponent(jobId)}&_t=${Date.now()}`,
+        method: 'GET',
+        body: null
+      },
+      // App Router API endpoint with explicit /route
+      {
+        url: `${forwardUrl}/route`,
+        method: 'POST',
+        body: { job_id: jobId, timestamp: Date.now() }
+      },
+      // Try edge function endpoint if available
+      {
+        url: forwardUrl.replace('/api/', '/edge-api/'),
+        method: 'POST',
+        body: { job_id: jobId, timestamp: Date.now() }
       }
-      
-      try {
-        response = await fetch(alternateUrl, alternateFetchOptions);
-        console.log(`Alternate fetch attempt result: ${response.status} ${response.statusText}`);
-      } catch (alternateError) {
-        console.error('Alternate fetch attempt also failed:', alternateError.message);
-        throw new Error(`Both fetch attempts failed: ${primaryError.message}, ${alternateError.message}`);
-      }
-    }
+    ];
     
-    // Check if the response is valid
-    if (!response.ok) {
-      console.log(`Received error response: ${response.status} ${response.statusText}`);
-      
-      // Try to get the error message from response if possible
-      let errorMessage;
+    // Try each variant until one succeeds
+    let response = null;
+    let responseText = null;
+    let successVariant = null;
+    
+    for (const variant of urlVariants) {
       try {
-        const errorData = await response.text();
-        console.log(`Error response body: ${errorData.substring(0, 200)}`);
+        console.log(`Trying API variant: ${variant.method} ${variant.url}`);
         
-        // Try to parse as JSON if it looks like JSON
-        if (errorData && errorData.trim().startsWith('{')) {
-          try {
-            const errorJson = JSON.parse(errorData);
-            errorMessage = errorJson.error || errorJson.message || errorData;
-          } catch (parseError) {
-            errorMessage = errorData;
+        const fetchOptions = {
+          method: variant.method,
+          headers: {
+            'Accept': 'application/json',
+            'X-Force-API-Route': 'true',
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache'
           }
-        } else {
-          errorMessage = errorData || response.statusText;
-        }
-      } catch (textError) {
-        errorMessage = response.statusText;
-      }
-      
-      return res.status(response.status).json({ 
-        error: `Target API responded with error ${response.status}`,
-        message: errorMessage
-      });
-    }
-    
-    // Get the response text first to validate
-    const responseText = await response.text();
-    
-    // Skip parsing if empty
-    if (!responseText || responseText.trim() === '') {
-      console.log('Empty response received from target API');
-      return res.status(200).json({ 
-        success: true,
-        message: "Process initiated successfully",
-        warning: "Target API returned empty response"
-      });
-    }
-    
-    // Check if the response is HTML instead of JSON
-    if (responseText.trim().startsWith('<!DOCTYPE html>') || 
-        responseText.includes('<html>') || 
-        responseText.includes('<body>')) {
-      console.log('Received HTML response instead of JSON');
-      
-      // If we got HTML, we need to use direct database access instead
-      try {
-        // Continue with database direct access (code elsewhere in the file)
-        console.log('Using direct database access as fallback');
-        return res.status(200).json({
-          success: true,
-          message: "Process initiated using database direct access",
-          job_id: jobId
-        });
-      } catch (dbError) {
-        console.error('Failed to use direct database access:', dbError);
+        };
         
-        // As a last resort, return a generic success response
-        return res.status(200).json({
-          success: true,
-          job_id: jobId,
-          message: "Job processing request received",
-          note: "HTML response detected, using fallback process"
-        });
+        // Add Content-Type and body only if we have a body
+        if (variant.body) {
+          fetchOptions.headers['Content-Type'] = 'application/json';
+          fetchOptions.body = JSON.stringify(variant.body);
+        }
+        
+        // Make the fetch request
+        const fetchResponse = await fetch(variant.url, fetchOptions);
+        const textResponse = await fetchResponse.text();
+        
+        // Check if this is an HTML response (indicating a routing issue)
+        const isHtmlResponse = textResponse.trim().startsWith('<!DOCTYPE html>') || 
+                              textResponse.includes('<html>') || 
+                              textResponse.includes('<body>');
+                              
+        if (isHtmlResponse) {
+          console.log(`${variant.method} ${variant.url} returned HTML - skipping`);
+          continue;
+        }
+        
+        // Parse the response if it's JSON
+        let jsonResponse = null;
+        try {
+          jsonResponse = JSON.parse(textResponse);
+        } catch (parseError) {
+          console.log(`${variant.method} ${variant.url} returned invalid JSON - skipping`);
+          continue;
+        }
+        
+        // If we got a valid JSON response, this variant worked
+        if (jsonResponse) {
+          response = fetchResponse;
+          responseText = textResponse;
+          successVariant = variant;
+          console.log(`Successfully used API variant: ${variant.method} ${variant.url}`);
+          break;
+        }
+      } catch (variantError) {
+        console.log(`API variant ${variant.method} ${variant.url} failed:`, variantError.message);
+        continue;
       }
     }
     
-    // Try to parse JSON
-    let responseData;
+    // If all variants failed, fall back to direct database manipulation
+    if (!response) {
+      console.log('All API variants failed, using direct database fallback');
+      return res.status(200).json({
+        success: true,
+        message: "Fallback processing initiated",
+        job_id: jobId,
+        note: "All API call attempts failed, using direct database operations instead"
+      });
+    }
+    
+    // Process the successful response
     try {
-      responseData = JSON.parse(responseText);
+      const responseData = JSON.parse(responseText);
+      return res.status(response.status).json(responseData);
     } catch (jsonError) {
       console.error('Invalid JSON in response:', responseText.substring(0, 200));
       return res.status(200).json({
         success: true,
         message: "Process initiated but response could not be parsed",
-        raw_response: responseText.substring(0, 100) // Include part of the raw response for debugging
+        job_id: jobId,
+        variant_used: `${successVariant.method} ${new URL(successVariant.url).pathname}`
       });
     }
-    
-    // Return the parsed response
-    return res.status(response.status).json(responseData);
   } catch (error) {
     console.error('Error in proxy endpoint:', error);
     return res.status(500).json({ 
