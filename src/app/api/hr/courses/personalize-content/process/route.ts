@@ -305,6 +305,16 @@ export async function GET(req: NextRequest) {
     }
     
     // Return the job info with proper headers
+    logWithTimestamp(`[ReqID:${requestId}] ✅ Returning successful GET response:`, {
+      success: true,
+      job: {
+        id: job.id,
+        status: job.status,
+        current_step: job.current_step,
+        progress: job.progress,
+        step_description: job.step_description
+      }
+    });
     return NextResponse.json(
       {
         success: true,
@@ -328,11 +338,15 @@ export async function GET(req: NextRequest) {
     );
   } catch (error) {
     logWithTimestamp(`[ReqID:${requestId}] ❌ Error processing GET request:`, error);
+    // Add logging before returning error response
+    const errorResponse = { 
+      error: "Failed to process request", 
+      message: error instanceof Error ? error.message : String(error || 'Unknown error'),
+      stack: process.env.NODE_ENV === 'development' && error instanceof Error ? error.stack : undefined
+    };
+    logWithTimestamp(`[ReqID:${requestId}] ❌ Returning error GET response:`, errorResponse);
     return NextResponse.json(
-      { 
-        error: "Failed to process request", 
-        message: error.message || 'Unknown error'
-      },
+      errorResponse,
       { 
         status: 500,
         headers: {
@@ -759,11 +773,14 @@ export async function POST(req: NextRequest) {
       }
       
       logWithTimestamp(`[ReqID:${requestId}] ✅ Job ${job_id} completed successfully`);
-      return NextResponse.json(
-        { 
+      // Add logging before returning success response
+      const successResponse = { 
         success: true,
-          message: "Content generation completed successfully" 
-        },
+        message: "Content generation completed successfully" 
+      };
+      logWithTimestamp(`[ReqID:${requestId}] ✅ Returning successful POST response:`, successResponse);
+      return NextResponse.json(
+        successResponse,
         { 
           status: 200,
           headers: {
@@ -789,11 +806,14 @@ export async function POST(req: NextRequest) {
         })
         .eq('id', job_id);
         
+      // Add logging before returning error response
+      const errorResponse = { 
+        error: "Failed to generate content",
+        details: error.message 
+      };
+      logWithTimestamp(`[ReqID:${requestId}] ❌ Returning error POST response:`, errorResponse);
       return NextResponse.json(
-        { 
-          error: "Failed to generate content",
-          details: error.message 
-        },
+        errorResponse,
         { 
           status: 500,
           headers: {
@@ -807,11 +827,15 @@ export async function POST(req: NextRequest) {
     
   } catch (error: any) {
     logWithTimestamp(`[ReqID:${requestId || 'unknown'}] ❌ Unhandled error processing job:`, error);
+    // Add logging before returning error response
+    const errorResponse = { 
+      error: "Error processing job request",
+      details: error.message || String(error || 'Unknown error'),
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    };
+    logWithTimestamp(`[ReqID:${requestId || 'unknown'}] ❌ Returning unhandled error POST response:`, errorResponse);
     return NextResponse.json(
-      { 
-        error: "Error processing job request",
-        details: error.message 
-      },
+      errorResponse,
       { 
         status: 500,
         headers: {

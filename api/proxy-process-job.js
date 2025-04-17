@@ -401,6 +401,8 @@ export default async function handler(req, res) {
     let responseData;
     try {
       responseData = JSON.parse(responseText);
+      // Add logging for successful JSON parse
+      console.log('✅ Successfully parsed JSON response from target API:', responseData);
     } catch (jsonError) {
       console.error('Invalid JSON in response:', responseText.substring(0, 200));
       return res.status(200).json({
@@ -413,11 +415,12 @@ export default async function handler(req, res) {
     // Return the parsed response
     return res.status(response.status).json(responseData);
   } catch (error) {
-    console.error('Error in proxy endpoint:', error);
+    console.error('❌ Error in proxy endpoint:', error);
+    // Log more details in the catch block
     return res.status(500).json({ 
-      error: 'Internal server error',
-      message: error.message,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      error: 'Internal server error in proxy',
+      message: error instanceof Error ? error.message : String(error || 'Unknown proxy error'),
+      stack: process.env.NODE_ENV === 'development' && error instanceof Error ? error.stack : undefined
     });
   }
 }
