@@ -4,6 +4,7 @@ import { PersonalizedContentService } from '@/services/personalized-content-serv
 import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabase-admin'; // Use admin for direct job interaction
 
 // Define JobStatus enum directly since the import is missing
 export enum JobStatus {
@@ -236,613 +237,150 @@ export async function OPTIONS(request: NextRequest) {
   });
 }
 
+// Consistent logging
+const log = (message: string, data?: any, requestId?: string) => {
+  console.log(`[${new Date().toISOString()}] [PROCESS-HANDLER]${requestId ? ` [ReqID:${requestId}]` : ''} ${message}`, data ? JSON.stringify(data) : '');
+};
+
+// Helper to extract job_id from either query or body
+async function getJobId(req: NextRequest): Promise<string | null> {
+  if (req.method === 'GET') {
+    const url = new URL(req.url);
+    return url.searchParams.get('job_id');
+  } else if (req.method === 'POST') {
+    try {
+      const body = await req.json();
+      return body?.job_id;
+    } catch (e) {
+      return null; // Invalid JSON
+    }
+  } else {
+    return null; // Unsupported method
+  }
+}
+
 /**
- * GET handler for personalize-content process
- * This properly handles the job_id parameter and returns a JSON response with proper headers
+ * API Route to trigger the processing of a specific personalization job.
+ * Accepts GET /api/hr/courses/personalize-content/process?job_id=...
+ * Accepts POST /api/hr/courses/personalize-content/process with { job_id: ... } in body
  */
 export async function GET(req: NextRequest) {
-  console.log("==== EXECUTION CHECK: process/route.ts GET HANDLER REACHED ===="); // Added for debugging
+  console.log("==== PROCESS HANDLER: GET Request Received ===="); // Simple log
   const requestId = uuidv4().slice(0, 8);
   logWithTimestamp(`[ReqID:${requestId}] GET request received from ${req.url}`);
+  return handleRequest(req, requestId);
+}
+
+export async function POST(req: NextRequest) {
+  console.log("==== PROCESS HANDLER: POST Request Received ===="); // Simple log
+  const requestId = uuidv4().slice(0, 8); // Generate a short request ID for tracing
+  logWithTimestamp(`[ReqID:${requestId}] POST request received from ${req.url}`);
+  logWithTimestamp(`[ReqID:${requestId}] Request headers:`, Object.fromEntries(req.headers));
+  return handleRequest(req, requestId);
+}
+
+async function handleRequest(req: NextRequest, requestId: string) {
+  log('🏁 Handling request...', { method: req.method }, requestId);
+  
+  // Simple CORS check for OPTIONS
+  if (req.method === 'OPTIONS') {
+    log('↩️ Responding to OPTIONS request', undefined, requestId);
+    return new NextResponse(null, {
+      status: 204,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      },
+    });
+  }
+
+  // Extract job_id from request
+  const jobId = await getJobId(req);
+  log(`🆔 Extracted Job ID: ${jobId}`, undefined, requestId);
+
+  if (!jobId) {
+    log('❌ Missing or invalid job_id', { method: req.method }, requestId);
+    return NextResponse.json(
+      { error: 'Job ID is required either in query parameters (GET) or JSON body (POST)' },
+      { status: 400 }
+    );
+  }
 
   try {
-    // Extract job_id from URL params
-    const url = new URL(req.url);
-    const jobId = url.searchParams.get('job_id');
-    const courseId = url.searchParams.get('course_id');
-    const employeeId = url.searchParams.get('employee_id');
-    
-    logWithTimestamp(`[ReqID:${requestId}] Query parameters: job_id=${jobId}, course_id=${courseId}, employee_id=${employeeId}`);
-    
-    // Validate the job_id
-    if (!jobId) {
-      logWithTimestamp(`[ReqID:${requestId}] ❌ Missing job_id parameter`);
-      return NextResponse.json(
-        { error: 'Missing job_id parameter' },
-        { 
-          status: 400,
-          headers: {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-          }
-        }
-      );
-    }
-    
-    // Create a body object mimicking what we'd receive from a POST
-    const requestBody = { 
-      job_id: jobId,
-      course_id: courseId || undefined,
-      employee_id: employeeId || undefined
-    };
-    
-    // Use the same logic as in POST to process the job
-    logWithTimestamp(`[ReqID:${requestId}] Forwarding to POST handler logic with constructed body:`, requestBody);
-    
-    // We're using the imported supabase client instead of createClient()
-    const { data: job, error: jobError } = await supabase
+    // Verify job exists and is in a processable state (e.g., 'pending' or 'in_progress')
+    log(`🔍 Verifying job status for job: ${jobId}`, undefined, requestId);
+    const { data: jobData, error: jobError } = await supabaseAdmin
       .from('content_generation_jobs')
-      .select('*')
+      .select('status')
       .eq('id', jobId)
       .single();
-      
-    if (jobError || !job) {
-      logWithTimestamp(`[ReqID:${requestId}] ❌ Error fetching job:`, jobError);
-      return NextResponse.json(
-        { error: "Job not found", details: jobError ? jobError.message : 'No job found with the provided ID' },
-        { 
-          status: 404,
-          headers: {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-          }
-        }
-      );
-    }
-    
-    // Return the job info with proper headers
-    logWithTimestamp(`[ReqID:${requestId}] ✅ Returning successful GET response:`, {
-      success: true,
-      job: {
-        id: job.id,
-        status: job.status,
-        current_step: job.current_step,
-        progress: job.progress,
-        step_description: job.step_description
+
+    if (jobError) {
+      log(`❌ Error fetching job: ${jobId}`, { error: jobError.message }, requestId);
+      if (jobError.code === 'PGRST116') { // Not found
+        return NextResponse.json({ error: 'Job not found' }, { status: 404 });
       }
-    });
+      return NextResponse.json({ error: 'Failed to fetch job details', details: jobError.message }, { status: 500 });
+    }
+
+    log(`✅ Job ${jobId} found with status: ${jobData.status}`, undefined, requestId);
+
+    // Potentially add check here: if jobData.status is 'completed' or 'failed', maybe return early?
+    // Example: 
+    // if (['completed', 'failed'].includes(jobData.status)) {
+    //   log(`🏁 Job ${jobId} already processed. Status: ${jobData.status}`, undefined, requestId);
+    //   return NextResponse.json({ success: true, message: `Job already ${jobData.status}`, status: jobData.status }, { status: 200 });
+    // }
+
+    // Trigger the actual job processing logic (async)
+    // We don't await this, the API responds immediately to acknowledge the trigger
+    log(`🚀 Triggering async processing for job: ${jobId}`, undefined, requestId);
+    // processPersonalizationJob(jobId, requestId).catch(processingError => { // <-- REMOVE THIS BLOCK
+    //   // Log errors during the async processing, but don't crash the API route
+    //   log(`❌ Uncaught error during async job processing for ${jobId}:`, { 
+    //     message: processingError instanceof Error ? processingError.message : String(processingError),
+    //     stack: processingError instanceof Error ? processingError.stack : undefined 
+    //   }, requestId);
+    //   // Optionally update job status to 'failed' here
+    //   supabaseAdmin
+    //     .from('content_generation_jobs')
+    //     .update({ 
+    //       status: 'failed',
+    //       error_message: `Async processing error: ${processingError instanceof Error ? processingError.message : String(processingError)}`,
+    //       updated_at: new Date().toISOString()
+    //     })
+    //     .eq('id', jobId);
+    // });
+    // NOTE: Actual processing should be handled by a separate queue worker or scheduled task
+    // that calls /api/hr/courses/process-personalization-queue
+
+    log(`✅ Processing triggered for job: ${jobId}. API responding immediately.`, undefined, requestId);
+    // Respond immediately to the client to indicate the trigger was received
     return NextResponse.json(
       {
         success: true,
-        job: {
-          id: job.id,
-          status: job.status,
-          current_step: job.current_step,
-          progress: job.progress,
-          step_description: job.step_description
-        }
+        message: 'Job processing triggered successfully.',
+        job_id: jobId,
       },
       {
-        status: 200,
         headers: {
-          'Content-Type': 'application/json',
           'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+          'Access-Control-Allow-Credentials': 'true',
         }
       }
     );
   } catch (error) {
-    logWithTimestamp(`[ReqID:${requestId}] ❌ Error processing GET request:`, error);
-    // Add logging before returning error response
-    const errorResponse = { 
-      error: "Failed to process request", 
-      message: error instanceof Error ? error.message : String(error || 'Unknown error'),
-      stack: process.env.NODE_ENV === 'development' && error instanceof Error ? error.stack : undefined
-    };
-    logWithTimestamp(`[ReqID:${requestId}] ❌ Returning error GET response:`, errorResponse);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown server error';
+    log(`❌ Unexpected error in handleRequest for job ${jobId}:`, { error: errorMessage, stack: error instanceof Error ? error.stack : undefined }, requestId);
     return NextResponse.json(
-      errorResponse,
-      { 
-        status: 500,
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-        }
-      }
-    );
-  }
-}
-
-// Request schema validation
-const requestSchema = z.object({
-  job_id: z.string().uuid()
-});
-
-/**
- * API endpoint to process a content personalization job
- * This endpoint is intended to be called by a background process or a webhook
- */
-export async function POST(req: NextRequest) {
-  console.log("==== EXECUTION CHECK: process/route.ts POST HANDLER REACHED ===="); // Added for debugging
-  const requestId = uuidv4().slice(0, 8); // Generate a short request ID for tracing
-  logWithTimestamp(`[ReqID:${requestId}] POST request received from ${req.url}`);
-  logWithTimestamp(`[ReqID:${requestId}] Request headers:`, Object.fromEntries(req.headers));
-  
-  try {
-    // Parse request body
-    logWithTimestamp(`[ReqID:${requestId}] 📦 Parsing request body...`);
-    let body;
-    try {
-      body = await req.json();
-      logWithTimestamp(`[ReqID:${requestId}] Request body:`, body);
-    } catch (parseError) {
-      logWithTimestamp(`[ReqID:${requestId}] ❌ Failed to parse request body:`, parseError);
-      return NextResponse.json(
-        { error: 'Invalid JSON in request body' },
-        { 
-          status: 400,
-          headers: {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-          }
-        }
-      );
-    }
-    
-    // Allow direct requests from the proxy-process-job.js with various parameters
-    // Support both job_id parameter and extended parameters
-    let job_id = body.job_id;
-    const requestCourseId = body.course_id;
-    const employee_id = body.employee_id || body.user_id;
-    const force_regenerate = body.force_regenerate;
-    
-    if (!job_id && req.nextUrl?.searchParams) {
-      // Check if job_id is provided in the query parameters (GET request or URL params)
-      job_id = req.nextUrl.searchParams.get('job_id') || undefined;
-    }
-    
-    // Validate the job_id
-    if (!job_id) {
-      logWithTimestamp(`[ReqID:${requestId}] ❌ Missing job_id parameter`);
-      return NextResponse.json(
-        { error: 'Missing job_id parameter' },
-        { 
-          status: 400,
-          headers: {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-          }
-        }
-      );
-    }
-    
-    // Validate the request - only check job_id if other parameters are not provided
-    if (!requestCourseId && !employee_id) {
-      logWithTimestamp(`[ReqID:${requestId}] 🔍 Validating request schema (job_id only)...`);
-      const validationResult = requestSchema.safeParse({ job_id });
-      if (!validationResult.success) {
-        logWithTimestamp(`[ReqID:${requestId}] ❌ Schema validation failed:`, validationResult.error);
-        return NextResponse.json(
-          { error: 'Invalid request data', details: validationResult.error.format() },
-          { 
-            status: 400,
-            headers: {
-              'Access-Control-Allow-Origin': '*',
-              'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-              'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-            }
-          }
-        );
-      }
-    }
-    
-    logWithTimestamp(`[ReqID:${requestId}] 🔄 Processing job ID: ${job_id}`);
-    
-    // We're now using the imported supabase client instead of createClient()
-    logWithTimestamp(`[ReqID:${requestId}] 🔍 Fetching job from database...`);
-    
-    // Get the job info from the database
-    const { data: job, error: jobError } = await supabase
-      .from('content_generation_jobs')
-      .select('*')
-      .eq('id', job_id)
-      .single();
-      
-    if (jobError || !job) {
-      logWithTimestamp(`[ReqID:${requestId}] ❌ Error fetching job:`, jobError);
-      return NextResponse.json(
-        { error: "Job not found", details: jobError ? jobError.message : 'No job found with the provided ID' },
-        { 
-          status: 404,
-          headers: {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-          }
-        }
-      );
-    }
-    
-    logWithTimestamp(`[ReqID:${requestId}] ✅ Job found:`, {
-      id: job.id,
-      status: job.status,
-      type: job.type,
-      created_at: job.created_at
-    });
-    
-    // Check if the job is already completed or failed
-    if (job.status === JobStatus.COMPLETED || job.status === JobStatus.FAILED) {
-      logWithTimestamp(`[ReqID:${requestId}] ⚠️ Job already ${job.status}`);
-      return NextResponse.json(
-        { 
-          status: job.status,
-          message: `Job ${job.status === JobStatus.COMPLETED ? 'already completed' : 'failed'}` 
-        },
-        { 
-          status: 200,
-          headers: {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-          }
-        }
-      );
-    }
-    
-    // Update the job status to PROCESSING
-    logWithTimestamp(`[ReqID:${requestId}] 🔄 Updating job status to PROCESSING...`);
-    const { error: updateError } = await supabase
-      .from('content_generation_jobs')
-      .update({ status: JobStatus.PROCESSING })
-      .eq('id', job_id);
-      
-    if (updateError) {
-      logWithTimestamp(`[ReqID:${requestId}] ❌ Error updating job status:`, updateError);
-      return NextResponse.json(
-        { error: "Failed to update job status", details: updateError.message },
-        { 
-          status: 500,
-          headers: {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-          }
-        }
-      );
-    }
-    
-    // Get the metadata from the job parameters
-    logWithTimestamp(`[ReqID:${requestId}] 🔍 Examining job parameters...`);
-    const parameters = job.parameters as any;
-    
-    if (!parameters) {
-      logWithTimestamp(`[ReqID:${requestId}] ❌ Invalid job parameters: null or undefined`);
-      await supabase
-        .from('content_generation_jobs')
-        .update({ 
-          status: JobStatus.FAILED, 
-          result: { error: "Invalid job parameters" } 
-        })
-        .eq('id', job_id);
-      
-      return NextResponse.json(
-        { error: "Invalid job parameters" },
-        { 
-          status: 400,
-          headers: {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-          }
-        }
-      );
-    }
-    
-    logWithTimestamp(`[ReqID:${requestId}] ✅ Job parameters:`, parameters);
-    
-    const {
-      course_id: paramsCourseId,
-      user_id,
-      course_title,
-      course_description,
-      user_knowledge,
-      user_aspirations,
-      is_regeneration
-    } = parameters;
-    
-    // Use request course_id if available, otherwise use the one from job parameters
-    const effectiveCourseId = requestCourseId || paramsCourseId;
-    
-    // Validate the course ID and user ID
-    if (!effectiveCourseId || !user_id) {
-      logWithTimestamp(`[ReqID:${requestId}] ❌ Missing required parameters: course_id=${effectiveCourseId}, user_id=${user_id}`);
-      await supabase
-        .from('content_generation_jobs')
-        .update({ 
-          status: JobStatus.FAILED, 
-          result: { error: "Missing course ID or user ID" } 
-        })
-        .eq('id', job_id);
-      
-      return NextResponse.json(
-        { error: "Missing course ID or user ID" },
-        { 
-          status: 400,
-          headers: {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-          }
-        }
-      );
-    }
-    
-    try {
-      logWithTimestamp(`[ReqID:${requestId}] 🔍 Fetching user preferences for user_id=${user_id}...`);
-      // Get user preferences
-      const { data: userPreferences, error: preferencesError } = await supabase
-        .from('user_preferences')
-        .select('*')
-        .eq('user_id', user_id)
-        .single();
-        
-      if (preferencesError) {
-        logWithTimestamp(`[ReqID:${requestId}] ⚠️ Could not fetch user preferences:`, preferencesError);
-      } else {
-        logWithTimestamp(`[ReqID:${requestId}] ✅ User preferences:`, userPreferences);
-      }
-      
-      logWithTimestamp(`[ReqID:${requestId}] 🔍 Fetching course details for course_id=${effectiveCourseId}...`);
-      // Get course
-      const { data: course, error: courseError } = await supabase
-        .from('courses')
-        .select('*')
-        .eq('id', effectiveCourseId)
-        .single();
-        
-      if (courseError) {
-        logWithTimestamp(`[ReqID:${requestId}] ⚠️ Could not fetch course details:`, courseError);
-      } else {
-        logWithTimestamp(`[ReqID:${requestId}] ✅ Course details:`, {
-          id: course.id,
-          title: course.title,
-          description: course.description?.substring(0, 100) + '...'
-        });
-      }
-      
-      // Initialize result data structure
-      let result = {
-        course_id: effectiveCourseId,
-        html_content: null,
-        modules: [],
-        generated_at: new Date().toISOString(),
-      };
-      
-      // Initialize AI provider
-      logWithTimestamp(`[ReqID:${requestId}] 🤖 Initializing AI provider...`);
-      const aiProvider = new GroqAIProvider();
-      
-      // Generate initial course structure and content
-      logWithTimestamp(`[ReqID:${requestId}] 🧠 Generating initial course content...`);
-      const initialContent = await generateInitialCourseContent(
-        aiProvider,
-        {
-          courseTitle: course_title || course?.title || 'Untitled Course',
-          courseDescription: course_description || course?.description || '',
-          userKnowledge: user_knowledge || '',
-          userAspirations: user_aspirations || '',
-          userPreferences: userPreferences || {
-            learning_style: 'balanced',
-            content_depth: 'intermediate'
-          }
-        }
-      );
-      
-      // Process the course structure
-      if (initialContent?.modules) {
-        logWithTimestamp(`[ReqID:${requestId}] ✅ Generated initial content with ${initialContent.modules.length} modules`);
-        result.modules = initialContent.modules;
-        
-        // Generate detailed content for each lesson in each module
-        for (const [moduleIndex, module] of initialContent.modules.entries()) {
-          logWithTimestamp(`[ReqID:${requestId}] 📝 Processing module ${moduleIndex + 1}/${initialContent.modules.length}: ${module.title}`);
-          
-          for (const [sectionIndex, section] of module.sections.entries()) {
-            if (section.type === 'lesson') {
-              logWithTimestamp(`[ReqID:${requestId}] 📚 Generating content for lesson ${sectionIndex + 1}/${module.sections.length}: ${section.title}`);
-              
-              const lessonContent = await generateLessonContent(
-                aiProvider,
-                {
-                  courseTitle: course_title || course?.title || 'Untitled Course',
-                  moduleTitle: module.title,
-                  lessonTitle: section.title,
-                  lessonObjectives: section.objectives || [],
-                  userPreferences: userPreferences || {
-                    learning_style: 'balanced',
-                    content_depth: 'intermediate'
-                  }
-                }
-              );
-              
-              section.content = lessonContent.content;
-              section.html_content = lessonContent.html_content;
-              logWithTimestamp(`[ReqID:${requestId}] ✅ Generated lesson content (${section.content.length} chars)`);
-              
-              // Generate assessment questions for the lesson
-              if (section.hasAssessment) {
-                logWithTimestamp(`[ReqID:${requestId}] 📝 Generating assessment questions for lesson: ${section.title}`);
-                const questions = await generateAssessmentQuestions(
-                  aiProvider,
-                  {
-                    courseTitle: course_title || course?.title || 'Untitled Course',
-                    moduleTitle: module.title,
-                    lessonTitle: section.title,
-                    lessonContent: section.content,
-                    questionCount: 3
-                  }
-                );
-                
-                section.assessment = {
-                  questions: questions
-                };
-                logWithTimestamp(`[ReqID:${requestId}] ✅ Generated ${questions.length} assessment questions`);
-              }
-              
-              // Generate key takeaways
-              logWithTimestamp(`[ReqID:${requestId}] 💡 Generating key takeaways for lesson: ${section.title}`);
-              const keyTakeaways = await generateKey(
-                aiProvider,
-                {
-                  lessonTitle: section.title,
-                  lessonContent: section.content
-                }
-              );
-              
-              section.keyTakeaways = keyTakeaways;
-              logWithTimestamp(`[ReqID:${requestId}] ✅ Generated ${keyTakeaways.length} key takeaways`);
-              
-              // Generate exercises
-              logWithTimestamp(`[ReqID:${requestId}] 🏋️ Generating exercises for lesson: ${section.title}`);
-              const exercises = await generateExercises(
-                aiProvider,
-                {
-                  lessonTitle: section.title,
-                  lessonContent: section.content,
-                  exerciseCount: 2
-                }
-              );
-              
-              section.exercises = exercises;
-              logWithTimestamp(`[ReqID:${requestId}] ✅ Generated ${exercises.length} exercises`);
-            }
-          }
-        }
-      } else {
-        logWithTimestamp(`[ReqID:${requestId}] ⚠️ No modules generated in initial content`);
-      }
-      
-      // Update personalized_course_content table
-      logWithTimestamp(`[ReqID:${requestId}] 💾 Saving personalized course content to database...`);
-      
-      // Check if we should use course_id/user_id or course_id/employee_id as the primary key
-      const contentUserId = employee_id || user_id;
-      
-      // Generate a UUID for the content entry
-      const contentId = uuidv4();
-      
-      const { error: contentError } = await supabase
-        .from('hr_personalized_course_content')
-        .upsert({
-          id: contentId, // Add explicit UUID to avoid NOT NULL constraint error
-          course_id: effectiveCourseId,
-          employee_id: contentUserId,
-          content: result,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }, { onConflict: 'course_id,employee_id' });
-        
-      if (contentError) {
-        logWithTimestamp(`[ReqID:${requestId}] ❌ Error saving personalized content:`, contentError);
-        throw new Error(`Failed to save personalized content: ${contentError.message}`);
-      }
-      
-      // Update job status to COMPLETED
-      logWithTimestamp(`[ReqID:${requestId}] 🏁 Marking job as COMPLETED`);
-      const { error: completeError } = await supabase
-        .from('content_generation_jobs')
-        .update({ 
-          status: JobStatus.COMPLETED, 
-          result: { success: true, message: "Content generation completed successfully" },
-          completed_at: new Date().toISOString()
-        })
-        .eq('id', job_id);
-        
-      if (completeError) {
-        logWithTimestamp(`[ReqID:${requestId}] ❌ Error updating job completion status:`, completeError);
-        throw new Error(`Failed to update job completion status: ${completeError.message}`);
-      }
-      
-      logWithTimestamp(`[ReqID:${requestId}] ✅ Job ${job_id} completed successfully`);
-      // Add logging before returning success response
-      const successResponse = { 
-        success: true,
-        message: "Content generation completed successfully" 
-      };
-      logWithTimestamp(`[ReqID:${requestId}] ✅ Returning successful POST response:`, successResponse);
-      return NextResponse.json(
-        successResponse,
-        { 
-          status: 200,
-          headers: {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-          }
-        }
-      );
-      
-    } catch (error: any) {
-      logWithTimestamp(`[ReqID:${requestId}] ❌ Error during content generation:`, error);
-      
-      // Update job status to FAILED
-      await supabase
-        .from('content_generation_jobs')
-        .update({
-          status: JobStatus.FAILED, 
-          result: { 
-            error: error.message || "Unknown error during content generation" 
-          },
-          completed_at: new Date().toISOString()
-        })
-        .eq('id', job_id);
-        
-      // Add logging before returning error response
-      const errorResponse = { 
-        error: "Failed to generate content",
-        details: error.message 
-      };
-      logWithTimestamp(`[ReqID:${requestId}] ❌ Returning error POST response:`, errorResponse);
-      return NextResponse.json(
-        errorResponse,
-        { 
-          status: 500,
-          headers: {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-          }
-        }
-      );
-    }
-    
-  } catch (error: any) {
-    logWithTimestamp(`[ReqID:${requestId || 'unknown'}] ❌ Unhandled error processing job:`, error);
-    // Add logging before returning error response
-    const errorResponse = { 
-      error: "Error processing job request",
-      details: error.message || String(error || 'Unknown error'),
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-    };
-    logWithTimestamp(`[ReqID:${requestId || 'unknown'}] ❌ Returning unhandled error POST response:`, errorResponse);
-    return NextResponse.json(
-      errorResponse,
+      { error: 'An unexpected server error occurred', details: errorMessage }, 
       { 
         status: 500,
         headers: {
           'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-        }
+          'Access-Control-Allow-Credentials': 'true',
+        } 
       }
     );
   }

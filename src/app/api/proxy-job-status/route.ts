@@ -6,6 +6,8 @@ import { supabase } from '@/lib/supabase';
  * GET /api/proxy-job-status?job_id={job_id}
  */
 export async function GET(req: NextRequest) {
+  console.log("==== PROXY STATUS HANDLER: GET Request Received ====");
+
   try {
     // Get the job ID from query parameters
     const url = new URL(req.url);

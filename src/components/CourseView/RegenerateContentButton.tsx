@@ -24,84 +24,32 @@ export function RegenerateContentButton({ courseId, onSuccess, onError }: Regene
   const { supabase } = useSupabase();
 
   const triggerJobProcessing = useCallback(async (jobId: string) => {
-    console.log(`🔄 Attempting to trigger job processing for: ${jobId}`);
+    const requestId = `trigger_${Date.now()}`;
+    console.log(`[${requestId}] 🔄 Attempting to trigger job processing for: ${jobId}`);
     setIsProcessing(true);
 
     try {
       // Get Supabase session for auth token
+      console.log(`[${requestId}] 🔐 Getting auth session for triggerJobProcessing`);
       const session = await supabase.auth.getSession();
       const authToken = session?.data?.session?.access_token;
 
       if (!authToken) {
-        console.error('❌ No authentication token available');
+        console.error(`[${requestId}] ❌ No authentication token available`);
         throw new Error('Authentication required');
       }
+      console.log(`[${requestId}] ✅ Auth token retrieved`);
 
       // Get the current deployment URL to avoid hardcoded domains
       const baseDomain = window.location.origin;
-      console.log(`🌐 Using base domain: ${baseDomain}`);
+      console.log(`[${requestId}] 🌐 Using base domain: ${baseDomain}`);
 
-      // First try the proxy endpoint with POST method (more reliable)
-      try {
-        console.log(`📡 Calling proxy endpoint with POST for job ${jobId}`);
-        const proxyResponse = await fetch(`/api/proxy-process-job`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${authToken}`,
-            'Accept': 'application/json'
-          },
-          body: JSON.stringify({ 
-            job_id: jobId,
-            timestamp: Date.now() // Add timestamp to prevent caching issues
-          })
-        });
-        
-        if (proxyResponse.ok) {
-          const result = await proxyResponse.json();
-          console.log(`✅ Proxy POST response:`, result);
-          setIsProcessing(false);
-          return;
-        }
-        
-        console.warn(`⚠️ Proxy POST endpoint failed with status ${proxyResponse.status}. Trying GET method...`);
-      } catch (proxyError) {
-        console.error(`❌ Error with proxy POST endpoint:`, proxyError);
-        // Continue to try GET method
-      }
-
-      // Try GET method as fallback
-      try {
-        console.log(`📡 Calling proxy endpoint with GET for job ${jobId}`);
-        const getNoCacheParam = `_nocache=${Date.now()}`; // Prevent caching
-        const getProxyResponse = await fetch(`/api/proxy-process-job?job_id=${jobId}&${getNoCacheParam}`, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${authToken}`,
-            'Accept': 'application/json',
-            'Cache-Control': 'no-cache, no-store',
-            'Pragma': 'no-cache'
-          }
-        });
-        
-        if (getProxyResponse.ok) {
-          const result = await getProxyResponse.json();
-          console.log(`✅ Proxy GET endpoint response:`, result);
-          setIsProcessing(false);
-          return;
-        }
-        
-        console.warn(`⚠️ Proxy GET endpoint also failed with status ${getProxyResponse.status}. Trying direct API...`);
-      } catch (getProxyError) {
-        console.error(`❌ Error with proxy GET endpoint:`, getProxyError);
-        // Continue to direct API as last resort
-      }
-
-      // Fallback to the direct API endpoint - try POST method first
-      console.log(`📡 Calling direct API endpoint (POST) for job ${jobId}`);
+      // Try the direct API endpoint - try POST method first
+      const directApiEndpoint = `${baseDomain}/api/hr/courses/personalize-content/process`;
+      console.log(`[${requestId}] 📡 Calling direct API endpoint (POST) ${directApiEndpoint} for job ${jobId}`);
       
       try {
-        const directResponse = await fetch(`${baseDomain}/api/hr/courses/personalize-content/process`, {
+        const directResponse = await fetch(directApiEndpoint, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -116,17 +64,20 @@ export function RegenerateContentButton({ courseId, onSuccess, onError }: Regene
           })
         });
 
+        console.log(`[${requestId}] 📡 Direct POST API response status: ${directResponse.status}`);
         if (directResponse.ok) {
           const result = await directResponse.json();
-          console.log(`✅ Direct POST API response:`, result);
+          console.log(`[${requestId}] ✅ Direct POST API response OK:`, result);
           setIsProcessing(false);
           return;
         }
         
-        console.warn(`⚠️ Direct POST API endpoint failed with status ${directResponse.status}. Trying GET method...`);
+        console.warn(`[${requestId}] ⚠️ Direct POST API endpoint failed with status ${directResponse.status}. Trying GET method...`);
   
         // Final attempt - try GET method with direct API
-        const directGetResponse = await fetch(`${baseDomain}/api/hr/courses/personalize-content/process?job_id=${jobId}&_t=${Date.now()}`, {
+        const directGetEndpoint = `${directApiEndpoint}?job_id=${jobId}&_t=${Date.now()}`;
+        console.log(`[${requestId}] 📡 Calling direct API endpoint (GET) ${directGetEndpoint} for job ${jobId}`);
+        const directGetResponse = await fetch(directGetEndpoint, {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${authToken}`,
@@ -136,21 +87,24 @@ export function RegenerateContentButton({ courseId, onSuccess, onError }: Regene
           }
         });
         
+        console.log(`[${requestId}] 📡 Direct GET API response status: ${directGetResponse.status}`);
         if (directGetResponse.ok) {
           const result = await directGetResponse.json();
-          console.log(`✅ Direct GET API response:`, result);
+          console.log(`[${requestId}] ✅ Direct GET API response OK:`, result);
           setIsProcessing(false);
           return;
         }
         
         // If all attempts fail, throw an error
+        const errorText = await directGetResponse.text();
+        console.error(`[${requestId}] ❌ All direct API attempts failed. Final status: ${directGetResponse.status}, Response: ${errorText}`);
         throw new Error(`Failed to process job via any method: ${directGetResponse.status} ${directGetResponse.statusText}`);
       } catch (directError) {
-        console.error('❌ Error with direct API calls:', directError);
+        console.error(`[${requestId}] ❌ Error with direct API calls:`, directError);
         throw directError; // Re-throw to be caught by the outer catch
       }
     } catch (error) {
-      console.error('❌ Error processing job:', error);
+      console.error(`[${requestId}] ❌ Error processing job:`, error);
       toast({
         title: "Error",
         description: `Failed to process job: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -207,15 +161,44 @@ export function RegenerateContentButton({ courseId, onSuccess, onError }: Regene
         
         if (userId) {
           // First try to get employee ID from user_employee_mappings
-          const { data: employeeMapping } = await supabase
-            .from('user_employee_mappings')
-            .select('employee_id')
-            .eq('user_id', userId)
-            .maybeSingle();
-            
-          const employeeId = employeeMapping?.employee_id || userId;
-          
-          // Check for existing pending or in-progress jobs
+          let employeeId = userId; // Default to userId if mapping fails or doesn't exist
+          try {
+            console.log(`[${requestId}] 🔗 Attempting to fetch employee mapping for user: ${userId}`);
+            const { data: employeeMapping, error: mappingError } = await supabase
+              .from('employee_user_mapping')
+              .select('employee_id')
+              .eq('user_id', userId)
+              .maybeSingle();
+
+            if (mappingError) {
+              console.error(`[${requestId}] ❌ Supabase Error fetching employee_user_mapping:`, {
+                message: mappingError.message,
+                details: mappingError.details,
+                hint: mappingError.hint,
+                code: mappingError.code,
+              });
+              // Log specific toast for 404 potentially due to RLS or missing table
+              if (mappingError.code === 'PGRST116' || mappingError.message.includes('404')) { 
+                toast({
+                  title: "Configuration Issue?",
+                  description: "Could not retrieve employee mapping (employee_user_mapping). Please check table existence and RLS policies in Supabase.",
+                  variant: "warning", // Use warning variant
+                });
+              }
+              // Do not throw an error here, proceed using userId as employeeId fallback
+            } else if (employeeMapping?.employee_id) {
+              employeeId = employeeMapping.employee_id;
+              console.log(`[${requestId}] ✅ Successfully mapped user ${userId} to employee ${employeeId}`);
+            } else {
+              console.log(`[${requestId}] ℹ️ No employee mapping found for user ${userId}, using user ID as employee ID.`);
+            }
+          } catch (mappingCatchError) {
+              console.error(`[${requestId}] 💥 Exception during employee mapping fetch:`, mappingCatchError);
+              // Proceed using userId as employeeId fallback
+          }
+
+          // Check for existing pending or in-progress jobs using the determined employeeId
+          console.log(`[${requestId}] 🔍 Checking for existing jobs for course ${courseId} and employee ${employeeId}`);
           const { data: existingJobs, error: jobCheckError } = await supabase
             .from('content_generation_jobs')
             .select('*')
@@ -282,20 +265,26 @@ export function RegenerateContentButton({ courseId, onSuccess, onError }: Regene
       
       // Detailed error logging
       if (!response.ok) {
-        const errorDetails = await response.text();
-        console.error(`[${requestId}] ❌ API Error (${response.status}):`, {
+        const errorBody = await response.text();
+        let errorJson: any = {};
+        try { errorJson = JSON.parse(errorBody); } catch { /* ignore json parse error */ }
+
+        console.error(`[${requestId}] ❌ API Error (${response.status}) calling ${legacyEndpoint}:`, {
           status: response.status,
           statusText: response.statusText,
-          responseBody: errorDetails,
+          responseBody: errorBody,
           endpoint: legacyEndpoint,
           courseId,
           requestDuration: `${requestDuration}ms`,
-          headers: Object.fromEntries([...response.headers.entries()].map(([k, v]) => 
-            [k, k.toLowerCase().includes('auth') ? '***' : v]
-          )),
-          contentType: response.headers.get('content-type')
         });
-        
+
+        // Use toast for user feedback
+        toast({
+          title: `API Error (${response.status})`,
+          description: errorJson?.error || errorJson?.message || `Failed to start regeneration. Status: ${response.statusText || response.status}`,
+          variant: "destructive",
+        });
+
         // For 401 errors, try alternative auth method
         if (response.status === 401) {
           console.log(`[${requestId}] 🔄 Authentication failed (401), trying alternative approach...`);
@@ -342,6 +331,9 @@ export function RegenerateContentButton({ courseId, onSuccess, onError }: Regene
           
           if (!fallbackResponse.ok) {
             const routerErrorDetails = await fallbackResponse.text();
+            let fallbackErrorJson: any = {};
+            try { fallbackErrorJson = JSON.parse(routerErrorDetails); } catch { /* ignore */ }
+
             console.error(`[${requestId}] ❌ Fallback API Error (${fallbackResponse.status}):`, {
               status: fallbackResponse.status,
               statusText: fallbackResponse.statusText,
@@ -349,12 +341,16 @@ export function RegenerateContentButton({ courseId, onSuccess, onError }: Regene
               endpoint: fallbackUrl,
               courseId,
               requestDuration: `${fallbackDuration}ms`,
-              headers: Object.fromEntries([...fallbackResponse.headers.entries()].map(([k, v]) => 
-                [k, k.toLowerCase().includes('auth') ? '***' : v]
-              )),
-              contentType: fallbackResponse.headers.get('content-type')
             });
-            throw new Error(`Failed to regenerate content: ${fallbackResponse.statusText}`);
+
+            // Use toast for fallback error
+            toast({
+              title: `Fallback API Error (${fallbackResponse.status})`,
+              description: fallbackErrorJson?.error || fallbackErrorJson?.message || `Failed to regenerate content via fallback. Status: ${fallbackResponse.statusText || fallbackResponse.status}`,
+              variant: "destructive",
+            });
+
+            throw new Error(`Failed to regenerate content: ${fallbackResponse.statusText || fallbackResponse.status}`);
           }
           
           const responseData = await fallbackResponse.json();
@@ -419,7 +415,7 @@ export function RegenerateContentButton({ courseId, onSuccess, onError }: Regene
         onSuccess();
       }
     } catch (error) {
-      console.error(`[${requestId}] ❌ Error regenerating course content:`, {
+      console.error(`[${requestId}] 💥 Catch-all Error regenerating course content:`, {
         error: error instanceof Error ? {
           name: error.name,
           message: error.message,
@@ -433,13 +429,17 @@ export function RegenerateContentButton({ courseId, onSuccess, onError }: Regene
         }
       });
       
-      toast({
-        title: 'Error',
-        description: error instanceof Error 
-          ? error.message 
-          : 'Failed to regenerate course content. Please try again.',
-        variant: 'destructive',
-      });
+      // Ensure a user-friendly toast is shown even for caught errors
+      // (unless it was already shown by specific handlers above)
+      if (!(error instanceof Error && error.message.includes("Failed to regenerate content"))) { // Avoid double-toast
+        toast({
+          title: 'Regeneration Error',
+          description: error instanceof Error 
+            ? error.message 
+            : 'An unexpected error occurred. Please try again.',
+          variant: 'destructive',
+        });
+      }
       
       if (onError && error instanceof Error) {
         onError(error);

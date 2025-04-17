@@ -20,6 +20,7 @@ import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/components/ui/use-toast';
 import ReactMarkdown from 'react-markdown';
 import HtmlContentRenderer from './HtmlContentRenderer';
+import { useSupabase } from '@/components/providers/supabase-provider';
 
 interface StepType {
   id: number;
@@ -51,6 +52,12 @@ interface JobStatus {
   error_message?: string;
 }
 
+// Define a simple type for the expected API response
+interface JobStatusResponse {
+  job?: any; // Adjust based on actual job data structure
+  error?: string;
+}
+
 // Default steps for the generation process
 const defaultSteps: StepType[] = [
   {
@@ -75,6 +82,13 @@ const defaultSteps: StepType[] = [
     icon: Zap,
   },
 ];
+
+// Simplified error handler for this component
+const handleError = (errorMessage: string, setErrorMessage: React.Dispatch<React.SetStateAction<string | null>>) => {
+  console.error("Job Status Error:", errorMessage);
+  setErrorMessage(errorMessage);
+  // Optionally, add toast notification here
+};
 
 export default function PersonalizedContentGenerationStatus({
   initialIsGenerating = false,
@@ -243,78 +257,82 @@ export default function PersonalizedContentGenerationStatus({
       
       const authToken = sessionData.session.access_token;
       
-      // Try with direct URL first to avoid proxy issues
+      // Try direct status endpoint first
+      const directStatusUrl = `/api/hr/courses/personalize-content/status?job_id=${jobId}`;
+      console.log(`📡 Calling direct status endpoint: ${directStatusUrl}`);
+      
       try {
-        const directResponse = await fetch(`/api/hr/courses/personalize-content/status?job_id=${jobId}`, {
-          method: 'GET',
+        const response = await fetch(directStatusUrl, {
           headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${authToken}`,
-            'Cache-Control': 'no-cache, no-store',
+            'Accept': 'application/json',
+            'Cache-Control': 'no-cache, no-store', // Prevent caching
             'Pragma': 'no-cache'
           }
         });
-        
-        // Add timestamp to track last successful response
-        setLastProgressUpdate(Date.now());
-        
-        if (directResponse.ok) {
-        const data = await directResponse.json();
-        
-        if (data.job) {
-            updateJobStatusState(data.job);
-            return;
+        console.log(`📡 Direct status response status: ${response.status}`);
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.warn(`⚠️ Direct status endpoint failed with status ${response.status}: ${errorText}. Falling back to DB check.`);
+          // Fall through to database check if API fails
+        } else {
+          const data: JobStatusResponse = await response.json();
+          console.log(`✅ Direct status API response OK:`, data);
+          
+          if (data.error) {
+            console.error(`❌ Error from status API:`, data.error);
+            handleError(data.error, setErrorMessage);
+            return; // Stop polling on API error
           }
+          
+          updateJobStatusState(data.job);
+          return; // Stop polling cycle if successful
         }
-      } catch (apiError) {
-        console.warn(`⚠️ Direct API job status check failed:`, apiError);
+      } catch (error) {
+        console.error(`❌ Error fetching direct status:`, error);
+        // Fall through to database check if API call fails completely
       }
-      
-      // Try proxy endpoint as fallback
+
+      // Fallback: Direct database query if API fails or returns error
+      console.log(` fallback: Querying database directly for job status: ${jobId}`);
       try {
-        const proxyResponse = await fetch(`/api/proxy-job-status?job_id=${jobId}`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${authToken}`,
-            'Cache-Control': 'no-cache, no-store',
-            'Pragma': 'no-cache'
-          }
-        });
+        const { data: job, error: jobError } = await supabase
+          .from('content_generation_jobs')
+          .select('*')
+          .eq('id', jobId)
+          .single();
         
-        if (proxyResponse.ok) {
-          const data = await proxyResponse.json();
+        if (jobError) {
+          console.error(`❌ Error querying job directly:`, jobError);
+          throw new Error(`Failed to get job status: ${jobError.message}`);
+        }
         
-          if (data.job) {
-            updateJobStatusState(data.job);
-            return;
+        if (job) {
+          console.log(`✅ Retrieved job status directly from database for job ${jobId}`);
+          updateJobStatusState(job);
+          return;
+        }
+        
+        throw new Error('No job data found');
+      } catch (error) {
+        console.error('❌ Error checking job status:', error);
+        setRetryCount(prev => prev + 1);
+        
+        // If we've exceeded retry count but still have valid job ID, try force-advancing progress
+        if (retryCount >= MAX_RETRIES && jobId) {
+          console.log(`⚠️ Retry count exceeded. Force advancing progress to unstick job ${jobId}`);
+          triggerJobProcessing();
+          setForceProgressUpdate(true);
+        }
+        
+        if (retryCount >= MAX_RETRIES * 2) {
+          setErrorMessage(error instanceof Error ? error.message : 'Failed to check job status after multiple attempts');
+          
+          if (onGenerationComplete) {
+            onGenerationComplete();
           }
         }
-      } catch (proxyError) {
-        console.warn(`⚠️ Proxy job status check failed:`, proxyError);
       }
-      
-      // If both API calls fail, try direct Supabase query as final fallback
-      console.log(`⚠️ API status checks failed, trying direct Supabase query for job ${jobId}`);
-      
-      const { data: job, error: jobError } = await supabase
-        .from('content_generation_jobs')
-        .select('*')
-        .eq('id', jobId)
-        .single();
-        
-      if (jobError) {
-        console.error(`❌ Error querying job directly:`, jobError);
-        throw new Error(`Failed to get job status: ${jobError.message}`);
-      }
-      
-      if (job) {
-        console.log(`✅ Retrieved job status directly from database for job ${jobId}`);
-        updateJobStatusState(job);
-        return;
-      }
-      
-      throw new Error('No job data found');
     } catch (error) {
       console.error('❌ Error checking job status:', error);
       setRetryCount(prev => prev + 1);
@@ -328,11 +346,11 @@ export default function PersonalizedContentGenerationStatus({
       
       if (retryCount >= MAX_RETRIES * 2) {
         setErrorMessage(error instanceof Error ? error.message : 'Failed to check job status after multiple attempts');
-      
-      if (onGenerationComplete) {
-        onGenerationComplete();
+        
+        if (onGenerationComplete) {
+          onGenerationComplete();
+        }
       }
-    }
     }
   }, [jobId, retryCount, pollAttempts, onGenerationComplete, updateJobStatusState]);
 

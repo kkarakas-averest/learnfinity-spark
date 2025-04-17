@@ -12,6 +12,8 @@ const jobIdSchema = z.object({
  * GET /api/hr/courses/personalize-content/status?job_id={job_id}
  */
 export async function GET(req: NextRequest) {
+  console.log("==== STATUS HANDLER: GET Request Received ===="); // Simple log
+  
   try {
     const url = new URL(req.url);
     const jobId = url.searchParams.get('job_id');
