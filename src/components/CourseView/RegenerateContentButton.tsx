@@ -37,85 +37,118 @@ export function RegenerateContentButton({ courseId, onSuccess, onError }: Regene
         throw new Error('Authentication required');
       }
 
-      // First try the proxy endpoint
-      try {
-        console.log(`📡 Calling proxy endpoint for job ${jobId}`);
-        const proxyResponse = await fetch(`/api/proxy-process-job?job_id=${jobId}`, {
-          method: 'GET', // Use GET as the primary method
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${authToken}`
-          }
-        });
+      // Get the current deployment URL to avoid hardcoded domains
+      const baseDomain = window.location.origin;
+      console.log(`🌐 Using base domain: ${baseDomain}`);
 
-        if (proxyResponse.ok) {
-          const result = await proxyResponse.json();
-          console.log(`✅ Proxy endpoint response:`, result);
-          setIsProcessing(false);
-          return;
-        }
-        
-        console.warn(`⚠️ Proxy endpoint failed with status ${proxyResponse.status}. Trying POST method...`);
-        
-        // If GET fails, try with POST to the proxy
-        const proxyPostResponse = await fetch(`/api/proxy-process-job`, {
+      // First try the proxy endpoint with POST method (more reliable)
+      try {
+        console.log(`📡 Calling proxy endpoint with POST for job ${jobId}`);
+        const proxyResponse = await fetch(`/api/proxy-process-job`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${authToken}`
+            'Authorization': `Bearer ${authToken}`,
+            'Accept': 'application/json'
           },
-          body: JSON.stringify({ job_id: jobId })
+          body: JSON.stringify({ 
+            job_id: jobId,
+            timestamp: Date.now() // Add timestamp to prevent caching issues
+          })
         });
         
-        if (proxyPostResponse.ok) {
-          const result = await proxyPostResponse.json();
-          console.log(`✅ Proxy POST endpoint response:`, result);
+        if (proxyResponse.ok) {
+          const result = await proxyResponse.json();
+          console.log(`✅ Proxy POST response:`, result);
           setIsProcessing(false);
           return;
         }
         
-        console.warn(`⚠️ Proxy POST endpoint failed with status ${proxyPostResponse.status}. Trying direct API...`);
+        console.warn(`⚠️ Proxy POST endpoint failed with status ${proxyResponse.status}. Trying GET method...`);
       } catch (proxyError) {
-        console.error(`❌ Error with proxy endpoint:`, proxyError);
-        // Continue to try the direct endpoint
+        console.error(`❌ Error with proxy POST endpoint:`, proxyError);
+        // Continue to try GET method
       }
 
-      // Fallback to the direct API endpoint
-      console.log(`📡 Calling direct API endpoint for job ${jobId}`);
-      
-      // First attempt with POST (the correct method per route.ts)
-      const directResponse = await fetch('/api/hr/courses/personalize-content/process', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authToken}`
-        },
-        body: JSON.stringify({ job_id: jobId })
-      });
-
-      if (!directResponse.ok) {
-        console.warn(`⚠️ Direct API endpoint failed with status ${directResponse.status}: ${directResponse.statusText}`);
-        
-        // Try one more time with GET in case the endpoint supports both methods
-        const directGetResponse = await fetch(`/api/hr/courses/personalize-content/process?job_id=${jobId}`, {
+      // Try GET method as fallback
+      try {
+        console.log(`📡 Calling proxy endpoint with GET for job ${jobId}`);
+        const getNoCacheParam = `_nocache=${Date.now()}`; // Prevent caching
+        const getProxyResponse = await fetch(`/api/proxy-process-job?job_id=${jobId}&${getNoCacheParam}`, {
           method: 'GET',
           headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${authToken}`
+            'Authorization': `Bearer ${authToken}`,
+            'Accept': 'application/json',
+            'Cache-Control': 'no-cache, no-store',
+            'Pragma': 'no-cache'
           }
         });
         
-        if (!directGetResponse.ok) {
-          throw new Error(`Failed to process job: ${directGetResponse.status} ${directGetResponse.statusText}`);
+        if (getProxyResponse.ok) {
+          const result = await getProxyResponse.json();
+          console.log(`✅ Proxy GET endpoint response:`, result);
+          setIsProcessing(false);
+          return;
         }
         
-        const result = await directGetResponse.json();
-        console.log(`✅ Direct GET API response:`, result);
-      } else {
-        const result = await directResponse.json();
-        console.log(`✅ Direct POST API response:`, result);
+        console.warn(`⚠️ Proxy GET endpoint also failed with status ${getProxyResponse.status}. Trying direct API...`);
+      } catch (getProxyError) {
+        console.error(`❌ Error with proxy GET endpoint:`, getProxyError);
+        // Continue to direct API as last resort
       }
 
+      // Fallback to the direct API endpoint - try POST method first
+      console.log(`📡 Calling direct API endpoint (POST) for job ${jobId}`);
+      
+      try {
+        const directResponse = await fetch(`${baseDomain}/api/hr/courses/personalize-content/process`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`,
+            'Accept': 'application/json',
+            'Cache-Control': 'no-cache, no-store',
+            'Pragma': 'no-cache'
+          },
+          body: JSON.stringify({ 
+            job_id: jobId,
+            timestamp: Date.now() // Add timestamp to prevent caching issues
+          })
+        });
+
+        if (directResponse.ok) {
+          const result = await directResponse.json();
+          console.log(`✅ Direct POST API response:`, result);
+          setIsProcessing(false);
+          return;
+        }
+        
+        console.warn(`⚠️ Direct POST API endpoint failed with status ${directResponse.status}. Trying GET method...`);
+  
+        // Final attempt - try GET method with direct API
+        const directGetResponse = await fetch(`${baseDomain}/api/hr/courses/personalize-content/process?job_id=${jobId}&_t=${Date.now()}`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${authToken}`,
+            'Accept': 'application/json',
+            'Cache-Control': 'no-cache, no-store',
+            'Pragma': 'no-cache'
+          }
+        });
+        
+        if (directGetResponse.ok) {
+          const result = await directGetResponse.json();
+          console.log(`✅ Direct GET API response:`, result);
+          setIsProcessing(false);
+          return;
+        }
+        
+        // If all attempts fail, throw an error
+        throw new Error(`Failed to process job via any method: ${directGetResponse.status} ${directGetResponse.statusText}`);
+      } catch (directError) {
+        console.error('❌ Error with direct API calls:', directError);
+        throw directError; // Re-throw to be caught by the outer catch
+      }
     } catch (error) {
       console.error('❌ Error processing job:', error);
       toast({
@@ -126,7 +159,7 @@ export function RegenerateContentButton({ courseId, onSuccess, onError }: Regene
     } finally {
       setIsProcessing(false);
     }
-  }, [courseId, supabase]);
+  }, [supabase, toast]);
 
   const handleRegenerate = async () => {
     setIsLoading(true);
