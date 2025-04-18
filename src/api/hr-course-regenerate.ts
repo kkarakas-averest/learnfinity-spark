@@ -7,7 +7,7 @@ import { Request, Response } from 'express';
 // Export a default handler function for Express compatibility
 export default function handler(req: Request, res: Response) {
   try {
-    // Always set proper CORS and content type headers
+    // Always set proper CORS and content type headers first thing
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -61,10 +61,16 @@ export default function handler(req: Request, res: Response) {
       }
     });
   } catch (error: any) {
-    console.error(`[${new Date().toISOString()}] [HR-COURSE-REGENERATE] Error:`, error);
+    // Convert error to string first to avoid serialization issues
+    const errorMessage = error?.message || 'Unknown error';
+    const errorString = String(errorMessage);
+    
+    console.error(`[${new Date().toISOString()}] [HR-COURSE-REGENERATE] Error:`, errorString);
+    
+    // Always return valid JSON even in error cases
     res.status(500).json({
       error: 'Failed to process request',
-      message: error?.message || 'Unknown error',
+      message: errorString,
       success: false
     });
   }
