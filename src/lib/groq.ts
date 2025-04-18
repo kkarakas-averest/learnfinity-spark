@@ -3,16 +3,16 @@ const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
 // Environment variables - access both browser and server environments
 const getEnv = () => {
-  // Client-side environment variables must start with VITE_
-  const VITE_GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY;
-  const VITE_ENABLE_LLM = import.meta.env.VITE_ENABLE_LLM === 'true';
+  // Using Next.js environment variables instead of Vite
+  const NEXT_PUBLIC_GROQ_API_KEY = process.env.NEXT_PUBLIC_GROQ_API_KEY || '';
+  const NEXT_PUBLIC_ENABLE_LLM = process.env.NEXT_PUBLIC_ENABLE_LLM === 'true';
   
   // Check for server-side environment variables as fallback
   const SERVER_API_KEY = typeof process !== 'undefined' ? process.env.GROQ_API_KEY : undefined;
   
   return {
-    GROQ_API_KEY: VITE_GROQ_API_KEY || SERVER_API_KEY || '',
-    ENABLE_LLM: VITE_ENABLE_LLM
+    GROQ_API_KEY: NEXT_PUBLIC_GROQ_API_KEY || SERVER_API_KEY || '',
+    ENABLE_LLM: NEXT_PUBLIC_ENABLE_LLM
   };
 };
 
