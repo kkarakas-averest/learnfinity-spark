@@ -4,7 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 // Initial state for UI
 export const initialUIState: UIState = {
   toasts: [],
-  modals: {},
+  modals: {} as Record<string, Modal>,
   theme: 'light',
   isMobile: false,
 };

@@ -470,7 +470,7 @@ export class NotificationService {
       for (const key of storageKeys) {
         const storedData = localStorage.getItem(key);
         if (storedData) {
-          let notifications: Notification[] = JSON.parse(storedData);
+          const notifications: Notification[] = JSON.parse(storedData);
           const updatedNotifications = notifications.map(n => 
             n.id === notificationId ? { ...n, isRead: true } : n
           );
@@ -492,7 +492,7 @@ export class NotificationService {
       const storedData = localStorage.getItem(storageKey);
       
       if (storedData) {
-        let notifications: Notification[] = JSON.parse(storedData);
+        const notifications: Notification[] = JSON.parse(storedData);
         const updatedNotifications = notifications.map(n => ({ ...n, isRead: true }));
         localStorage.setItem(storageKey, JSON.stringify(updatedNotifications));
       }
@@ -529,7 +529,7 @@ export class NotificationService {
       for (const key of storageKeys) {
         const storedData = localStorage.getItem(key);
         if (storedData) {
-          let notifications: Notification[] = JSON.parse(storedData);
+          const notifications: Notification[] = JSON.parse(storedData);
           const filteredNotifications = notifications.filter(n => n.id !== notificationId);
           
           if (notifications.length !== filteredNotifications.length) {
@@ -644,7 +644,7 @@ export class NotificationService {
       for (const key of storageKeys) {
         const storedData = localStorage.getItem(key);
         if (storedData) {
-          let notifications: Notification[] = JSON.parse(storedData);
+          const notifications: Notification[] = JSON.parse(storedData);
           const validNotifications = notifications.filter(n => 
             !n.expiresAt || new Date(n.expiresAt).toISOString() >= now
           );
