@@ -28,6 +28,7 @@ app.use((req, res, next) => {
 
 // Debug API endpoint
 app.get('/api/debug-api-health', (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
   res.json({ 
     status: 'ok',
     message: 'API server is running correctly',
@@ -36,7 +37,7 @@ app.get('/api/debug-api-health', (req, res) => {
 });
 
 // HR Course regenerate endpoint with improved handling
-app.post('/api/hr/courses/regenerate-content', (req, res) => {
+app.all('/api/hr/courses/regenerate-content', (req, res) => {
   try {
     console.log('[Express Server] Handling regenerate-content request');
     
@@ -46,8 +47,13 @@ app.post('/api/hr/courses/regenerate-content', (req, res) => {
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     res.setHeader('Content-Type', 'application/json');
     
+    // Handle OPTIONS request for CORS preflight
+    if (req.method === 'OPTIONS') {
+      return res.status(204).end();
+    }
+    
     // Use the existing handler logic
-    const courseId = req.body?.courseId;
+    const courseId = req.method === 'GET' ? req.query.courseId : req.body?.courseId;
     
     if (!courseId) {
       return res.status(400).json({ 
@@ -79,7 +85,7 @@ app.post('/api/hr/courses/regenerate-content', (req, res) => {
 });
 
 // Simplified endpoint with direct handler
-app.post('/api/hr-course-regenerate', (req, res) => {
+app.all('/api/hr-course-regenerate', (req, res) => {
   try {
     console.log('[Express Server] Handling hr-course-regenerate request');
     
@@ -89,54 +95,13 @@ app.post('/api/hr-course-regenerate', (req, res) => {
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-CSRF-Token');
     
-    // Extract course ID from query params or body
-    const courseId = req.body?.courseId || req.query.courseId;
-      
-    if (!courseId) {
-      console.log(`[API Server] Missing courseId parameter`);
-      return res.status(400).json({
-        error: 'Missing required parameter: courseId',
-        success: false
-      });
+    // Handle OPTIONS request for CORS preflight
+    if (req.method === 'OPTIONS') {
+      return res.status(204).end();
     }
     
-    // Generate a unique job ID for tracking
-    const jobId = `job_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-    
-    // Return a successful response with job ID for tracking
-    console.log(`[API Server] Returning success response with job ID: ${jobId}`);
-    return res.status(200).json({
-      success: true,
-      message: 'Course content regeneration request received',
-      job_id: jobId,
-      timestamp: new Date().toISOString(),
-      course: {
-        id: courseId,
-        status: 'regenerating'
-      }
-    });
-  } catch (error) {
-    console.error(`[API Server] Error:`, error);
-    return res.status(500).json({
-      error: 'Failed to process request',
-      message: error?.message || 'Unknown error',
-      success: false
-    });
-  }
-});
-
-app.get('/api/hr-course-regenerate', (req, res) => {
-  console.log('[Express Server] Handling hr-course-regenerate GET request');
-  
-  try {
-    // Always set proper content type and CORS headers
-    res.setHeader('Content-Type', 'application/json');
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-CSRF-Token');
-    
-    // Extract course ID from query params
-    const courseId = req.query.courseId;
+    // Extract course ID from query params or body
+    const courseId = req.method === 'GET' ? req.query.courseId : req.body?.courseId;
       
     if (!courseId) {
       console.log(`[API Server] Missing courseId parameter`);
@@ -173,6 +138,7 @@ app.get('/api/hr-course-regenerate', (req, res) => {
 
 // Fallback for all other routes
 app.use((req, res) => {
+  res.setHeader('Content-Type', 'application/json');
   res.status(404).json({
     error: 'Not Found',
     message: `Endpoint ${req.method} ${req.path} does not exist`
