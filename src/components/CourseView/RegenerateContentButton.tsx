@@ -177,15 +177,21 @@ export function RegenerateContentButton({ courseId, onSuccess, onError }: Regene
                 hint: mappingError.hint,
                 code: mappingError.code,
               });
-              // Log specific toast for 404 potentially due to RLS or missing table
-              if (mappingError.code === 'PGRST116' || mappingError.message.includes('404')) { 
-                toast({
-                  title: "Configuration Issue?",
-                  description: "Could not retrieve employee mapping (employee_user_mapping). Please check table existence and RLS policies in Supabase.",
-                  variant: "warning", // Use warning variant
-                });
+              
+              // Try direct approach with employees table
+              const { data: employeeData, error: employeeError } = await supabase
+                .from('employees')
+                .select('id')
+                .eq('user_id', userId)
+                .maybeSingle();
+                
+              if (!employeeError && employeeData?.id) {
+                employeeId = employeeData.id;
+                console.log(`[${requestId}] ✅ Found employee ID directly from employees table: ${employeeId}`);
+              } else {
+                // Do not throw an error here, proceed using userId as employeeId fallback
+                console.log(`[${requestId}] ℹ️ Could not find employee in 'employees' table, using user ID as fallback`);
               }
-              // Do not throw an error here, proceed using userId as employeeId fallback
             } else if (employeeMapping?.employee_id) {
               employeeId = employeeMapping.employee_id;
               console.log(`[${requestId}] ✅ Successfully mapped user ${userId} to employee ${employeeId}`);
@@ -238,7 +244,8 @@ export function RegenerateContentButton({ courseId, onSuccess, onError }: Regene
       }
       
       // Try the legacy API endpoint first - more reliable in production
-      const legacyEndpoint = '/api/hr/courses/regenerate-content';
+      const baseDomain = window.location.origin;
+      const legacyEndpoint = `${baseDomain}/api/hr/courses/regenerate-content`;
       console.log(`[${requestId}] 🚀 Calling ${legacyEndpoint} with auth token`, {
         method: 'POST',
         courseId,
@@ -305,7 +312,7 @@ export function RegenerateContentButton({ courseId, onSuccess, onError }: Regene
           const freshToken = tokenData?.session?.access_token || authToken;
           
           // Try the API with token in query parameter as fallback
-          const fallbackUrl = `/api/hr/courses/regenerate-content?access_token=${encodeURIComponent(freshToken)}`;
+          const fallbackUrl = `${baseDomain}/api/hr/courses/regenerate-content?access_token=${encodeURIComponent(freshToken)}`;
           console.log(`[${requestId}] 🚀 Attempting fallback request to:`, {
             endpoint: fallbackUrl,
             method: 'POST',
