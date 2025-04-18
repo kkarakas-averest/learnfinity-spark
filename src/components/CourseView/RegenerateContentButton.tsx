@@ -9,6 +9,27 @@ import PersonalizedContentGenerationStatus from '@/components/courses/Personaliz
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useSupabase } from '@/components/providers/supabase-provider';
 
+// Determine the correct base URL for API calls
+const getApiBaseUrl = () => {
+  // In browser environments
+  if (typeof window !== 'undefined') {
+    // For production Vercel deployments
+    if (process.env.NEXT_PUBLIC_VERCEL_ENV === 'production') {
+      return process.env.NEXT_PUBLIC_API_BASE_URL || 'https://learnfinity-spark.vercel.app';
+    }
+    // For preview Vercel deployments
+    if (process.env.NEXT_PUBLIC_VERCEL_ENV === 'preview') {
+      return process.env.NEXT_PUBLIC_VERCEL_URL ? 
+        `https://${process.env.NEXT_PUBLIC_VERCEL_URL}` : 
+        window.location.origin;
+    }
+    // Default to current origin (works for local dev and other cases)
+    return window.location.origin;
+  }
+  // Server-side fallback
+  return process.env.NEXT_PUBLIC_API_BASE_URL || '';
+};
+
 interface RegenerateContentButtonProps {
   courseId: string;
   onSuccess?: () => void;
@@ -162,49 +183,103 @@ export function RegenerateContentButton({ courseId, onSuccess, onError }: Regene
         if (userId) {
           // First try to get employee ID from user_employee_mappings
           let employeeId = userId; // Default to userId if mapping fails or doesn't exist
+          let mappingMethod = 'user_id_fallback'; // Track which method was used
+          
           try {
             console.log(`[${requestId}] 🔗 Attempting to fetch employee mapping for user: ${userId}`);
-            const { data: employeeMapping, error: mappingError } = await supabase
-              .from('employee_user_mapping')
-              .select('employee_id')
-              .eq('user_id', userId)
-              .maybeSingle();
-
-            if (mappingError) {
-              console.error(`[${requestId}] ❌ Supabase Error fetching employee_user_mapping:`, {
-                message: mappingError.message,
-                details: mappingError.details,
-                hint: mappingError.hint,
-                code: mappingError.code,
-              });
-              
-              // Try direct approach with employees table
-              const { data: employeeData, error: employeeError } = await supabase
-                .from('employees')
-                .select('id')
+            
+            // APPROACH 1: Direct mapping table query via Supabase client
+            try {
+              const { data: employeeMapping, error: mappingError } = await supabase
+                .from('employee_user_mapping')
+                .select('employee_id')
                 .eq('user_id', userId)
                 .maybeSingle();
+
+              if (mappingError) {
+                console.error(`[${requestId}] ❌ Supabase Error fetching employee_user_mapping:`, {
+                  message: mappingError.message,
+                  details: mappingError.details,
+                  hint: mappingError.hint,
+                  code: mappingError.code,
+                });
                 
-              if (!employeeError && employeeData?.id) {
-                employeeId = employeeData.id;
-                console.log(`[${requestId}] ✅ Found employee ID directly from employees table: ${employeeId}`);
-              } else {
-                // Do not throw an error here, proceed using userId as employeeId fallback
-                console.log(`[${requestId}] ℹ️ Could not find employee in 'employees' table, using user ID as fallback`);
+                // Continue to next approach
+              } else if (employeeMapping?.employee_id) {
+                employeeId = employeeMapping.employee_id;
+                mappingMethod = 'mapping_table_direct';
+                console.log(`[${requestId}] ✅ Successfully mapped user ${userId} to employee ${employeeId} via direct query`);
               }
-            } else if (employeeMapping?.employee_id) {
-              employeeId = employeeMapping.employee_id;
-              console.log(`[${requestId}] ✅ Successfully mapped user ${userId} to employee ${employeeId}`);
-            } else {
-              console.log(`[${requestId}] ℹ️ No employee mapping found for user ${userId}, using user ID as employee ID.`);
+            } catch (directMappingError) {
+              console.error(`[${requestId}] 💥 Exception during direct mapping fetch:`, directMappingError);
+              // Continue to next approach
             }
+            
+            // APPROACH 2: Try direct approach with employees table if mapping failed
+            if (mappingMethod === 'user_id_fallback') {
+              try {
+                const { data: employeeData, error: employeeError } = await supabase
+                  .from('employees')
+                  .select('id')
+                  .eq('user_id', userId)
+                  .maybeSingle();
+                  
+                if (!employeeError && employeeData?.id) {
+                  employeeId = employeeData.id;
+                  mappingMethod = 'employees_table';
+                  console.log(`[${requestId}] ✅ Found employee ID directly from employees table: ${employeeId}`);
+                } else {
+                  console.log(`[${requestId}] ℹ️ Could not find employee in 'employees' table, trying server-side API`);
+                }
+              } catch (employeeTableError) {
+                console.error(`[${requestId}] 💥 Exception querying employees table:`, employeeTableError);
+                // Continue to next approach
+              }
+            }
+            
+            // APPROACH 3: Try server API endpoint with service role access
+            if (mappingMethod === 'user_id_fallback') {
+              try {
+                const apiBase = getApiBaseUrl();
+                const serverMappingEndpoint = `${apiBase}/api/user/get-employee-mapping?userId=${encodeURIComponent(userId)}`;
+                console.log(`[${requestId}] 🔍 Attempting server-side mapping lookup at: ${serverMappingEndpoint}`);
+                
+                const mappingResponse = await fetch(serverMappingEndpoint, {
+                  method: 'GET',
+                  headers: {
+                    'Authorization': `Bearer ${authToken}`,
+                    'Content-Type': 'application/json'
+                  }
+                });
+                
+                if (mappingResponse.ok) {
+                  const mappingData = await mappingResponse.json();
+                  if (mappingData.employeeId) {
+                    employeeId = mappingData.employeeId;
+                    mappingMethod = 'server_api';
+                    console.log(`[${requestId}] ✅ Retrieved employee mapping via server API: ${employeeId}`);
+                  }
+                } else {
+                  console.warn(`[${requestId}] ⚠️ Server mapping API returned error: ${mappingResponse.status}`);
+                }
+              } catch (serverApiError) {
+                console.error(`[${requestId}] 💥 Exception calling server mapping API:`, serverApiError);
+                // Continue with fallback
+              }
+            }
+            
+            // Fallback if all approaches failed
+            if (mappingMethod === 'user_id_fallback') {
+              console.log(`[${requestId}] ℹ️ All mapping approaches failed. Using user ID as employee ID: ${userId}`);
+            }
+            
           } catch (mappingCatchError) {
               console.error(`[${requestId}] 💥 Exception during employee mapping fetch:`, mappingCatchError);
               // Proceed using userId as employeeId fallback
           }
 
           // Check for existing pending or in-progress jobs using the determined employeeId
-          console.log(`[${requestId}] 🔍 Checking for existing jobs for course ${courseId} and employee ${employeeId}`);
+          console.log(`[${requestId}] 🔍 Checking for existing jobs for course ${courseId} and employee ${employeeId} (mapping method: ${mappingMethod})`);
           const { data: existingJobs, error: jobCheckError } = await supabase
             .from('content_generation_jobs')
             .select('*')
@@ -243,85 +318,111 @@ export function RegenerateContentButton({ courseId, onSuccess, onError }: Regene
         // Continue with job creation anyway if check fails
       }
       
-      // Try the legacy API endpoint first - more reliable in production
-      const baseDomain = window.location.origin;
-      const legacyEndpoint = `${baseDomain}/api/hr/courses/regenerate-content`;
-      console.log(`[${requestId}] 🚀 Calling ${legacyEndpoint} with auth token`, {
-        method: 'POST',
-        courseId,
-        endpoint: legacyEndpoint,
-        authTokenLength: authToken.length,
-        authTokenPrefix: authToken.substring(0, 10) + '...'
-      });
+      // Get the correct API base URL based on environment
+      const apiBase = getApiBaseUrl();
+      console.log(`[${requestId}] 🌐 Using API base URL: ${apiBase}`);
       
-      const requestStartTime = Date.now();
-      const response = await fetch(legacyEndpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authToken}`
-        },
-        body: JSON.stringify({
-          courseId,
-          forceRegenerate: true,
-          access_token: authToken,  // Include in body as fallback
-        }),
-        credentials: 'include',
-      });
-      const requestDuration = Date.now() - requestStartTime;
+      // Try multiple API endpoints in sequence, with fallbacks
+      let apiResponse = null;
+      let responseData = null;
       
-      // Detailed error logging
-      if (!response.ok) {
-        const errorBody = await response.text();
-        let errorJson: any = {};
-        try { errorJson = JSON.parse(errorBody); } catch { /* ignore json parse error */ }
-
-        console.error(`[${requestId}] ❌ API Error (${response.status}) calling ${legacyEndpoint}:`, {
-          status: response.status,
-          statusText: response.statusText,
-          responseBody: errorBody,
-          endpoint: legacyEndpoint,
-          courseId,
-          requestDuration: `${requestDuration}ms`,
-        });
-
-        // Use toast for user feedback
-        toast({
-          title: `API Error (${response.status})`,
-          description: errorJson?.error || errorJson?.message || `Failed to start regeneration. Status: ${response.statusText || response.status}`,
-          variant: "destructive",
-        });
-
-        // For 401 errors, try alternative auth method
-        if (response.status === 401) {
-          console.log(`[${requestId}] 🔄 Authentication failed (401), trying alternative approach...`);
-          
-          // Get a fresh token if available
-          console.log(`[${requestId}] 🔐 Requesting fresh auth token`);
-          const { data: tokenData, error: freshTokenError } = await supabase.auth.getSession();
-          
-          if (freshTokenError) {
-            console.error(`[${requestId}] ❌ Fresh token retrieval failed:`, {
-              error: freshTokenError,
-              errorCode: freshTokenError.code,
-              errorMessage: freshTokenError.message,
-              stack: freshTokenError.stack
-            });
-          }
-          
-          const freshToken = tokenData?.session?.access_token || authToken;
-          
-          // Try the API with token in query parameter as fallback
-          const fallbackUrl = `${baseDomain}/api/hr/courses/regenerate-content?access_token=${encodeURIComponent(freshToken)}`;
-          console.log(`[${requestId}] 🚀 Attempting fallback request to:`, {
-            endpoint: fallbackUrl,
-            method: 'POST',
+      // ATTEMPT 1: Standard API endpoint
+      const standardEndpoint = `${apiBase}/api/hr/courses/regenerate-content`;
+      console.log(`[${requestId}] 🚀 Calling standard endpoint: ${standardEndpoint}`);
+      
+      try {
+        const requestStartTime = Date.now();
+        const response = await fetch(standardEndpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({
             courseId,
-            usingFreshToken: !!tokenData?.session?.access_token,
-            tokenLength: freshToken.length,
-            tokenPrefix: freshToken.substring(0, 10) + '...'
+            forceRegenerate: true,
+            access_token: authToken,  // Include in body as fallback
+          }),
+          credentials: 'include',
+        });
+        const requestDuration = Date.now() - requestStartTime;
+        
+        if (response.ok) {
+          apiResponse = response;
+          responseData = await response.json();
+          console.log(`[${requestId}] ✅ Standard API call successful in ${requestDuration}ms`);
+        } else {
+          const errorBody = await response.text();
+          console.error(`[${requestId}] ❌ Standard API Error (${response.status}):`, {
+            status: response.status,
+            statusText: response.statusText,
+            responseBody: errorBody,
+            endpoint: standardEndpoint,
+            requestDuration: `${requestDuration}ms`,
           });
           
+          // Continue to next attempt
+        }
+      } catch (standardApiError) {
+        console.error(`[${requestId}] 💥 Exception during standard API call:`, standardApiError);
+        // Continue to next attempt
+      }
+      
+      // ATTEMPT 2: Try alternative endpoint if standard failed
+      if (!apiResponse) {
+        const alternativeEndpoint = `${apiBase}/api/courses/regenerate`;
+        console.log(`[${requestId}] 🚀 Trying alternative endpoint: ${alternativeEndpoint}`);
+        
+        try {
+          const altStartTime = Date.now();
+          const altResponse = await fetch(alternativeEndpoint, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({
+              courseId,
+              forceRegenerate: true,
+              access_token: authToken,
+            }),
+            credentials: 'include',
+          });
+          const altDuration = Date.now() - altStartTime;
+          
+          if (altResponse.ok) {
+            apiResponse = altResponse;
+            responseData = await altResponse.json();
+            console.log(`[${requestId}] ✅ Alternative API call successful in ${altDuration}ms`);
+          } else {
+            const altErrorBody = await altResponse.text();
+            console.error(`[${requestId}] ❌ Alternative API Error (${altResponse.status}):`, {
+              status: altResponse.status,
+              statusText: altResponse.statusText,
+              responseBody: altErrorBody,
+              endpoint: alternativeEndpoint,
+              requestDuration: `${altDuration}ms`,
+            });
+            
+            // Continue to next attempt
+          }
+        } catch (altApiError) {
+          console.error(`[${requestId}] 💥 Exception during alternative API call:`, altApiError);
+          // Continue to next attempt
+        }
+      }
+      
+      // ATTEMPT 3: Try fallback with query parameter auth if prior attempts failed
+      if (!apiResponse) {
+        // Get a fresh token if available
+        console.log(`[${requestId}] 🔐 Requesting fresh auth token for fallback`);
+        const { data: tokenData } = await supabase.auth.getSession();
+        const freshToken = tokenData?.session?.access_token || authToken;
+        
+        const fallbackUrl = `${apiBase}/api/hr/courses/regenerate-content?access_token=${encodeURIComponent(freshToken)}`;
+        console.log(`[${requestId}] 🚀 Attempting fallback request to: ${fallbackUrl}`);
+          
+        try {
           const fallbackStartTime = Date.now();
           const fallbackResponse = await fetch(fallbackUrl, {
             method: 'POST',
@@ -336,90 +437,54 @@ export function RegenerateContentButton({ courseId, onSuccess, onError }: Regene
           });
           const fallbackDuration = Date.now() - fallbackStartTime;
           
-          if (!fallbackResponse.ok) {
-            const routerErrorDetails = await fallbackResponse.text();
-            let fallbackErrorJson: any = {};
-            try { fallbackErrorJson = JSON.parse(routerErrorDetails); } catch { /* ignore */ }
-
+          if (fallbackResponse.ok) {
+            apiResponse = fallbackResponse;
+            responseData = await fallbackResponse.json();
+            console.log(`[${requestId}] ✅ Fallback API call successful in ${fallbackDuration}ms`);
+          } else {
+            const fallbackErrorBody = await fallbackResponse.text();
             console.error(`[${requestId}] ❌ Fallback API Error (${fallbackResponse.status}):`, {
               status: fallbackResponse.status,
               statusText: fallbackResponse.statusText,
-              responseBody: routerErrorDetails,
+              responseBody: fallbackErrorBody,
               endpoint: fallbackUrl,
-              courseId,
               requestDuration: `${fallbackDuration}ms`,
             });
-
-            // Use toast for fallback error
-            toast({
-              title: `Fallback API Error (${fallbackResponse.status})`,
-              description: fallbackErrorJson?.error || fallbackErrorJson?.message || `Failed to regenerate content via fallback. Status: ${fallbackResponse.statusText || fallbackResponse.status}`,
-              variant: "destructive",
-            });
-
-            throw new Error(`Failed to regenerate content: ${fallbackResponse.statusText || fallbackResponse.status}`);
           }
+        } catch (fallbackApiError) {
+          console.error(`[${requestId}] 💥 Exception during fallback API call:`, fallbackApiError);
+        }
+      }
+      
+      // Handle the result of API attempts
+      if (apiResponse && responseData) {
+        console.log(`[${requestId}] ✅ Content regeneration successful:`, {
+          response: responseData
+        });
+        
+        // Show progress tracking
+        if (responseData.job_id) {
+          setJobId(responseData.job_id);
+          setShowProgressDialog(true);
           
-          const responseData = await fallbackResponse.json();
-          console.log(`[${requestId}] ✅ Content regeneration successful via fallback approach:`, {
-            response: responseData,
-            endpoint: fallbackUrl,
-            requestDuration: `${fallbackDuration}ms`,
-            courseId
-          });
-          
-          // Show progress tracking
-          if (responseData.job_id) {
-            setJobId(responseData.job_id);
-            setShowProgressDialog(true);
-            
-            // Manually trigger job processing
-            setTimeout(async () => {
-              await triggerJobProcessing(responseData.job_id);
-            }, 500);
-          }
-          
-          toast({
-            title: 'Course content regenerating',
-            description: 'Your personalized course content is being generated. This may take a moment.',
-          });
-          
-          if (onSuccess) {
-            onSuccess();
-          }
-          
-          return;
+          // Manually trigger job processing
+          setTimeout(async () => {
+            await triggerJobProcessing(responseData.job_id);
+          }, 500);
         }
         
-        throw new Error(`Failed to regenerate content: ${response.statusText}`);
-      }
-      
-      const responseData = await response.json();
-      console.log(`[${requestId}] ✅ Content regeneration successful:`, {
-        response: responseData,
-        endpoint: legacyEndpoint,
-        requestDuration: `${requestDuration}ms`,
-        courseId
-      });
-      
-      // Show progress tracking
-      if (responseData.job_id) {
-        setJobId(responseData.job_id);
-        setShowProgressDialog(true);
+        toast({
+          title: 'Course content regenerating',
+          description: 'Your personalized course content is being generated. This may take a moment.',
+        });
         
-        // Manually trigger job processing
-        setTimeout(async () => {
-          await triggerJobProcessing(responseData.job_id);
-        }, 500);
-      }
-      
-      toast({
-        title: 'Course content regenerating',
-        description: 'Your personalized course content is being generated. This may take a moment.',
-      });
-      
-      if (onSuccess) {
-        onSuccess();
+        if (onSuccess) {
+          onSuccess();
+        }
+      } else {
+        // All API attempts failed
+        console.error(`[${requestId}] ❌ All API attempts failed`);
+        throw new Error('Failed to regenerate content: All API endpoints failed. Please try again later.');
       }
     } catch (error) {
       console.error(`[${requestId}] 💥 Catch-all Error regenerating course content:`, {
@@ -437,16 +502,13 @@ export function RegenerateContentButton({ courseId, onSuccess, onError }: Regene
       });
       
       // Ensure a user-friendly toast is shown even for caught errors
-      // (unless it was already shown by specific handlers above)
-      if (!(error instanceof Error && error.message.includes("Failed to regenerate content"))) { // Avoid double-toast
-        toast({
-          title: 'Regeneration Error',
-          description: error instanceof Error 
-            ? error.message 
-            : 'An unexpected error occurred. Please try again.',
-          variant: 'destructive',
-        });
-      }
+      toast({
+        title: 'Regeneration Error',
+        description: error instanceof Error 
+          ? error.message 
+          : 'An unexpected error occurred. Please try again.',
+        variant: 'destructive',
+      });
       
       if (onError && error instanceof Error) {
         onError(error);
