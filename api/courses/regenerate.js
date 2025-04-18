@@ -17,6 +17,7 @@ const supabaseAdmin = process.env.SUPABASE_SERVICE_ROLE_KEY
 /**
  * Alternate API endpoint for regenerating course content
  * This serves as a fallback for the main regenerate-content endpoint
+ * Accepts both GET and POST requests
  */
 module.exports = async (req, res) => {
   // Enable CORS
@@ -30,13 +31,13 @@ module.exports = async (req, res) => {
     return res.status(200).end();
   }
 
-  // Only allow POST method
-  if (req.method !== 'POST') {
+  // Accept both GET and POST requests
+  if (req.method !== 'POST' && req.method !== 'GET') {
     return res.status(405).json({ error: `Method ${req.method} not allowed` });
   }
 
   const requestId = uuidv4().slice(0, 8);
-  console.log(`[${requestId}] ⚠️ [ALTERNATE-ENDPOINT] Using fallback course regeneration endpoint`);
+  console.log(`[${requestId}] ⚠️ [ALTERNATE-ENDPOINT] Using fallback course regeneration endpoint via ${req.method}`);
   
   try {
     // Get authentication token
@@ -66,8 +67,8 @@ module.exports = async (req, res) => {
       }
     }
     
-    // Check body for access token (last resort)
-    if (!userId && req.body) {
+    // Check body for access token (last resort) - only for POST
+    if (!userId && req.method === 'POST' && req.body) {
       const bodyToken = req.body.access_token;
       if (bodyToken) {
         const { data, error } = await supabase.auth.getUser(bodyToken);
@@ -83,8 +84,19 @@ module.exports = async (req, res) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
     
-    // Get request body
-    const { courseId, forceRegenerate = true } = req.body;
+    // Get parameters from either query (GET) or body (POST)
+    let courseId, forceRegenerate = true;
+    
+    if (req.method === 'GET') {
+      courseId = req.query.courseId;
+      forceRegenerate = req.query.forceRegenerate !== 'false';
+    } else {
+      // POST method
+      if (req.body) {
+        courseId = req.body.courseId;
+        forceRegenerate = req.body.forceRegenerate !== false;
+      }
+    }
     
     if (!courseId) {
       console.log(`[${requestId}] ❌ Missing courseId in request`);
@@ -157,7 +169,8 @@ module.exports = async (req, res) => {
           updated_at: new Date().toISOString(),
           metadata: {
             requested_by: userId,
-            alternate_endpoint: true
+            alternate_endpoint: true,
+            request_method: req.method
           }
         });
         

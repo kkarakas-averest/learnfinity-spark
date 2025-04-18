@@ -404,7 +404,36 @@ export function RegenerateContentButton({ courseId, onSuccess, onError }: Regene
               requestDuration: `${altDuration}ms`,
             });
             
-            // Continue to next attempt
+            // Try GET method for alternative endpoint if POST failed
+            console.log(`[${requestId}] 🔄 Trying alternative endpoint with GET method`);
+            try {
+              const getAltStartTime = Date.now();
+              const getAltResponse = await fetch(`${alternativeEndpoint}?courseId=${encodeURIComponent(courseId)}&access_token=${encodeURIComponent(authToken)}`, {
+                method: 'GET',
+                headers: {
+                  'Authorization': `Bearer ${authToken}`,
+                  'Accept': 'application/json'
+                }
+              });
+              const getAltDuration = Date.now() - getAltStartTime;
+              
+              if (getAltResponse.ok) {
+                apiResponse = getAltResponse;
+                responseData = await getAltResponse.json();
+                console.log(`[${requestId}] ✅ Alternative GET API call successful in ${getAltDuration}ms`);
+              } else {
+                const getAltErrorBody = await getAltResponse.text();
+                console.error(`[${requestId}] ❌ Alternative GET API Error (${getAltResponse.status}):`, {
+                  status: getAltResponse.status,
+                  statusText: getAltResponse.statusText,
+                  responseBody: getAltErrorBody,
+                  endpoint: `${alternativeEndpoint} (GET)`,
+                  requestDuration: `${getAltDuration}ms`,
+                });
+              }
+            } catch (getAltError) {
+              console.error(`[${requestId}] 💥 Exception during alternative GET API call:`, getAltError);
+            }
           }
         } catch (altApiError) {
           console.error(`[${requestId}] 💥 Exception during alternative API call:`, altApiError);
@@ -419,6 +448,7 @@ export function RegenerateContentButton({ courseId, onSuccess, onError }: Regene
         const { data: tokenData } = await supabase.auth.getSession();
         const freshToken = tokenData?.session?.access_token || authToken;
         
+        // Try POST first
         const fallbackUrl = `${apiBase}/api/hr/courses/regenerate-content?access_token=${encodeURIComponent(freshToken)}`;
         console.log(`[${requestId}] 🚀 Attempting fallback request to: ${fallbackUrl}`);
           
@@ -450,6 +480,37 @@ export function RegenerateContentButton({ courseId, onSuccess, onError }: Regene
               endpoint: fallbackUrl,
               requestDuration: `${fallbackDuration}ms`,
             });
+            
+            // Try GET as a last resort
+            console.log(`[${requestId}] 🔄 Trying main endpoint with GET method as final attempt`);
+            try {
+              const getFallbackUrl = `${apiBase}/api/hr/courses/regenerate-content?courseId=${encodeURIComponent(courseId)}&access_token=${encodeURIComponent(freshToken)}`;
+              const getFallbackStartTime = Date.now();
+              const getFallbackResponse = await fetch(getFallbackUrl, {
+                method: 'GET',
+                headers: {
+                  'Accept': 'application/json'
+                }
+              });
+              const getFallbackDuration = Date.now() - getFallbackStartTime;
+              
+              if (getFallbackResponse.ok) {
+                apiResponse = getFallbackResponse;
+                responseData = await getFallbackResponse.json();
+                console.log(`[${requestId}] ✅ GET Fallback API call successful in ${getFallbackDuration}ms`);
+              } else {
+                const getFallbackErrorBody = await getFallbackResponse.text();
+                console.error(`[${requestId}] ❌ GET Fallback API Error (${getFallbackResponse.status}):`, {
+                  status: getFallbackResponse.status,
+                  statusText: getFallbackResponse.statusText,
+                  responseBody: getFallbackErrorBody,
+                  endpoint: getFallbackUrl,
+                  requestDuration: `${getFallbackDuration}ms`
+                });
+              }
+            } catch (getFallbackError) {
+              console.error(`[${requestId}] 💥 Exception during GET fallback API call:`, getFallbackError);
+            }
           }
         } catch (fallbackApiError) {
           console.error(`[${requestId}] 💥 Exception during fallback API call:`, fallbackApiError);

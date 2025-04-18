@@ -31,6 +31,7 @@ const logWithTimestamp = (message, data, requestId) => {
 /**
  * API endpoint to regenerate personalized course content
  * This is the Vercel serverless function version
+ * Accepts both GET and POST requests
  */
 module.exports = async (req, res) => {
   // Enable CORS
@@ -44,13 +45,13 @@ module.exports = async (req, res) => {
     return res.status(200).end();
   }
 
-  // Only allow POST method
-  if (req.method !== 'POST') {
+  // Accept both GET and POST requests
+  if (req.method !== 'POST' && req.method !== 'GET') {
     return res.status(405).json({ error: `Method ${req.method} not allowed` });
   }
 
   const requestId = uuidv4().slice(0, 8); // Generate a short request ID for tracing
-  logWithTimestamp(`📩 Request received`, undefined, requestId);
+  logWithTimestamp(`📩 Request received via ${req.method}`, undefined, requestId);
   
   try {
     // Initialize user ID and session variables
@@ -94,8 +95,8 @@ module.exports = async (req, res) => {
       }
     }
     
-    // If not found in query, try in body
-    if (!userId && req.body) {
+    // If not found in query, try in body for POST requests
+    if (!userId && req.method === 'POST' && req.body) {
       const bodyToken = req.body.access_token;
       
       if (bodyToken) {
@@ -120,8 +121,26 @@ module.exports = async (req, res) => {
       });
     }
 
-    // Parse request body
-    const { courseId, forceRegenerate = true, personalizationOptions = {} } = req.body;
+    // Get parameters from either query (GET) or body (POST)
+    let courseId, forceRegenerate = true, personalizationOptions = {};
+    
+    if (req.method === 'GET') {
+      courseId = req.query.courseId;
+      forceRegenerate = req.query.forceRegenerate !== 'false'; // Default to true unless explicitly set to false
+      try {
+        personalizationOptions = req.query.personalizationOptions ? JSON.parse(req.query.personalizationOptions) : {};
+      } catch (e) {
+        // If parsing fails, use empty object
+        personalizationOptions = {};
+      }
+    } else {
+      // POST method - get from body
+      if (req.body) {
+        courseId = req.body.courseId;
+        forceRegenerate = req.body.forceRegenerate !== false; // Default to true unless explicitly set to false
+        personalizationOptions = req.body.personalizationOptions || {};
+      }
+    }
     
     if (!courseId) {
       logWithTimestamp(`❌ Missing courseId in request`, undefined, requestId);

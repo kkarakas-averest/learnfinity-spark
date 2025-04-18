@@ -20,6 +20,22 @@ const supabaseAdmin = process.env.SUPABASE_SERVICE_ROLE_KEY
  * GET /api/user/get-employee-mapping
  */
 module.exports = async (req, res) => {
+  // Enable CORS
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
+  res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization');
+
+  // Handle OPTIONS request
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
+  // Only allow GET method
+  if (req.method !== 'GET') {
+    return res.status(405).json({ error: `Method ${req.method} not allowed` });
+  }
+
   const requestId = uuidv4().slice(0, 8);
   const userId = req.query.userId;
   
@@ -34,18 +50,37 @@ module.exports = async (req, res) => {
   const authHeader = req.headers.authorization || '';
   let isAuthenticated = false;
   
+  // Check Bearer token in Authorization header
   if (authHeader.startsWith('Bearer ')) {
     const token = authHeader.substring(7);
     try {
       const { data, error } = await supabase.auth.getUser(token);
       if (data?.user && !error) {
         isAuthenticated = true;
+        console.log(`[${requestId}] ✅ get-employee-mapping: Authenticated via Bearer token`);
       }
     } catch (error) {
       console.error(`[${requestId}] ❌ get-employee-mapping: Auth error`, error);
     }
   }
   
+  // Try URL access token as fallback
+  if (!isAuthenticated) {
+    const accessToken = req.query.access_token;
+    if (accessToken) {
+      try {
+        const { data, error } = await supabase.auth.getUser(accessToken);
+        if (data?.user && !error) {
+          isAuthenticated = true;
+          console.log(`[${requestId}] ✅ get-employee-mapping: Authenticated via URL token`);
+        }
+      } catch (error) {
+        console.error(`[${requestId}] ❌ get-employee-mapping: URL token auth error`, error);
+      }
+    }
+  }
+  
+  // If auth check is enabled but auth failed
   if (!isAuthenticated) {
     console.log(`[${requestId}] ❌ get-employee-mapping: Unauthorized request`);
     return res.status(401).json({ error: 'Unauthorized' });
