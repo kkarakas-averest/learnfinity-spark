@@ -517,6 +517,105 @@ export function RegenerateContentButton({ courseId, onSuccess, onError }: Regene
         }
       }
       
+      // ATTEMPT 4: Try our simplified flatter path endpoint
+      if (!apiResponse) {
+        const simplifiedEndpoint = `${apiBase}/api/hr-course-regenerate`;
+        console.log(`[${requestId}] 🚀 Trying simplified endpoint: ${simplifiedEndpoint}`);
+        
+        try {
+          const simplifiedStartTime = Date.now();
+          const simplifiedResponse = await fetch(simplifiedEndpoint, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({
+              courseId,
+              access_token: authToken,
+            }),
+            credentials: 'include',
+          });
+          const simplifiedDuration = Date.now() - simplifiedStartTime;
+          
+          if (simplifiedResponse.ok) {
+            apiResponse = simplifiedResponse;
+            responseData = await simplifiedResponse.json();
+            console.log(`[${requestId}] ✅ Simplified endpoint call successful in ${simplifiedDuration}ms`);
+          } else {
+            const simplifiedErrorBody = await simplifiedResponse.text();
+            console.error(`[${requestId}] ❌ Simplified endpoint Error (${simplifiedResponse.status}):`, {
+              status: simplifiedResponse.status,
+              statusText: simplifiedResponse.statusText,
+              responseBody: simplifiedErrorBody,
+              endpoint: simplifiedEndpoint,
+              requestDuration: `${simplifiedDuration}ms`,
+            });
+            
+            // Try GET method as well
+            console.log(`[${requestId}] 🔄 Trying simplified endpoint with GET method`);
+            try {
+              const simplifiedGetUrl = `${simplifiedEndpoint}?courseId=${encodeURIComponent(courseId)}&access_token=${encodeURIComponent(authToken)}`;
+              const getSimplifiedStartTime = Date.now();
+              const getSimplifiedResponse = await fetch(simplifiedGetUrl, {
+                method: 'GET',
+                headers: {
+                  'Accept': 'application/json'
+                }
+              });
+              const getSimplifiedDuration = Date.now() - getSimplifiedStartTime;
+              
+              if (getSimplifiedResponse.ok) {
+                apiResponse = getSimplifiedResponse;
+                responseData = await getSimplifiedResponse.json();
+                console.log(`[${requestId}] ✅ Simplified GET API call successful in ${getSimplifiedDuration}ms`);
+              } else {
+                const getSimplifiedErrorBody = await getSimplifiedResponse.text();
+                console.error(`[${requestId}] ❌ Simplified GET API Error (${getSimplifiedResponse.status}):`, {
+                  status: getSimplifiedResponse.status,
+                  statusText: getSimplifiedResponse.statusText,
+                  responseBody: getSimplifiedErrorBody,
+                  endpoint: `${simplifiedEndpoint} (GET)`,
+                  requestDuration: `${getSimplifiedDuration}ms`,
+                });
+              }
+            } catch (getSimplifiedError) {
+              console.error(`[${requestId}] 💥 Exception during simplified GET API call:`, getSimplifiedError);
+            }
+          }
+        } catch (simplifiedApiError) {
+          console.error(`[${requestId}] 💥 Exception during simplified API call:`, simplifiedApiError);
+        }
+      }
+      
+      // Try our test-api endpoint to diagnose if there's a general API routing issue
+      if (!apiResponse) {
+        const testApiEndpoint = `${apiBase}/api/test-api`;
+        console.log(`[${requestId}] 🔬 Trying test-api endpoint for diagnostics: ${testApiEndpoint}`);
+        
+        try {
+          const testApiResponse = await fetch(testApiEndpoint, {
+            method: 'GET',
+            headers: {
+              'Accept': 'application/json'
+            }
+          });
+          
+          if (testApiResponse.ok) {
+            const testData = await testApiResponse.json();
+            console.log(`[${requestId}] ✅ Test API is working:`, testData);
+            console.error(`[${requestId}] ⚠️ Test API works but course regeneration APIs fail - likely an issue with specific route configuration`);
+          } else {
+            console.error(`[${requestId}] ❌ Test API also fails - likely a general API routing issue:`, {
+              status: testApiResponse.status,
+              statusText: testApiResponse.statusText
+            });
+          }
+        } catch (testApiError) {
+          console.error(`[${requestId}] 💥 Exception during test API call:`, testApiError);
+        }
+      }
+      
       // Handle the result of API attempts
       if (apiResponse && responseData) {
         console.log(`[${requestId}] ✅ Content regeneration successful:`, {
