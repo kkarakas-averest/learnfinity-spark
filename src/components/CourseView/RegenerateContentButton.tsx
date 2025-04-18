@@ -136,6 +136,115 @@ export function RegenerateContentButton({ courseId, onSuccess, onError }: Regene
     }
   }, [supabase, toast]);
 
+  const getApiEndpoints = (baseUrl: string) => {
+    return [
+      // First priority: simplified flat path endpoint (most reliable in previews)
+      {
+        url: `${baseUrl}/api/hr-course-regenerate`,
+        method: 'POST',
+        description: 'Simplified endpoint'
+      },
+      // Second priority: standard API endpoint
+      {
+        url: `${baseUrl}/api/hr/courses/regenerate-content`,
+        method: 'POST',
+        description: 'Standard endpoint'
+      },
+      // Third priority: alternative endpoint
+      {
+        url: `${baseUrl}/api/courses/regenerate`,
+        method: 'POST',
+        description: 'Alternative endpoint'
+      },
+      // Fourth priority: GET method for simplified endpoint
+      {
+        url: `${baseUrl}/api/hr-course-regenerate`,
+        method: 'GET',
+        description: 'Simplified endpoint (GET)'
+      }
+    ];
+  };
+
+  const tryApiEndpoint = async (endpoint, authToken, body) => {
+    const requestId = `regen_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    console.log(`[${requestId}] 🚀 Calling ${endpoint.description}: ${endpoint.url}`);
+    
+    try {
+      const config: RequestInit = {
+        method: endpoint.method,
+        headers: {
+          'Accept': 'application/json',
+          'Cache-Control': 'no-cache, no-store',
+          'Pragma': 'no-cache'
+        },
+        credentials: 'include'
+      };
+      
+      // Add auth header if we have a token
+      if (authToken) {
+        config.headers['Authorization'] = `Bearer ${authToken}`;
+      }
+      
+      // Add body for POST requests
+      if (endpoint.method === 'POST') {
+        config.headers['Content-Type'] = 'application/json';
+        config.body = JSON.stringify(body);
+      }
+      
+      // For GET requests, append params to URL
+      let url = endpoint.url;
+      if (endpoint.method === 'GET') {
+        const params = new URLSearchParams();
+        if (courseId) params.append('courseId', courseId);
+        if (authToken) params.append('access_token', authToken);
+        params.append('_t', Date.now().toString()); // Cache buster
+        url = `${url}?${params.toString()}`;
+      }
+      
+      const response = await fetch(url, config);
+      
+      // Check if we got a successful response
+      if (!response.ok) {
+        console.log(`[${requestId}] ❌ ${endpoint.description} failed with status ${response.status}`);
+        
+        // Try to get error details from response
+        let errorText = '';
+        const contentType = response.headers.get('content-type');
+        
+        if (contentType && contentType.includes('application/json')) {
+          const errorData = await response.json();
+          errorText = JSON.stringify(errorData);
+        } else {
+          // Probably got HTML - this is our main issue
+          errorText = await response.text().then(text => 
+            text.length > 100 ? text.substring(0, 100) + '...' : text
+          );
+          console.log(`[${requestId}] ⚠️ Received non-JSON response: ${errorText}`);
+          throw new Error(`Server returned ${response.status} with non-JSON response`);
+        }
+        
+        throw new Error(`API returned ${response.status}: ${errorText}`);
+      }
+      
+      // Explicitly check for JSON content type
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        console.log(`[${requestId}] ⚠️ Response not JSON, content-type: ${contentType}`);
+        const text = await response.text();
+        console.log(`[${requestId}] ⚠️ Response body: ${text.substring(0, 100)}...`);
+        throw new Error('API returned non-JSON response');
+      }
+      
+      // Try to parse response as JSON
+      const data = await response.json();
+      console.log(`[${requestId}] ✅ ${endpoint.description} succeeded:`, data);
+      return { success: true, data };
+    } catch (error) {
+      console.log(`[${requestId}] 💥 ${endpoint.description} error:`, error);
+      return { success: false, error };
+    }
+  };
+
   const handleRegenerate = async () => {
     setIsLoading(true);
     const requestId = `regen_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
@@ -143,575 +252,93 @@ export function RegenerateContentButton({ courseId, onSuccess, onError }: Regene
     try {
       console.log(`[${requestId}] 🔄 Starting content regeneration for course:`, courseId);
       
-      // Get Supabase token directly - first approach
+      // Get Supabase token
       console.log(`[${requestId}] 🔐 Retrieving Supabase auth session`);
       const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
       
       if (sessionError) {
-        console.error(`[${requestId}] ❌ Auth Error: Failed to get Supabase session:`, {
-          error: sessionError,
-          errorCode: sessionError.code,
-          errorMessage: sessionError.message,
-          stack: sessionError.stack
-        });
+        console.error(`[${requestId}] ❌ Auth Error:`, sessionError);
+        throw new Error(`Authentication error: ${sessionError.message}`);
       }
       
-      // Authentication with multiple fallbacks
-      const authToken = 
-        sessionData?.session?.access_token || 
-        localStorage.getItem('supabase.auth.token');
+      const authToken = sessionData?.session?.access_token;
       
       if (!authToken) {
-        console.error(`[${requestId}] ❌ Auth Error: No authentication token available`, {
-          sessionExists: !!sessionData?.session,
-          localStorageTokenExists: !!localStorage.getItem('supabase.auth.token'),
-          courseId
-        });
-        throw new Error('Authentication error: No valid session found. Please sign in again.');
+        console.error(`[${requestId}] ❌ No authentication token available`);
+        throw new Error('Authentication required. Please sign in again.');
       }
       
       console.log(`[${requestId}] ✅ Authentication token retrieved successfully`);
       
-      // Check for existing pending or in-progress jobs first
-      try {
-        console.log(`[${requestId}] 🔍 Checking for existing jobs for this course`);
-        
-        // Get current user info to find employee ID
-        const { data: userData } = await supabase.auth.getUser();
-        const userId = userData?.user?.id;
-        
-        if (userId) {
-          // First try to get employee ID from user_employee_mappings
-          let employeeId = userId; // Default to userId if mapping fails or doesn't exist
-          let mappingMethod = 'user_id_fallback'; // Track which method was used
-          
-          try {
-            console.log(`[${requestId}] 🔗 Attempting to fetch employee mapping for user: ${userId}`);
-            
-            // APPROACH 1: Direct mapping table query via Supabase client
-            try {
-              const { data: employeeMapping, error: mappingError } = await supabase
-                .from('employee_user_mapping')
-                .select('employee_id')
-                .eq('user_id', userId)
-                .maybeSingle();
-
-              if (mappingError) {
-                console.error(`[${requestId}] ❌ Supabase Error fetching employee_user_mapping:`, {
-                  message: mappingError.message,
-                  details: mappingError.details,
-                  hint: mappingError.hint,
-                  code: mappingError.code,
-                });
-                
-                // Continue to next approach
-              } else if (employeeMapping?.employee_id) {
-                employeeId = employeeMapping.employee_id;
-                mappingMethod = 'mapping_table_direct';
-                console.log(`[${requestId}] ✅ Successfully mapped user ${userId} to employee ${employeeId} via direct query`);
-              }
-            } catch (directMappingError) {
-              console.error(`[${requestId}] 💥 Exception during direct mapping fetch:`, directMappingError);
-              // Continue to next approach
-            }
-            
-            // APPROACH 2: Try direct approach with employees table if mapping failed
-            if (mappingMethod === 'user_id_fallback') {
-              try {
-                const { data: employeeData, error: employeeError } = await supabase
-                  .from('employees')
-                  .select('id')
-                  .eq('user_id', userId)
-                  .maybeSingle();
-                  
-                if (!employeeError && employeeData?.id) {
-                  employeeId = employeeData.id;
-                  mappingMethod = 'employees_table';
-                  console.log(`[${requestId}] ✅ Found employee ID directly from employees table: ${employeeId}`);
-                } else {
-                  console.log(`[${requestId}] ℹ️ Could not find employee in 'employees' table, trying server-side API`);
-                }
-              } catch (employeeTableError) {
-                console.error(`[${requestId}] 💥 Exception querying employees table:`, employeeTableError);
-                // Continue to next approach
-              }
-            }
-            
-            // APPROACH 3: Try server API endpoint with service role access
-            if (mappingMethod === 'user_id_fallback') {
-              try {
-                const apiBase = getApiBaseUrl();
-                const serverMappingEndpoint = `${apiBase}/api/user/get-employee-mapping?userId=${encodeURIComponent(userId)}`;
-                console.log(`[${requestId}] 🔍 Attempting server-side mapping lookup at: ${serverMappingEndpoint}`);
-                
-                const mappingResponse = await fetch(serverMappingEndpoint, {
-                  method: 'GET',
-                  headers: {
-                    'Authorization': `Bearer ${authToken}`,
-                    'Content-Type': 'application/json'
-                  }
-                });
-                
-                if (mappingResponse.ok) {
-                  const mappingData = await mappingResponse.json();
-                  if (mappingData.employeeId) {
-                    employeeId = mappingData.employeeId;
-                    mappingMethod = 'server_api';
-                    console.log(`[${requestId}] ✅ Retrieved employee mapping via server API: ${employeeId}`);
-                  }
-                } else {
-                  console.warn(`[${requestId}] ⚠️ Server mapping API returned error: ${mappingResponse.status}`);
-                }
-              } catch (serverApiError) {
-                console.error(`[${requestId}] 💥 Exception calling server mapping API:`, serverApiError);
-                // Continue with fallback
-              }
-            }
-            
-            // Fallback if all approaches failed
-            if (mappingMethod === 'user_id_fallback') {
-              console.log(`[${requestId}] ℹ️ All mapping approaches failed. Using user ID as employee ID: ${userId}`);
-            }
-            
-          } catch (mappingCatchError) {
-              console.error(`[${requestId}] 💥 Exception during employee mapping fetch:`, mappingCatchError);
-              // Proceed using userId as employeeId fallback
-          }
-
-          // Check for existing pending or in-progress jobs using the determined employeeId
-          console.log(`[${requestId}] 🔍 Checking for existing jobs for course ${courseId} and employee ${employeeId} (mapping method: ${mappingMethod})`);
-          const { data: existingJobs, error: jobCheckError } = await supabase
-            .from('content_generation_jobs')
-            .select('*')
-            .eq('course_id', courseId)
-            .eq('employee_id', employeeId)
-            .in('status', ['pending', 'in_progress'])
-            .order('created_at', { ascending: false })
-            .limit(1);
-            
-          if (jobCheckError) {
-            console.warn(`[${requestId}] ⚠️ Error checking existing jobs:`, jobCheckError);
-          } else if (existingJobs && existingJobs.length > 0) {
-            const existingJob = existingJobs[0];
-            console.log(`[${requestId}] ✅ Found existing ${existingJob.status} job: ${existingJob.id}`);
-            
-            // Show progress dialog for existing job
-            setJobId(existingJob.id);
-            setShowProgressDialog(true);
-            
-            // Trigger job processing to ensure it continues
-            setTimeout(async () => {
-              await triggerJobProcessing(existingJob.id);
-            }, 500);
-            
-            toast({
-              title: 'Resuming Content Generation',
-              description: 'Found an existing job in progress. Resuming from where it left off.',
-            });
-            
-            setIsLoading(false);
-            return; // Exit early - no need to create a new job
-          }
-        }
-      } catch (checkError) {
-        console.warn(`[${requestId}] ⚠️ Error checking for existing jobs:`, checkError);
-        // Continue with job creation anyway if check fails
-      }
-      
-      // Get the correct API base URL based on environment
+      // Get API base URL
       const apiBase = getApiBaseUrl();
       console.log(`[${requestId}] 🌐 Using API base URL: ${apiBase}`);
       
-      // Try multiple API endpoints in sequence, with fallbacks
-      let apiResponse = null;
+      // Try multiple API endpoints in sequence until one succeeds
+      const endpoints = getApiEndpoints(apiBase);
+      let apiSuccess = false;
       let responseData = null;
       
-      // ATTEMPT 1: Standard API endpoint
-      const standardEndpoint = `${apiBase}/api/hr/courses/regenerate-content`;
-      console.log(`[${requestId}] 🚀 Calling standard endpoint: ${standardEndpoint}`);
-      
-      try {
-        const requestStartTime = Date.now();
-        const response = await fetch(standardEndpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${authToken}`
-          },
-          body: JSON.stringify({
-            courseId,
-            forceRegenerate: true,
-            access_token: authToken,  // Include in body as fallback
-          }),
-          credentials: 'include',
-        });
-        const requestDuration = Date.now() - requestStartTime;
-        
-        if (response.ok) {
-          // Check if the response is actually JSON
-          const contentType = response.headers.get('content-type');
-          if (contentType && contentType.includes('application/json')) {
-            apiResponse = response;
-            responseData = await response.json();
-            console.log(`[${requestId}] ✅ Standard API call successful in ${requestDuration}ms`);
-          } else {
-            // HTML response instead of JSON
-            const text = await response.text();
-            console.error(`[${requestId}] 💥 API returned non-JSON response:`, {
-              contentType,
-              responsePreview: text.substring(0, 150) + '...'
-            });
-            throw new Error('API returned HTML instead of JSON. This likely means the API endpoint is misconfigured.');
-          }
-        } else {
-          const errorBody = await response.text();
-          console.error(`[${requestId}] ❌ Standard API Error (${response.status}):`, {
-            status: response.status,
-            statusText: response.statusText,
-            responseBody: errorBody,
-            endpoint: standardEndpoint,
-            requestDuration: `${requestDuration}ms`,
-          });
-          
-          // Continue to next attempt
-        }
-      } catch (standardApiError) {
-        console.error(`[${requestId}] 💥 Exception during standard API call:`, standardApiError);
-        // Continue to next attempt
-      }
-      
-      // ATTEMPT 2: Try alternative endpoint if standard failed
-      if (!apiResponse) {
-        const alternativeEndpoint = `${apiBase}/api/courses/regenerate`;
-        console.log(`[${requestId}] 🚀 Trying alternative endpoint: ${alternativeEndpoint}`);
-        
-        try {
-          const altStartTime = Date.now();
-          const altResponse = await fetch(alternativeEndpoint, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${authToken}`
-            },
-            body: JSON.stringify({
-              courseId,
-              forceRegenerate: true,
-              access_token: authToken,
-            }),
-            credentials: 'include',
-          });
-          const altDuration = Date.now() - altStartTime;
-          
-          if (altResponse.ok) {
-            apiResponse = altResponse;
-            responseData = await altResponse.json();
-            console.log(`[${requestId}] ✅ Alternative API call successful in ${altDuration}ms`);
-          } else {
-            const altErrorBody = await altResponse.text();
-            console.error(`[${requestId}] ❌ Alternative API Error (${altResponse.status}):`, {
-              status: altResponse.status,
-              statusText: altResponse.statusText,
-              responseBody: altErrorBody,
-              endpoint: alternativeEndpoint,
-              requestDuration: `${altDuration}ms`,
-            });
-            
-            // Try GET method for alternative endpoint if POST failed
-            console.log(`[${requestId}] 🔄 Trying alternative endpoint with GET method`);
-            try {
-              const getAltStartTime = Date.now();
-              const getAltResponse = await fetch(`${alternativeEndpoint}?courseId=${encodeURIComponent(courseId)}&access_token=${encodeURIComponent(authToken)}`, {
-                method: 'GET',
-                headers: {
-                  'Authorization': `Bearer ${authToken}`,
-                  'Accept': 'application/json'
-                }
-              });
-              const getAltDuration = Date.now() - getAltStartTime;
-              
-              if (getAltResponse.ok) {
-                apiResponse = getAltResponse;
-                responseData = await getAltResponse.json();
-                console.log(`[${requestId}] ✅ Alternative GET API call successful in ${getAltDuration}ms`);
-              } else {
-                const getAltErrorBody = await getAltResponse.text();
-                console.error(`[${requestId}] ❌ Alternative GET API Error (${getAltResponse.status}):`, {
-                  status: getAltResponse.status,
-                  statusText: getAltResponse.statusText,
-                  responseBody: getAltErrorBody,
-                  endpoint: `${alternativeEndpoint} (GET)`,
-                  requestDuration: `${getAltDuration}ms`,
-                });
-              }
-            } catch (getAltError) {
-              console.error(`[${requestId}] 💥 Exception during alternative GET API call:`, getAltError);
-            }
-          }
-        } catch (altApiError) {
-          console.error(`[${requestId}] 💥 Exception during alternative API call:`, altApiError);
-          // Continue to next attempt
-        }
-      }
-      
-      // Check if we're getting HTML instead of JSON (common error with incorrect API routes)
-      const tryParseHtmlError = async (response) => {
-        try {
-          const text = await response.text();
-          if (text.includes('<!DOCTYPE html>')) {
-            console.error(`[${requestId}] 💥 Received HTML instead of JSON. This likely means the API route is not properly configured.`);
-            return true;
-          }
-          return false;
-        } catch (e) {
-          console.error(`[${requestId}] 💥 Error checking for HTML response:`, e);
-          return false;
-        }
-      };
-
-      // Fix the tryParseHtmlError function to return the parsed data if it's valid JSON
-      const tryParseJsonFromResponse = async (response) => {
-        try {
-          const text = await response.text();
-          if (text.includes('<!DOCTYPE html>')) {
-            console.error(`[${requestId}] 💥 Received HTML instead of JSON. This likely means the API route is not properly configured.`);
-            return { isHtml: true, data: null };
-          }
-          
-          try {
-            // Try to parse the text as JSON
-            const data = JSON.parse(text);
-            return { isHtml: false, data };
-          } catch (parseError) {
-            console.error(`[${requestId}] 💥 Response is not HTML but also not valid JSON:`, text.substring(0, 100));
-            return { isHtml: false, data: null };
-          }
-        } catch (e) {
-          console.error(`[${requestId}] 💥 Error checking for HTML response:`, e);
-          return { isHtml: false, data: null };
-        }
-      };
-      
-      // ATTEMPT 3: Try fallback with query parameter auth if prior attempts failed
-      if (!apiResponse) {
-        // Get a fresh token if available
-        console.log(`[${requestId}] 🔐 Requesting fresh auth token for fallback`);
-        const { data: tokenData } = await supabase.auth.getSession();
-        const freshToken = tokenData?.session?.access_token || authToken;
-        
-        // Try POST first
-        const fallbackUrl = `${apiBase}/api/hr/courses/regenerate-content?access_token=${encodeURIComponent(freshToken)}`;
-        console.log(`[${requestId}] 🚀 Attempting fallback request to: ${fallbackUrl}`);
-          
-        try {
-          const fallbackStartTime = Date.now();
-          const fallbackResponse = await fetch(fallbackUrl, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              courseId,
-              forceRegenerate: true,
-            }),
-            credentials: 'include',
-          });
-          const fallbackDuration = Date.now() - fallbackStartTime;
-          
-          if (fallbackResponse.ok) {
-            apiResponse = fallbackResponse;
-            responseData = await fallbackResponse.json();
-            console.log(`[${requestId}] ✅ Fallback API call successful in ${fallbackDuration}ms`);
-          } else {
-            const fallbackErrorBody = await fallbackResponse.text();
-            console.error(`[${requestId}] ❌ Fallback API Error (${fallbackResponse.status}):`, {
-              status: fallbackResponse.status,
-              statusText: fallbackResponse.statusText,
-              responseBody: fallbackErrorBody,
-              endpoint: fallbackUrl,
-              requestDuration: `${fallbackDuration}ms`,
-            });
-            
-            // Try GET as a last resort
-            console.log(`[${requestId}] 🔄 Trying main endpoint with GET method as final attempt`);
-            try {
-              const getFallbackUrl = `${apiBase}/api/hr/courses/regenerate-content?courseId=${encodeURIComponent(courseId)}&access_token=${encodeURIComponent(freshToken)}`;
-              const getFallbackStartTime = Date.now();
-              const getFallbackResponse = await fetch(getFallbackUrl, {
-                method: 'GET',
-                headers: {
-                  'Accept': 'application/json'
-                }
-              });
-              const getFallbackDuration = Date.now() - getFallbackStartTime;
-              
-              if (getFallbackResponse.ok) {
-                apiResponse = getFallbackResponse;
-                responseData = await getFallbackResponse.json();
-                console.log(`[${requestId}] ✅ GET Fallback API call successful in ${getFallbackDuration}ms`);
-              } else {
-                const getFallbackErrorBody = await getFallbackResponse.text();
-                console.error(`[${requestId}] ❌ GET Fallback API Error (${getFallbackResponse.status}):`, {
-                  status: getFallbackResponse.status,
-                  statusText: getFallbackResponse.statusText,
-                  responseBody: getFallbackErrorBody,
-                  endpoint: getFallbackUrl,
-                  requestDuration: `${getFallbackDuration}ms`
-                });
-              }
-            } catch (getFallbackError) {
-              console.error(`[${requestId}] 💥 Exception during GET fallback API call:`, getFallbackError);
-            }
-          }
-        } catch (fallbackApiError) {
-          console.error(`[${requestId}] 💥 Exception during fallback API call:`, fallbackApiError);
-        }
-      }
-      
-      // ATTEMPT 4: Try our simplified flatter path endpoint
-      if (!apiResponse) {
-        const simplifiedEndpoint = `${apiBase}/api/hr-course-regenerate`;
-        console.log(`[${requestId}] 🚀 Trying simplified endpoint: ${simplifiedEndpoint}`);
-        
-        try {
-          const simplifiedStartTime = Date.now();
-          const simplifiedResponse = await fetch(simplifiedEndpoint, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${authToken}`
-            },
-            body: JSON.stringify({
-              courseId,
-              access_token: authToken,
-            }),
-            credentials: 'include',
-          });
-          const simplifiedDuration = Date.now() - simplifiedStartTime;
-          
-          if (simplifiedResponse.ok) {
-            apiResponse = simplifiedResponse;
-            responseData = await simplifiedResponse.json();
-            console.log(`[${requestId}] ✅ Simplified endpoint call successful in ${simplifiedDuration}ms`);
-          } else {
-            const simplifiedErrorBody = await simplifiedResponse.text();
-            console.error(`[${requestId}] ❌ Simplified endpoint Error (${simplifiedResponse.status}):`, {
-              status: simplifiedResponse.status,
-              statusText: simplifiedResponse.statusText,
-              responseBody: simplifiedErrorBody,
-              endpoint: simplifiedEndpoint,
-              requestDuration: `${simplifiedDuration}ms`,
-            });
-            
-            // Try GET method as well
-            console.log(`[${requestId}] 🔄 Trying simplified endpoint with GET method`);
-            try {
-              const simplifiedGetUrl = `${simplifiedEndpoint}?courseId=${encodeURIComponent(courseId)}&access_token=${encodeURIComponent(authToken)}`;
-              const getSimplifiedStartTime = Date.now();
-              const getSimplifiedResponse = await fetch(simplifiedGetUrl, {
-                method: 'GET',
-                headers: {
-                  'Accept': 'application/json'
-                }
-              });
-              const getSimplifiedDuration = Date.now() - getSimplifiedStartTime;
-              
-              if (getSimplifiedResponse.ok) {
-                apiResponse = getSimplifiedResponse;
-                responseData = await getSimplifiedResponse.json();
-                console.log(`[${requestId}] ✅ Simplified GET API call successful in ${getSimplifiedDuration}ms`);
-              } else {
-                const getSimplifiedErrorBody = await getSimplifiedResponse.text();
-                console.error(`[${requestId}] ❌ Simplified GET API Error (${getSimplifiedResponse.status}):`, {
-                  status: getSimplifiedResponse.status,
-                  statusText: getSimplifiedResponse.statusText,
-                  responseBody: getSimplifiedErrorBody,
-                  endpoint: `${simplifiedEndpoint} (GET)`,
-                  requestDuration: `${getSimplifiedDuration}ms`,
-                });
-              }
-            } catch (getSimplifiedError) {
-              console.error(`[${requestId}] 💥 Exception during simplified GET API call:`, getSimplifiedError);
-            }
-          }
-        } catch (simplifiedApiError) {
-          console.error(`[${requestId}] 💥 Exception during simplified API call:`, simplifiedApiError);
-        }
-      }
-      
-      // Try our test-api endpoint to diagnose if there's a general API routing issue
-      if (!apiResponse) {
-        const testApiEndpoint = `${apiBase}/api/test-api`;
-        console.log(`[${requestId}] 🔬 Trying test-api endpoint for diagnostics: ${testApiEndpoint}`);
-        
-        try {
-          const testApiResponse = await fetch(testApiEndpoint, {
-            method: 'GET',
-            headers: {
-              'Accept': 'application/json'
-            }
-          });
-          
-          if (testApiResponse.ok) {
-            const testData = await testApiResponse.json();
-            console.log(`[${requestId}] ✅ Test API is working:`, testData);
-            console.error(`[${requestId}] ⚠️ Test API works but course regeneration APIs fail - likely an issue with specific route configuration`);
-          } else {
-            console.error(`[${requestId}] ❌ Test API also fails - likely a general API routing issue:`, {
-              status: testApiResponse.status,
-              statusText: testApiResponse.statusText
-            });
-          }
-        } catch (testApiError) {
-          console.error(`[${requestId}] 💥 Exception during test API call:`, testApiError);
-        }
-      }
-      
-      // Handle the result of API attempts
-      if (apiResponse && responseData) {
-        console.log(`[${requestId}] ✅ Content regeneration successful:`, {
-          response: responseData
-        });
-        
-        // Show progress tracking
-        if (responseData.job_id) {
-          setJobId(responseData.job_id);
-          setShowProgressDialog(true);
-          
-          // Manually trigger job processing
-          setTimeout(async () => {
-            await triggerJobProcessing(responseData.job_id);
-          }, 500);
-        }
-        
-        toast({
-          title: 'Course content regenerating',
-          description: 'Your personalized course content is being generated. This may take a moment.',
-        });
-        
-        if (onSuccess) {
-          onSuccess();
-        }
-      } else {
-        // All API attempts failed
-        console.error(`[${requestId}] ❌ All API attempts failed`);
-        throw new Error('Failed to regenerate content: All API endpoints failed. Please try again later.');
-      }
-    } catch (error) {
-      console.error(`[${requestId}] 💥 Catch-all Error regenerating course content:`, {
-        error: error instanceof Error ? {
-          name: error.name,
-          message: error.message,
-          stack: error.stack,
-        } : error,
+      const requestBody = {
         courseId,
-        timestamp: new Date().toISOString(),
-        browserInfo: {
-          userAgent: navigator.userAgent,
-          language: navigator.language,
+        forceRegenerate: true,
+        access_token: authToken,  // Include in body as fallback
+      };
+      
+      for (const endpoint of endpoints) {
+        const result = await tryApiEndpoint(endpoint, authToken, requestBody);
+        
+        if (result.success) {
+          apiSuccess = true;
+          responseData = result.data;
+          console.log(`[${requestId}] ✅ API call succeeded using ${endpoint.description}`);
+          break;
         }
+      }
+      
+      if (!apiSuccess || !responseData) {
+        // Try test API to diagnose if there's a general API routing issue
+        try {
+          const testApiEndpoint = `${apiBase}/api/debug-api-health`;
+          console.log(`[${requestId}] 🔬 Trying diagnostic test API: ${testApiEndpoint}`);
+          
+          const testResponse = await fetch(testApiEndpoint);
+          if (testResponse.ok) {
+            const testData = await testResponse.json();
+            console.log(`[${requestId}] ✅ Test API is working:`, testData);
+            throw new Error('Content regeneration API endpoints are not working, but test API is. This suggests an issue with specific route configuration.');
+          } else {
+            console.log(`[${requestId}] ❌ Test API also failed with status ${testResponse.status}`);
+            throw new Error('All API endpoints failing. This suggests a general API routing issue on the server.');
+          }
+        } catch (testError) {
+          console.error(`[${requestId}] 💥 Test API error:`, testError);
+          throw new Error('All API endpoints failed, including test endpoint. Please try again later.');
+        }
+      }
+      
+      // Show progress tracking
+      if (responseData.job_id) {
+        setJobId(responseData.job_id);
+        setShowProgressDialog(true);
+        
+        // Manually trigger job processing
+        setTimeout(async () => {
+          await triggerJobProcessing(responseData.job_id);
+        }, 500);
+      }
+      
+      toast({
+        title: 'Course content regenerating',
+        description: 'Your personalized course content is being generated. This may take a moment.',
       });
       
-      // Ensure a user-friendly toast is shown even for caught errors
+      if (onSuccess) {
+        onSuccess();
+      }
+    } catch (error) {
+      console.error(`[${requestId}] 💥 Error regenerating course content:`, error);
+      
       toast({
         title: 'Regeneration Error',
         description: error instanceof Error 
@@ -769,4 +396,4 @@ export function RegenerateContentButton({ courseId, onSuccess, onError }: Regene
       </Dialog>
     </>
   );
-} 
+}
