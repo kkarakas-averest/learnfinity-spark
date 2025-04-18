@@ -1,8 +1,7 @@
 {
   "version": 2,
-  "buildCommand": "next build",
-  "framework": "nextjs",
-  "outputDirectory": ".next",
+  "buildCommand": "pnpm run vercel-build",
+  "outputDirectory": "dist",
   "installCommand": "pnpm install --no-frozen-lockfile",
   "github": {
     "enabled": true,
@@ -52,6 +51,6 @@
     "GROQ_API_KEY": "${GROQ_API_KEY}",
     "NODE_ENV": "production",
     "VERCEL_DEPLOYMENT": "true",
-    "DEPLOYMENT_TIMESTAMP": "2024-06-13-revert-to-working-build"
+    "DEPLOYMENT_TIMESTAMP": "2024-06-18-fix-env-compatibility"
   }
 }

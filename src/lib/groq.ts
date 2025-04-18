@@ -3,16 +3,29 @@ const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
 // Environment variables - access both browser and server environments
 const getEnv = () => {
-  // Using Next.js environment variables instead of Vite
-  const NEXT_PUBLIC_GROQ_API_KEY = process.env.NEXT_PUBLIC_GROQ_API_KEY || '';
-  const NEXT_PUBLIC_ENABLE_LLM = process.env.NEXT_PUBLIC_ENABLE_LLM === 'true';
+  let viteGroqApiKey = '';
+  let viteEnableLlm = false;
+  
+  // Try to safely access import.meta.env (Vite environment)
+  try {
+    // @ts-ignore - Safely handle import.meta.env for both Vite and Next.js environments
+    if (typeof import.meta !== 'undefined' && import.meta.env) {
+      // @ts-ignore - Access Vite environment variables
+      viteGroqApiKey = import.meta.env.VITE_GROQ_API_KEY || '';
+      // @ts-ignore - Access Vite environment variables
+      viteEnableLlm = import.meta.env.VITE_ENABLE_LLM === 'true';
+    }
+  } catch (e) {
+    console.log('Access to import.meta.env failed, using process.env instead');
+  }
   
   // Check for server-side environment variables as fallback
-  const SERVER_API_KEY = typeof process !== 'undefined' ? process.env.GROQ_API_KEY : undefined;
+  const serverApiKey = typeof process !== 'undefined' && process.env ? 
+    (process.env.GROQ_API_KEY || process.env.NEXT_PUBLIC_GROQ_API_KEY || '') : '';
   
   return {
-    GROQ_API_KEY: NEXT_PUBLIC_GROQ_API_KEY || SERVER_API_KEY || '',
-    ENABLE_LLM: NEXT_PUBLIC_ENABLE_LLM
+    GROQ_API_KEY: viteGroqApiKey || serverApiKey || '',
+    ENABLE_LLM: viteEnableLlm
   };
 };
 
