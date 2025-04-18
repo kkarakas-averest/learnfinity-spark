@@ -1,35 +1,10 @@
 {
   "version": 2,
-  "buildCommand": "pnpm run vercel-build",
-  "outputDirectory": "dist",
-  "installCommand": "pnpm install --no-frozen-lockfile",
+  "buildCommand": "next build",
   "github": {
     "enabled": true,
     "silent": false
   },
-  "builds": [
-    {
-      "src": "package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "dist"
-      }
-    },
-    {
-      "src": "api/**/*.js",
-      "use": "@vercel/node"
-    }
-  ],
-  "rewrites": [
-    {
-      "source": "/api/:path*",
-      "destination": "/api/:path*"
-    },
-    {
-      "source": "/((?!api/|_next/static/|_next/image/|favicon.ico|.*\\..*).*)",
-      "destination": "/index.html"
-    }
-  ],
   "headers": [
     {
       "source": "/api/(.*)",

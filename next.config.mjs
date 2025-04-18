@@ -2,8 +2,18 @@ import { withSentryConfig } from "@sentry/nextjs";
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // This comment/change forces a clean build to resolve API routing issues
-  // Last modified: 2023-10-16T12:00:00Z
+  // Remove distDir to allow Next.js to use its default
+  // distDir: 'production-build',
+  
+  // Ensure API routes are properly handled
+  experimental: {
+    serverComponentsExternalPackages: [],
+  },
+  
+  // Add this if there are any issues with image optimization
+  images: {
+    domains: ['learnfinity-spark.vercel.app'],
+  },
 };
 
 export default withSentryConfig(
