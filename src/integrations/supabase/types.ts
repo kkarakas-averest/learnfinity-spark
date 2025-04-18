@@ -9,6 +9,18 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      admin_users: {
+        Row: {
+          user_id: string
+        }
+        Insert: {
+          user_id: string
+        }
+        Update: {
+          user_id?: string
+        }
+        Relationships: []
+      }
       agent_activities: {
         Row: {
           activity_type: string
@@ -917,6 +929,72 @@ export type Database = {
           name?: string
         }
         Relationships: []
+      }
+      content_generation_jobs: {
+        Row: {
+          completed_at: string | null
+          course_id: string
+          created_at: string
+          current_step: number
+          employee_id: string
+          error_message: string | null
+          id: string
+          initiated_by: string | null
+          metadata: Json | null
+          progress: number
+          status: string
+          step_description: string | null
+          total_steps: number
+          updated_at: string
+        }
+        Insert: {
+          completed_at?: string | null
+          course_id: string
+          created_at: string
+          current_step?: number
+          employee_id: string
+          error_message?: string | null
+          id: string
+          initiated_by?: string | null
+          metadata?: Json | null
+          progress?: number
+          status: string
+          step_description?: string | null
+          total_steps: number
+          updated_at: string
+        }
+        Update: {
+          completed_at?: string | null
+          course_id?: string
+          created_at?: string
+          current_step?: number
+          employee_id?: string
+          error_message?: string | null
+          id?: string
+          initiated_by?: string | null
+          metadata?: Json | null
+          progress?: number
+          status?: string
+          step_description?: string | null
+          total_steps?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_generation_jobs_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "hr_courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_generation_jobs_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "hr_employees"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       content_metadata: {
         Row: {
@@ -1936,6 +2014,7 @@ export type Database = {
           id: string
           last_accessed: string | null
           personalized_content_completed_at: string | null
+          personalized_content_generation_job_id: string | null
           personalized_content_generation_status: string | null
           personalized_content_id: string | null
           personalized_content_started_at: string | null
@@ -1944,6 +2023,7 @@ export type Database = {
           score: number | null
           status: string | null
           total_modules: number | null
+          updated_at: string | null
         }
         Insert: {
           completed_modules?: number | null
@@ -1956,6 +2036,7 @@ export type Database = {
           id?: string
           last_accessed?: string | null
           personalized_content_completed_at?: string | null
+          personalized_content_generation_job_id?: string | null
           personalized_content_generation_status?: string | null
           personalized_content_id?: string | null
           personalized_content_started_at?: string | null
@@ -1964,6 +2045,7 @@ export type Database = {
           score?: number | null
           status?: string | null
           total_modules?: number | null
+          updated_at?: string | null
         }
         Update: {
           completed_modules?: number | null
@@ -1976,6 +2058,7 @@ export type Database = {
           id?: string
           last_accessed?: string | null
           personalized_content_completed_at?: string | null
+          personalized_content_generation_job_id?: string | null
           personalized_content_generation_status?: string | null
           personalized_content_id?: string | null
           personalized_content_started_at?: string | null
@@ -1984,6 +2067,7 @@ export type Database = {
           score?: number | null
           status?: string | null
           total_modules?: number | null
+          updated_at?: string | null
         }
         Relationships: [
           {
@@ -1998,6 +2082,13 @@ export type Database = {
             columns: ["employee_id"]
             isOneToOne: false
             referencedRelation: "hr_employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_course_enrollments_personalized_content_generation_job__fkey"
+            columns: ["personalized_content_generation_job_id"]
+            isOneToOne: false
+            referencedRelation: "content_generation_jobs"
             referencedColumns: ["id"]
           },
           {
@@ -2937,7 +3028,7 @@ export type Database = {
           hire_date?: string | null
           id?: string
           last_hr_sync?: string | null
-          preferences: Json
+          preferences?: Json
           prior_experience?: string | null
           title?: string | null
           updated_at?: string | null

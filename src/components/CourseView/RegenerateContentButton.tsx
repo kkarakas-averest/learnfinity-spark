@@ -348,9 +348,21 @@ export function RegenerateContentButton({ courseId, onSuccess, onError }: Regene
         const requestDuration = Date.now() - requestStartTime;
         
         if (response.ok) {
-          apiResponse = response;
-          responseData = await response.json();
-          console.log(`[${requestId}] ✅ Standard API call successful in ${requestDuration}ms`);
+          // Check if the response is actually JSON
+          const contentType = response.headers.get('content-type');
+          if (contentType && contentType.includes('application/json')) {
+            apiResponse = response;
+            responseData = await response.json();
+            console.log(`[${requestId}] ✅ Standard API call successful in ${requestDuration}ms`);
+          } else {
+            // HTML response instead of JSON
+            const text = await response.text();
+            console.error(`[${requestId}] 💥 API returned non-JSON response:`, {
+              contentType,
+              responsePreview: text.substring(0, 150) + '...'
+            });
+            throw new Error('API returned HTML instead of JSON. This likely means the API endpoint is misconfigured.');
+          }
         } else {
           const errorBody = await response.text();
           console.error(`[${requestId}] ❌ Standard API Error (${response.status}):`, {
@@ -440,6 +452,44 @@ export function RegenerateContentButton({ courseId, onSuccess, onError }: Regene
           // Continue to next attempt
         }
       }
+      
+      // Check if we're getting HTML instead of JSON (common error with incorrect API routes)
+      const tryParseHtmlError = async (response) => {
+        try {
+          const text = await response.text();
+          if (text.includes('<!DOCTYPE html>')) {
+            console.error(`[${requestId}] 💥 Received HTML instead of JSON. This likely means the API route is not properly configured.`);
+            return true;
+          }
+          return false;
+        } catch (e) {
+          console.error(`[${requestId}] 💥 Error checking for HTML response:`, e);
+          return false;
+        }
+      };
+
+      // Fix the tryParseHtmlError function to return the parsed data if it's valid JSON
+      const tryParseJsonFromResponse = async (response) => {
+        try {
+          const text = await response.text();
+          if (text.includes('<!DOCTYPE html>')) {
+            console.error(`[${requestId}] 💥 Received HTML instead of JSON. This likely means the API route is not properly configured.`);
+            return { isHtml: true, data: null };
+          }
+          
+          try {
+            // Try to parse the text as JSON
+            const data = JSON.parse(text);
+            return { isHtml: false, data };
+          } catch (parseError) {
+            console.error(`[${requestId}] 💥 Response is not HTML but also not valid JSON:`, text.substring(0, 100));
+            return { isHtml: false, data: null };
+          }
+        } catch (e) {
+          console.error(`[${requestId}] 💥 Error checking for HTML response:`, e);
+          return { isHtml: false, data: null };
+        }
+      };
       
       // ATTEMPT 3: Try fallback with query parameter auth if prior attempts failed
       if (!apiResponse) {
