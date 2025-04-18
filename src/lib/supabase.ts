@@ -3,19 +3,19 @@ import type { Database } from './database.types';
 import { getEnvVar } from './env-loader';
 
 // Check if Supabase environment variables are configured
-// Use the environment loader instead of direct access
-let supabaseUrl = getEnvVar('VITE_SUPABASE_URL', '');
-let supabaseAnonKey = getEnvVar('VITE_SUPABASE_ANON_KEY', '');
+// Try Next.js environment variables first, then fallback to Vite
+let supabaseUrl = getEnvVar('NEXT_PUBLIC_SUPABASE_URL', '');
+let supabaseAnonKey = getEnvVar('NEXT_PUBLIC_SUPABASE_ANON_KEY', '');
 
-// Try Next.js environment variables as fallback
+// Try Vite environment variables as fallback
 if (!supabaseUrl) {
-  supabaseUrl = getEnvVar('NEXT_PUBLIC_SUPABASE_URL', '');
-  console.log('Using NEXT_PUBLIC_SUPABASE_URL as fallback:', !!supabaseUrl);
+  supabaseUrl = getEnvVar('VITE_SUPABASE_URL', '');
+  console.log('Using VITE_SUPABASE_URL as fallback:', !!supabaseUrl);
 }
 
 if (!supabaseAnonKey) {
-  supabaseAnonKey = getEnvVar('NEXT_PUBLIC_SUPABASE_ANON_KEY', '');
-  console.log('Using NEXT_PUBLIC_SUPABASE_ANON_KEY as fallback:', !!supabaseAnonKey);
+  supabaseAnonKey = getEnvVar('VITE_SUPABASE_ANON_KEY', '');
+  console.log('Using VITE_SUPABASE_ANON_KEY as fallback:', !!supabaseAnonKey);
 }
 
 // Hardcoded fallback for development/testing only
