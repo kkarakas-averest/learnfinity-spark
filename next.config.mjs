@@ -1,7 +1,10 @@
 import { withSentryConfig } from "@sentry/nextjs";
 
 /** @type {import('next').NextConfig} */
-const nextConfig = {};
+const nextConfig = {
+  // This comment/change forces a clean build to resolve API routing issues
+  // Last modified: 2023-10-16T12:00:00Z
+};
 
 export default withSentryConfig(
   nextConfig,
