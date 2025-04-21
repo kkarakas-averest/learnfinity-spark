@@ -31,26 +31,6 @@ if (!fs.existsSync('api-server-cors-fix.js')) {
   process.exit(1);
 }
 
-// Check package.json for correct scripts
-try {
-  const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-  const hasViteDevScript = packageJson.scripts && packageJson.scripts.dev === 'vite';
-  
-  if (!hasViteDevScript) {
-    console.warn(`${colors.warning}
-Warning: Your package.json "dev" script is not set to "vite".
-This may cause issues. Please update package.json with these scripts:
-  "dev": "vite",
-  "build": "vite build",
-  "build:dev": "vite build --mode development",
-  "server": "node api-server-cors-fix.js",
-  "start": "node start-dev.js"
-${colors.reset}`);
-  }
-} catch (err) {
-  console.warn(`${colors.warning}Warning: Couldn't read package.json to validate scripts.${colors.reset}`);
-}
-
 // Start Vite dev server
 const viteProcess = spawn('npx', ['vite'], {
   stdio: 'pipe',

@@ -1,3 +1,4 @@
+
 // Simple Express server for serving the React app
 import express from 'express';
 import { fileURLToPath } from 'url';
@@ -29,4 +30,4 @@ app.listen(PORT, () => {
   } else {
     console.error(`❌ index.html file NOT FOUND at ${indexPath}`);
   }
-}); 
+});
