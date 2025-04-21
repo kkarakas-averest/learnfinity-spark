@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { RotateCcwIcon } from "@/components/ui/custom-icons";
 import { toast } from "@/components/ui/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 /**
  * RegenerateContentButtonVite - pure Vite/React version
@@ -24,6 +25,7 @@ const RegenerateContentButtonVite = ({
 }: RegenerateContentButtonViteProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const [currentStep, setCurrentStep] = useState<string>("");
+  const { user } = useAuth();
 
   // Helper function to log with identifier for easier debugging
   const logOperation = (message: string, data?: any) => {
@@ -41,8 +43,12 @@ const RegenerateContentButtonVite = ({
   const fetchEmployeeDataForCourse = async (courseId: string) => {
     updateProgress("Fetching employee data...");
     try {
-      // Get course enrollment to find the employee
-      const enrollmentResponse = await fetch(`/api/hr/courses/${courseId}/enrollment`, {
+      if (!user?.id) {
+        throw new Error("User ID not available. Please login again.");
+      }
+
+      // Get course enrollment to find the employee - now with userId in query params
+      const enrollmentResponse = await fetch(`/api/hr/courses/${courseId}/enrollment?userId=${user.id}`, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
@@ -53,12 +59,25 @@ const RegenerateContentButtonVite = ({
         throw new Error(`Failed to fetch enrollment data: ${enrollmentResponse.status}`);
       }
 
-      const enrollment = await enrollmentResponse.json();
-      const employeeId = enrollment.employeeId || enrollment.employee_id;
+      const enrollmentData = await enrollmentResponse.json();
+      
+      // Log the enrollment data structure to help debug
+      logOperation("📋 Received enrollment data:", enrollmentData);
+      
+      // Our API returns { enrollment: { ... } }
+      const enrollment = enrollmentData.enrollment;
+      
+      if (!enrollment) {
+        throw new Error("Enrollment data is missing from the response");
+      }
+      
+      const employeeId = enrollment.employee_id || enrollment.employeeId || enrollment.user_id || enrollment.userId;
       
       if (!employeeId) {
-        throw new Error("No employee found enrolled in this course");
+        throw new Error("No employee ID found in the enrollment data");
       }
+      
+      logOperation("👤 Found employee ID:", employeeId);
 
       // Now fetch the employee CV data
       updateProgress("Retrieving CV data...");
