@@ -37,7 +37,7 @@ const NotificationPanel: React.FC<NotificationPanelProps> = ({
         setIsLoading(true);
         setError(null);
         
-        let options: {
+        const options: {
           unreadOnly?: boolean;
           minPriority?: NotificationPriority;
           limit?: number;
