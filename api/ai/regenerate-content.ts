@@ -263,17 +263,6 @@ export default async function handler(
     
     logWithTimestamp(`Employee verified: ${employeeData.name}, Position: ${employeeData.position_title}, Dept: ${employeeData.department_name}`, undefined, requestId);
     
-    // 3. Get the employee skills
-    const { data: skills, error: skillsError } = await supabase
-      .from('hr_employee_skills')
-      .select('*, hr_skills!inner(id, name, category)')
-      .eq('employee_id', employeeId);
-      
-    if (skillsError) {
-      logWithTimestamp(`Error fetching employee skills:`, skillsError, requestId);
-      // Continue anyway, skills are optional
-    }
-    
     // 4. Check for existing enrollment
     const { data: enrollment, error: enrollmentError } = await supabase
       .from('hr_course_enrollments')
@@ -474,19 +463,22 @@ export default async function handler(
     // Generate a unique ID for the main content
     const contentId = uuidv4();
 
-    // 1. Insert into ai_course_content
-    const { error: contentInsertError } = await supabase
+    // 1. Upsert into ai_course_content (handles existing records)
+    const { error: contentUpsertError } = await supabase
       .from('ai_course_content')
-      .insert({
-        id: contentId,
+      .upsert({
+        // We might not know the existing ID, so let upsert handle it based on constraint
+        // If the record exists based on the constraint, it will be updated.
+        // If it doesn't exist, these values will be used for insertion.
+        id: contentId, // Provide an ID for potential insertion
         course_id: courseId,
         title: parsedContent.title,
         description: parsedContent.description,
         learning_objectives: parsedContent.learning_objectives || [],
         created_for_user_id: employeeId,
-        employee_id: employeeId,
+        employee_id: employeeId, // Ensure this is set correctly
         is_active: true,
-        version: '1.0',
+        version: '1.0', // Keep version static for now, or implement versioning
         personalization_context: employeeData?.cv_extracted_data || {},
         metadata: { 
             generation_method: 'groq', 
@@ -494,16 +486,35 @@ export default async function handler(
             job_id: jobId,
             request_id: requestId 
         },
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        created_at: new Date().toISOString(), // Gets set on insert
+        updated_at: new Date().toISOString(), // Gets updated on upsert
+      }, {
+        // Specify the constraint name for conflict resolution
+        onConflict: 'course_id,version,created_for_user_id',
       });
 
-    if (contentInsertError) {
-      logWithTimestamp(`Error inserting into ai_course_content:`, contentInsertError, requestId);
-      throw new Error(`Failed to store main content: ${contentInsertError.message}`);
+    if (contentUpsertError) {
+      logWithTimestamp(`Error upserting into ai_course_content:`, contentUpsertError, requestId);
+      throw new Error(`Failed to store/update main content: ${contentUpsertError.message}`);
     }
     
-    logWithTimestamp(`Main content stored with ID: ${contentId}`, undefined, requestId);
+    // We may not get the ID back directly from upsert without .select(), 
+    // but we need an ID for sections. Let's re-query to get the ID for certain.
+    const { data: upsertedContent, error: queryError } = await supabase
+      .from('ai_course_content')
+      .select('id')
+      .eq('course_id', courseId)
+      .eq('version', '1.0')
+      .eq('created_for_user_id', employeeId)
+      .single();
+
+    if (queryError || !upsertedContent?.id) {
+      logWithTimestamp(`Error fetching ID after upsert:`, queryError, requestId);
+      throw new Error('Failed to retrieve content ID after upsert.');
+    }
+    
+    const actualContentId = upsertedContent.id;
+    logWithTimestamp(`Main content stored/updated with ID: ${actualContentId}`, undefined, requestId);
 
     // Prepare sections, generating UUIDs for modules
     const moduleUuidMap = new Map<string, string>();
@@ -516,7 +527,7 @@ export default async function handler(
         
         return {
             id: uuidv4(),
-            content_id: contentId,
+            content_id: actualContentId, // Use the retrieved ID
             module_id: moduleUuid,
             section_id: uuidv4(),
             title: section.title,
@@ -545,7 +556,7 @@ export default async function handler(
     const { error: enrollmentUpdateError } = await supabase
       .from('hr_course_enrollments')
       .update({
-        personalized_content_id: contentId,
+        personalized_content_id: actualContentId, // Use the retrieved ID
         personalized_content_generation_status: 'completed',
         personalized_content_completed_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
@@ -583,7 +594,7 @@ export default async function handler(
       success: true,
       message: 'Personalized content generated successfully',
       job_id: jobId,
-      content_id: contentId,
+      content_id: actualContentId,
       requestId,
       status: 'completed',
       course: {
