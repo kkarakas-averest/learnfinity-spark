@@ -42,6 +42,27 @@ const logWithTimestamp = (message: string, data?: any, requestId?: string) => {
   }
 };
 
+// Add this type declarations above the handler function
+type Department = {
+  name: string;
+  // Add other department fields if needed
+};
+
+type Position = {
+  title: string;
+  // Add other position fields if needed
+};
+
+type EmployeeDataRaw = {
+  id: string;
+  name: string;
+  cv_extracted_data: any;
+  department_id: string;
+  position_id: string;
+  hr_departments?: Department | Department[] | null;
+  hr_positions?: Position | Position[] | null;
+};
+
 export default async function handler(
   req: VercelRequest,
   res: VercelResponse
@@ -211,15 +232,15 @@ export default async function handler(
 
     // Map the data to flatten department/position names
     const employeeData = {
-      ...employeeDataRaw,
+      ...employeeDataRaw as EmployeeDataRaw,
       // Access the first element if it's an array, otherwise use the object directly
-      department_name: Array.isArray(employeeDataRaw.hr_departments) 
-                          ? employeeDataRaw.hr_departments[0]?.name 
-                          : employeeDataRaw.hr_departments?.name 
+      department_name: Array.isArray((employeeDataRaw as EmployeeDataRaw).hr_departments) 
+                          ? ((employeeDataRaw as EmployeeDataRaw).hr_departments as Department[])[0]?.name 
+                          : ((employeeDataRaw as EmployeeDataRaw).hr_departments as Department)?.name 
                           || null,
-      position_title: Array.isArray(employeeDataRaw.hr_positions) 
-                          ? employeeDataRaw.hr_positions[0]?.title 
-                          : employeeDataRaw.hr_positions?.title 
+      position_title: Array.isArray((employeeDataRaw as EmployeeDataRaw).hr_positions) 
+                          ? ((employeeDataRaw as EmployeeDataRaw).hr_positions as Position[])[0]?.title 
+                          : ((employeeDataRaw as EmployeeDataRaw).hr_positions as Position)?.title 
                           || null,
       // Optionally clear the original nested structures after mapping
       hr_departments: undefined,
