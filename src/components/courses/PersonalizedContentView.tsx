@@ -1,7 +1,6 @@
-
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from '@/lib/react-helpers';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent } from '@/components/ui/card';
 import { BookOpen } from 'lucide-react';
@@ -12,13 +11,13 @@ import PersonalizedCourseContent from '../learner/PersonalizedCourseContent'; //
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/lib/supabase';
 import { 
-  CheckCircle2, 
-  XCircle, 
+  CheckCircle, 
+  Circle, 
   User, 
   Zap, 
   FileText, 
   Sparkles, 
-  LoaderCircle
+  Loader2
 } from 'lucide-react';
 
 interface PersonalizedContentViewProps {
@@ -28,6 +27,15 @@ interface PersonalizedContentViewProps {
   employeeId?: string | null;
   courseId?: string | null;
   onGenerateContent?: () => Promise<void>;
+  onContentReady?: () => Promise<void>;
+}
+
+interface StepType {
+  id: string;
+  title: string;
+  description: string;
+  status: 'pending' | 'loading' | 'complete' | 'error';
+  icon: React.ComponentType;
 }
 
 export function PersonalizedContentView({
@@ -36,54 +44,56 @@ export function PersonalizedContentView({
   isLoading,
   employeeId,
   courseId,
-  onGenerateContent
+  onGenerateContent,
+  onContentReady
 }: PersonalizedContentViewProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [currentStep, setCurrentStep] = useState(-1);
   const [generationError, setGenerationError] = useState<string | undefined>();
   const [estimatedTimeRemaining, setEstimatedTimeRemaining] = useState<number | undefined>();
   const [pollInterval, setPollInterval] = useState<NodeJS.Timeout | null>(null);
+  const [shouldRefetchContent, setShouldRefetchContent] = useState(false);
   const { toast } = useToast();
   
-  const generationSteps = [
+  const generationSteps: StepType[] = [
     {
       id: 'profile-data',
       title: 'Profile Data Retrieved',
       description: 'Your employee profile and CV data are loaded',
-      status: 'pending' as const,
+      status: 'pending',
       icon: User
     },
     {
       id: 'course-data',
       title: 'Course Materials Analyzed',
       description: 'Course content is analyzed to prepare for personalization',
-      status: 'pending' as const,
+      status: 'pending',
       icon: BookOpen
     },
     {
       id: 'llm-api',
       title: 'AI Personalization Started',
       description: 'LLM API is called to generate tailored content',
-      status: 'pending' as const,
+      status: 'pending',
       icon: Zap
     },
     {
       id: 'content-creation',
       title: 'Content Creation',
       description: 'Converting AI responses into structured learning materials',
-      status: 'pending' as const,
+      status: 'pending',
       icon: FileText
     },
     {
       id: 'course-ready',
       title: 'Course Ready',
       description: 'Your personalized course is now available',
-      status: 'pending' as const,
+      status: 'pending',
       icon: Sparkles
     }
   ];
   
-  const [steps, setSteps] = useState(generationSteps);
+  const [steps, setSteps] = useState<StepType[]>(generationSteps);
   
   useEffect(() => {
     if (isGenerating) {
@@ -106,7 +116,7 @@ export function PersonalizedContentView({
             if (currentStep < 1) setCurrentStep(1);
             else if (currentStep < 2) setCurrentStep(2);
             
-            setEstimatedTimeRemaining(prev => prev ? Math.max(prev - 10, 60) : 180);
+            setEstimatedTimeRemaining((prev: number | undefined) => prev ? Math.max(prev - 10, 60) : 180);
             
             updateStepStatus(0, 'complete');
             updateStepStatus(1, 'complete');
@@ -124,7 +134,25 @@ export function PersonalizedContentView({
             updateStepStatus(4, 'complete');
             setCurrentStep(4);
             
-            window.location.reload();
+            setShouldRefetchContent(true);
+            if (onContentReady) {
+              try {
+                await onContentReady();
+              } catch (error) {
+                console.error("Error refreshing content:", error);
+                toast({
+                  title: "Content is ready",
+                  description: "Please refresh the page to view your personalized content", 
+                  variant: "default"
+                });
+              }
+            } else {
+              toast({
+                title: "Content generation complete", 
+                description: "Your personalized content is ready",
+                variant: "default"
+              });
+            }
           } 
           else if (statusData?.personalized_content_generation_status === 'failed') {
             setGenerationError('Content generation failed. Please try again later.');
@@ -157,7 +185,7 @@ export function PersonalizedContentView({
   }, [isGenerating, courseId, employeeId, currentStep]);
   
   const updateStepStatus = (stepIndex: number, status: 'pending' | 'loading' | 'complete' | 'error') => {
-    setSteps(prevSteps => {
+    setSteps((prevSteps: StepType[]) => {
       const newSteps = [...prevSteps];
       if (newSteps[stepIndex]) {
         newSteps[stepIndex] = { ...newSteps[stepIndex], status };
@@ -214,12 +242,19 @@ export function PersonalizedContentView({
         />
       ) : (
         <PersonalizedContentGenerationStatus
-          steps={steps}
-          currentStep={currentStep}
-          isGenerating={isGenerating}
-          estimatedTimeRemaining={estimatedTimeRemaining}
+          initialSteps={steps.map((step: StepType, index: number) => ({
+            id: index + 1,
+            name: step.title,
+            description: step.description,
+            status: step.status,
+            icon: step.icon
+          }))}
+          initialCurrentStep={currentStep}
+          initialIsGenerating={isGenerating}
           onGenerateContent={handleGenerateContent}
           error={generationError}
+          courseId={courseId || undefined}
+          employeeId={employeeId || undefined}
         />
       )}
     </div>
