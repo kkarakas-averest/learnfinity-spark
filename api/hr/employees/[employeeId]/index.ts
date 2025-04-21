@@ -32,6 +32,17 @@ const HARDCODED_SUPABASE_URL = 'https://ujlqzkkkfatehxeqtbdl.supabase.co';
 // ⚠️ TESTING ONLY: Fixed hardcoded key that worked previously in enrollment API ⚠️
 const HARDCODED_SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqbHF6a2trZmF0ZWh4ZXF0YmRsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcwNzc2NzQ0MiwiZXhwIjoyMDIzMzQzNDQyfQ.VwKqRxdI1uSDkA5zcLY3zEWAyDl9OuSazkHaJbNkDRA';
 
+// Add this type above the handler
+type EmployeeSkillRow = {
+  skill?: {
+    id?: string;
+    name?: string;
+    category?: string;
+  };
+  proficiency?: string;
+  // ...other fields from hr_employee_skills if needed
+};
+
 export default async function handler(
   req: VercelRequest,
   res: VercelResponse
@@ -193,7 +204,7 @@ export default async function handler(
       // Format the employee data
       const formattedEmployee = {
         ...employee,
-        skills: skills?.map(s => ({
+        skills: skills?.map((s: EmployeeSkillRow) => ({
           id: s.skill?.id,
           name: s.skill?.name,
           category: s.skill?.category,
