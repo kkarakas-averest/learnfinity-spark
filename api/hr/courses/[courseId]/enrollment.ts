@@ -15,9 +15,8 @@ const setCorsHeaders = (res: VercelResponse) => {
   return res;
 };
 
-// Explicitly set the runtime to Node.js (not Edge)
+// Configure regions only
 export const config = {
-  runtime: 'nodejs',
   regions: ['iad1'], // Default Washington DC region
 };
 
