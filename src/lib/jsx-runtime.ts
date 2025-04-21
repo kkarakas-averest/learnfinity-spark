@@ -13,5 +13,8 @@ export * from 'react/jsx-runtime';
 // Export the development JSX runtime
 export * from 'react/jsx-dev-runtime';
 
+// Export Fragment specifically since it's commonly used
+export { Fragment } from 'react';
+
 // Log when this module is first imported
 console.log('JSX runtime compatibility layer loaded');
