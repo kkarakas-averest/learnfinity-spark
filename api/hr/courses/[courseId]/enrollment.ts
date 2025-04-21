@@ -72,22 +72,66 @@ export default async function handler(
     if (req.method === 'GET') {
       const userId = req.query.userId as string;
 
-      // Defensive: Warn if body is present in GET
-      if (req.body && Object.keys(req.body).length > 0) {
-        console.warn('GET request should not have a body. Ignoring body.', req.body);
-      }
-
       if (!userId) {
         return res.status(400).json({ error: 'User ID is required as a query parameter' });
       }
       
-      console.log('Checking enrollment status via GET', { userId, courseId });
+      console.log('Looking up employee ID for user', { userId });
 
-      // Check if the user is already enrolled
+      // First, get employee_id from hr_employees table using user_id
+      const { data: employee, error: employeeError } = await supabase
+        .from('hr_employees')
+        .select('id')
+        .eq('user_id', userId)
+        .single();
+
+      if (employeeError) {
+        // Handle the case where we can't find an employee record
+        if (employeeError.code === 'PGRST116') { // "No rows returned" error
+          console.log('No employee record found for user', { userId });
+          
+          // IMPORTANT: In this case, try using the userId as the employeeId directly
+          // This handles the case where userId might actually BE the employeeId
+          console.log('Checking enrollment with userId as employeeId fallback', { userId, courseId });
+          
+          const { data: enrollment, error: checkError } = await supabase
+            .from('hr_course_enrollments')
+            .select('*')
+            .eq('employee_id', userId)
+            .eq('course_id', courseId)
+            .single();
+
+          if (checkError && checkError.code !== 'PGRST116') {
+            console.error('Error checking enrollment with userId as employeeId:', checkError);
+            return res.status(500).json({ error: checkError.message });
+          }
+
+          if (!enrollment) {
+            return res.status(404).json({ error: 'Enrollment not found' });
+          }
+
+          console.log('Retrieved enrollment using userId as employeeId', enrollment);
+          return res.status(200).json({ enrollment });
+        } else {
+          // This is a real error, not just "no rows"
+          console.error('Error looking up employee:', employeeError);
+          return res.status(500).json({ error: `Error looking up employee: ${employeeError.message}` });
+        }
+      }
+
+      const employeeId = employee?.id;
+      
+      if (!employeeId) {
+        return res.status(404).json({ error: 'No employee record found for this user' });
+      }
+      
+      console.log('Found employee ID, checking enrollment', { employeeId, courseId });
+      
+      // Now check if the employee is enrolled in the course, using employee_id
       const { data: enrollment, error: checkError } = await supabase
         .from('hr_course_enrollments')
         .select('*')
-        .eq('user_id', userId)
+        .eq('employee_id', employeeId)
         .eq('course_id', courseId)
         .single();
 
@@ -113,13 +157,28 @@ export default async function handler(
         return res.status(400).json({ error: 'User ID is required in request body' });
       }
 
-      console.log('Checking enrollment status via POST', { userId, courseId });
+      // First, get employee_id from hr_employees table
+      const { data: employee, error: employeeError } = await supabase
+        .from('hr_employees')
+        .select('id')
+        .eq('user_id', userId)
+        .single();
 
-      // Check if the user is already enrolled
+      if (employeeError && employeeError.code !== 'PGRST116') {
+        console.error('Error looking up employee:', employeeError);
+        return res.status(500).json({ error: `Error looking up employee: ${employeeError.message}` });
+      }
+
+      // If no employee record found, we could either fail or use the userId as employeeId
+      const employeeId = employee?.id || userId; // Fallback to userId if no employee record
+      
+      console.log('Checking enrollment status via POST', { userId, employeeId, courseId });
+
+      // Check if the employee is already enrolled, using employee_id
       const { data: existingEnrollment, error: checkError } = await supabase
         .from('hr_course_enrollments')
         .select('*')
-        .eq('user_id', userId)
+        .eq('employee_id', employeeId)
         .eq('course_id', courseId)
         .single();
 
@@ -136,16 +195,16 @@ export default async function handler(
         });
       }
 
-      console.log('Creating new enrollment');
+      console.log('Creating new enrollment with employee_id', { employeeId, courseId });
 
-      // Create the enrollment
+      // Create the enrollment using employee_id
       const { data: enrollment, error } = await supabase
         .from('hr_course_enrollments')
         .insert({
-          user_id: userId,
+          employee_id: employeeId, // Use employee_id, not user_id
           course_id: courseId,
           status: 'active',
-          enrolled_at: new Date().toISOString(),
+          enrollment_date: new Date().toISOString(),
         })
         .select()
         .single();
