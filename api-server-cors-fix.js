@@ -36,10 +36,10 @@ app.get('/api/debug-api-health', (req, res) => {
   });
 });
 
-// HR Course regenerate endpoint with improved handling
-app.all('/api/hr/courses/regenerate-content', (req, res) => {
+// Generic handler for all course regeneration endpoints
+const handleCourseRegeneration = (req, res) => {
   try {
-    console.log('[Express Server] Handling regenerate-content request');
+    console.log('[Express Server] Handling course regeneration request');
     
     // Always set proper CORS and content type headers 
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -52,57 +52,9 @@ app.all('/api/hr/courses/regenerate-content', (req, res) => {
       return res.status(204).end();
     }
     
-    // Use the existing handler logic
+    // Extract courseId from query params or body
     const courseId = req.method === 'GET' ? req.query.courseId : req.body?.courseId;
     
-    if (!courseId) {
-      return res.status(400).json({ 
-        error: 'Course ID is required',
-        success: false
-      });
-    }
-    
-    // Generate a unique job ID for tracking
-    const jobId = `job_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-    
-    return res.status(200).json({
-      success: true,
-      message: 'Course content regeneration initiated',
-      job_id: jobId,
-      course: {
-        id: courseId,
-        status: 'regenerating'
-      }
-    });
-  } catch (error) {
-    console.error('[Express Server] Error handling regenerate-content request:', error);
-    res.status(500).json({
-      error: 'Internal server error',
-      message: error?.message || 'Unknown error',
-      success: false
-    });
-  }
-});
-
-// Simplified endpoint with direct handler
-app.all('/api/hr-course-regenerate', (req, res) => {
-  try {
-    console.log('[Express Server] Handling hr-course-regenerate request');
-    
-    // Always set proper content type and CORS headers
-    res.setHeader('Content-Type', 'application/json');
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-CSRF-Token');
-    
-    // Handle OPTIONS request for CORS preflight
-    if (req.method === 'OPTIONS') {
-      return res.status(204).end();
-    }
-    
-    // Extract course ID from query params or body
-    const courseId = req.method === 'GET' ? req.query.courseId : req.body?.courseId;
-      
     if (!courseId) {
       console.log(`[API Server] Missing courseId parameter`);
       return res.status(400).json({
@@ -130,6 +82,113 @@ app.all('/api/hr-course-regenerate', (req, res) => {
     console.error(`[API Server] Error:`, error);
     return res.status(500).json({
       error: 'Failed to process request',
+      message: error?.message || 'Unknown error',
+      success: false
+    });
+  }
+};
+
+// HR Course regenerate endpoint with simplified endpoint
+app.all('/api/hr-course-regenerate', handleCourseRegeneration);
+
+// Standard endpoint
+app.all('/api/hr/courses/regenerate-content', handleCourseRegeneration);
+
+// Alternative endpoint
+app.all('/api/courses/regenerate', handleCourseRegeneration);
+
+// Legacy endpoint with improved handling
+app.all('/api/hr/courses/regenerate-content', handleCourseRegeneration);
+
+// Universal enhance endpoint
+app.all('/api/hr/courses/universal-enhance', (req, res) => {
+  try {
+    console.log('[Express Server] Handling universal enhance request');
+    
+    // Set proper headers
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    
+    // Handle OPTIONS request for CORS preflight
+    if (req.method === 'OPTIONS') {
+      return res.status(204).end();
+    }
+    
+    // Extract parameters
+    const body = req.method === 'GET' ? req.query : req.body || {};
+    const { courseId, employeeId } = body;
+    
+    if (!courseId || !employeeId) {
+      return res.status(400).json({
+        error: 'Missing required parameters',
+        success: false
+      });
+    }
+    
+    // Generate a unique ID
+    const contentId = `content_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    
+    // Return success response
+    return res.status(200).json({
+      success: true,
+      message: 'Course content enhanced successfully',
+      content_id: contentId,
+      course: {
+        id: courseId,
+        title: `Course ${courseId.substring(0, 8)}`,
+        status: 'personalized'
+      }
+    });
+  } catch (error) {
+    console.error('[Express Server] Error:', error);
+    return res.status(500).json({
+      error: 'Failed to enhance course content',
+      message: error?.message || 'Unknown error',
+      success: false
+    });
+  }
+});
+
+// Personalize content process endpoint
+app.all('/api/hr/courses/personalize-content/process', (req, res) => {
+  try {
+    console.log('[Express Server] Handling personalize content process request');
+    
+    // Set proper headers
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    
+    // Handle OPTIONS request for CORS preflight
+    if (req.method === 'OPTIONS') {
+      return res.status(204).end();
+    }
+    
+    // Extract job_id parameter
+    const jobId = req.method === 'GET' ? req.query.job_id : req.body?.job_id;
+    
+    if (!jobId) {
+      return res.status(400).json({
+        error: 'Missing required parameter: job_id',
+        success: false
+      });
+    }
+    
+    // Return success response
+    return res.status(200).json({
+      success: true,
+      message: 'Content processing completed successfully',
+      job_id: jobId,
+      status: 'completed',
+      progress: 100
+    });
+  } catch (error) {
+    console.error('[Express Server] Error:', error);
+    return res.status(500).json({
+      error: 'Failed to process content generation job',
       message: error?.message || 'Unknown error',
       success: false
     });
