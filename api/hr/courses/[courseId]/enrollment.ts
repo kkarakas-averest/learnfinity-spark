@@ -35,7 +35,9 @@ const HARDCODED_SUPABASE_URL = 'https://ujlqzkkkfatehxeqtbdl.supabase.co';
 // and only use this hardcoded key for development/debugging
 // DO NOT COMMIT YOUR ACTUAL SERVICE KEY TO GIT
 // Instead, add SUPABASE_SERVICE_ROLE_KEY to Vercel environment variables for Production, Preview, and Development
-const HARDCODED_SERVICE_KEY = ''; // Intentionally left blank for security
+// ⚠️ WARNING: Replace the placeholder below with your actual Supabase service role key before deployment ⚠️
+// Then after testing, revert this change before committing to avoid exposing your key in source code
+const HARDCODED_SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.INSERT_YOUR_ACTUAL_SERVICE_KEY_HERE'; // REPLACE THIS
 
 export default async function handler(
   req: VercelRequest,
@@ -80,11 +82,13 @@ export default async function handler(
   }
 
   // Check if the essential variables were found and EXIT EARLY if service key is missing or invalid
-  if (!supabaseServiceKey || supabaseServiceKey === '') {
+  if (!supabaseServiceKey || supabaseServiceKey === '' || 
+      supabaseServiceKey.includes('INSERT_YOUR_ACTUAL_SERVICE_KEY_HERE')) {
     console.error('CRITICAL ERROR: Missing or invalid Supabase Service Key. Check Vercel Environment Variables.', { 
       supabaseUrlValue: supabaseUrl ? supabaseUrl.substring(0, 8) + '...' : 'MISSING',
       hasServiceKeyValue: Boolean(supabaseServiceKey),
       isEmpty: supabaseServiceKey === '',
+      isUnmodifiedPlaceholder: supabaseServiceKey.includes('INSERT_YOUR_ACTUAL_SERVICE_KEY_HERE'),
       envDetails: {
         SUPABASE_URL: process.env.SUPABASE_URL ? 'Defined' : 'Undefined',
         VITE_SUPABASE_URL: process.env.VITE_SUPABASE_URL ? 'Defined' : 'Undefined',
@@ -95,9 +99,14 @@ export default async function handler(
     });
     // EXIT HERE if config is missing or using placeholder
     return res.status(500).json({ 
-      error: 'Server configuration error - missing Supabase service key',
-      details: 'You need to add SUPABASE_SERVICE_ROLE_KEY to your Vercel project environment variables for all environments (Production, Preview, and Development)',
-      setup_instructions: 'Go to Vercel Dashboard > Your Project > Settings > Environment Variables and add SUPABASE_SERVICE_ROLE_KEY'
+      error: 'Server configuration error - missing or invalid Supabase service key',
+      details: 'You need to either:',
+      options: [
+        '1. Replace the placeholder in HARDCODED_SERVICE_KEY with your actual Supabase service key in the code (for development only)',
+        '2. Add SUPABASE_SERVICE_ROLE_KEY to your Vercel project environment variables for all environments',
+        '3. Add VITE_SUPABASE_SERVICE_KEY to your Vercel project environment variables for all environments'
+      ],
+      setup_instructions: 'Go to Vercel Dashboard > Your Project > Settings > Environment Variables and add the required keys'
     });
   }
 
