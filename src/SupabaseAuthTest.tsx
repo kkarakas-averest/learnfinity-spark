@@ -1,10 +1,10 @@
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 
 const SupabaseAuthTest: React.FC = () => {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = React.useState(null);
   
-  useEffect(() => {
+  React.useEffect(() => {
     // Check for user authentication
     console.log("Auth test component mounted");
   }, []);

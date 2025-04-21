@@ -34,6 +34,8 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [
       react({ 
+        // Explicitly set JSX runtime to 'automatic'
+        jsxRuntime: 'automatic',
         // Ensure React refresh works properly
         include: '**/*.{jsx,tsx}',
       }),
@@ -50,7 +52,7 @@ export default defineConfig(({ mode }) => {
       port: 8080,
       proxy: {
         '/api': {
-          target: 'http://localhost:3084', // Updated to match the API_PORT in api-server-cors-fix.js
+          target: 'http://localhost:3084',
           changeOrigin: true,
         },
       },
