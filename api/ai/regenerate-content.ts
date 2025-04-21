@@ -195,7 +195,8 @@ export default async function handler(
     // 2. Get the employee data
     const { data: employeeData, error: employeeError } = await supabase
       .from('hr_employees')
-      .select('*, department:hr_departments(*), position:hr_positions(*)')
+      // Select specific fields including cv_extracted_data
+      .select('id, name, cv_extracted_data, department:hr_departments(name), position:hr_positions(name)')
       .eq('id', employeeId)
       .single();
       
@@ -213,7 +214,7 @@ export default async function handler(
     // 3. Get the employee skills
     const { data: skills, error: skillsError } = await supabase
       .from('hr_employee_skills')
-      .select('*, skill:hr_skills(id, name, category)')
+      .select('*, hr_skills!inner(id, name, category)')
       .eq('employee_id', employeeId);
       
     if (skillsError) {
@@ -319,18 +320,218 @@ export default async function handler(
       // Continue anyway
     }
     
-    // IMPORTANT: This is a simplified version that doesn't actually call Groq API
-    // In production, you would want to call the Groq API or use a background job
+    // --- BEGIN GROQ API CALL & CONTENT STORAGE ---
+    logWithTimestamp(`Preparing to call Groq for course ${courseId} and employee ${employeeId}`, undefined, requestId);
     
-    logWithTimestamp(`Content generation job created: ${jobId}`, undefined, requestId);
+    // Ensure we have the necessary data
+    if (!employeeData?.cv_extracted_data) {
+      throw new Error('Missing cv_extracted_data for the employee.');
+    }
+    if (!courseData?.title || !courseData?.description) {
+        throw new Error('Missing title or description for the course.');
+    }
+
+    // Initialize Groq Client (using the key resolved earlier)
+    const groq = new Groq({ apiKey: groqApiKey });
+
+    // Construct a simplified prompt
+    const prompt = `
+      Generate personalized course content for the course "${courseData.title}" based on the following employee CV data.
+      Course Description: ${courseData.description}
+      Employee CV Data: ${JSON.stringify(employeeData.cv_extracted_data)}
+
+      Output the content in JSON format with the following structure:
+      {
+        "title": "Personalized Course Title",
+        "description": "Personalized Course Description",
+        "learning_objectives": ["Objective 1", "Objective 2", "..."],
+        "sections": [
+          { "module_id": "module-1", "title": "Section 1.1 Title", "content": "HTML content for section 1.1..." },
+          { "module_id": "module-1", "title": "Section 1.2 Title", "content": "HTML content for section 1.2..." },
+          { "module_id": "module-2", "title": "Section 2.1 Title", "content": "HTML content for section 2.1..." }
+        ]
+      }
+    `;
+
+    logWithTimestamp(`Sending prompt to Groq...`, { promptLength: prompt.length }, requestId);
+
+    // Update job status before calling Groq
+    await supabase.from('content_generation_jobs').update({ 
+        current_step: 3, 
+        progress: 30, 
+        step_description: 'Calling Groq API for content generation', 
+        updated_at: new Date().toISOString() 
+    }).eq('id', jobId);
+
+    // Call Groq API
+    const chatCompletion = await groq.chat.completions.create({
+        messages: [{ role: 'user', content: prompt }],
+        model: 'llama3-8b-8192', // Or your preferred model
+        temperature: 0.7,
+        max_tokens: 4096, // Adjust as needed
+        response_format: { type: "json_object" }, // Request JSON output
+    });
+
+    const groqResponseContent = chatCompletion.choices[0]?.message?.content;
     
-    // Return success response
+    if (!groqResponseContent) {
+        throw new Error('Groq API returned an empty response.');
+    }
+
+    logWithTimestamp(`Received response from Groq. Attempting to parse...`, undefined, requestId);
+
+    // Update job status after Groq call
+    await supabase.from('content_generation_jobs').update({ 
+        current_step: 4, 
+        progress: 50, 
+        step_description: 'Parsing Groq response', 
+        updated_at: new Date().toISOString() 
+    }).eq('id', jobId);
+
+    // Parse the JSON response from Groq
+    let parsedContent: {
+        title: string;
+        description: string;
+        learning_objectives: string[];
+        sections: { module_id: string; title: string; content: string }[];
+    };
+    try {
+        parsedContent = JSON.parse(groqResponseContent);
+        // Basic validation of parsed structure
+        if (!parsedContent.title || !parsedContent.sections || !Array.isArray(parsedContent.sections)) {
+            throw new Error('Parsed Groq response is missing required fields (title, sections).');
+        }
+    } catch (parseError: any) {
+        logWithTimestamp(`Error parsing Groq JSON response:`, parseError, requestId);
+        logWithTimestamp(`Raw Groq response content:`, groqResponseContent, requestId);
+        throw new Error(`Failed to parse content from Groq API: ${parseError.message}`);
+    }
+
+    logWithTimestamp(`Groq response parsed successfully. Storing content...`, undefined, requestId);
+
+    // Update job status before database insertion
+    await supabase.from('content_generation_jobs').update({ 
+        current_step: 5, 
+        progress: 70, 
+        step_description: 'Storing generated content in database', 
+        updated_at: new Date().toISOString() 
+    }).eq('id', jobId);
+    
+    // Generate a unique ID for the main content
+    const contentId = uuidv4();
+
+    // 1. Insert into ai_course_content
+    const { error: contentInsertError } = await supabase
+      .from('ai_course_content')
+      .insert({
+        id: contentId,
+        course_id: courseId,
+        title: parsedContent.title,
+        description: parsedContent.description,
+        learning_objectives: parsedContent.learning_objectives || [],
+        created_for_user_id: employeeId,
+        employee_id: employeeId,
+        is_active: true,
+        version: '1.0',
+        personalization_context: employeeData?.cv_extracted_data || {},
+        metadata: { 
+            generation_method: 'groq', 
+            model_used: 'llama3-8b-8192',
+            job_id: jobId,
+            request_id: requestId 
+        },
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      });
+
+    if (contentInsertError) {
+      logWithTimestamp(`Error inserting into ai_course_content:`, contentInsertError, requestId);
+      throw new Error(`Failed to store main content: ${contentInsertError.message}`);
+    }
+    
+    logWithTimestamp(`Main content stored with ID: ${contentId}`, undefined, requestId);
+
+    // Prepare sections, generating UUIDs for modules
+    const moduleUuidMap = new Map<string, string>();
+    const sectionsToInsert = parsedContent.sections.map((section, index) => {
+        const originalModuleId = section.module_id || `module-${index + 1}`;
+        if (!moduleUuidMap.has(originalModuleId)) {
+            moduleUuidMap.set(originalModuleId, uuidv4());
+        }
+        const moduleUuid = moduleUuidMap.get(originalModuleId)!;
+        
+        return {
+            id: uuidv4(),
+            content_id: contentId,
+            module_id: moduleUuid,
+            section_id: uuidv4(),
+            title: section.title,
+            content: section.content,
+            order_index: index,
+        };
+    });
+
+    // 2. Insert into ai_course_content_sections
+    if (sectionsToInsert.length > 0) {
+        const { error: sectionsInsertError } = await supabase
+          .from('ai_course_content_sections')
+          .insert(sectionsToInsert);
+
+        if (sectionsInsertError) {
+          logWithTimestamp(`Error inserting into ai_course_content_sections:`, sectionsInsertError, requestId);
+          throw new Error(`Failed to store content sections: ${sectionsInsertError.message}`);
+        }
+        logWithTimestamp(`${sectionsToInsert.length} content sections stored.`, undefined, requestId);
+    } else {
+        logWithTimestamp(`No sections found in Groq response to store.`, undefined, requestId);
+    }
+
+    // 3. Update Enrollment Status
+    logWithTimestamp(`Updating enrollment to completed status...`, undefined, requestId);
+    const { error: enrollmentUpdateError } = await supabase
+      .from('hr_course_enrollments')
+      .update({
+        personalized_content_id: contentId,
+        personalized_content_generation_status: 'completed',
+        personalized_content_completed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq('employee_id', employeeId)
+      .eq('course_id', courseId);
+
+    if (enrollmentUpdateError) {
+      logWithTimestamp(`Error updating enrollment status:`, enrollmentUpdateError, requestId);
+    }
+
+    // 4. Update Job Status to Completed
+    logWithTimestamp(`Updating job ${jobId} to completed status...`, undefined, requestId);
+    const { error: jobUpdateError } = await supabase
+      .from('content_generation_jobs')
+      .update({
+        status: 'completed',
+        progress: 100,
+        current_step: 6,
+        step_description: 'Content generation and storage completed successfully',
+        completed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', jobId);
+    
+     if (jobUpdateError) {
+      logWithTimestamp(`Error updating job status to completed:`, jobUpdateError, requestId);
+    }
+
+    logWithTimestamp(`Content generation process completed successfully for job ${jobId}`, undefined, requestId);
+    // --- END GROQ API CALL & CONTENT STORAGE ---
+
+    // Return success response with content ID
     return res.status(200).json({
       success: true,
-      message: 'Content regeneration started',
+      message: 'Personalized content generated successfully',
       job_id: jobId,
+      content_id: contentId,
       requestId,
-      status: 'in_progress',
+      status: 'completed',
       course: {
         id: courseId,
         title: courseData.title
