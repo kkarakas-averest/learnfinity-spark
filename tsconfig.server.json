@@ -10,12 +10,12 @@
     "allowSyntheticDefaultImports": true,
     "skipLibCheck": true,
     "types": ["node"],
-    "typeRoots": ["./node_modules/@types"],
+    "typeRoots": ["./node_modules/@types", "./src/types"],
     "noEmit": false
   },
   "ts-node": {
     "esm": false,
     "experimentalSpecifierResolution": "node"
   },
-  "include": ["api-server.ts", "src/api/**/*"]
+  "include": ["api-server.ts", "api-server-cors-fix.js", "src/api/**/*"]
 }
