@@ -19,6 +19,10 @@ echo "Reinstalling dependencies..."
 rm -rf node_modules
 pnpm install --no-frozen-lockfile || npm install || yarn
 
+# Fix TypeScript configuration references
+echo "Fixing TypeScript configuration references..."
+grep -q '"references": \[\]' tsconfig.local.json || echo "Warning: Check tsconfig.local.json references section"
+
 # Start dev server
 echo "Starting development server..."
 pnpm run dev || npm run dev || yarn dev

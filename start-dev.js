@@ -31,11 +31,16 @@ if (!fs.existsSync('api-server-cors-fix.js')) {
   process.exit(1);
 }
 
-// Start Vite dev server with custom tsconfig and no frozen lockfile
+// Start Vite dev server with custom tsconfig and development environment
 const viteProcess = spawn('npx', ['vite', '--config', 'vite.config.ts', '--force'], {
   stdio: 'pipe',
   shell: true,
-  env: { ...process.env, VITE_CUSTOM_TSCONFIG: 'tsconfig.local.json', NODE_ENV: 'development' }
+  env: { 
+    ...process.env, 
+    VITE_CUSTOM_TSCONFIG: 'tsconfig.local.json', 
+    NODE_ENV: 'development',
+    TS_NODE_PROJECT: 'tsconfig.server.json'
+  }
 });
 
 console.log(`${colors.vite}[VITE] Starting dev server...${colors.reset}`);
@@ -50,10 +55,14 @@ viteProcess.stderr.on('data', (data) => {
   console.log(`${colors.error}[VITE ERROR] ${output}${colors.reset}`);
 });
 
-// Start API server
+// Start API server with specific TS config
 const apiProcess = spawn('node', ['api-server-cors-fix.js'], {
   stdio: 'pipe',
-  shell: true
+  shell: true,
+  env: {
+    ...process.env,
+    TS_NODE_PROJECT: 'tsconfig.server.json'
+  }
 });
 
 console.log(`${colors.api}[API] Starting API server...${colors.reset}`);
