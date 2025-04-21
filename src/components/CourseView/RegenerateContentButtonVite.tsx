@@ -1,7 +1,7 @@
-
-import React, { useState } from "react";
+import React, { useState } from "@/lib/react-helpers";
 import { Button } from "@/components/ui/button";
-import { Loader2, RotateCcw } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import { RotateCcwIcon } from "@/components/ui/custom-icons";
 import { toast } from "@/components/ui/use-toast";
 
 /**
@@ -17,11 +17,11 @@ interface RegenerateContentButtonViteProps {
   onError?: (error: Error) => void;
 }
 
-const RegenerateContentButtonVite: React.FC<RegenerateContentButtonViteProps> = ({
+const RegenerateContentButtonVite = ({
   courseId,
   onSuccess,
   onError,
-}) => {
+}: RegenerateContentButtonViteProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const [currentStep, setCurrentStep] = useState<string>("");
 
@@ -166,8 +166,8 @@ const RegenerateContentButtonVite: React.FC<RegenerateContentButtonViteProps> = 
         disabled={isLoading}
         className="flex items-center space-x-2 bg-green-500 hover:bg-green-600 text-white"
       >
-        {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RotateCcw className="h-4 w-4 mr-2" />}
-        {isLoading ? "Regenerating..." : "Regenerate Content"}
+        {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RotateCcwIcon className="h-4 w-4 mr-2" />}
+        {isLoading ? "Regenerating..." : "Regenerate Content (Vite)"}
       </Button>
       
       {currentStep && (
