@@ -1,3 +1,4 @@
+
 // Fix React component types for global elements
 import 'react';
 
