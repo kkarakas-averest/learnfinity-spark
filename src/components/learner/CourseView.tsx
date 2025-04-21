@@ -12,6 +12,7 @@ import CourseModuleList from './CourseModuleList';
 import CourseContentSection from './CourseContentSection';
 import PersonalizedCourseContent from './PersonalizedCourseContent';
 import RegenerateContentButtonVite from '@/components/CourseView/RegenerateContentButtonVite';
+import { AICourseContentSection } from '@/lib/types/content';
 
 interface CourseViewProps {
   courseId: string;
@@ -23,7 +24,7 @@ const CourseView: React.FC<CourseViewProps> = ({
   courseId, 
   employeeId,
   hasPersonalizedContent: initialPersonalizationState = false
-}) => {
+}: CourseViewProps) => {
   const navigate = useNavigate();
   const [loading, setLoading] = React.useState(true);
   const [course, setCourse] = React.useState<any>(null);
@@ -300,8 +301,8 @@ const CourseView: React.FC<CourseViewProps> = ({
     }
     
     const moduleSections = personalizedContentSections.filter(
-      section => section.module_id === selectedModuleId
-    ).sort((a, b) => a.order_index - b.order_index);
+      (section: AICourseContentSection) => section.module_id === selectedModuleId
+    ).sort((a: AICourseContentSection, b: AICourseContentSection) => a.order_index - b.order_index);
     
     if (moduleSections.length === 0) {
       return (
@@ -313,7 +314,7 @@ const CourseView: React.FC<CourseViewProps> = ({
     
     return (
       <div className="space-y-6">
-        {moduleSections.map(section => (
+        {moduleSections.map((section: AICourseContentSection) => (
           <CourseContentSection 
             key={section.id} 
             title={section.title}
@@ -403,36 +404,39 @@ const CourseView: React.FC<CourseViewProps> = ({
                     </p>
                   )}
                 </div>
-              ) : hasPersonalizedContent ? (
-                <div className="flex items-center space-x-2">
-                  <div className="h-3 w-3 bg-green-500 rounded-full" />
-                  <p className="text-sm">Personalized content is available for you</p>
-                </div>
               ) : (
-                <div className="flex items-center justify-between">
-                  <p className="text-sm text-muted-foreground">
-                    Personalize this course based on your profile
-                  </p>
-                  <RegenerateContentButtonVite
-                    courseId={courseId}
-                    onSuccess={() => {
-                      setHasPersonalizedContent(false);
-                      setTimeout(() => {
-                        if (typeof window !== "undefined") {
-                          window.location.reload();
-                        }
-                      }, 2000);
-                    }}
-                    onError={(error) => {
-                      toast({
-                        title: "Failed to regenerate content",
-                        description: error.message,
-                        variant: "destructive",
-                      });
-                    }}
-                  />
+                <div className="flex items-center space-x-2">
+                  {hasPersonalizedContent && (
+                    <>
+                      <div className="h-3 w-3 bg-green-500 rounded-full" />
+                      <p className="text-sm">Personalized content is available for you</p>
+                    </>
+                  )}
                 </div>
               )}
+              <div className="flex items-center justify-between mt-2">
+                <p className="text-sm text-muted-foreground">
+                  Personalize this course based on your profile
+                </p>
+                <RegenerateContentButtonVite
+                  courseId={courseId}
+                  onSuccess={() => {
+                    setHasPersonalizedContent(false);
+                    setTimeout(() => {
+                      if (typeof window !== "undefined") {
+                        window.location.reload();
+                      }
+                    }, 2000);
+                  }}
+                  onError={(error) => {
+                    toast({
+                      title: "Failed to regenerate content",
+                      description: error.message,
+                      variant: "destructive",
+                    });
+                  }}
+                />
+              </div>
             </div>
           )}
         </CardContent>
