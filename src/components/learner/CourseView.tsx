@@ -465,7 +465,6 @@ const CourseView: React.FC<CourseViewProps> = ({
             <div>
               <h1 className="text-3xl font-bold mb-2">{course?.title}</h1>
               <p className="text-blue-100 mb-4 max-w-3xl">{course?.description}</p>
-              
               <div className="flex flex-wrap gap-2 mb-4">
                 {course?.tags?.map((tag: string, index: number) => (
                   <Badge key={index} variant="secondary" className="bg-white/20 text-white hover:bg-white/30">
@@ -484,25 +483,12 @@ const CourseView: React.FC<CourseViewProps> = ({
                 )}
               </div>
             </div>
-            
-            {hasPersonalizedContent ? (
-              <Badge className="bg-gradient-to-r from-purple-500 to-pink-500 text-white border-none px-3 py-1.5 flex items-center gap-1.5">
-                <Sparkles className="h-4 w-4" />
-                <span className="font-medium">Personalized</span>
-              </Badge>
-            ) : employeeId && (
-              <Button
-                onClick={generatePersonalizedContent}
-                variant="secondary"
-                disabled={generatingContent || contentGenerationStatus.isGenerating}
-                className="bg-white text-blue-700 hover:bg-blue-50 flex items-center gap-2"
-              >
-                <Sparkles className="h-4 w-4" />
-                {generatingContent || contentGenerationStatus.isGenerating
-                  ? "Generating..."
-                  : "Personalize Content"}
-              </Button>
-            )}
+            <div className="flex items-center gap-2">
+              <RegenerateContentButtonVite
+                courseId={courseId}
+                userId={employeeId || undefined}
+              />
+            </div>
           </div>
           
           <div className="w-full bg-white/20 rounded-full h-2 mb-2">

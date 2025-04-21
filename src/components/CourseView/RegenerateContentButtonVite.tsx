@@ -199,8 +199,67 @@ export default function RegenerateContentButtonVite({
       // Success - show message and call the success callback
       toast.success("Course content regeneration initiated successfully!");
       setProgress("Regeneration started..."); // Update progress message
-      if (onSuccess) onSuccess();
-      // Maybe poll for job status here if needed? For now, just indicate start.
+      
+      // Add a polling mechanism to check completion status
+      const pollCompletionStatus = async () => {
+        try {
+          const checkStatusUrl = `/api/hr/courses/${courseId}/enrollment?userId=${targetUserId}`;
+          const statusResponse = await fetch(checkStatusUrl);
+          if (!statusResponse.ok) return false;
+          
+          const statusData = await statusResponse.json();
+          const status = statusData?.enrollment?.personalized_content_generation_status;
+          
+          // If completed, clear interval and call onSuccess
+          if (status === 'completed') {
+            logOperation('Content generation completed. Stopping polling.', { status });
+            return true;
+          }
+          
+          return false;
+        } catch (error) {
+          console.error('Error checking content status:', error);
+          return false;
+        }
+      };
+      
+      // Poll for completion every 3 seconds for up to 3 minutes
+      let attempts = 0;
+      const maxAttempts = 60; // 3 minutes at 3-second intervals
+      
+      const pollInterval = setInterval(async () => {
+        attempts++;
+        
+        const isComplete = await pollCompletionStatus();
+        if (isComplete || attempts >= maxAttempts) {
+          clearInterval(pollInterval);
+          
+          // Wait a short delay before triggering a content refresh
+          setTimeout(() => {
+            setLoading(false);
+            setProgress(null);
+            
+            if (onSuccess) {
+              logOperation('Calling onSuccess callback');
+              onSuccess();
+            }
+          }, 1000);
+        }
+      }, 3000);
+      
+      // This is a fallback - if polling fails, still clean up the UI after some time
+      setTimeout(() => {
+        if (loading) {
+          clearInterval(pollInterval);
+          setLoading(false);
+          setProgress(null);
+          
+          if (onSuccess) {
+            logOperation('Calling onSuccess callback (timeout fallback)');
+            onSuccess();
+          }
+        }
+      }, 180000); // 3 minutes max
 
     } catch (error: unknown) { // Catch unknown type
       const typedError = error instanceof Error ? error : new Error(String(error));
@@ -217,7 +276,7 @@ export default function RegenerateContentButtonVite({
           setLoading(false);
           setProgress(null);
       }
-      // Consider a timeout to reset loading/progress after successful start message
+      // The setTimeout cleanup has been moved to the polling logic
       // setTimeout(() => { setLoading(false); setProgress(null); }, 3000);
     }
   };
@@ -233,8 +292,7 @@ export default function RegenerateContentButtonVite({
   return (
     <Button
       onClick={handleRegenerate}
-      className="flex items-center gap-2"
-      variant="outline"
+      className="flex items-center gap-2 bg-green-600 text-white hover:bg-green-700"
       disabled={isDisabled} // Use combined disabled state
       title={titleText} // Add tooltip for disabled state
       data-testid="regenerate-content-button"
