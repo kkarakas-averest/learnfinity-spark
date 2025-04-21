@@ -62,7 +62,12 @@ export default async function handler(
     // Handle GET request - check enrollment for a user
     if (req.method === 'GET') {
       const userId = req.query.userId as string;
-      
+
+      // Defensive: Warn if body is present in GET
+      if (req.body && Object.keys(req.body).length > 0) {
+        console.warn('GET request should not have a body. Ignoring body.', req.body);
+      }
+
       if (!userId) {
         return res.status(400).json({ error: 'User ID is required as a query parameter' });
       }
