@@ -18,17 +18,9 @@ if (import.meta.env.DEV) {
   );
 }
 
-// Export the JSX runtime for Vite/SWC - using named imports to avoid name conflicts
-import * as jsxRuntime from 'react/jsx-runtime';
-import * as jsxDevRuntime from 'react/jsx-dev-runtime';
-
-export const jsx = jsxRuntime.jsx;
-export const jsxs = jsxRuntime.jsxs;
-export const Fragment = jsxRuntime.Fragment;
-
-// Export the dev runtime
-export const jsxDEV = jsxDevRuntime.jsxDEV;
-// jsxsDEV doesn't exist in React's JSX dev runtime, so we're removing it
+// Re-export the JSX runtime for Vite/SWC - using named imports to avoid name conflicts
+export { jsx, jsxs, Fragment } from './react-helpers/jsx-runtime';
+export { jsxDEV } from './react-helpers/jsx-dev-runtime';
 
 // Re-export common hooks and components
 export const {

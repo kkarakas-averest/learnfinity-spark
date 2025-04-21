@@ -1,3 +1,4 @@
+
 import type { BaseAgentConfig } from '@/types/agent.types';
 
 export class BaseAgent {
@@ -11,6 +12,11 @@ export class BaseAgent {
     this.role = config.role;
     this.goal = config.goal;
     this.backstory = config.backstory;
+  }
+
+  // Update the return type signature to match the agent interface
+  protected async initialize(): Promise<{ success: boolean; message?: string }> {
+    return { success: true };
   }
 
   protected log(...args: any[]): void {
