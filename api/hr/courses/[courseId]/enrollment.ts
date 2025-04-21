@@ -31,6 +31,11 @@ export const config = {
 
 // HARDCODED FALLBACK VALUES - Only used if environment variables fail
 const HARDCODED_SUPABASE_URL = 'https://ujlqzkkkfatehxeqtbdl.supabase.co';
+// IMPORTANT: For security, you should set this in Vercel environment variables 
+// and only use this hardcoded key for development/debugging
+// DO NOT COMMIT YOUR ACTUAL SERVICE KEY TO GIT
+// Instead, add SUPABASE_SERVICE_ROLE_KEY to Vercel environment variables for Production, Preview, and Development
+const HARDCODED_SERVICE_KEY = ''; // Intentionally left blank for security
 
 export default async function handler(
   req: VercelRequest,
@@ -59,8 +64,8 @@ export default async function handler(
                     process.env.VITE_SUPABASE_URL || 
                     process.env.NEXT_PUBLIC_SUPABASE_URL;
   
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 
-                             process.env.VITE_SUPABASE_SERVICE_KEY;
+  let supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 
+                           process.env.VITE_SUPABASE_SERVICE_KEY;
 
   // CRITICAL: Check if Supabase URL contains placeholders and use hardcoded value if needed
   if (!supabaseUrl || supabaseUrl.includes('$') || supabaseUrl.includes('{')) {
@@ -68,11 +73,18 @@ export default async function handler(
     supabaseUrl = HARDCODED_SUPABASE_URL;
   }
 
-  // Check if the essential variables were found and EXIT EARLY if service key is missing
-  if (!supabaseServiceKey) {
-    console.error('CRITICAL ERROR: Missing Supabase Service Key. Check Vercel Environment Variables.', { 
+  // CRITICAL: Check if service key is missing or contains placeholders
+  if (!supabaseServiceKey || supabaseServiceKey.includes('$') || supabaseServiceKey.includes('{')) {
+    console.warn('WARNING: Using hardcoded Supabase service key because environment variable contains placeholders or is undefined');
+    supabaseServiceKey = HARDCODED_SERVICE_KEY;
+  }
+
+  // Check if the essential variables were found and EXIT EARLY if service key is missing or invalid
+  if (!supabaseServiceKey || supabaseServiceKey === '') {
+    console.error('CRITICAL ERROR: Missing or invalid Supabase Service Key. Check Vercel Environment Variables.', { 
       supabaseUrlValue: supabaseUrl ? supabaseUrl.substring(0, 8) + '...' : 'MISSING',
       hasServiceKeyValue: Boolean(supabaseServiceKey),
+      isEmpty: supabaseServiceKey === '',
       envDetails: {
         SUPABASE_URL: process.env.SUPABASE_URL ? 'Defined' : 'Undefined',
         VITE_SUPABASE_URL: process.env.VITE_SUPABASE_URL ? 'Defined' : 'Undefined',
@@ -81,8 +93,12 @@ export default async function handler(
         VITE_SUPABASE_SERVICE_KEY: process.env.VITE_SUPABASE_SERVICE_KEY ? 'Defined' : 'Undefined'
       }
     });
-    // EXIT HERE if config is missing
-    return res.status(500).json({ error: 'Server configuration error - missing Supabase service key' });
+    // EXIT HERE if config is missing or using placeholder
+    return res.status(500).json({ 
+      error: 'Server configuration error - missing Supabase service key',
+      details: 'You need to add SUPABASE_SERVICE_ROLE_KEY to your Vercel project environment variables for all environments (Production, Preview, and Development)',
+      setup_instructions: 'Go to Vercel Dashboard > Your Project > Settings > Environment Variables and add SUPABASE_SERVICE_ROLE_KEY'
+    });
   }
 
   // *** STEP 2: Nullify body if GET (keep this) ***
