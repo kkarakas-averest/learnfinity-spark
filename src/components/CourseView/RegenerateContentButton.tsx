@@ -1,33 +1,51 @@
-'use client';
+// REMOVED: 'use client';
 
-import React, { useState, useEffect, useCallback } from '@/lib/react-helpers';
+import React from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { Loader2 } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+// REMOVED: import { supabase } from '@/lib/supabase'; // We will initialize it here
+import { createClient, SupabaseClient } from '@supabase/supabase-js'; // ADDED import
 import PersonalizedContentGenerationStatus from '@/components/courses/PersonalizedContentGenerationStatus';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { useSupabase } from '@/components/providers/supabase-provider';
+// REMOVED: import { useSupabase } from '@/components/providers/supabase-provider'; // Remove Next.js specific provider
 
-// Determine the correct base URL for API calls
-const getApiBaseUrl = () => {
-  // In browser environments
-  if (typeof window !== 'undefined') {
-    // For production Vercel deployments
-    if (process.env.NEXT_PUBLIC_VERCEL_ENV === 'production') {
-      return process.env.NEXT_PUBLIC_API_BASE_URL || 'https://learnfinity-spark.vercel.app';
-    }
-    // For preview Vercel deployments
-    if (process.env.NEXT_PUBLIC_VERCEL_ENV === 'preview') {
-      return process.env.NEXT_PUBLIC_VERCEL_URL ? 
-        `https://${process.env.NEXT_PUBLIC_VERCEL_URL}` : 
-        window.location.origin;
-    }
-    // Default to current origin (works for local dev and other cases)
-    return window.location.origin;
+// --- ADDED: Initialize Supabase Client for Vite ---
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+
+let supabase: SupabaseClient | null = null;
+if (supabaseUrl && supabaseAnonKey) {
+  try {
+    supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: true, // Allow session persistence in the browser
+        autoRefreshToken: true,
+        detectSessionInUrl: false
+      }
+    });
+    console.log('[RegenerateButton] Supabase client initialized for Vite.');
+  } catch (error) {
+      console.error('[RegenerateButton] Error initializing Supabase client:', error);
   }
-  // Server-side fallback
-  return process.env.NEXT_PUBLIC_API_BASE_URL || '';
+} else {
+    console.warn('[RegenerateButton] Missing Supabase URL or Anon Key in Vite env.');
+}
+// --- END: Initialize Supabase Client ---
+
+// Determine the correct base URL for API calls (prioritize Vite env)
+const getApiBaseUrl = () => {
+  // Use Vite environment variable if available
+  if (import.meta.env.VITE_API_BASE_URL) {
+    return import.meta.env.VITE_API_BASE_URL;
+  }
+  
+  // Fallback logic (can be simplified or removed if VITE_API_BASE_URL is always set)
+  if (typeof window !== 'undefined') {
+    console.warn('[RegenerateButton] VITE_API_BASE_URL not set, falling back to window.location.origin. Ensure VITE_API_BASE_URL is set in your .env file for the Express server.');
+    return window.location.origin; // Fallback for local dev if env var is missing
+  }
+  return ''; // Should not happen in browser
 };
 
 interface RegenerateContentButtonProps {
@@ -38,22 +56,41 @@ interface RegenerateContentButtonProps {
 
 export function RegenerateContentButton({ courseId, onSuccess, onError }: RegenerateContentButtonProps) {
   const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(false);
-  const [jobId, setJobId] = useState<string | undefined>(undefined);
-  const [showProgressDialog, setShowProgressDialog] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const { supabase } = useSupabase();
+  const [isLoading, setIsLoading] = React.useState(false);
+  const [jobId, setJobId] = React.useState<string | undefined>(undefined);
+  const [showProgressDialog, setShowProgressDialog] = React.useState(false);
+  const [isProcessing, setIsProcessing] = React.useState(false);
+  // REMOVED: const { supabase } = useSupabase(); // Use locally initialized client
 
-  const triggerJobProcessing = useCallback(async (jobId: string) => {
+  // --- Ensure Supabase client is available ---
+  if (!supabase) {
+      // Render a disabled button or an error message if Supabase isn't configured
+      return (
+          <Button variant="outline" size="sm" disabled>
+              Supabase Not Configured
+          </Button>
+      );
+  }
+  // --- END: Ensure Supabase client ---
+
+  const triggerJobProcessing = React.useCallback(async (jobId: string) => {
     const requestId = `trigger_${Date.now()}`;
     console.log(`[${requestId}] 🔄 Attempting to trigger job processing for: ${jobId}`);
     setIsProcessing(true);
 
+    // Ensure supabase client is available inside useCallback
+    if (!supabase) {
+        console.error(`[${requestId}] ❌ Supabase client not available in triggerJobProcessing`);
+        toast({ title: "Error", description: "Supabase client not configured.", variant: "destructive" });
+        setIsProcessing(false);
+        return;
+    }
+
     try {
       // Get Supabase session for auth token
       console.log(`[${requestId}] 🔐 Getting auth session for triggerJobProcessing`);
-      const session = await supabase.auth.getSession();
-      const authToken = session?.data?.session?.access_token;
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      const authToken = sessionData?.session?.access_token;
 
       if (!authToken) {
         console.error(`[${requestId}] ❌ No authentication token available`);
@@ -61,69 +98,39 @@ export function RegenerateContentButton({ courseId, onSuccess, onError }: Regene
       }
       console.log(`[${requestId}] ✅ Auth token retrieved`);
 
-      // Get the current deployment URL to avoid hardcoded domains
-      const baseDomain = window.location.origin;
-      console.log(`[${requestId}] 🌐 Using base domain: ${baseDomain}`);
-
-      // Try the direct API endpoint - try POST method first
-      const directApiEndpoint = `${baseDomain}/api/hr/courses/personalize-content/process`;
-      console.log(`[${requestId}] 📡 Calling direct API endpoint (POST) ${directApiEndpoint} for job ${jobId}`);
+      // Use the configured API base URL
+      const apiBase = getApiBaseUrl(); 
+      // Example: Target a specific processing endpoint on the Express server
+      // Adjust the path as needed based on your Express server routes
+      const processEndpoint = `${apiBase}/api/hr/courses/process-job`; 
+      console.log(`[${requestId}] 📡 Calling job processing endpoint (POST) ${processEndpoint} for job ${jobId}`);
       
-      try {
-        const directResponse = await fetch(directApiEndpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${authToken}`,
-            'Accept': 'application/json',
-            'Cache-Control': 'no-cache, no-store',
-            'Pragma': 'no-cache'
-          },
-          body: JSON.stringify({ 
-            job_id: jobId,
-            timestamp: Date.now() // Add timestamp to prevent caching issues
-          })
-        });
+      const response = await fetch(processEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`,
+          'Accept': 'application/json',
+          'Cache-Control': 'no-cache, no-store',
+          'Pragma': 'no-cache'
+        },
+        body: JSON.stringify({ 
+          job_id: jobId,
+          timestamp: Date.now() // Add timestamp to prevent caching issues
+        })
+      });
 
-        console.log(`[${requestId}] 📡 Direct POST API response status: ${directResponse.status}`);
-        if (directResponse.ok) {
-          const result = await directResponse.json();
-          console.log(`[${requestId}] ✅ Direct POST API response OK:`, result);
-          setIsProcessing(false);
-          return;
-        }
-        
-        console.warn(`[${requestId}] ⚠️ Direct POST API endpoint failed with status ${directResponse.status}. Trying GET method...`);
-  
-        // Final attempt - try GET method with direct API
-        const directGetEndpoint = `${directApiEndpoint}?job_id=${jobId}&_t=${Date.now()}`;
-        console.log(`[${requestId}] 📡 Calling direct API endpoint (GET) ${directGetEndpoint} for job ${jobId}`);
-        const directGetResponse = await fetch(directGetEndpoint, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${authToken}`,
-            'Accept': 'application/json',
-            'Cache-Control': 'no-cache, no-store',
-            'Pragma': 'no-cache'
-          }
-        });
-        
-        console.log(`[${requestId}] 📡 Direct GET API response status: ${directGetResponse.status}`);
-        if (directGetResponse.ok) {
-          const result = await directGetResponse.json();
-          console.log(`[${requestId}] ✅ Direct GET API response OK:`, result);
-          setIsProcessing(false);
-          return;
-        }
-        
-        // If all attempts fail, throw an error
-        const errorText = await directGetResponse.text();
-        console.error(`[${requestId}] ❌ All direct API attempts failed. Final status: ${directGetResponse.status}, Response: ${errorText}`);
-        throw new Error(`Failed to process job via any method: ${directGetResponse.status} ${directGetResponse.statusText}`);
-      } catch (directError) {
-        console.error(`[${requestId}] ❌ Error with direct API calls:`, directError);
-        throw directError; // Re-throw to be caught by the outer catch
+      console.log(`[${requestId}] 📡 Job processing API response status: ${response.status}`);
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`[${requestId}] ❌ Job processing API failed. Status: ${response.status}, Response: ${errorText}`);
+        throw new Error(`Failed to process job: ${response.status} ${response.statusText}`);
       }
+      
+      const result = await response.json();
+      console.log(`[${requestId}] ✅ Job processing API response OK:`, result);
+      // Further actions based on result if needed
+
     } catch (error) {
       console.error(`[${requestId}] ❌ Error processing job:`, error);
       toast({
@@ -134,33 +141,35 @@ export function RegenerateContentButton({ courseId, onSuccess, onError }: Regene
     } finally {
       setIsProcessing(false);
     }
-  }, [supabase, toast]);
+  }, [toast]); // Removed supabase from dependencies as it's now module-level
 
   const getApiEndpoints = (baseUrl: string) => {
+    // Update these URLs to point to your Express server
+    // Use the full URL provided by getApiBaseUrl()
     return [
-      // First priority: simplified flat path endpoint (most reliable in previews)
-      {
-        url: `${baseUrl}/api/hr-course-regenerate`,
-        method: 'POST',
-        description: 'Simplified endpoint'
-      },
-      // Second priority: standard API endpoint
+      // Standard endpoint (most likely the one migrated)
       {
         url: `${baseUrl}/api/hr/courses/regenerate-content`,
         method: 'POST',
-        description: 'Standard endpoint'
+        description: 'Standard Express endpoint'
       },
-      // Third priority: alternative endpoint
+      // Simplified endpoint (if you migrate this one too)
       {
-        url: `${baseUrl}/api/courses/regenerate`,
+        url: `${baseUrl}/api/hr-course-regenerate`, 
         method: 'POST',
-        description: 'Alternative endpoint'
+        description: 'Simplified Express endpoint'
       },
-      // Fourth priority: GET method for simplified endpoint
+      // Alternative endpoint (if migrated)
       {
-        url: `${baseUrl}/api/hr-course-regenerate`,
+        url: `${baseUrl}/api/courses/regenerate`, 
+        method: 'POST',
+        description: 'Alternative Express endpoint'
+      },
+      // GET method for standard endpoint (if supported by your Express route)
+      {
+        url: `${baseUrl}/api/hr/courses/regenerate-content`, 
         method: 'GET',
-        description: 'Simplified endpoint (GET)'
+        description: 'Standard Express endpoint (GET)'
       }
     ];
   };
@@ -177,7 +186,7 @@ export function RegenerateContentButton({ courseId, onSuccess, onError }: Regene
           'Cache-Control': 'no-cache, no-store',
           'Pragma': 'no-cache'
         },
-        credentials: 'include'
+        // credentials: 'include' // May not be needed if using Authorization header
       };
       
       // Add auth header if we have a token
@@ -196,7 +205,8 @@ export function RegenerateContentButton({ courseId, onSuccess, onError }: Regene
       if (endpoint.method === 'GET') {
         const params = new URLSearchParams();
         if (courseId) params.append('courseId', courseId);
-        if (authToken) params.append('access_token', authToken);
+        // Pass token in query only if absolutely necessary (Bearer header is preferred)
+        // if (authToken) params.append('access_token', authToken);
         params.append('_t', Date.now().toString()); // Cache buster
         url = `${url}?${params.toString()}`;
       }
@@ -208,30 +218,22 @@ export function RegenerateContentButton({ courseId, onSuccess, onError }: Regene
         console.log(`[${requestId}] ❌ ${endpoint.description} failed with status ${response.status}`);
         
         // Try to get error details from response
-        let errorText = '';
-        const contentType = response.headers.get('content-type');
-        
-        if (contentType && contentType.includes('application/json')) {
-          const errorData = await response.json();
-          errorText = JSON.stringify(errorData);
-        } else {
-          // Probably got HTML - this is our main issue
-          errorText = await response.text().then(text => 
-            text.length > 100 ? text.substring(0, 100) + '...' : text
-          );
-          console.log(`[${requestId}] ⚠️ Received non-JSON response: ${errorText}`);
-          throw new Error(`Server returned ${response.status} with non-JSON response`);
+        let errorDetails = '';
+        try {
+            const errorData = await response.json(); // Try parsing as JSON first
+            errorDetails = errorData?.message || errorData?.error || JSON.stringify(errorData);
+        } catch (e) {
+            errorDetails = await response.text(); // Fallback to text
         }
-        
-        throw new Error(`API returned ${response.status}: ${errorText}`);
+        console.log(`[${requestId}] ⚠️ Error details: ${errorDetails.substring(0, 200)}...`);
+        throw new Error(`API returned ${response.status}: ${errorDetails}`);
       }
       
-      // Explicitly check for JSON content type
+      // Explicitly check for JSON content type before parsing
       const contentType = response.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
-        console.log(`[${requestId}] ⚠️ Response not JSON, content-type: ${contentType}`);
         const text = await response.text();
-        console.log(`[${requestId}] ⚠️ Response body: ${text.substring(0, 100)}...`);
+        console.log(`[${requestId}] ⚠️ Response not JSON, content-type: ${contentType}, body: ${text.substring(0, 100)}...`);
         throw new Error('API returned non-JSON response');
       }
       
@@ -248,6 +250,14 @@ export function RegenerateContentButton({ courseId, onSuccess, onError }: Regene
   const handleRegenerate = async () => {
     setIsLoading(true);
     const requestId = `regen_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+
+    // Ensure supabase client is available inside handleRegenerate
+    if (!supabase) {
+        console.error(`[${requestId}] ❌ Supabase client not available in handleRegenerate`);
+        toast({ title: "Error", description: "Supabase client not configured.", variant: "destructive" });
+        setIsLoading(false);
+        return;
+    }
     
     try {
       console.log(`[${requestId}] 🔄 Starting content regeneration for course:`, courseId);
@@ -270,8 +280,11 @@ export function RegenerateContentButton({ courseId, onSuccess, onError }: Regene
       
       console.log(`[${requestId}] ✅ Authentication token retrieved successfully`);
       
-      // Get API base URL
+      // Get API base URL for Express server
       const apiBase = getApiBaseUrl();
+      if (!apiBase) {
+          throw new Error('API Base URL is not configured. Set VITE_API_BASE_URL.');
+      }
       console.log(`[${requestId}] 🌐 Using API base URL: ${apiBase}`);
       
       // Try multiple API endpoints in sequence until one succeeds
@@ -282,7 +295,7 @@ export function RegenerateContentButton({ courseId, onSuccess, onError }: Regene
       const requestBody = {
         courseId,
         forceRegenerate: true,
-        access_token: authToken,  // Include in body as fallback
+        // access_token: authToken, // Sending via Authorization header is preferred
       };
       
       for (const endpoint of endpoints) {
@@ -297,24 +310,24 @@ export function RegenerateContentButton({ courseId, onSuccess, onError }: Regene
       }
       
       if (!apiSuccess || !responseData) {
-        // Try test API to diagnose if there's a general API routing issue
-        try {
-          const testApiEndpoint = `${apiBase}/api/debug-api-health`;
-          console.log(`[${requestId}] 🔬 Trying diagnostic test API: ${testApiEndpoint}`);
-          
-          const testResponse = await fetch(testApiEndpoint);
-          if (testResponse.ok) {
-            const testData = await testResponse.json();
-            console.log(`[${requestId}] ✅ Test API is working:`, testData);
-            throw new Error('Content regeneration API endpoints are not working, but test API is. This suggests an issue with specific route configuration.');
-          } else {
-            console.log(`[${requestId}] ❌ Test API also failed with status ${testResponse.status}`);
-            throw new Error('All API endpoints failing. This suggests a general API routing issue on the server.');
-          }
-        } catch (testError) {
-          console.error(`[${requestId}] 💥 Test API error:`, testError);
-          throw new Error('All API endpoints failed, including test endpoint. Please try again later.');
-        }
+         console.error(`[${requestId}] ❌ All API endpoints failed.`);
+         // Check if Express server is reachable via debug endpoint
+         try {
+             const debugEndpoint = `${apiBase}/api/debug`; // Assuming /api/debug exists on Express server
+             console.log(`[${requestId}] 🔬 Trying diagnostic test API: ${debugEndpoint}`);
+             const testResponse = await fetch(debugEndpoint);
+             if (testResponse.ok) {
+                 const testData = await testResponse.json();
+                 console.log(`[${requestId}] ✅ Express debug API is working:`, testData);
+                 throw new Error('Content regeneration API endpoints are not working, but the Express server seems reachable. Check route paths and logic.');
+             } else {
+                 console.log(`[${requestId}] ❌ Express debug API failed with status ${testResponse.status}`);
+                 throw new Error('All API endpoints failing, including debug endpoint. Ensure the Express server is running and accessible at the configured VITE_API_BASE_URL.');
+             }
+         } catch (testError) {
+             console.error(`[${requestId}] 💥 Test API error:`, testError);
+             throw new Error(`All API endpoints failed. ${testError instanceof Error ? testError.message : 'Please try again later.'}`);
+         }
       }
       
       // Show progress tracking
@@ -322,10 +335,12 @@ export function RegenerateContentButton({ courseId, onSuccess, onError }: Regene
         setJobId(responseData.job_id);
         setShowProgressDialog(true);
         
-        // Manually trigger job processing
-        setTimeout(async () => {
-          await triggerJobProcessing(responseData.job_id);
-        }, 500);
+        // Manually trigger job processing (if needed by your Express backend)
+        // setTimeout(async () => {
+        //   await triggerJobProcessing(responseData.job_id);
+        // }, 500);
+      } else {
+          console.warn(`[${requestId}] ⚠️ No job_id received from API response. Cannot track progress.`);
       }
       
       toast({

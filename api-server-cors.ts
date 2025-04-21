@@ -8,6 +8,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 import * as fs from 'fs';
 import * as path from 'path';
+import { v4 as uuidv4 } from 'uuid';
 
 // Load environment variables - do this at the very beginning
 const result = dotenv.config();
@@ -39,7 +40,7 @@ const corsOptions = {
     callback(null, true);
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Cache-Control', 'Pragma'],
   credentials: true,
   preflightContinue: false,
   optionsSuccessStatus: 204,
@@ -62,16 +63,16 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   res.setHeader('Content-Type', 'application/json');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Cache-Control, Pragma');
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Max-Age', '86400'); // 24 hours
   next();
 });
 
-// Initialize Supabase - Look for both VITE_ prefixed and regular env vars
-const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
-const supabaseKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY || process.env.VITE_SUPABASE_SERVICE_KEY || '';
+// Initialize Supabase - Look for VITE_, non-prefixed, and NEXT_PUBLIC_ variants
+const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabaseServiceKey = process.env.VITE_SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_KEY || ''; // Typically no NEXT_PUBLIC_ for service key
 
 // Log what we found without exposing the full keys (security measure)
 console.log(`Using Supabase URL: ${supabaseUrl ? 'Found ✅' : 'Missing ❌'}`);
@@ -441,7 +442,7 @@ app.get('/api/learner/dashboard', async (req: Request, res: Response) => {
       'Content-Type': 'application/json',
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With, Accept'
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With, Accept, Cache-Control, Pragma'
     });
     
     return res.json(dashboardData);
@@ -463,6 +464,276 @@ app.get('/api/learner/dashboard', async (req: Request, res: Response) => {
     });
   }
 });
+
+// Logging helper function (consider moving to a shared utils file)
+const logWithTimestamp = (message: string, data?: any, requestId?: string) => {
+  const timestamp = new Date().toISOString();
+  const reqIdText = requestId ? `[ReqID:${requestId}] ` : '';
+  const logPrefix = `[${timestamp}] [EXPRESS-REGENERATE] ${reqIdText}`;
+  
+  if (data) {
+    console.log(`${logPrefix} ${message}`, typeof data === 'string' ? data : JSON.stringify(data, null, 2));
+  } else {
+    console.log(`${logPrefix} ${message}`);
+  }
+};
+
+// Common logic for processing regeneration
+async function processContentRegenerationExpress(
+  req: Request,
+  res: Response,
+  courseId: string,
+  userId: string,
+  forceRegenerate: boolean = true,
+  personalizationOptions: any = {},
+  requestId: string
+) {
+  logWithTimestamp(`🚀 Starting content regeneration process for course: ${courseId}`, undefined, requestId);
+  
+  if (!supabase || !supabaseAdmin) {
+      logWithTimestamp(`❌ Supabase client not initialized`, undefined, requestId);
+      return res.status(500).json({ error: 'Server configuration error: Supabase not initialized' });
+  }
+
+  // Create or update learner profile with these options
+  if (personalizationOptions && Object.keys(personalizationOptions).length > 0) {
+    logWithTimestamp(`📝 Updating learner profile for user: ${userId.substring(0, 8)}...`, undefined, requestId);
+    const { error } = await supabase
+      .from('learner_profiles')
+      .upsert({ user_id: userId, ...personalizationOptions });
+    if (error) logWithTimestamp(`❌ Error updating learner profile:`, error, requestId);
+    else logWithTimestamp(`✅ Learner profile updated successfully`, undefined, requestId);
+  }
+  
+  let targetEmployeeId = userId;
+  logWithTimestamp(`🔍 Looking up employee mapping for user: ${userId.substring(0, 8)}...`, undefined, requestId);
+  const { data: mappingData, error: mappingError } = await supabase
+    .from('employee_user_mapping')
+    .select('employee_id')
+    .eq('user_id', userId)
+    .single();
+  
+  if (mappingData?.employee_id) {
+    targetEmployeeId = mappingData.employee_id;
+    logWithTimestamp(`✅ Found employee mapping: ${targetEmployeeId.substring(0, 8)}...`, undefined, requestId);
+  } else {
+    logWithTimestamp(`⚠️ No employee mapping found, using user ID as employee ID`, undefined, requestId);
+  }
+  
+  logWithTimestamp(`🔍 Verifying course exists: ${courseId}`, undefined, requestId);
+  const { data: courseData, error: courseError } = await supabase
+    .from('hr_courses')
+    .select('*')
+    .eq('id', courseId)
+    .single();
+    
+  if (courseError || !courseData) {
+    logWithTimestamp(`❌ Error fetching course:`, courseError, requestId);
+    return res.status(404).json({ error: 'Course not found', details: courseError?.message });
+  }
+  logWithTimestamp(`✅ Course verified: ${courseData.title}`, undefined, requestId);
+  
+  logWithTimestamp(`🔍 Checking for existing jobs for course: ${courseId} and employee: ${targetEmployeeId}`, undefined, requestId);
+  const { data: existingJobs, error: jobQueryError } = await supabaseAdmin
+    .from('content_generation_jobs')
+    .select('*')
+    .eq('course_id', courseId)
+    .eq('employee_id', targetEmployeeId)
+    .in('status', ['pending', 'in_progress'])
+    .order('created_at', { ascending: false })
+    .limit(1);
+    
+  if (jobQueryError) {
+    logWithTimestamp(`⚠️ Error checking for existing jobs:`, jobQueryError, requestId);
+  } else if (existingJobs && existingJobs.length > 0) {
+    const existingJob = existingJobs[0];
+    logWithTimestamp(`✅ Found existing ${existingJob.status} job: ${existingJob.id}`, undefined, requestId);
+    await supabaseAdmin
+      .from('content_generation_jobs')
+      .update({ updated_at: new Date().toISOString() })
+      .eq('id', existingJob.id);
+      
+    logWithTimestamp(`🔄 Returning existing job ID: ${existingJob.id}`, undefined, requestId);
+    return res.json({
+      success: true,
+      message: `Reusing existing ${existingJob.status} job`,
+      job_id: existingJob.id,
+      status: existingJob.status,
+      current_step: existingJob.current_step,
+      progress: existingJob.progress
+    });
+  }
+  
+  const jobId = uuidv4();
+  logWithTimestamp(`📝 Creating job record with ID: ${jobId}`, undefined, requestId);
+  
+  const { error: jobError } = await supabaseAdmin
+    .from('content_generation_jobs')
+    .insert({
+      id: jobId,
+      course_id: courseId,
+      employee_id: targetEmployeeId,
+      status: 'in_progress',
+      total_steps: 10,
+      current_step: 1,
+      progress: 0,
+      step_description: 'Initializing content generation process',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      metadata: { personalization_options: personalizationOptions }
+    });
+    
+  if (jobError) {
+    logWithTimestamp(`❌ Error creating job record:`, jobError, requestId);
+    return res.status(500).json({ error: 'Failed to create job record', details: jobError.message });
+  }
+  logWithTimestamp(`✅ Job record created successfully, ID: ${jobId}`, undefined, requestId);
+  
+  // Placeholder content generation (adapt as needed from original logic)
+  const contentOutline = { /* ... simplified placeholder structure ... */ }; 
+  const personalizedContent = { /* ... simplified placeholder structure ... */ };
+
+  const { error: storageError } = await supabase
+    .from('hr_personalized_course_content')
+    .insert({
+        // Ensure this matches your table schema
+        id: jobId, 
+        course_id: courseId,
+        employee_id: targetEmployeeId,
+        content: personalizedContent, 
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        is_active: true 
+    });
+    
+  if (storageError) {
+    logWithTimestamp(`❌ Error storing placeholder content:`, storageError, requestId);
+    // Don't fail the request, but log the error
+  }
+
+  // Mark job as completed (or trigger async process here if needed)
+  await supabaseAdmin
+    .from('content_generation_jobs')
+    .update({
+      status: 'completed', // Or 'pending' if async
+      current_step: 10,
+      step_description: 'Placeholder content generated successfully',
+      progress: 100,
+      updated_at: new Date().toISOString(),
+      completed_at: new Date().toISOString() // Or null if async
+    })
+    .eq('id', jobId);
+    
+  return res.json({
+    success: true,
+    message: 'Course content regeneration started successfully (Placeholder)',
+    job_id: jobId,
+  });
+}
+
+// --- Express Route Handler Function ---
+const handleRegenerateContentRequest = async (req: Request, res: Response) => {
+  const requestId = uuidv4().slice(0, 8);
+  logWithTimestamp(`📩 Request received: ${req.method} ${req.path}`, undefined, requestId);
+
+  // Handle OPTIONS for CORS preflight
+  if (req.method === 'OPTIONS') {
+      logWithTimestamp(`↩️ Responding to OPTIONS request`, undefined, requestId);
+      // Add CORS headers specifically for the OPTIONS preflight response
+      res.setHeader('Access-Control-Allow-Origin', '*'); 
+      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+      // ADD Cache-Control and Pragma here as well for consistency
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Cache-Control, Pragma');
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+      res.setHeader('Access-Control-Max-Age', '86400');
+      return res.status(204).send();
+  }
+
+  if (!supabase) {
+    logWithTimestamp(`❌ Supabase client not ready`, undefined, requestId);
+    return res.status(500).json({ error: 'Server configuration error' });
+  }
+
+  try {
+    let userId: string | undefined;
+    let courseId: string | undefined;
+    let forceRegenerate: boolean = true;
+    let personalizationOptions: any = {};
+    
+    // Authentication: Prioritize Authorization header
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.replace('Bearer ', '');
+      logWithTimestamp(`🔐 Attempting Bearer token auth`, undefined, requestId);
+      const { data, error } = await supabase.auth.getUser(token);
+      if (!error && data.user) {
+        userId = data.user.id;
+        logWithTimestamp(`✅ Authenticated with Bearer token for user: ${userId?.substring(0, 8)}...`, undefined, requestId);
+      } else {
+         logWithTimestamp(`❌ Bearer token auth failed:`, error, requestId);
+      }
+    }
+    
+    // If no token auth, try access_token from query (for GET) or body (for POST fallback)
+    if (!userId) {
+        const accessToken = req.query.access_token as string || req.body?.access_token as string;
+        if (accessToken) {
+            logWithTimestamp(`🔐 Attempting access_token auth (from ${req.method === 'GET' ? 'query' : 'body'})`, undefined, requestId);
+            const { data, error } = await supabase.auth.getUser(accessToken);
+             if (!error && data.user) {
+                userId = data.user.id;
+                logWithTimestamp(`✅ Authenticated with access_token for user: ${userId?.substring(0, 8)}...`, undefined, requestId);
+            } else {
+                logWithTimestamp(`❌ access_token auth failed:`, error, requestId);
+            }
+        }
+    }
+
+    if (!userId) {
+      logWithTimestamp(`❌ Authentication failed`, undefined, requestId);
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    // Get parameters based on method
+    if (req.method === 'GET') {
+        courseId = req.query.courseId as string;
+        forceRegenerate = req.query.forceRegenerate !== 'false';
+        try {
+            const optionsParam = req.query.personalizationOptions as string;
+            if (optionsParam) personalizationOptions = JSON.parse(optionsParam);
+        } catch (e) {
+            logWithTimestamp(`⚠️ Failed to parse personalizationOptions from query:`, e, requestId);
+        }
+    } else if (req.method === 'POST') {
+        courseId = req.body?.courseId;
+        forceRegenerate = req.body?.forceRegenerate !== false;
+        personalizationOptions = req.body?.personalizationOptions || {};
+    } else {
+         logWithTimestamp(`❌ Method not allowed: ${req.method}`, undefined, requestId);
+         // Set Allow header for 405
+         res.setHeader('Allow', 'GET, POST, OPTIONS');
+         return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
+    }
+
+    if (!courseId) {
+      logWithTimestamp(`❌ Missing courseId`, undefined, requestId);
+      return res.status(400).json({ error: 'Course ID is required' });
+    }
+
+    // Process the request using the common logic function
+    return await processContentRegenerationExpress(req, res, courseId, userId, forceRegenerate, personalizationOptions, requestId);
+
+  } catch (error: any) {
+    logWithTimestamp(`❌ Unexpected error in route handler:`, error, requestId);
+    return res.status(500).json({ 
+      error: 'Internal Server Error', 
+      details: error.message || 'Unknown error' 
+    });
+  }
+};
+
+// --- Express Route Definition (using the handler function) ---
+app.all('/api/hr/courses/regenerate-content', handleRegenerateContentRequest);
 
 // Handle all OPTIONS requests for CORS preflight
 app.options('*', cors(corsOptions));

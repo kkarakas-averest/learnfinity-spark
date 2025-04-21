@@ -4,10 +4,19 @@ import tsconfigPaths from 'vite-tsconfig-paths';
 import path from 'path';
 import { componentTagger } from "lovable-tagger";
 
-export default defineConfig(({ mode }) => {
-  // Load environment variables
-  const env = loadEnv(mode, process.cwd(), ["VITE_", "NEXT_PUBLIC_"]);
-  
+// Load env vars at the top level
+const mode = process.env.MODE || 'development'; // Get mode or default
+const env = loadEnv(mode, process.cwd(), ["VITE_", "NEXT_PUBLIC_", "API_PORT"]);
+
+// Determine the API port (default to 3083 if not set)
+const apiPort = parseInt(env.API_PORT || '3083', 10);
+const apiTarget = `http://localhost:${apiPort}`;
+
+// Log the target being used
+console.log(`[vite.config.ts] Determined API Proxy Target: ${apiTarget}`);
+
+export default defineConfig((configEnv) => {
+  const { mode } = configEnv;
   // Log available environment variables in development mode
   if (mode === 'development') {
     console.log('\n🌍 Environment Variables Loaded in Vite Config:');
@@ -16,6 +25,7 @@ export default defineConfig(({ mode }) => {
         console.log(`- ${key}: ${key.includes('KEY') ? '******' : env[key]}`);
       }
     });
+    console.log(`- API_PORT: ${env.API_PORT || '(Not set, default 3083)'}`);
   }
   
   // Handle Supabase URL fallback if missing
@@ -33,9 +43,8 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [
       react(),
-      mode === 'development' && componentTagger(),
       tsconfigPaths()
-    ].filter(Boolean),
+    ],
     resolve: {
       alias: {
         '@': path.resolve(__dirname, './src'),
@@ -46,8 +55,10 @@ export default defineConfig(({ mode }) => {
       port: 8080,
       proxy: {
         '/api': {
-          target: 'http://localhost:3000',
+          target: apiTarget,
           changeOrigin: true,
+          secure: false,
+          ws: true,
         },
       },
     },
