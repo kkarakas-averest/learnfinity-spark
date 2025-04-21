@@ -15,10 +15,27 @@ function extractCourseIdFromPath(url: string): string | null {
 }
 
 // Initialize Supabase client
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://ujlqzkkkfatehxeqtbdl.supabase.co';
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_SERVICE_KEY || 
-  // Fallback to anon key for testing only (has limited permissions)
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqbHF6a2trZmF0ZWh4ZXF0YmRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MDMxODU3NTEsImV4cCI6MjAxODc2MTc1MX0.TbZvGrWFamWDOiHz3WDL8W13y5mRoQCSzuArmXuPQco';
+// Prioritize standard backend names, then VITE_/NEXT_PUBLIC_ as fallbacks
+const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_SERVICE_KEY;
+
+// Check if the essential variables were actually found
+if (!supabaseUrl || !supabaseServiceKey) {
+  console.error('CRITICAL ERROR: Missing Supabase URL or Service Key. Check Vercel Environment Variables.', { 
+    supabaseUrlValue: supabaseUrl ? supabaseUrl.substring(0, 8) + '...' : 'MISSING',
+    hasServiceKeyValue: Boolean(supabaseServiceKey),
+    envDetails: {
+      SUPABASE_URL: process.env.SUPABASE_URL ? 'Defined' : 'Undefined',
+      VITE_SUPABASE_URL: process.env.VITE_SUPABASE_URL ? 'Defined' : 'Undefined',
+      NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL ? 'Defined' : 'Undefined',
+      SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY ? 'Defined' : 'Undefined',
+      VITE_SUPABASE_SERVICE_KEY: process.env.VITE_SUPABASE_SERVICE_KEY ? 'Defined' : 'Undefined'
+    }
+  });
+  // Return 500 immediately if configuration is missing
+  // Note: We removed the hardcoded fallback keys/URL as they hide the real configuration issue.
+  // return res.status(500).json({ error: 'Server configuration error - missing Supabase credentials' });
+}
 
 // Set CORS headers helper function
 const setCorsHeaders = (res: VercelResponse) => {
@@ -94,30 +111,13 @@ export default async function handler(
   }
 
   try {
-    if (!supabaseUrl || !supabaseServiceKey) {
-      console.error('Missing Supabase credentials', { 
-        supabaseUrl,
-        hasUrl: Boolean(supabaseUrl), 
-        hasServiceKey: Boolean(supabaseServiceKey),
-        envVars: {
-          NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL ? 'defined' : 'undefined',
-          VITE_SUPABASE_URL: process.env.VITE_SUPABASE_URL ? 'defined' : 'undefined',
-          SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY ? 'defined' : 'undefined',
-          VITE_SUPABASE_SERVICE_KEY: process.env.VITE_SUPABASE_SERVICE_KEY ? 'defined' : 'undefined'
-        }
-      });
-      return res.status(500).json({ 
-        error: 'Server configuration error - missing Supabase credentials',
-        details: {
-          hasUrl: Boolean(supabaseUrl),
-          hasServiceKey: Boolean(supabaseServiceKey)
-        }
-      });
-    }
+    // Moved check outside/before the try block as it's a fatal config error
+    // if (!supabaseUrl || !supabaseServiceKey) { ... }
 
     // Initialize Supabase
-    console.log('Initializing Supabase with URL:', supabaseUrl.substring(0, 8) + '...');
-    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+    // Log removed as it's logged in the check above
+    // console.log('Initializing Supabase with URL:', supabaseUrl.substring(0, 8) + '...'); 
+    const supabase = createClient(supabaseUrl!, supabaseServiceKey!, {
       auth: {
         persistSession: false,
         autoRefreshToken: false
@@ -143,12 +143,12 @@ export default async function handler(
       // OPTIMIZATION: Try direct enrollment lookup first since that's the most likely case
       // Skip employee lookup entirely - assume the ID might be an employee ID already
       const { data: directEnrollment, error: directError } = await supabase
-        .from('hr_course_enrollments')
-        .select('*')
+    .from('hr_course_enrollments')
+    .select('*')
         .eq('employee_id', userId)
-        .eq('course_id', courseId)
-        .single();
-        
+    .eq('course_id', courseId)
+    .single();
+
       if (directEnrollment) {
         // Success! Return the enrollment directly without any employee lookup
         console.log('DIRECT HIT: Found enrollment directly using userId as employeeId', directEnrollment);
@@ -205,9 +205,9 @@ export default async function handler(
       if (employeeId === userId) {
         console.log('CIRCULAR REFERENCE: employee.id equals user_id', { employeeId, userId });
         // We already tried this ID in the direct lookup above
-        return res.status(404).json({ error: 'Enrollment not found' });
-      }
-      
+    return res.status(404).json({ error: 'Enrollment not found' });
+  }
+
       console.log('STEP 3: Found mapped employee ID, checking enrollment', { 
         employeeId, 
         userId, 
