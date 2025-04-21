@@ -33,7 +33,10 @@ export default defineConfig(({ mode }) => {
   
   return {
     plugins: [
-      react(),
+      react({ 
+        // Ensure React refresh works properly
+        include: '**/*.{jsx,tsx}',
+      }),
       mode === 'development' && componentTagger(),
       tsconfigPaths()
     ].filter(Boolean),
