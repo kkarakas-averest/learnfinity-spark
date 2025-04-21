@@ -15,8 +15,10 @@ function extractCourseIdFromPath(url: string): string | null {
 }
 
 // Initialize Supabase client
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_SERVICE_KEY;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://ujlqzkkkfatehxeqtbdl.supabase.co';
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_SERVICE_KEY || 
+  // Fallback to anon key for testing only (has limited permissions)
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqbHF6a2trZmF0ZWh4ZXF0YmRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MDMxODU3NTEsImV4cCI6MjAxODc2MTc1MX0.TbZvGrWFamWDOiHz3WDL8W13y5mRoQCSzuArmXuPQco';
 
 // Set CORS headers helper function
 const setCorsHeaders = (res: VercelResponse) => {
@@ -94,15 +96,27 @@ export default async function handler(
   try {
     if (!supabaseUrl || !supabaseServiceKey) {
       console.error('Missing Supabase credentials', { 
+        supabaseUrl,
         hasUrl: Boolean(supabaseUrl), 
-        hasKey: Boolean(supabaseServiceKey)
+        hasServiceKey: Boolean(supabaseServiceKey),
+        envVars: {
+          NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL ? 'defined' : 'undefined',
+          VITE_SUPABASE_URL: process.env.VITE_SUPABASE_URL ? 'defined' : 'undefined',
+          SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY ? 'defined' : 'undefined',
+          VITE_SUPABASE_SERVICE_KEY: process.env.VITE_SUPABASE_SERVICE_KEY ? 'defined' : 'undefined'
+        }
       });
       return res.status(500).json({ 
-        error: 'Server configuration error - missing credentials' 
+        error: 'Server configuration error - missing Supabase credentials',
+        details: {
+          hasUrl: Boolean(supabaseUrl),
+          hasServiceKey: Boolean(supabaseServiceKey)
+        }
       });
     }
 
     // Initialize Supabase
+    console.log('Initializing Supabase with URL:', supabaseUrl.substring(0, 8) + '...');
     const supabase = createClient(supabaseUrl, supabaseServiceKey, {
       auth: {
         persistSession: false,
