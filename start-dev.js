@@ -31,10 +31,11 @@ if (!fs.existsSync('api-server-cors-fix.js')) {
   process.exit(1);
 }
 
-// Start Vite dev server
-const viteProcess = spawn('npx', ['vite'], {
+// Start Vite dev server with custom tsconfig
+const viteProcess = spawn('npx', ['vite', '--config', 'vite.config.ts', '--force'], {
   stdio: 'pipe',
-  shell: true
+  shell: true,
+  env: { ...process.env, VITE_CUSTOM_TSCONFIG: 'tsconfig.local.json' }
 });
 
 console.log(`${colors.vite}[VITE] Starting dev server...${colors.reset}`);

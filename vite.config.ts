@@ -9,6 +9,9 @@ export default defineConfig(({ mode }) => {
   // Load environment variables
   const env = loadEnv(mode, process.cwd(), ["VITE_", "NEXT_PUBLIC_"]);
   
+  // Get custom tsconfig path from env or use default
+  const tsconfigPath = process.env.VITE_CUSTOM_TSCONFIG || 'tsconfig.json';
+  
   // Log available environment variables in development mode
   if (mode === 'development') {
     console.log('\n🌍 Environment Variables Loaded in Vite Config:');
@@ -17,6 +20,7 @@ export default defineConfig(({ mode }) => {
         console.log(`- ${key}: ${key.includes('KEY') ? '******' : env[key]}`);
       }
     });
+    console.log(`\n📄 Using TypeScript config: ${tsconfigPath}\n`);
   }
   
   // Handle Supabase URL fallback if missing
@@ -40,7 +44,10 @@ export default defineConfig(({ mode }) => {
         include: '**/*.{jsx,tsx}',
       }),
       mode === 'development' && componentTagger(),
-      tsconfigPaths()
+      tsconfigPaths({
+        // Use custom tsconfig path if provided
+        projects: [tsconfigPath]
+      })
     ].filter(Boolean),
     resolve: {
       alias: {
