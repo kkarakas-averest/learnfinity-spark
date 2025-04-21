@@ -365,7 +365,7 @@ const messagingService = {
   async getUnreadMessageCount(userId: string): Promise<{ count: number, error: Error | null }> {
     try {
       // Get conversations the user is part of
-      let { data: conversations, error: convError } = await supabase
+      const { data: conversations, error: convError } = await supabase
         .from('conversations')
         .select('id')
         .or(`employee_id.eq.${userId},hr_user_id.eq.${userId}`);

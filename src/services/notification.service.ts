@@ -506,7 +506,7 @@ export class NotificationService {
       const userId = notification.recipientId || 'system';
       const storageKey = `notifications_${userId}`;
       const storedData = localStorage.getItem(storageKey);
-      let notifications: Notification[] = storedData ? JSON.parse(storedData) : [];
+      const notifications: Notification[] = storedData ? JSON.parse(storedData) : [];
       
       // Add new notification
       notifications.push(notification);
