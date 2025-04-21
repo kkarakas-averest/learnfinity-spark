@@ -44,4 +44,38 @@ export async function enrollInCourse(courseId: string, userId: string) {
       message: error instanceof Error ? error.message : 'Unknown error occurred',
     };
   }
+}
+
+/**
+ * Get enrollment information for a user in a course
+ * @param courseId - The ID of the course
+ * @param userId - The ID of the user
+ * @returns Promise with the enrollment data
+ */
+export async function getEnrollment(courseId: string, userId: string) {
+  try {
+    const response = await fetch(`/api/hr/courses/${courseId}/enrollment?userId=${encodeURIComponent(userId)}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to fetch enrollment data');
+    }
+
+    const data = await response.json();
+    return {
+      success: true,
+      enrollment: data.enrollment,
+    };
+  } catch (error) {
+    console.error('Error fetching enrollment:', error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : 'Unknown error occurred',
+    };
+  }
 } 

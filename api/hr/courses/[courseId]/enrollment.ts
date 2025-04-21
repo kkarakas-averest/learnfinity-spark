@@ -38,11 +38,6 @@ export default async function handler(
     body: typeof req.body === 'object' ? 'Has body' : 'No body'
   });
 
-  // Only allow POST method
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-
   // Get course ID from the URL
   const { courseId } = req.query;
   
@@ -63,62 +58,99 @@ export default async function handler(
 
     // Initialize Supabase
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Handle GET request - check enrollment for a user
+    if (req.method === 'GET') {
+      const userId = req.query.userId as string;
+      
+      if (!userId) {
+        return res.status(400).json({ error: 'User ID is required as a query parameter' });
+      }
+      
+      console.log('Checking enrollment status via GET', { userId, courseId });
+
+      // Check if the user is already enrolled
+      const { data: enrollment, error: checkError } = await supabase
+        .from('enrollments')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('course_id', courseId)
+        .single();
+
+      if (checkError && checkError.code !== 'PGRST116') { // PGRST116 is "no rows returned"
+        console.error('Error checking enrollment:', checkError);
+        return res.status(500).json({ error: checkError.message });
+      }
+
+      if (!enrollment) {
+        return res.status(404).json({ error: 'Enrollment not found' });
+      }
+
+      console.log('Retrieved enrollment', enrollment);
+      return res.status(200).json({ enrollment });
+    }
     
-    // Get the user data from the request body
-    const { userId } = req.body;
-    
-    if (!userId) {
-      return res.status(400).json({ error: 'User ID is required' });
+    // Handle POST request - create new enrollment
+    if (req.method === 'POST') {
+      // Get the user data from the request body
+      const { userId } = req.body;
+      
+      if (!userId) {
+        return res.status(400).json({ error: 'User ID is required in request body' });
+      }
+
+      console.log('Checking enrollment status via POST', { userId, courseId });
+
+      // Check if the user is already enrolled
+      const { data: existingEnrollment, error: checkError } = await supabase
+        .from('enrollments')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('course_id', courseId)
+        .single();
+
+      if (checkError && checkError.code !== 'PGRST116') { // PGRST116 is "no rows returned"
+        console.error('Error checking enrollment:', checkError);
+        return res.status(500).json({ error: checkError.message });
+      }
+
+      if (existingEnrollment) {
+        console.log('User already enrolled', existingEnrollment);
+        return res.status(409).json({ 
+          error: 'Already enrolled',
+          enrollment: existingEnrollment
+        });
+      }
+
+      console.log('Creating new enrollment');
+
+      // Create the enrollment
+      const { data: enrollment, error } = await supabase
+        .from('enrollments')
+        .insert({
+          user_id: userId,
+          course_id: courseId,
+          status: 'active',
+          enrolled_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Enrollment error:', error);
+        return res.status(500).json({ error: error.message });
+      }
+
+      console.log('Enrollment successful', enrollment);
+
+      // Return the enrollment data
+      return res.status(201).json({ enrollment });
     }
 
-    console.log('Checking enrollment status', { userId, courseId });
-
-    // Check if the user is already enrolled
-    const { data: existingEnrollment, error: checkError } = await supabase
-      .from('enrollments')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('course_id', courseId)
-      .single();
-
-    if (checkError && checkError.code !== 'PGRST116') { // PGRST116 is "no rows returned"
-      console.error('Error checking enrollment:', checkError);
-      return res.status(500).json({ error: checkError.message });
-    }
-
-    if (existingEnrollment) {
-      console.log('User already enrolled', existingEnrollment);
-      return res.status(409).json({ 
-        error: 'Already enrolled',
-        enrollment: existingEnrollment
-      });
-    }
-
-    console.log('Creating new enrollment');
-
-    // Create the enrollment
-    const { data: enrollment, error } = await supabase
-      .from('enrollments')
-      .insert({
-        user_id: userId,
-        course_id: courseId,
-        status: 'active',
-        enrolled_at: new Date().toISOString(),
-      })
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Enrollment error:', error);
-      return res.status(500).json({ error: error.message });
-    }
-
-    console.log('Enrollment successful', enrollment);
-
-    // Return the enrollment data
-    return res.status(201).json({ enrollment });
+    // If we get here, it's an unsupported method
+    return res.status(405).json({ error: 'Method not allowed' });
   } catch (error) {
     console.error('Server error:', error);
-    return res.status(500).json({ error: 'Failed to enroll in course' });
+    return res.status(500).json({ error: 'Failed to process enrollment request' });
   }
 }
