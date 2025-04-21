@@ -178,7 +178,7 @@ export default async function handler(
     // 2. Get the employee data
     const { data: employeeData, error: employeeError } = await supabase
       .from('hr_employees')
-      .select('*, department:hr_departments(*), position:hr_job_positions(*)')
+      .select('*, department:hr_departments(*), position:hr_positions(*)')
       .eq('id', employeeId)
       .single();
       
