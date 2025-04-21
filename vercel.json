@@ -44,6 +44,6 @@
     "GROQ_API_KEY": "${GROQ_API_KEY}",
     "NODE_ENV": "production",
     "VERCEL_DEPLOYMENT": "true",
-    "DEPLOYMENT_TIMESTAMP": "2024-06-18-fix-env-compatibility"
+    "DEPLOYMENT_TIMESTAMP": "2024-06-21-force-api-function-deployment"
   }
 }
