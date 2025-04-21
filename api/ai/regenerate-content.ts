@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { v4 as uuidv4 } from 'uuid';
+import Groq from 'groq-sdk'; // Import Groq SDK
 
 // Set CORS headers helper function
 const setCorsHeaders = (res: VercelResponse) => {
@@ -25,6 +26,8 @@ const HARDCODED_SUPABASE_URL = 'https://ujlqzkkkfatehxeqtbdl.supabase.co';
 // Instead, add SUPABASE_SERVICE_ROLE_KEY to Vercel environment variables for Production, Preview, and Development
 // ⚠️ TESTING ONLY: Using provided hardcoded key for testing. REMOVE BEFORE COMMIT/DEPLOY. ⚠️
 const HARDCODED_SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqbHF6a2trZmF0ZWh4ZXF0YmRsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0MDY4MDgzMiwiZXhwIjoyMDU2MjU2ODMyfQ.A2AVZwetKe-CIJUzVcNm0OdNlceABZvDFU6YsX3kDRA';
+// ⚠️ TESTING ONLY: Using provided hardcoded Groq key for testing. REMOVE BEFORE COMMIT/DEPLOY. ⚠️
+const HARDCODED_GROQ_API_KEY = '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';
 
 // Simple logging helper with timestamps
 const logWithTimestamp = (message: string, data?: any, requestId?: string) => {
@@ -68,6 +71,8 @@ export default async function handler(
   let supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 
                            process.env.VITE_SUPABASE_SERVICE_KEY;
 
+  let groqApiKey = process.env.GROQ_API_KEY || process.env.VITE_GROQ_API_KEY; // Read Groq Key
+
   // --- BEGIN: Detailed Environment Logging ---
   const mask = (val?: string) => {
     if (!val) return '[empty]';
@@ -86,14 +91,17 @@ export default async function handler(
     VITE_GROQ_API_KEY: process.env.VITE_GROQ_API_KEY ? 'Defined' : 'Undefined',
     HARDCODED_SUPABASE_URL: HARDCODED_SUPABASE_URL,
     HARDCODED_SERVICE_KEY: mask(HARDCODED_SERVICE_KEY),
+    HARDCODED_GROQ_API_KEY: HARDCODED_GROQ_API_KEY,
     usedSupabaseUrl: supabaseUrl,
     usedServiceKey: mask(supabaseServiceKey),
+    usedGroqApiKey: mask(groqApiKey),
   };
   logWithTimestamp('==== ENV DEBUG START ====', logEnv, requestId);
   if (!process.env.SUPABASE_URL) logWithTimestamp('SUPABASE_URL is missing', undefined, requestId);
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) logWithTimestamp('SUPABASE_SERVICE_ROLE_KEY is missing', undefined, requestId);
   if (supabaseUrl && (supabaseUrl.includes('$') || supabaseUrl.includes('{'))) logWithTimestamp('supabaseUrl contains unresolved placeholder:', supabaseUrl, requestId);
   if (supabaseServiceKey && (supabaseServiceKey.includes('$') || supabaseServiceKey.includes('{'))) logWithTimestamp('supabaseServiceKey contains unresolved placeholder:', mask(supabaseServiceKey), requestId);
+  if (groqApiKey && (groqApiKey.includes('$') || groqApiKey.includes('{'))) logWithTimestamp('groqApiKey contains unresolved placeholder:', mask(groqApiKey), requestId);
   // --- END: Detailed Environment Logging ---
 
   // CRITICAL: Check if Supabase URL contains placeholders and use hardcoded value if needed
@@ -106,6 +114,12 @@ export default async function handler(
   if (!supabaseServiceKey || supabaseServiceKey.includes('$') || supabaseServiceKey.includes('{')) {
     logWithTimestamp('WARNING: Using hardcoded Supabase service key because environment variable contains placeholders or is undefined', undefined, requestId);
     supabaseServiceKey = HARDCODED_SERVICE_KEY;
+  }
+
+  // CRITICAL: Check if Groq API key is missing or contains placeholders
+  if (!groqApiKey || groqApiKey.includes('$') || groqApiKey.includes('{')) {
+    logWithTimestamp('WARNING: Using hardcoded Groq API key because environment variable contains placeholders or is undefined', undefined, requestId);
+    groqApiKey = HARDCODED_GROQ_API_KEY;
   }
 
   // Check if the essential variables were found and EXIT EARLY if service key is missing or invalid
@@ -144,9 +158,12 @@ export default async function handler(
   
   logWithTimestamp(`Starting regeneration process for course: ${courseId} and employee: ${employeeId}`, undefined, requestId);
 
+  let supabase: SupabaseClient | null = null;
+  let jobId: string | null = null;
+
   try {
     // Initialize Supabase with our working credentials
-    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+    supabase = createClient(supabaseUrl, supabaseServiceKey, {
       auth: {
         persistSession: false,
         autoRefreshToken: false
@@ -154,7 +171,7 @@ export default async function handler(
     });
 
     // Create job record with ID for tracking this regeneration request
-    const jobId = uuidv4();
+    jobId = uuidv4();
     logWithTimestamp(`Creating job record with ID: ${jobId}`, undefined, requestId);
     
     // 1. Get the course data
@@ -196,7 +213,7 @@ export default async function handler(
     // 3. Get the employee skills
     const { data: skills, error: skillsError } = await supabase
       .from('hr_employee_skills')
-      .select('*, skill:hr_skills(*)')
+      .select('*, skill:hr_skills(id, name, category)')
       .eq('employee_id', employeeId);
       
     if (skillsError) {
