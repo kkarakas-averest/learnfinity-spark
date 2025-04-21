@@ -513,7 +513,7 @@ Ensure the HTML content includes proper formatting with headings, paragraphs, li
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userPrompt }
         ],
-        model: 'llama-3.1-70b-versatile', // Using the more capable versatile model
+        model: 'llama-3.3-70b-versatile', // Using the latest versatile model
         temperature: 0.7,
         max_tokens: 8192, // Increased token limit for longer content
         response_format: { type: "json_object" }, // Request JSON output
@@ -594,7 +594,7 @@ Ensure the HTML content includes proper formatting with headings, paragraphs, li
           personalization_context: employeeData?.cv_extracted_data || {},
           metadata: { 
               generation_method: 'groq', 
-              model_used: 'llama-3.1-70b-versatile',
+              model_used: 'llama-3.3-70b-versatile',
               job_id: jobId,
               request_id: requestId,
               updated: new Date().toISOString()
@@ -639,7 +639,7 @@ Ensure the HTML content includes proper formatting with headings, paragraphs, li
           personalization_context: employeeData?.cv_extracted_data || {},
           metadata: { 
               generation_method: 'groq', 
-              model_used: 'llama-3.1-70b-versatile',
+              model_used: 'llama-3.3-70b-versatile',
               job_id: jobId,
               request_id: requestId 
           },
