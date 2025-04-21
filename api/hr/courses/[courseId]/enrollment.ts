@@ -2,8 +2,8 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 
 // Initialize Supabase client
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_SERVICE_KEY;
 
 // Set CORS headers helper function
 const setCorsHeaders = (res: VercelResponse) => {
@@ -13,6 +13,12 @@ const setCorsHeaders = (res: VercelResponse) => {
   res.setHeader('Access-Control-Allow-Headers', 
     'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization');
   return res;
+};
+
+// Explicitly set the runtime to Node.js (not Edge)
+export const config = {
+  runtime: 'nodejs',
+  regions: ['iad1'], // Default Washington DC region
 };
 
 export default async function handler(
@@ -27,6 +33,12 @@ export default async function handler(
     return res.status(200).end();
   }
 
+  console.log('Request received for enrollment API', { 
+    method: req.method, 
+    query: req.query,
+    body: typeof req.body === 'object' ? 'Has body' : 'No body'
+  });
+
   // Only allow POST method
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -40,6 +52,16 @@ export default async function handler(
   }
 
   try {
+    if (!supabaseUrl || !supabaseServiceKey) {
+      console.error('Missing Supabase credentials', { 
+        hasUrl: Boolean(supabaseUrl), 
+        hasKey: Boolean(supabaseServiceKey)
+      });
+      return res.status(500).json({ 
+        error: 'Server configuration error - missing credentials' 
+      });
+    }
+
     // Initialize Supabase
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     
@@ -50,20 +72,30 @@ export default async function handler(
       return res.status(400).json({ error: 'User ID is required' });
     }
 
+    console.log('Checking enrollment status', { userId, courseId });
+
     // Check if the user is already enrolled
-    const { data: existingEnrollment } = await supabase
+    const { data: existingEnrollment, error: checkError } = await supabase
       .from('enrollments')
       .select('*')
       .eq('user_id', userId)
       .eq('course_id', courseId)
       .single();
 
+    if (checkError && checkError.code !== 'PGRST116') { // PGRST116 is "no rows returned"
+      console.error('Error checking enrollment:', checkError);
+      return res.status(500).json({ error: checkError.message });
+    }
+
     if (existingEnrollment) {
+      console.log('User already enrolled', existingEnrollment);
       return res.status(409).json({ 
         error: 'Already enrolled',
         enrollment: existingEnrollment
       });
     }
+
+    console.log('Creating new enrollment');
 
     // Create the enrollment
     const { data: enrollment, error } = await supabase
@@ -81,6 +113,8 @@ export default async function handler(
       console.error('Enrollment error:', error);
       return res.status(500).json({ error: error.message });
     }
+
+    console.log('Enrollment successful', enrollment);
 
     // Return the enrollment data
     return res.status(201).json({ enrollment });
