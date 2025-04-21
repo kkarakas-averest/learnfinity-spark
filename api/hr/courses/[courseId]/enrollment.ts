@@ -24,10 +24,14 @@ const setCorsHeaders = (res: VercelResponse) => {
   return res;
 };
 
-// Configure regions only
+// Export runtime configuration for Vercel Serverless Functions
 export const config = {
-  regions: ['iad1'], // Default Washington DC region
+  runtime: 'nodejs18.x', // Explicitly define the runtime 
+  regions: ['iad1'], // Washington DC region
 };
+
+// HARDCODED FALLBACK VALUES - Only used if environment variables fail
+const HARDCODED_SUPABASE_URL = 'https://ujlqzkkkfatehxeqtbdl.supabase.co';
 
 export default async function handler(
   req: VercelRequest,
@@ -51,12 +55,23 @@ export default async function handler(
   });
 
   // *** STEP 1: Read and Validate Env Vars INSIDE the handler ***
-  const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_SERVICE_KEY;
+  // Try all possible environment variable names without using string interpolation
+  let supabaseUrl = process.env.SUPABASE_URL || 
+                    process.env.VITE_SUPABASE_URL || 
+                    process.env.NEXT_PUBLIC_SUPABASE_URL;
+  
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 
+                             process.env.VITE_SUPABASE_SERVICE_KEY;
 
-  // Check if the essential variables were actually found and EXIT EARLY
-  if (!supabaseUrl || !supabaseServiceKey) {
-    console.error('CRITICAL ERROR: Missing Supabase URL or Service Key. Check Vercel Environment Variables.', { 
+  // CRITICAL: Check if Supabase URL contains placeholders and use hardcoded value if needed
+  if (!supabaseUrl || supabaseUrl.includes('$') || supabaseUrl.includes('{')) {
+    console.warn('WARNING: Using hardcoded Supabase URL because environment variable contains placeholders or is undefined');
+    supabaseUrl = HARDCODED_SUPABASE_URL;
+  }
+
+  // Check if the essential variables were found and EXIT EARLY if service key is missing
+  if (!supabaseServiceKey) {
+    console.error('CRITICAL ERROR: Missing Supabase Service Key. Check Vercel Environment Variables.', { 
       supabaseUrlValue: supabaseUrl ? supabaseUrl.substring(0, 8) + '...' : 'MISSING',
       hasServiceKeyValue: Boolean(supabaseServiceKey),
       envDetails: {
@@ -68,25 +83,8 @@ export default async function handler(
       }
     });
     // EXIT HERE if config is missing
-    return res.status(500).json({ error: 'Server configuration error - missing Supabase credentials' });
+    return res.status(500).json({ error: 'Server configuration error - missing Supabase service key' });
   }
-
-  // NEW CHECK: Detect unresolved placeholder variables (containing $)
-  if (supabaseUrl.includes('$')) {
-    console.error('CRITICAL ERROR: Supabase URL contains unresolved placeholders:', supabaseUrl);
-    return res.status(500).json({ 
-      error: 'Server configuration error - Supabase URL contains unresolved placeholders. Verify Vercel environment variables are correctly set WITHOUT prefixes.',
-      debug_url: supabaseUrl
-    });
-  }
-
-  if (supabaseServiceKey.includes('$')) {
-    console.error('CRITICAL ERROR: Supabase Service Key contains unresolved placeholders');
-    return res.status(500).json({ 
-      error: 'Server configuration error - Supabase Service Key contains unresolved placeholders. Verify Vercel environment variables are correctly set WITHOUT prefixes.'
-    });
-  }
-  // *** END Env Var Check ***
 
   // *** STEP 2: Nullify body if GET (keep this) ***
   if (req.method === 'GET') {
@@ -102,7 +100,8 @@ export default async function handler(
     query: req.query,
     body: req.body ? 'Has body' : 'No body',
     headers: req.headers,
-    url: req.url
+    url: req.url,
+    supabaseUrlConfig: supabaseUrl.substring(0, 20) + '...' // Log partial URL to confirm it's correct
   });
 
   // *** STEP 4: Extract and Validate courseId (keep this) ***
@@ -137,7 +136,7 @@ export default async function handler(
   // *** STEP 5: Main Try/Catch Block ***
   try {
     // Initialize Supabase INSIDE try block, using validated variables
-    console.log('Initializing Supabase with URL:', supabaseUrl.substring(0, 8) + '...'); 
+    console.log('Initializing Supabase with URL:', supabaseUrl.substring(0, 20) + '...'); 
     const supabase = createClient(supabaseUrl, supabaseServiceKey, {
       auth: {
         persistSession: false,
