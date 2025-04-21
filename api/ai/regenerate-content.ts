@@ -193,23 +193,54 @@ export default async function handler(
     logWithTimestamp(`Course verified: ${courseData.title}`, undefined, requestId);
     
     // 2. Get the employee data
-    const { data: employeeData, error: employeeError } = await supabase
+    const { data: employeeDataRaw, error: employeeError } = await supabase
       .from('hr_employees')
-      // Select specific fields including cv_extracted_data
-      .select('id, name, cv_extracted_data, department:hr_departments(name), position:hr_positions(name)')
+      // Fetch required fields and related department/position names
+      .select('id, name, cv_extracted_data, department_id, position_id, hr_departments(name), hr_positions(name)')
       .eq('id', employeeId)
       .single();
       
-    if (employeeError || !employeeData) {
+    if (employeeError || !employeeDataRaw) {
       logWithTimestamp(`Error fetching employee:`, employeeError, requestId);
       return res.status(404).json({ 
         error: 'Employee not found', 
-        details: employeeError?.message,
+        details: employeeError?.message || 'Unknown error fetching employee data',
         requestId 
       });
     }
+
+    // Map the data to flatten department/position names
+    const employeeData = {
+      ...employeeDataRaw,
+      // Access the first element if it's an array, otherwise use the object directly
+      department_name: Array.isArray(employeeDataRaw.hr_departments) 
+                          ? employeeDataRaw.hr_departments[0]?.name 
+                          : employeeDataRaw.hr_departments?.name 
+                          || null,
+      position_title: Array.isArray(employeeDataRaw.hr_positions) 
+                          ? employeeDataRaw.hr_positions[0]?.name 
+                          : employeeDataRaw.hr_positions?.name 
+                          || null,
+      // Optionally clear the original nested structures after mapping
+      hr_departments: undefined,
+      hr_positions: undefined,
+    };
+    delete employeeData.hr_departments; // Clean up mapped object
+    delete employeeData.hr_positions;   // Clean up mapped object
+
+    // Check if cv_extracted_data exists on the mapped object
+    if (!employeeData.cv_extracted_data) {
+        logWithTimestamp(`Missing cv_extracted_data for employee: ${employeeId}`, employeeData, requestId);
+        // Decide how to handle missing CV data - throw error or proceed with default content?
+        // For now, throwing an error as personalization depends on it.
+        return res.status(400).json({ 
+            error: 'Missing CV data for employee', 
+            details: 'Cannot generate personalized content without employee CV information.',
+            requestId 
+        });
+    }
     
-    logWithTimestamp(`Employee verified: ${employeeData.name}`, undefined, requestId);
+    logWithTimestamp(`Employee verified: ${employeeData.name}, Position: ${employeeData.position_title}, Dept: ${employeeData.department_name}`, undefined, requestId);
     
     // 3. Get the employee skills
     const { data: skills, error: skillsError } = await supabase
@@ -325,6 +356,8 @@ export default async function handler(
     
     // Ensure we have the necessary data
     if (!employeeData?.cv_extracted_data) {
+      // This check might be redundant now due to the earlier check, but kept for safety
+      logWithTimestamp(`CRITICAL: cv_extracted_data somehow became null after mapping`, employeeData, requestId);
       throw new Error('Missing cv_extracted_data for the employee.');
     }
     if (!courseData?.title || !courseData?.description) {
