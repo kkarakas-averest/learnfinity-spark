@@ -195,8 +195,8 @@ export default async function handler(
     // 2. Get the employee data
     const { data: employeeDataRaw, error: employeeError } = await supabase
       .from('hr_employees')
-      // Fetch required fields and related department/position names
-      .select('id, name, cv_extracted_data, department_id, position_id, hr_departments(name), hr_positions(name)')
+      // Fetch required fields and related department/position titles
+      .select('id, name, cv_extracted_data, department_id, position_id, hr_departments(name), hr_positions(title)')
       .eq('id', employeeId)
       .single();
       
@@ -218,8 +218,8 @@ export default async function handler(
                           : employeeDataRaw.hr_departments?.name 
                           || null,
       position_title: Array.isArray(employeeDataRaw.hr_positions) 
-                          ? employeeDataRaw.hr_positions[0]?.name 
-                          : employeeDataRaw.hr_positions?.name 
+                          ? employeeDataRaw.hr_positions[0]?.title 
+                          : employeeDataRaw.hr_positions?.title 
                           || null,
       // Optionally clear the original nested structures after mapping
       hr_departments: undefined,
