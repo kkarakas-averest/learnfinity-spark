@@ -633,7 +633,8 @@ OUTPUT FORMAT:
           id: uuidv4(),
           content_id: actualContentId,
           module_id: moduleUuid,
-          section_id: section.section_id || uuidv4(),
+          section_id: uuidv4(), // Always use a generated UUID for section_id
+          logical_section_id: section.section_id || null, // Store the logical string ID for display
           title: section.title,
           content: section.content,
           case_study: section.case_study,

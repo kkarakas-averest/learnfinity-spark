@@ -138,7 +138,12 @@ const PersonalizedCourseContent: React.FC<PersonalizedCourseContentProps> = ({
               {module.sections.map((section: AICourseContentSection, index: number) => (
                 <Card key={index}>
                   <CardHeader>
-                    <CardTitle className="text-lg">{section.title}</CardTitle>
+                    <CardTitle className="text-lg">
+                      {section.logical_section_id ? (
+                        <span className="text-xs text-muted-foreground mr-2">{section.logical_section_id}</span>
+                      ) : null}
+                      {section.title}
+                    </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div 

@@ -38,6 +38,7 @@ export interface AICourseContentSection {
   content: string;
   module_id: string;
   section_id: string;
+  logical_section_id?: string;
   order_index: number;
   created_at?: string;
   updated_at?: string;
