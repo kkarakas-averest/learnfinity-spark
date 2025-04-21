@@ -16,8 +16,7 @@
     "isolatedModules": true,
     "noEmit": true,
     "jsx": "react-jsx",
-    "jsxImportSource": "@/lib/react-helpers",
-
+    
     /* Linting */
     "strict": true,
     "noUnusedLocals": false,
