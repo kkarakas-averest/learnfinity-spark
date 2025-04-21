@@ -1,3 +1,4 @@
+
 /**
  * Base configuration for all agents
  */
@@ -23,7 +24,7 @@ export interface Agent {
   /**
    * Initialize the agent
    */
-  initialize(): Promise<void>;
+  initialize(): Promise<{ success: boolean; message?: string }>;
   
   /**
    * Process a task assigned to this agent
@@ -46,4 +47,4 @@ export interface Agent {
     currentTask?: string;
     lastActivity?: Date;
   }>;
-} 
+}

@@ -1,3 +1,4 @@
+
 /**
  * Type definitions for the Multi-Agent System
  * 
@@ -69,4 +70,4 @@ export interface MultiAgentSystem {
   initialize: () => Promise<{ success: boolean; message?: string }>;
   getAgent: <T extends Agent>(agentType: string) => T | null;
   processTask: (taskType: string, data: any) => Promise<any>;
-} 
+}
