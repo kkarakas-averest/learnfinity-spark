@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
@@ -88,101 +89,6 @@ const RegenerateContentButtonVite: React.FC<RegenerateContentButtonViteProps> = 
     } catch (error: any) {
       logOperation(`❌ Error fetching employee data: ${error.message}`);
       throw new Error(`Failed to get employee data: ${error.message}`);
-    }
-  };
-
-  // Function to fetch course data
-  const fetchCourseData = async (courseId: string) => {
-    updateProgress("Fetching course details...");
-    try {
-      const response = await fetch(`/api/hr/courses/${courseId}`, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch course data: ${response.status}`);
-      }
-
-      return await response.json();
-    } catch (error: any) {
-      logOperation(`❌ Error fetching course data: ${error.message}`);
-      throw new Error(`Failed to get course data: ${error.message}`);
-    }
-  };
-
-  // Function to generate personalized content
-  const generatePersonalizedContent = async (
-    courseId: string,
-    courseData: any,
-    employeeData: any
-  ) => {
-    updateProgress("Generating personalized content...");
-    try {
-      const payload = {
-        courseId,
-        courseTitle: courseData.title,
-        courseDescription: courseData.description,
-        employeeId: employeeData.employeeId,
-        employeeName: employeeData.name,
-        position: employeeData.position,
-        department: employeeData.department,
-        profileData: employeeData.cvData
-      };
-
-      // First try using the course content generation endpoint
-      const response = await fetch(`/api/hr/courses/enhance-content`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Server responded with ${response.status}`);
-      }
-
-      return await response.json();
-    } catch (error: any) {
-      logOperation(`❌ Error generating content: ${error.message}`);
-      throw new Error(`Failed to generate personalized content: ${error.message}`);
-    }
-  };
-
-  // Function to save the generated content to the database
-  const saveGeneratedContent = async (
-    courseId: string, 
-    employeeId: string,
-    content: any
-  ) => {
-    updateProgress("Saving personalized content...");
-    try {
-      const savePayload = {
-        courseId,
-        employeeId,
-        content,
-        isActive: true,
-      };
-
-      const saveResponse = await fetch(`/api/hr/courses/save-personalized-content`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(savePayload),
-      });
-
-      if (!saveResponse.ok) {
-        throw new Error(`Failed to save content: ${saveResponse.status}`);
-      }
-
-      return await saveResponse.json();
-    } catch (error: any) {
-      logOperation(`❌ Error saving content: ${error.message}`);
-      throw new Error(`Failed to save personalized content: ${error.message}`);
     }
   };
 
