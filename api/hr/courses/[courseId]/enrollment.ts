@@ -26,7 +26,6 @@ const setCorsHeaders = (res: VercelResponse) => {
 
 // Export runtime configuration for Vercel Serverless Functions
 export const config = {
-  runtime: 'nodejs', // Explicitly define the runtime 
   regions: ['iad1'], // Washington DC region
 };
 
