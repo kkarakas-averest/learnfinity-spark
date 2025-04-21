@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -16,6 +15,7 @@ import { PersonalizedContentService } from "@/services/personalized-content-serv
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/lib/supabase";
 import { AICourseContent, AICourseContentSection } from "@/lib/types/content";
+import RegenerateContentButtonVite from "@/components/CourseView/RegenerateContentButtonVite";
 
 interface CourseDetails {
   id: string;
@@ -222,8 +222,9 @@ export function CourseDetails({ course }: CourseDetailsProps) {
             </div>
           </div>
         </div>
-        <div className="flex justify-start md:justify-end">
+        <div className="flex flex-col items-end gap-2">
           <Button>Start Course</Button>
+          <RegenerateContentButtonVite courseId={course.id} />
         </div>
       </div>
 

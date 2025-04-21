@@ -1,7 +1,7 @@
 
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
+import { Loader2, RotateCcw } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 
 /**
@@ -104,7 +104,7 @@ const RegenerateContentButtonVite: React.FC<RegenerateContentButtonViteProps> = 
       // Step 2: Call Edge Function for regeneration
       updateProgress("Calling Edge Function to personalize content...");
       const edgeFuncRes = await fetch(
-        "/functions/v1/regenerate-course-content",
+        "https://ujlqzkkkfatehxeqtbdl.functions.supabase.co/regenerate-course-content",
         {
           method: "POST",
           headers: {
@@ -164,9 +164,9 @@ const RegenerateContentButtonVite: React.FC<RegenerateContentButtonViteProps> = 
       <Button 
         onClick={handleRegenerate} 
         disabled={isLoading}
-        className="flex items-center space-x-2"
+        className="flex items-center space-x-2 bg-green-500 hover:bg-green-600 text-white"
       >
-        {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+        {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RotateCcw className="h-4 w-4 mr-2" />}
         {isLoading ? "Regenerating..." : "Regenerate Content"}
       </Button>
       
