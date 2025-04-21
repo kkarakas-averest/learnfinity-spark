@@ -11,6 +11,7 @@ import { PersonalizedContentService } from '@/services/personalized-content-serv
 import CourseModuleList from './CourseModuleList';
 import CourseContentSection from './CourseContentSection';
 import PersonalizedCourseContent from './PersonalizedCourseContent';
+import RegenerateContentButtonVite from '@/components/CourseView/RegenerateContentButtonVite';
 
 interface CourseViewProps {
   courseId: string;
@@ -412,13 +413,24 @@ const CourseView: React.FC<CourseViewProps> = ({
                   <p className="text-sm text-muted-foreground">
                     Personalize this course based on your profile
                   </p>
-                  <Button 
-                    size="sm" 
-                    onClick={generatePersonalizedContent}
-                    disabled={generatingContent || !enrollmentId}
-                  >
-                    {generatingContent ? 'Generating...' : 'Generate Personalized Content'}
-                  </Button>
+                  <RegenerateContentButtonVite
+                    courseId={courseId}
+                    onSuccess={() => {
+                      setHasPersonalizedContent(false);
+                      setTimeout(() => {
+                        if (typeof window !== "undefined") {
+                          window.location.reload();
+                        }
+                      }, 2000);
+                    }}
+                    onError={(error) => {
+                      toast({
+                        title: "Failed to regenerate content",
+                        description: error.message,
+                        variant: "destructive",
+                      });
+                    }}
+                  />
                 </div>
               )}
             </div>
