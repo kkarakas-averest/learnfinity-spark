@@ -2,7 +2,7 @@
  * Simple API Server with CORS support
  * Designed to work with the Vite development server
  */
-import express, { Request, Response, NextFunction } from 'express';
+import express, { Request, Response, NextFunction, RequestHandler } from 'express';
 import cors from 'cors';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
@@ -253,8 +253,7 @@ const getMockDashboardData = (userId: string): any => {
 };
 
 // Learner dashboard endpoint
-// @ts-ignore: Express type issue with async handler
-app.get('/api/learner/dashboard', async (req: Request, res: Response) => {
+app.get('/api/learner/dashboard', async (req, res) => {
   console.log('Received request for /api/learner/dashboard');
   console.log('Query parameters:', req.query);
   console.log('Request headers:', {
@@ -267,11 +266,12 @@ app.get('/api/learner/dashboard', async (req: Request, res: Response) => {
   const userId = req.query.userId as string;
   
   if (!userId) {
-    return res.status(400).json({
+    res.status(400).json({
       error: 'Missing userId parameter',
       status: 400,
       timestamp: new Date().toISOString()
     });
+    return;
   }
   
   try {
@@ -445,7 +445,8 @@ app.get('/api/learner/dashboard', async (req: Request, res: Response) => {
       'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With, Accept, Cache-Control, Pragma'
     });
     
-    return res.json(dashboardData);
+    res.json(dashboardData);
+    return;
     
   } catch (error) {
     console.error('Error processing dashboard request:', error);
@@ -456,12 +457,13 @@ app.get('/api/learner/dashboard', async (req: Request, res: Response) => {
       'Access-Control-Allow-Origin': '*'
     });
     
-    return res.status(500).json({
+    res.status(500).json({
       error: 'Internal Server Error',
       message: error instanceof Error ? error.message : 'Unknown error',
       status: 500,
       timestamp: new Date().toISOString()
     });
+    return;
   }
 });
 
@@ -632,7 +634,8 @@ async function processContentRegenerationExpress(
 }
 
 // --- Express Route Handler Function ---
-const handleRegenerateContentRequest = async (req: Request, res: Response) => {
+// @ts-expect-error: Express async handler type limitation
+app.all('/api/hr/courses/regenerate-content', async (req, res) => {
   const requestId = uuidv4().slice(0, 8);
   logWithTimestamp(`📩 Request received: ${req.method} ${req.path}`, undefined, requestId);
 
@@ -730,10 +733,7 @@ const handleRegenerateContentRequest = async (req: Request, res: Response) => {
       details: error.message || 'Unknown error' 
     });
   }
-};
-
-// --- Express Route Definition (using the handler function) ---
-app.all('/api/hr/courses/regenerate-content', handleRegenerateContentRequest);
+});
 
 // Handle all OPTIONS requests for CORS preflight
 app.options('*', cors(corsOptions));
