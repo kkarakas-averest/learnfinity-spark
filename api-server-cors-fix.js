@@ -5,6 +5,7 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const { v4: uuidv4 } = require('uuid');
 
 // Create Express app
 const app = express();
@@ -100,10 +101,10 @@ app.all('/api/courses/regenerate', handleCourseRegeneration);
 // Legacy endpoint with improved handling
 app.all('/api/hr/courses/regenerate-content', handleCourseRegeneration);
 
-// Universal enhance endpoint
-app.all('/api/hr/courses/universal-enhance', (req, res) => {
+// Universal enhance endpoint for course content personalization
+app.all('/api/hr/courses/enhance-content', (req, res) => {
   try {
-    console.log('[Express Server] Handling universal enhance request');
+    console.log('[Express Server] Handling enhance content request');
     
     // Set proper headers
     res.setHeader('Content-Type', 'application/json');
@@ -117,7 +118,7 @@ app.all('/api/hr/courses/universal-enhance', (req, res) => {
     }
     
     // Extract parameters
-    const body = req.method === 'GET' ? req.query : req.body || {};
+    const body = req.body || {};
     const { courseId, employeeId } = body;
     
     if (!courseId || !employeeId) {
@@ -127,24 +128,330 @@ app.all('/api/hr/courses/universal-enhance', (req, res) => {
       });
     }
     
-    // Generate a unique ID
-    const contentId = `content_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    // Generate mock enhanced content for development
+    const mockEnhancedContent = {
+      enhancedDescription: `This course has been personalized for the employee's specific needs and role.`,
+      learningObjectives: [
+        "Understand key concepts relevant to your role",
+        "Apply techniques specific to your department's needs",
+        "Develop skills identified in your CV as areas for growth"
+      ],
+      modules: [
+        {
+          title: "Personalized Introduction Module",
+          description: "Custom introduction based on your experience level",
+          sections: [
+            {
+              title: "Welcome to Your Personalized Course",
+              content: "<div class='prose max-w-none'>This content has been tailored to your specific profile and needs.</div>"
+            },
+            {
+              title: "Your Learning Path",
+              content: "<div class='prose max-w-none'>Based on your CV, we've identified key areas to focus on.</div>"
+            }
+          ]
+        },
+        {
+          title: "Core Concepts for Your Role",
+          description: "Essential knowledge customized for your position",
+          sections: [
+            {
+              title: "Role-Specific Techniques",
+              content: "<div class='prose max-w-none'>This section covers techniques particularly relevant to your current position.</div>"
+            }
+          ]
+        }
+      ],
+      quizzes: [
+        {
+          moduleIndex: 0,
+          questions: [
+            {
+              question: "Which approach best fits your current role?",
+              options: ["Option A", "Option B", "Option C", "Option D"],
+              correctAnswer: 2
+            }
+          ]
+        }
+      ]
+    };
     
     // Return success response
     return res.status(200).json({
       success: true,
       message: 'Course content enhanced successfully',
-      content_id: contentId,
-      course: {
-        id: courseId,
-        title: `Course ${courseId.substring(0, 8)}`,
-        status: 'personalized'
-      }
+      content: mockEnhancedContent,
+      timestamp: new Date().toISOString()
     });
   } catch (error) {
     console.error('[Express Server] Error:', error);
     return res.status(500).json({
       error: 'Failed to enhance course content',
+      message: error?.message || 'Unknown error',
+      success: false
+    });
+  }
+});
+
+// Save personalized content endpoint
+app.post('/api/hr/courses/save-personalized-content', (req, res) => {
+  try {
+    console.log('[Express Server] Handling save personalized content request');
+    
+    // Set proper headers
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    
+    // Handle OPTIONS request for CORS preflight
+    if (req.method === 'OPTIONS') {
+      return res.status(204).end();
+    }
+    
+    // Extract parameters
+    const { courseId, employeeId, content } = req.body;
+    
+    if (!courseId || !employeeId || !content) {
+      return res.status(400).json({
+        error: 'Missing required parameters',
+        success: false
+      });
+    }
+    
+    // Generate a unique content ID
+    const contentId = uuidv4();
+    
+    // Return success response
+    return res.status(200).json({
+      success: true,
+      message: 'Personalized content saved successfully',
+      contentId: contentId,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('[Express Server] Error:', error);
+    return res.status(500).json({
+      error: 'Failed to save personalized content',
+      message: error?.message || 'Unknown error',
+      success: false
+    });
+  }
+});
+
+// Update enrollment endpoint
+app.post('/api/hr/course-enrollments/update-content', (req, res) => {
+  try {
+    console.log('[Express Server] Handling update enrollment content request');
+    
+    // Set proper headers
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    
+    // Handle OPTIONS request for CORS preflight
+    if (req.method === 'OPTIONS') {
+      return res.status(204).end();
+    }
+    
+    // Extract parameters
+    const { courseId, employeeId, contentId } = req.body;
+    
+    if (!courseId || !employeeId || !contentId) {
+      return res.status(400).json({
+        error: 'Missing required parameters',
+        success: false
+      });
+    }
+    
+    // Generate a job ID
+    const jobId = `job_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    
+    // Return success response
+    return res.status(200).json({
+      success: true,
+      message: 'Enrollment updated successfully',
+      jobId: jobId,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('[Express Server] Error:', error);
+    return res.status(500).json({
+      error: 'Failed to update enrollment',
+      message: error?.message || 'Unknown error',
+      success: false
+    });
+  }
+});
+
+// Course enrollment endpoint
+app.get('/api/hr/courses/:courseId/enrollment', (req, res) => {
+  try {
+    console.log('[Express Server] Handling get course enrollment request');
+    
+    // Set proper headers
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    
+    // Handle OPTIONS request for CORS preflight
+    if (req.method === 'OPTIONS') {
+      return res.status(204).end();
+    }
+    
+    // Extract course ID from URL params
+    const courseId = req.params.courseId;
+    
+    if (!courseId) {
+      return res.status(400).json({
+        error: 'Missing required parameter: courseId',
+        success: false
+      });
+    }
+    
+    // Return mock enrollment data
+    return res.status(200).json({
+      courseId: courseId,
+      employeeId: "test-employee-id",
+      enrollmentDate: new Date().toISOString(),
+      status: "enrolled",
+      progress: 0
+    });
+  } catch (error) {
+    console.error('[Express Server] Error:', error);
+    return res.status(500).json({
+      error: 'Failed to get enrollment',
+      message: error?.message || 'Unknown error',
+      success: false
+    });
+  }
+});
+
+// Employee data endpoint
+app.get('/api/hr/employees/:employeeId', (req, res) => {
+  try {
+    console.log('[Express Server] Handling get employee request');
+    
+    // Set proper headers
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    
+    // Handle OPTIONS request for CORS preflight
+    if (req.method === 'OPTIONS') {
+      return res.status(204).end();
+    }
+    
+    // Extract employee ID from URL params
+    const employeeId = req.params.employeeId;
+    
+    if (!employeeId) {
+      return res.status(400).json({
+        error: 'Missing required parameter: employeeId',
+        success: false
+      });
+    }
+    
+    // Return mock employee data with CV extracted data
+    return res.status(200).json({
+      id: employeeId,
+      name: "John Doe",
+      email: "john.doe@example.com",
+      position: {
+        id: "pos-123",
+        title: "Senior Developer"
+      },
+      department: {
+        id: "dept-456",
+        name: "Engineering"
+      },
+      cv_extraction_date: new Date().toISOString(),
+      cv_file_url: "https://example.com/cv.pdf",
+      cv_extracted_data: {
+        summary: "Experienced software developer with 10+ years in full-stack development. Specializes in React, TypeScript, and Node.js.",
+        skills: ["JavaScript", "TypeScript", "React", "Node.js", "Express", "REST API", "GraphQL"],
+        experience: [
+          {
+            title: "Senior Developer",
+            company: "Tech Solutions Inc.",
+            years: "2018-Present"
+          },
+          {
+            title: "Frontend Developer",
+            company: "Web Innovators",
+            years: "2015-2018"
+          }
+        ],
+        education: [
+          {
+            degree: "BSc Computer Science",
+            institution: "University of Technology"
+          }
+        ],
+        certifications: ["AWS Certified Developer", "React Professional"],
+        personalInsights: {
+          yearsOfExperience: 10,
+          toolsAndTechnologies: ["VS Code", "GitHub", "Docker", "AWS"],
+          preferredLearningStyle: "Visual"
+        }
+      }
+    });
+  } catch (error) {
+    console.error('[Express Server] Error:', error);
+    return res.status(500).json({
+      error: 'Failed to get employee',
+      message: error?.message || 'Unknown error',
+      success: false
+    });
+  }
+});
+
+// Course data endpoint
+app.get('/api/hr/courses/:courseId', (req, res) => {
+  try {
+    console.log('[Express Server] Handling get course request');
+    
+    // Set proper headers
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    
+    // Handle OPTIONS request for CORS preflight
+    if (req.method === 'OPTIONS') {
+      return res.status(204).end();
+    }
+    
+    // Extract course ID from URL params
+    const courseId = req.params.courseId;
+    
+    if (!courseId) {
+      return res.status(400).json({
+        error: 'Missing required parameter: courseId',
+        success: false
+      });
+    }
+    
+    // Return mock course data
+    return res.status(200).json({
+      id: courseId,
+      title: "Advanced Web Development",
+      description: "Learn advanced techniques for building modern web applications with React, TypeScript, and Node.js.",
+      skill_level: "intermediate",
+      duration: 120,  // minutes
+      department_id: "dept-456",
+      skills: ["JavaScript", "React", "TypeScript"],
+      status: "active",
+      created_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),  // 30 days ago
+      updated_at: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('[Express Server] Error:', error);
+    return res.status(500).json({
+      error: 'Failed to get course',
       message: error?.message || 'Unknown error',
       success: false
     });
