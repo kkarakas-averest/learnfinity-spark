@@ -8,6 +8,12 @@ function isValidUUID(uuid: string): boolean {
   return uuidRegex.test(uuid);
 }
 
+// Extracts courseId from URL path if present
+function extractCourseIdFromPath(url: string): string | null {
+  const match = url?.match(/\/api\/hr\/courses\/([^\/]+)\/enrollment/);
+  return match ? match[1] : null;
+}
+
 // Initialize Supabase client
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_SERVICE_KEY;
@@ -52,16 +58,32 @@ export default async function handler(
     method: req.method, 
     query: req.query,
     body: req.body ? 'Has body' : 'No body',
-    headers: req.headers
+    headers: req.headers,
+    url: req.url
   });
 
-  // Get course ID from the URL
-  const { courseId } = req.query;
+  // Try to get courseId from different possible sources
+  let courseId = req.query.courseId as string;
   
-  // Validate courseId and userId early
-  if (!courseId || typeof courseId !== 'string') {
-    console.log('Bad Request: Missing courseId');
-    return res.status(400).json({ error: 'Course ID is required' });
+  // If courseId isn't available in query, try to extract from URL path
+  if (!courseId && req.url) {
+    const pathExtractedId = extractCourseIdFromPath(req.url);
+    if (pathExtractedId) {
+      console.log(`CourseId extracted from URL path: ${pathExtractedId}`);
+      courseId = pathExtractedId;
+    }
+  }
+  
+  console.log('CourseId parameter details:', { 
+    courseIdValue: courseId,
+    courseIdType: typeof courseId,
+    allQueryParams: req.query
+  });
+  
+  // Validate courseId
+  if (!courseId) {
+    console.log('Bad Request: Missing courseId', { query: req.query, url: req.url });
+    return res.status(400).json({ error: 'Course ID is required in the URL path' });
   }
   
   if (!isValidUUID(courseId)) {
