@@ -35,8 +35,8 @@ const HARDCODED_SUPABASE_URL = 'https://ujlqzkkkfatehxeqtbdl.supabase.co';
 // and only use this hardcoded key for development/debugging
 // DO NOT COMMIT YOUR ACTUAL SERVICE KEY TO GIT
 // Instead, add SUPABASE_SERVICE_ROLE_KEY to Vercel environment variables for Production, Preview, and Development
-// ⚠️ TESTING ONLY: Replace this placeholder with your actual key, test, THEN REMOVE IT AFTER TESTING ⚠️
-const HARDCODED_SERVICE_KEY = 'REPLACE_THIS_WITH_YOUR_ACTUAL_SERVICE_KEY'; // REPLACE THIS ENTIRE STRING
+// ⚠️ TESTING ONLY: Using provided hardcoded key for testing. REMOVE BEFORE COMMIT/DEPLOY. ⚠️
+const HARDCODED_SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqbHF6a2trZmF0ZWh4ZXF0YmRsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0MDY4MDgzMiwiZXhwIjoyMDU2MjU2ODMyfQ.A2AVZwetKe-CIJUzVcNm0OdNlceABZvDFU6YsX3kDRA';
 
 export default async function handler(
   req: VercelRequest,

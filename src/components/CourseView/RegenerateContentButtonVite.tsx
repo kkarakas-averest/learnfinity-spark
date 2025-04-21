@@ -1,204 +1,255 @@
-import React, { useState } from "@/lib/react-helpers";
+import React from "@/lib/react-helpers";
+import { useState } from "@/lib/react-helpers";
 import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
-import { RotateCcwIcon } from "@/components/ui/custom-icons";
-import { toast } from "@/components/ui/use-toast";
+import { Loader2, RefreshCw } from "lucide-react";
+import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
 
 /**
  * RegenerateContentButtonVite - pure Vite/React version
  * Props:
  *   courseId (string, required): ID of the course to regenerate.
- *   userId (string, optional): ID of the user/employee to regenerate content for.
+ *   userId (string, optional): ID of the user/employee to regenerate content for. If not provided, attempts to use authenticated user's ID.
  *   onSuccess?: callback to trigger on successful regeneration.
  *   onError?: callback for errors.
  */
-interface RegenerateContentButtonViteProps {
+interface RegenerateContentButtonProps {
   courseId: string;
   userId?: string;
-  onSuccess?: (jobId: string) => void;
+  onSuccess?: () => void;
   onError?: (error: Error) => void;
 }
 
-const RegenerateContentButtonVite = ({
+/**
+ * Button component that triggers regeneration of course content.
+ * Handles authentication state and provides user feedback.
+ */
+export default function RegenerateContentButtonVite({
   courseId,
-  userId,
+  userId: propUserId,
   onSuccess,
   onError,
-}: RegenerateContentButtonViteProps) => {
-  const [isLoading, setIsLoading] = useState(false);
-  const [currentStep, setCurrentStep] = useState<string>("");
+}: RegenerateContentButtonProps) {
+  const [loading, setLoading] = useState(false);
+  const [progress, setProgress] = useState<string | null>(null);
+  const auth = useAuth();
 
-  // Helper function to log with identifier for easier debugging
-  const logOperation = (message: string, data?: any) => {
-    const logId = `regen_${Date.now().toString()}_${Math.random().toString(36).substring(2, 9)}`;
-    console.log(`[${logId}] ${message}`, data ? data : '');
-    return logId;
+  // Helper for operation logging (useful for debugging)
+  const logOperation = (action: string, data?: any) => {
+    console.log(`[RegenerateContentVite] ${action}`, data || '');
   };
 
-  // Function to update progress status
-  const updateProgress = (step: string) => {
-    setCurrentStep(step);
+  // Determine the user ID to use
+  const getTargetUserId = (): string | undefined => {
+    // 1. Use propUserId if explicitly provided
+    if (propUserId) {
+      logOperation('Using provided userId prop', { propUserId });
+      return propUserId;
+    }
+    // 2. Use authenticated user ID if available and authenticated
+    if (auth?.isAuthenticated && auth.user?.id) {
+      logOperation('Using authenticated user ID from context', { userId: auth.user.id });
+      return auth.user.id;
+    }
+    // 3. No user ID available
+    logOperation('No usable userId found (prop or authenticated context)');
+    return undefined;
   };
 
-  // Function to get employee CV data based on course enrollment
-  const fetchEmployeeDataForCourse = async (courseId: string) => {
-    updateProgress("Fetching employee data...");
+  // Get the employee ID by fetching enrollment data
+  const fetchEmployeeData = async (): Promise<string | null> => {
+    const targetUserId = getTargetUserId();
+
+    if (!targetUserId) {
+      // This error should ideally be caught before calling handleRegenerate,
+      // but we check again here for safety.
+      throw new Error("User ID is required but could not be determined.");
+    }
+
+    setProgress("Checking course enrollment...");
+    logOperation('Fetching enrollment data', { courseId, targetUserId });
+
     try {
-      const currentUserId = userId || localStorage.getItem('userId') || sessionStorage.getItem('userId');
-      
-      if (!currentUserId) {
-        throw new Error("User ID not available. Please login again.");
-      }
+      const enrollmentApiUrl = `/api/hr/courses/${courseId}/enrollment?userId=${targetUserId}`;
+      logOperation('Calling enrollment API', { url: enrollmentApiUrl });
 
-      // Get course enrollment to find the employee - now with userId in query params
-      const enrollmentResponse = await fetch(`/api/hr/courses/${courseId}/enrollment?userId=${currentUserId}`, {
+      const enrollmentResponse = await fetch(enrollmentApiUrl, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
+          // Add Authorization header if your API requires it
+          // 'Authorization': `Bearer ${auth?.session?.access_token}`
         },
+      });
+
+      logOperation('Enrollment API response', {
+        status: enrollmentResponse.status,
+        ok: enrollmentResponse.ok,
+        statusText: enrollmentResponse.statusText
       });
 
       if (!enrollmentResponse.ok) {
-        throw new Error(`Failed to fetch enrollment data: ${enrollmentResponse.status}`);
+        let errorDetails = 'Unknown enrollment API error';
+        try {
+          // Attempt to parse JSON error first
+          const errorJson = await enrollmentResponse.json();
+          errorDetails = errorJson.error || errorJson.message || JSON.stringify(errorJson);
+        } catch (jsonError) {
+          try {
+            // Fallback to text error if JSON parsing fails
+            errorDetails = await enrollmentResponse.text();
+          } catch (textError) {
+            // Use status text as last resort
+            errorDetails = enrollmentResponse.statusText;
+          }
+        }
+        throw new Error(`Enrollment check failed: ${errorDetails} (${enrollmentResponse.status})`);
       }
 
       const enrollmentData = await enrollmentResponse.json();
-      
-      // Log the enrollment data structure to help debug
-      logOperation("📋 Received enrollment data:", enrollmentData);
-      
-      // Our API returns { enrollment: { ... } }
-      const enrollment = enrollmentData.enrollment;
-      
-      if (!enrollment) {
-        throw new Error("Enrollment data is missing from the response");
-      }
-      
-      const employeeId = enrollment.employee_id || enrollment.employeeId || enrollment.user_id || enrollment.userId;
-      
+      logOperation('Enrollment data received', enrollmentData);
+
+      // Validate structure (adjust based on actual API response)
+      const employeeId = enrollmentData?.enrollment?.employee_id;
+
       if (!employeeId) {
-        throw new Error("No employee ID found in the enrollment data");
-      }
-      
-      logOperation("👤 Found employee ID:", employeeId);
-
-      // Now fetch the employee CV data
-      updateProgress("Retrieving CV data...");
-      const employeeResponse = await fetch(`/api/hr/employees/${employeeId}`, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
-
-      if (!employeeResponse.ok) {
-        throw new Error(`Failed to fetch employee data: ${employeeResponse.status}`);
+        logOperation('Employee ID not found in enrollment data', { enrollmentData });
+        throw new Error("Employee ID not found in enrollment data.");
       }
 
-      const employeeData = await employeeResponse.json();
-      
-      if (!employeeData.cv_extracted_data) {
-        throw new Error("Employee has no CV data. Please upload and process a CV first.");
-      }
+      logOperation('Employee ID found', { employeeId });
+      setProgress("Enrollment verified");
+      return employeeId;
 
-      return {
-        employeeId,
-        cvData: employeeData.cv_extracted_data,
-        name: employeeData.name,
-        position: employeeData.position?.title || "Unknown Position",
-        department: employeeData.department?.name || "Unknown Department"
-      };
-    } catch (error: any) {
-      logOperation(`❌ Error fetching employee data: ${error.message}`);
-      throw new Error(`Failed to get employee data: ${error.message}`);
+    } catch (error: unknown) { // Catch unknown type
+      logOperation('Error fetching employee data', error);
+      // Ensure error is an Error instance
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to get employee data: ${errorMessage}`);
     }
   };
 
-  // Main regenerate handler
   const handleRegenerate = async () => {
-    const logId = logOperation("🔄 Starting content regeneration for course:", courseId);
-    setIsLoading(true);
+    // Prevent action if no user ID could be determined
+    const targetUserId = getTargetUserId();
+    if (!targetUserId) {
+      toast.error("Cannot regenerate content: User ID is missing.");
+      logOperation('Regeneration blocked: No user ID available.');
+      if (onError) onError(new Error("User ID is missing"));
+      return;
+    }
+
+    setLoading(true);
+    setProgress("Starting regeneration...");
+    logOperation('Initiating regeneration process', { courseId });
+
+    let employeeId: string | null = null;
 
     try {
-      // Step 1: Fetch employee data including CV
-      const employeeData = await fetchEmployeeDataForCourse(courseId);
+      // Step 1: Get employee ID based on enrollment
+      employeeId = await fetchEmployeeData(); // This now uses targetUserId internally
 
-      // Step 2: Call Edge Function for regeneration
-      updateProgress("Calling Edge Function to personalize content...");
-      const edgeFuncRes = await fetch(
-        "https://ujlqzkkkfatehxeqtbdl.functions.supabase.co/regenerate-course-content",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            courseId,
-            employeeId: employeeData.employeeId
-          })
+      if (!employeeId) {
+        // This case should be handled within fetchEmployeeData, but double-check
+        throw new Error("Could not determine employee ID after fetch.");
+      }
+
+      setProgress("Regenerating course content...");
+      logOperation('Calling content regeneration API', { courseId, employeeId });
+
+      // Step 2: Call the serverless function to regenerate content
+      const regenerateApiUrl = "/api/ai/regenerate-content";
+      const response = await fetch(regenerateApiUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+           // Add Authorization header if your API requires it
+          // 'Authorization': `Bearer ${auth?.session?.access_token}`
+        },
+        body: JSON.stringify({
+          courseId,
+          employeeId, // Send the fetched employeeId
+        }),
+      });
+
+      logOperation('Regeneration API response', {
+        status: response.status,
+        ok: response.ok,
+        statusText: response.statusText
+      });
+
+      if (!response.ok) {
+         let errorDetails = 'Unknown regeneration API error';
+        try {
+          const errorJson = await response.json();
+          errorDetails = errorJson.error || errorJson.message || JSON.stringify(errorJson);
+        } catch (jsonError) {
+          try {
+            errorDetails = await response.text();
+          } catch (textError) {
+            errorDetails = response.statusText;
+          }
         }
-      );
-
-      if (!edgeFuncRes.ok) {
-        const errJson = await edgeFuncRes.json();
-        throw new Error(errJson?.error || "Edge function error");
+        throw new Error(`Regeneration failed: ${errorDetails} (${response.status})`);
       }
 
-      const edgeResult = await edgeFuncRes.json();
-      if (!edgeResult.success) {
-        throw new Error(edgeResult?.error || "Failed to generate personalized content");
-      }
+      const data = await response.json();
+      logOperation('Regeneration completed successfully', data);
 
-      toast({
-        title: "Content Regenerated Successfully",
-        description: "The course content has been personalized and saved.",
-        variant: "default",
-      });
+      // Success - show message and call the success callback
+      toast.success("Course content regeneration initiated successfully!");
+      setProgress("Regeneration started..."); // Update progress message
+      if (onSuccess) onSuccess();
+      // Maybe poll for job status here if needed? For now, just indicate start.
 
-      logOperation("✅ Content regeneration completed successfully!", {
-        contentId: edgeResult.contentId,
-        jobId: edgeResult.jobId
-      });
+    } catch (error: unknown) { // Catch unknown type
+      const typedError = error instanceof Error ? error : new Error(String(error));
+      const errorMessage = typedError.message || "An unexpected error occurred during regeneration.";
+      logOperation('Error in regeneration process', { error: typedError });
 
-      if (onSuccess && edgeResult.jobId) {
-        onSuccess(edgeResult.jobId);
-      }
+      toast.error(errorMessage);
+      if (onError) onError(typedError); // Pass the Error object
 
-      window.location.reload();
-    } catch (error: any) {
-      logOperation(`💥 Error regenerating course content: ${error.message}`);
-
-      toast({
-        title: "Regeneration Failed",
-        description: error.message || "An unexpected error occurred.",
-        variant: "destructive",
-      });
-
-      if (onError) onError(error);
     } finally {
-      setIsLoading(false);
-      setCurrentStep("");
+      // Keep loading true briefly after success to show "Regeneration started..."
+      // Reset loading state completely on error.
+      if (!(progress === "Regeneration started...")) {
+          setLoading(false);
+          setProgress(null);
+      }
+      // Consider a timeout to reset loading/progress after successful start message
+      // setTimeout(() => { setLoading(false); setProgress(null); }, 3000);
     }
   };
 
-  return (
-    <div className="flex flex-col gap-2">
-      <Button 
-        onClick={handleRegenerate} 
-        disabled={isLoading}
-        className="flex items-center space-x-2 bg-green-500 hover:bg-green-600 text-white"
-      >
-        {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RotateCcwIcon className="h-4 w-4 mr-2" />}
-        {isLoading ? "Regenerating..." : "Regenerate Content (Vite)"}
-      </Button>
-      
-      {currentStep && (
-        <div className="text-xs text-muted-foreground mt-1">
-          <span className="font-medium">Status:</span> {currentStep}
-        </div>
-      )}
-    </div>
-  );
-};
+  // Determine if the button should be disabled
+  const isDisabled = loading || (!propUserId && !auth?.isAuthenticated);
+  const buttonText = loading ? (progress || "Processing...") : "Regenerate Content";
+  const titleText = !propUserId && !auth?.isAuthenticated
+    ? "Login required or provide User ID"
+    : "Regenerate personalized content for this course";
 
-export default RegenerateContentButtonVite;
+  // Component render
+  return (
+    <Button
+      onClick={handleRegenerate}
+      className="flex items-center gap-2"
+      variant="outline"
+      disabled={isDisabled} // Use combined disabled state
+      title={titleText} // Add tooltip for disabled state
+      data-testid="regenerate-content-button"
+    >
+      {loading ? (
+        <>
+          <Loader2 className="h-4 w-4 animate-spin" />
+          {buttonText}
+        </>
+      ) : (
+        <>
+          <RefreshCw className="h-4 w-4" />
+          {buttonText}
+        </>
+      )}
+    </Button>
+  );
+}
