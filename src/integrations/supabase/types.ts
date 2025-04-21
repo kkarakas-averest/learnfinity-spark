@@ -2340,6 +2340,9 @@ export type Database = {
           rag_status_reason: string | null
           rag_status_updated_at: string | null
           rag_status_updated_by: string | null
+          resume_processed: boolean | null
+          resume_processed_at: string | null
+          resume_text: string | null
           resume_url: string | null
           skills: string[] | null
           status: string | null
@@ -2366,6 +2369,9 @@ export type Database = {
           rag_status_reason?: string | null
           rag_status_updated_at?: string | null
           rag_status_updated_by?: string | null
+          resume_processed?: boolean | null
+          resume_processed_at?: string | null
+          resume_text?: string | null
           resume_url?: string | null
           skills?: string[] | null
           status?: string | null
@@ -2392,6 +2398,9 @@ export type Database = {
           rag_status_reason?: string | null
           rag_status_updated_at?: string | null
           rag_status_updated_by?: string | null
+          resume_processed?: boolean | null
+          resume_processed_at?: string | null
+          resume_text?: string | null
           resume_url?: string | null
           skills?: string[] | null
           status?: string | null

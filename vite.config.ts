@@ -1,3 +1,4 @@
+
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import tsconfigPaths from 'vite-tsconfig-paths';
@@ -46,7 +47,7 @@ export default defineConfig(({ mode }) => {
       port: 8080,
       proxy: {
         '/api': {
-          target: 'http://localhost:3000',
+          target: 'http://localhost:3084', // Updated to match the API_PORT in api-server-cors-fix.js
           changeOrigin: true,
         },
       },
