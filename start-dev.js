@@ -31,11 +31,11 @@ if (!fs.existsSync('api-server-cors-fix.js')) {
   process.exit(1);
 }
 
-// Start Vite dev server with custom tsconfig
+// Start Vite dev server with custom tsconfig and no frozen lockfile
 const viteProcess = spawn('npx', ['vite', '--config', 'vite.config.ts', '--force'], {
   stdio: 'pipe',
   shell: true,
-  env: { ...process.env, VITE_CUSTOM_TSCONFIG: 'tsconfig.local.json' }
+  env: { ...process.env, VITE_CUSTOM_TSCONFIG: 'tsconfig.local.json', NODE_ENV: 'development' }
 });
 
 console.log(`${colors.vite}[VITE] Starting dev server...${colors.reset}`);

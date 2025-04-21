@@ -14,7 +14,7 @@ rm -rf node_modules/.vite
 echo "Clearing package manager cache..."
 pnpm store prune || npm cache clean --force || yarn cache clean
 
-# Reinstall dependencies
+# Reinstall dependencies without frozen lockfile
 echo "Reinstalling dependencies..."
 rm -rf node_modules
 pnpm install --no-frozen-lockfile || npm install || yarn
