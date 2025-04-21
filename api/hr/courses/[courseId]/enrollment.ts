@@ -85,7 +85,7 @@ export default async function handler(
 
       // Check if the user is already enrolled
       const { data: enrollment, error: checkError } = await supabase
-        .from('enrollments')
+        .from('hr_course_enrollments')
         .select('*')
         .eq('user_id', userId)
         .eq('course_id', courseId)
@@ -117,7 +117,7 @@ export default async function handler(
 
       // Check if the user is already enrolled
       const { data: existingEnrollment, error: checkError } = await supabase
-        .from('enrollments')
+        .from('hr_course_enrollments')
         .select('*')
         .eq('user_id', userId)
         .eq('course_id', courseId)
@@ -140,7 +140,7 @@ export default async function handler(
 
       // Create the enrollment
       const { data: enrollment, error } = await supabase
-        .from('enrollments')
+        .from('hr_course_enrollments')
         .insert({
           user_id: userId,
           course_id: courseId,
