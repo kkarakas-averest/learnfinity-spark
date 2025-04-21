@@ -41,6 +41,15 @@ export default async function handler(
     return res.status(200).end();
   }
 
+  // TEMPORARY DEBUG: Print exactly what environment variables the function sees
+  console.log('DEBUG_ENV', {
+    SUPABASE_URL: process.env.SUPABASE_URL,
+    SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY ? 'DEFINED (value hidden)' : 'UNDEFINED',
+    VITE_SUPABASE_URL: process.env.VITE_SUPABASE_URL,
+    VITE_SUPABASE_SERVICE_KEY: process.env.VITE_SUPABASE_SERVICE_KEY ? 'DEFINED (value hidden)' : 'UNDEFINED',
+    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL
+  });
+
   // *** STEP 1: Read and Validate Env Vars INSIDE the handler ***
   const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_SERVICE_KEY;
@@ -60,6 +69,22 @@ export default async function handler(
     });
     // EXIT HERE if config is missing
     return res.status(500).json({ error: 'Server configuration error - missing Supabase credentials' });
+  }
+
+  // NEW CHECK: Detect unresolved placeholder variables (containing $)
+  if (supabaseUrl.includes('$')) {
+    console.error('CRITICAL ERROR: Supabase URL contains unresolved placeholders:', supabaseUrl);
+    return res.status(500).json({ 
+      error: 'Server configuration error - Supabase URL contains unresolved placeholders. Verify Vercel environment variables are correctly set WITHOUT prefixes.',
+      debug_url: supabaseUrl
+    });
+  }
+
+  if (supabaseServiceKey.includes('$')) {
+    console.error('CRITICAL ERROR: Supabase Service Key contains unresolved placeholders');
+    return res.status(500).json({ 
+      error: 'Server configuration error - Supabase Service Key contains unresolved placeholders. Verify Vercel environment variables are correctly set WITHOUT prefixes.'
+    });
   }
   // *** END Env Var Check ***
 
