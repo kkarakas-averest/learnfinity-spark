@@ -1,6 +1,13 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 
+// Simple UUID validator
+function isValidUUID(uuid: string): boolean {
+  if (!uuid) return false;
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(uuid);
+}
+
 // Initialize Supabase client
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_SERVICE_KEY;
@@ -44,14 +51,22 @@ export default async function handler(
   console.log('Request received for enrollment API', { 
     method: req.method, 
     query: req.query,
-    body: req.body ? 'Has body' : 'No body'
+    body: req.body ? 'Has body' : 'No body',
+    headers: req.headers
   });
 
   // Get course ID from the URL
   const { courseId } = req.query;
   
+  // Validate courseId and userId early
   if (!courseId || typeof courseId !== 'string') {
+    console.log('Bad Request: Missing courseId');
     return res.status(400).json({ error: 'Course ID is required' });
+  }
+  
+  if (!isValidUUID(courseId)) {
+    console.log('Bad Request: Invalid courseId format', courseId);
+    return res.status(400).json({ error: 'Course ID must be a valid UUID' });
   }
 
   try {
@@ -66,68 +81,105 @@ export default async function handler(
     }
 
     // Initialize Supabase
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false
+      }
+    });
 
     // Handle GET request - check enrollment for a user
     if (req.method === 'GET') {
       const userId = req.query.userId as string;
-
+      
       if (!userId) {
+        console.log('Bad Request: Missing userId');
         return res.status(400).json({ error: 'User ID is required as a query parameter' });
       }
-      
-      console.log('Looking up employee ID for user', { userId });
 
-      // First, get employee_id from hr_employees table using user_id
+      if (!isValidUUID(userId)) {
+        console.log('Bad Request: Invalid userId format', userId);
+        return res.status(400).json({ error: 'User ID must be a valid UUID' });
+      }
+
+      console.log('STEP 1: Looking up enrollment directly using userId as employeeId', { userId, courseId });
+      
+      // OPTIMIZATION: Try direct enrollment lookup first since that's the most likely case
+      // Skip employee lookup entirely - assume the ID might be an employee ID already
+      const { data: directEnrollment, error: directError } = await supabase
+        .from('hr_course_enrollments')
+        .select('*')
+        .eq('employee_id', userId)
+        .eq('course_id', courseId)
+        .single();
+        
+      if (directEnrollment) {
+        // Success! Return the enrollment directly without any employee lookup
+        console.log('DIRECT HIT: Found enrollment directly using userId as employeeId', directEnrollment);
+        return res.status(200).json({ enrollment: directEnrollment });
+      }
+      
+      // If no direct hit but no real error (just no rows), proceed to employee lookup
+      if (directError && directError.code !== 'PGRST116') {
+        console.error('Error checking direct enrollment:', directError);
+      } else {
+        console.log('No direct enrollment found, attempting employee mapping...');
+      }
+      
+      console.log('STEP 2: Looking up employee ID for user', { userId });
+
+      // Now try mapping user_id to employee_id if direct lookup failed
       const { data: employee, error: employeeError } = await supabase
         .from('hr_employees')
-        .select('id')
+        .select('id, user_id, name')
         .eq('user_id', userId)
         .single();
 
+      // Log exactly what we found to debug
+      if (employee) {
+        console.log('Found employee record:', employee);
+      } else {
+        console.log('No employee record found with this user_id', { userId });
+      }
+
       if (employeeError) {
-        // Handle the case where we can't find an employee record
         if (employeeError.code === 'PGRST116') { // "No rows returned" error
-          console.log('No employee record found for user', { userId });
+          console.log('No employee record with user_id matching', { userId });
           
-          // IMPORTANT: In this case, try using the userId as the employeeId directly
-          // This handles the case where userId might actually BE the employeeId
-          console.log('Checking enrollment with userId as employeeId fallback', { userId, courseId });
-          
-          const { data: enrollment, error: checkError } = await supabase
-            .from('hr_course_enrollments')
-            .select('*')
-            .eq('employee_id', userId)
-            .eq('course_id', courseId)
-            .single();
-
-          if (checkError && checkError.code !== 'PGRST116') {
-            console.error('Error checking enrollment with userId as employeeId:', checkError);
-            return res.status(500).json({ error: checkError.message });
-          }
-
-          if (!enrollment) {
-            return res.status(404).json({ error: 'Enrollment not found' });
-          }
-
-          console.log('Retrieved enrollment using userId as employeeId', enrollment);
-          return res.status(200).json({ enrollment });
+          // We already tried the direct lookup above, so no need to fall back again
+          return res.status(404).json({ error: 'Enrollment not found' });
         } else {
           // This is a real error, not just "no rows"
-          console.error('Error looking up employee:', employeeError);
-          return res.status(500).json({ error: `Error looking up employee: ${employeeError.message}` });
+          console.error('Database error looking up employee:', employeeError);
+          return res.status(500).json({ 
+            error: `Error looking up employee: ${employeeError.message}`,
+            details: employeeError
+          });
         }
       }
 
       const employeeId = employee?.id;
       
       if (!employeeId) {
-        return res.status(404).json({ error: 'No employee record found for this user' });
+        console.log('Found employee record but missing ID field');
+        return res.status(404).json({ error: 'Invalid employee record (missing ID)' });
       }
       
-      console.log('Found employee ID, checking enrollment', { employeeId, courseId });
+      // Check if it's the same as the userId (circular reference case)
+      if (employeeId === userId) {
+        console.log('CIRCULAR REFERENCE: employee.id equals user_id', { employeeId, userId });
+        // We already tried this ID in the direct lookup above
+        return res.status(404).json({ error: 'Enrollment not found' });
+      }
       
-      // Now check if the employee is enrolled in the course, using employee_id
+      console.log('STEP 3: Found mapped employee ID, checking enrollment', { 
+        employeeId, 
+        userId, 
+        isCircular: employeeId === userId, 
+        courseId 
+      });
+      
+      // Now check if the employee is enrolled in the course, using the mapped employee_id
       const { data: enrollment, error: checkError } = await supabase
         .from('hr_course_enrollments')
         .select('*')
@@ -135,16 +187,26 @@ export default async function handler(
         .eq('course_id', courseId)
         .single();
 
-      if (checkError && checkError.code !== 'PGRST116') { // PGRST116 is "no rows returned"
-        console.error('Error checking enrollment:', checkError);
-        return res.status(500).json({ error: checkError.message });
+      if (checkError) {
+        if (checkError.code === 'PGRST116') { // "No rows returned" error
+          console.log('No enrollment found for mapped employee ID', { employeeId, courseId });
+          return res.status(404).json({ error: 'Enrollment not found' });
+        } else {
+          // Real database error
+          console.error('Error checking enrollment with mapped employee ID:', checkError);
+          return res.status(500).json({ 
+            error: `Database error: ${checkError.message}`,
+            details: checkError
+          });
+        }
       }
 
       if (!enrollment) {
+        console.log('No enrollment found after mapping user to employee');
         return res.status(404).json({ error: 'Enrollment not found' });
       }
 
-      console.log('Retrieved enrollment', enrollment);
+      console.log('SUCCESS: Retrieved enrollment using mapped employee ID', enrollment);
       return res.status(200).json({ enrollment });
     }
     
@@ -222,8 +284,12 @@ export default async function handler(
 
     // If we get here, it's an unsupported method
     return res.status(405).json({ error: 'Method not allowed' });
-  } catch (error) {
-    console.error('Server error:', error);
-    return res.status(500).json({ error: 'Failed to process enrollment request' });
+  } catch (error: any) {
+    console.error('Unhandled server error:', error);
+    return res.status(500).json({ 
+      error: 'Failed to process enrollment request',
+      message: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 }
