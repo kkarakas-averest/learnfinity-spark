@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
@@ -191,77 +190,62 @@ const RegenerateContentButtonVite: React.FC<RegenerateContentButtonViteProps> = 
   const handleRegenerate = async () => {
     const logId = logOperation("🔄 Starting content regeneration for course:", courseId);
     setIsLoading(true);
-    
+
     try {
       // Step 1: Fetch employee data including CV
       const employeeData = await fetchEmployeeDataForCourse(courseId);
-      
-      // Step 2: Fetch course data
-      const courseData = await fetchCourseData(courseId);
-      
-      // Step 3: Generate personalized content using Groq via the API
-      const generatedContent = await generatePersonalizedContent(
-        courseId,
-        courseData,
-        employeeData
+
+      // Step 2: Call Edge Function for regeneration
+      updateProgress("Calling Edge Function to personalize content...");
+      const edgeFuncRes = await fetch(
+        "/functions/v1/regenerate-course-content",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            courseId,
+            employeeId: employeeData.employeeId
+          })
+        }
       );
-      
-      // Step 4: Save the generated content to the database
-      const savedResult = await saveGeneratedContent(
-        courseId,
-        employeeData.employeeId,
-        generatedContent
-      );
-      
-      // Step 5: Update the enrollment record to point to the new content
-      updateProgress("Updating enrollment record...");
-      const updateResponse = await fetch(`/api/hr/course-enrollments/update-content`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          courseId,
-          employeeId: employeeData.employeeId,
-          contentId: savedResult.contentId || savedResult.id
-        }),
-      });
-      
-      if (!updateResponse.ok) {
-        throw new Error(`Failed to update enrollment: ${updateResponse.status}`);
+
+      if (!edgeFuncRes.ok) {
+        const errJson = await edgeFuncRes.json();
+        throw new Error(errJson?.error || "Edge function error");
       }
-      
-      const updateResult = await updateResponse.json();
-      
-      // Success!
+
+      const edgeResult = await edgeFuncRes.json();
+      if (!edgeResult.success) {
+        throw new Error(edgeResult?.error || "Failed to generate personalized content");
+      }
+
       toast({
         title: "Content Regenerated Successfully",
         description: "The course content has been personalized and saved.",
         variant: "default",
       });
-      
+
       logOperation("✅ Content regeneration completed successfully!", {
-        contentId: savedResult.contentId || savedResult.id,
-        jobId: updateResult.jobId || `job_${Date.now()}`
+        contentId: edgeResult.contentId,
+        jobId: edgeResult.jobId
       });
-      
-      // Call the success callback if provided
-      if (onSuccess && updateResult.jobId) {
-        onSuccess(updateResult.jobId);
+
+      if (onSuccess && edgeResult.jobId) {
+        onSuccess(edgeResult.jobId);
       }
-      
-      // Refresh the page to show the new content
+
       window.location.reload();
-      
     } catch (error: any) {
       logOperation(`💥 Error regenerating course content: ${error.message}`);
-      
+
       toast({
         title: "Regeneration Failed",
         description: error.message || "An unexpected error occurred.",
         variant: "destructive",
       });
-      
+
       if (onError) onError(error);
     } finally {
       setIsLoading(false);
