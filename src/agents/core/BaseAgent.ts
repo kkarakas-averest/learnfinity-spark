@@ -1,3 +1,4 @@
+
 /**
  * Base Agent Implementation
  * 
@@ -43,11 +44,12 @@ export abstract class BaseAgent implements Agent {
   /**
    * Initialize the agent
    */
-  async initialize(): Promise<void> {
+  async initialize(): Promise<{ success: boolean; message?: string }> {
     this.initialized = true;
     if (this.verbose) {
       this.log(`${this.name} initialized`);
     }
+    return { success: true };
   }
 
   /**
@@ -129,4 +131,4 @@ export abstract class BaseAgent implements Agent {
     this.log(`Sending message to ${to}: ${JSON.stringify(content).substring(0, 100)}...`);
     return this.createResponseMessage(to, content, metadata);
   }
-} 
+}

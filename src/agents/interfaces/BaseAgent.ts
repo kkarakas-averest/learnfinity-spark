@@ -1,3 +1,4 @@
+
 import { User } from '@supabase/supabase-js';
 
 /**
@@ -41,7 +42,7 @@ export interface BaseAgent {
   /**
    * Initialize the agent with configuration
    */
-  initialize(config?: Record<string, any>): Promise<void>;
+  initialize(config?: Record<string, any>): Promise<{ success: boolean; message?: string }>;
   
   /**
    * Execute a task appropriate for this agent

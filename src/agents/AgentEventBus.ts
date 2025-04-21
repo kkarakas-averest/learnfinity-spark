@@ -1,3 +1,4 @@
+
 import { v4 as uuidv4 } from 'uuid';
 import { supabase } from '@/lib/supabase';
 import { AgentEvent } from './interfaces/BaseAgent';
@@ -78,9 +79,9 @@ export class AgentEventBus {
       const channel = supabase
         .channel(`agent-events-${eventType}`)
         .on(
-          'INSERT',
-          { event: 'agent_events', filter: `event_type=eq.${eventType}` },
-          (payload) => {
+          'postgres_changes', 
+          { event: 'INSERT', schema: 'public', table: 'agent_events', filter: `event_type=eq.${eventType}` },
+          (payload: any) => {
             const event: AgentEvent = {
               id: payload.new.id,
               source: payload.new.source_agent,
@@ -130,4 +131,4 @@ export class AgentEventBus {
       });
     }
   }
-} 
+}
