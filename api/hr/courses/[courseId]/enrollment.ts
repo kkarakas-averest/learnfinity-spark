@@ -32,10 +32,19 @@ export default async function handler(
     return res.status(200).end();
   }
 
+  // *** NEW FIX: Explicitly nullify body for GET requests ***
+  if (req.method === 'GET') {
+    if (req.body && Object.keys(req.body).length > 0) {
+      console.warn('GET request received with body. Explicitly removing body before processing.', req.body);
+      // Force body to null to clear it at the infrastructure level
+      req.body = null;
+    }
+  }
+
   console.log('Request received for enrollment API', { 
     method: req.method, 
     query: req.query,
-    body: typeof req.body === 'object' ? 'Has body' : 'No body'
+    body: req.body ? 'Has body' : 'No body'
   });
 
   // Get course ID from the URL
