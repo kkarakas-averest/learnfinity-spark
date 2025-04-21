@@ -69,6 +69,32 @@ export default async function handler(
   let supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 
                            process.env.VITE_SUPABASE_SERVICE_KEY;
 
+  // --- BEGIN: Detailed Environment Logging ---
+  const mask = (val?: string) => {
+    if (!val) return '[empty]';
+    if (val.length < 8) return '[too short]';
+    return val.slice(0, 4) + '...' + val.slice(-4);
+  };
+  const logEnv = {
+    NODE_ENV: process.env.NODE_ENV,
+    VERCEL_ENV: process.env.VERCEL_ENV,
+    SUPABASE_URL: process.env.SUPABASE_URL,
+    VITE_SUPABASE_URL: process.env.VITE_SUPABASE_URL,
+    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
+    SUPABASE_SERVICE_ROLE_KEY: mask(process.env.SUPABASE_SERVICE_ROLE_KEY),
+    VITE_SUPABASE_SERVICE_KEY: mask(process.env.VITE_SUPABASE_SERVICE_KEY),
+    HARDCODED_SUPABASE_URL: HARDCODED_SUPABASE_URL,
+    HARDCODED_SERVICE_KEY: mask(HARDCODED_SERVICE_KEY),
+    usedSupabaseUrl: supabaseUrl,
+    usedServiceKey: mask(supabaseServiceKey),
+  };
+  console.log('==== ENV DEBUG START ====', logEnv);
+  if (!process.env.SUPABASE_URL) console.warn('SUPABASE_URL is missing');
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) console.warn('SUPABASE_SERVICE_ROLE_KEY is missing');
+  if (supabaseUrl && (supabaseUrl.includes('$') || supabaseUrl.includes('{'))) console.warn('supabaseUrl contains unresolved placeholder:', supabaseUrl);
+  if (supabaseServiceKey && (supabaseServiceKey.includes('$') || supabaseServiceKey.includes('{'))) console.warn('supabaseServiceKey contains unresolved placeholder:', mask(supabaseServiceKey));
+  // --- END: Detailed Environment Logging ---
+
   // CRITICAL: Check if Supabase URL contains placeholders and use hardcoded value if needed
   if (!supabaseUrl || supabaseUrl.includes('$') || supabaseUrl.includes('{')) {
     console.warn('WARNING: Using hardcoded Supabase URL because environment variable contains placeholders or is undefined');
