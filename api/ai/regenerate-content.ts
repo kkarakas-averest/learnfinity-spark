@@ -460,47 +460,11 @@ export default async function handler(
         updated_at: new Date().toISOString() 
     }).eq('id', jobId);
     
-    // Generate a unique ID for the main content
+    // Generate a unique ID for potential new content
     const contentId = uuidv4();
 
-    // 1. Upsert into ai_course_content (handles existing records)
-    const { error: contentUpsertError } = await supabase
-      .from('ai_course_content')
-      .upsert({
-        // We might not know the existing ID, so let upsert handle it based on constraint
-        // If the record exists based on the constraint, it will be updated.
-        // If it doesn't exist, these values will be used for insertion.
-        id: contentId, // Provide an ID for potential insertion
-        course_id: courseId,
-        title: parsedContent.title,
-        description: parsedContent.description,
-        learning_objectives: parsedContent.learning_objectives || [],
-        created_for_user_id: employeeId,
-        employee_id: employeeId, // Ensure this is set correctly
-        is_active: true,
-        version: '1.0', // Keep version static for now, or implement versioning
-        personalization_context: employeeData?.cv_extracted_data || {},
-        metadata: { 
-            generation_method: 'groq', 
-            model_used: 'llama3-8b-8192',
-            job_id: jobId,
-            request_id: requestId 
-        },
-        created_at: new Date().toISOString(), // Gets set on insert
-        updated_at: new Date().toISOString(), // Gets updated on upsert
-      }, {
-        // Specify the constraint name for conflict resolution
-        onConflict: 'course_id,version,created_for_user_id',
-      });
-
-    if (contentUpsertError) {
-      logWithTimestamp(`Error upserting into ai_course_content:`, contentUpsertError, requestId);
-      throw new Error(`Failed to store/update main content: ${contentUpsertError.message}`);
-    }
-    
-    // We may not get the ID back directly from upsert without .select(), 
-    // but we need an ID for sections. Let's re-query to get the ID for certain.
-    const { data: upsertedContent, error: queryError } = await supabase
+    // 1. First, check if content already exists
+    const { data: existingContent, error: checkError } = await supabase
       .from('ai_course_content')
       .select('id')
       .eq('course_id', courseId)
@@ -508,13 +472,84 @@ export default async function handler(
       .eq('created_for_user_id', employeeId)
       .single();
 
-    if (queryError || !upsertedContent?.id) {
-      logWithTimestamp(`Error fetching ID after upsert:`, queryError, requestId);
-      throw new Error('Failed to retrieve content ID after upsert.');
+    let actualContentId: string;
+    
+    if (existingContent) {
+      // Content exists, update it
+      actualContentId = existingContent.id;
+      logWithTimestamp(`Existing content found with ID: ${actualContentId}. Updating...`, undefined, requestId);
+      
+      // Update the existing content
+      const { error: updateError } = await supabase
+        .from('ai_course_content')
+        .update({
+          title: parsedContent.title,
+          description: parsedContent.description,
+          learning_objectives: parsedContent.learning_objectives || [],
+          is_active: true,
+          personalization_context: employeeData?.cv_extracted_data || {},
+          metadata: { 
+              generation_method: 'groq', 
+              model_used: 'llama3-8b-8192',
+              job_id: jobId,
+              request_id: requestId,
+              updated: new Date().toISOString()
+          },
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', actualContentId);
+      
+      if (updateError) {
+        logWithTimestamp(`Error updating ai_course_content:`, updateError, requestId);
+        throw new Error(`Failed to update content: ${updateError.message}`);
+      }
+      
+      // 1.1. Delete existing sections for this content
+      logWithTimestamp(`Deleting existing sections for content ID: ${actualContentId}`, undefined, requestId);
+      const { error: deleteError } = await supabase
+        .from('ai_course_content_sections')
+        .delete()
+        .eq('content_id', actualContentId);
+      
+      if (deleteError) {
+        logWithTimestamp(`Error deleting existing sections:`, deleteError, requestId);
+        throw new Error(`Failed to delete existing sections: ${deleteError.message}`);
+      }
+    } else {
+      // Content doesn't exist, create new
+      logWithTimestamp(`No existing content found. Creating new with ID: ${contentId}`, undefined, requestId);
+      actualContentId = contentId;
+      
+      const { error: insertError } = await supabase
+        .from('ai_course_content')
+        .insert({
+          id: contentId,
+          course_id: courseId,
+          title: parsedContent.title,
+          description: parsedContent.description,
+          learning_objectives: parsedContent.learning_objectives || [],
+          created_for_user_id: employeeId,
+          employee_id: employeeId,
+          is_active: true,
+          version: '1.0',
+          personalization_context: employeeData?.cv_extracted_data || {},
+          metadata: { 
+              generation_method: 'groq', 
+              model_used: 'llama3-8b-8192',
+              job_id: jobId,
+              request_id: requestId 
+          },
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        });
+      
+      if (insertError) {
+        logWithTimestamp(`Error inserting into ai_course_content:`, insertError, requestId);
+        throw new Error(`Failed to create new content: ${insertError.message}`);
+      }
     }
     
-    const actualContentId = upsertedContent.id;
-    logWithTimestamp(`Main content stored/updated with ID: ${actualContentId}`, undefined, requestId);
+    logWithTimestamp(`Content ${existingContent ? 'updated' : 'created'} with ID: ${actualContentId}`, undefined, requestId);
 
     // Prepare sections, generating UUIDs for modules
     const moduleUuidMap = new Map<string, string>();
