@@ -1,6 +1,10 @@
 {
   "version": 2,
-  "buildCommand": "next build",
+  "buildCommand": "pnpm run build",
+  "devCommand": "pnpm run dev",
+  "framework": "vite",
+  "installCommand": "pnpm install",
+  "outputDirectory": "dist",
   "github": {
     "enabled": true,
     "silent": false

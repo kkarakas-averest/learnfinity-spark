@@ -84,7 +84,7 @@ export function parseStorageUrl(url: string): { bucket: string; path: string } |
     if (!url) return null;
     
     // Handle new format URLs (supabase.co/storage/v1/object/public/bucket/path)
-    let match = url.match(/\/storage\/v1\/object\/(?:public|authenticated)\/([^\/]+)\/(.+)$/);
+    let match = url.match(/\/storage\/v1\/object\/(?:public|authenticated)\/([^/]+)\/(.+)$/);
     
     if (match) {
       return {
@@ -94,7 +94,7 @@ export function parseStorageUrl(url: string): { bucket: string; path: string } |
     }
     
     // Try alternate format (subdomain.supabase.co/storage/v1/object/bucket/path)
-    match = url.match(/\/storage\/v1\/object\/([^\/]+)\/(.+)$/);
+    match = url.match(/\/storage\/v1\/object\/([^/]+)\/(.+)$/);
     
     if (match) {
       return {
