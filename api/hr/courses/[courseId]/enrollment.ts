@@ -14,29 +14,6 @@ function extractCourseIdFromPath(url: string): string | null {
   return match ? match[1] : null;
 }
 
-// Initialize Supabase client
-// Prioritize standard backend names, then VITE_/NEXT_PUBLIC_ as fallbacks
-const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_SERVICE_KEY;
-
-// Check if the essential variables were actually found
-if (!supabaseUrl || !supabaseServiceKey) {
-  console.error('CRITICAL ERROR: Missing Supabase URL or Service Key. Check Vercel Environment Variables.', { 
-    supabaseUrlValue: supabaseUrl ? supabaseUrl.substring(0, 8) + '...' : 'MISSING',
-    hasServiceKeyValue: Boolean(supabaseServiceKey),
-    envDetails: {
-      SUPABASE_URL: process.env.SUPABASE_URL ? 'Defined' : 'Undefined',
-      VITE_SUPABASE_URL: process.env.VITE_SUPABASE_URL ? 'Defined' : 'Undefined',
-      NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL ? 'Defined' : 'Undefined',
-      SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY ? 'Defined' : 'Undefined',
-      VITE_SUPABASE_SERVICE_KEY: process.env.VITE_SUPABASE_SERVICE_KEY ? 'Defined' : 'Undefined'
-    }
-  });
-  // Return 500 immediately if configuration is missing
-  // Note: We removed the hardcoded fallback keys/URL as they hide the real configuration issue.
-  // return res.status(500).json({ error: 'Server configuration error - missing Supabase credentials' });
-}
-
 // Set CORS headers helper function
 const setCorsHeaders = (res: VercelResponse) => {
   res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -64,15 +41,37 @@ export default async function handler(
     return res.status(200).end();
   }
 
-  // *** NEW FIX: Explicitly nullify body for GET requests ***
+  // *** STEP 1: Read and Validate Env Vars INSIDE the handler ***
+  const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_SERVICE_KEY;
+
+  // Check if the essential variables were actually found and EXIT EARLY
+  if (!supabaseUrl || !supabaseServiceKey) {
+    console.error('CRITICAL ERROR: Missing Supabase URL or Service Key. Check Vercel Environment Variables.', { 
+      supabaseUrlValue: supabaseUrl ? supabaseUrl.substring(0, 8) + '...' : 'MISSING',
+      hasServiceKeyValue: Boolean(supabaseServiceKey),
+      envDetails: {
+        SUPABASE_URL: process.env.SUPABASE_URL ? 'Defined' : 'Undefined',
+        VITE_SUPABASE_URL: process.env.VITE_SUPABASE_URL ? 'Defined' : 'Undefined',
+        NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL ? 'Defined' : 'Undefined',
+        SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY ? 'Defined' : 'Undefined',
+        VITE_SUPABASE_SERVICE_KEY: process.env.VITE_SUPABASE_SERVICE_KEY ? 'Defined' : 'Undefined'
+      }
+    });
+    // EXIT HERE if config is missing
+    return res.status(500).json({ error: 'Server configuration error - missing Supabase credentials' });
+  }
+  // *** END Env Var Check ***
+
+  // *** STEP 2: Nullify body if GET (keep this) ***
   if (req.method === 'GET') {
     if (req.body && Object.keys(req.body).length > 0) {
-      console.warn('GET request received with body. Explicitly removing body before processing.', req.body);
-      // Force body to null to clear it at the infrastructure level
+      console.warn('GET request received with body...');
       req.body = null;
     }
   }
 
+  // *** STEP 3: Log Request (keep this) ***
   console.log('Request received for enrollment API', { 
     method: req.method, 
     query: req.query,
@@ -81,7 +80,7 @@ export default async function handler(
     url: req.url
   });
 
-  // Try to get courseId from different possible sources
+  // *** STEP 4: Extract and Validate courseId (keep this) ***
   let courseId = req.query.courseId as string;
   
   // If courseId isn't available in query, try to extract from URL path
@@ -110,14 +109,11 @@ export default async function handler(
     return res.status(400).json({ error: 'Course ID must be a valid UUID' });
   }
 
+  // *** STEP 5: Main Try/Catch Block ***
   try {
-    // Moved check outside/before the try block as it's a fatal config error
-    // if (!supabaseUrl || !supabaseServiceKey) { ... }
-
-    // Initialize Supabase
-    // Log removed as it's logged in the check above
-    // console.log('Initializing Supabase with URL:', supabaseUrl.substring(0, 8) + '...'); 
-    const supabase = createClient(supabaseUrl!, supabaseServiceKey!, {
+    // Initialize Supabase INSIDE try block, using validated variables
+    console.log('Initializing Supabase with URL:', supabaseUrl.substring(0, 8) + '...'); 
+    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
       auth: {
         persistSession: false,
         autoRefreshToken: false
