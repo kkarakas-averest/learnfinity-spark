@@ -17,7 +17,7 @@ const PersonalizedCourseContent: React.FC<PersonalizedCourseContentProps> = ({
   content, 
   sections, 
   isLoading = false 
-}) => {
+}: PersonalizedCourseContentProps) => {
   console.log(`Rendering PersonalizedCourseContent with: ${content ? `contentId: ${content.id}, sectionsCount: ${sections.length}` : 'null content'}, sections: ${JSON.stringify(sections)}`);
   
   // Group sections by module_id
@@ -46,7 +46,7 @@ const PersonalizedCourseContent: React.FC<PersonalizedCourseContentProps> = ({
   
   // Extract module info for tabs
   const modules = React.useMemo(() => {
-    return Array.from(moduleMap.keys()).map(moduleId => {
+    return (Array.from(moduleMap.keys()) as string[]).map((moduleId) => {
       const moduleSections = moduleMap.get(moduleId) || [];
       // Use the first section's title to derive module title
       const firstSection = moduleSections[0];
@@ -111,7 +111,7 @@ const PersonalizedCourseContent: React.FC<PersonalizedCourseContentProps> = ({
               <h3 className="text-sm font-medium mb-2">Learning Objectives:</h3>
               <ul className="list-disc list-inside text-sm text-muted-foreground">
                 {Array.isArray(content.learning_objectives) ? (
-                  content.learning_objectives.map((objective, index) => (
+                  content.learning_objectives.map((objective: string, index: number) => (
                     <li key={index} className="ml-2">{objective}</li>
                   ))
                 ) : (
@@ -126,25 +126,50 @@ const PersonalizedCourseContent: React.FC<PersonalizedCourseContentProps> = ({
       {modules.length > 0 ? (
         <Tabs defaultValue={modules[0].id}>
           <TabsList className="mb-4">
-            {modules.map(module => (
+            {modules.map((module: { id: string; title: string; sections: AICourseContentSection[] }) => (
               <TabsTrigger key={module.id} value={module.id} className="flex-1">
                 {module.title}
               </TabsTrigger>
             ))}
           </TabsList>
           
-          {modules.map(module => (
+          {modules.map((module: { id: string; title: string; sections: AICourseContentSection[] }) => (
             <TabsContent key={module.id} value={module.id} className="space-y-4">
-              {module.sections.map((section, index) => (
+              {module.sections.map((section: AICourseContentSection, index: number) => (
                 <Card key={index}>
                   <CardHeader>
                     <CardTitle className="text-lg">{section.title}</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div 
-                      className="prose max-w-none"
+                      className="prose max-w-none mb-4"
                       dangerouslySetInnerHTML={{ __html: section.content }}
                     />
+                    {section.case_study && (
+                      <blockquote className="border-l-4 border-blue-400 bg-blue-50 p-4 my-4 text-blue-900">
+                        <strong>Case Study:</strong>
+                        <div dangerouslySetInnerHTML={{ __html: section.case_study }} />
+                      </blockquote>
+                    )}
+                    {section.actionable_takeaway && (
+                      <div className="bg-green-50 border-l-4 border-green-400 p-4 my-4 rounded">
+                        <strong>Actionable Takeaway:</strong> {section.actionable_takeaway}
+                      </div>
+                    )}
+                    {section.quiz && section.quiz.question && (
+                      <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 my-4 rounded">
+                        <strong>Quiz:</strong>
+                        <div className="mt-2">
+                          <span className="font-medium">Q:</span> {section.quiz.question}
+                        </div>
+                        {section.quiz.answer && (
+                          <details className="mt-2 cursor-pointer">
+                            <summary className="font-medium text-blue-700">Show Answer</summary>
+                            <div className="mt-1">{section.quiz.answer}</div>
+                          </details>
+                        )}
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               ))}

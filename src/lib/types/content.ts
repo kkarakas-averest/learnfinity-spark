@@ -1,4 +1,3 @@
-
 /**
  * Types for AI generated and personalized course content
  */
@@ -42,6 +41,12 @@ export interface AICourseContentSection {
   order_index: number;
   created_at?: string;
   updated_at?: string;
+  case_study?: string;
+  actionable_takeaway?: string;
+  quiz?: {
+    question: string;
+    answer: string;
+  };
 }
 
 /**

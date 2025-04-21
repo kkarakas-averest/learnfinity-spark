@@ -384,107 +384,60 @@ export default async function handler(
     const groq = new Groq({ apiKey: groqApiKey });
 
     // Create a comprehensive system prompt for more detailed content generation
-    const systemPrompt = `You are an expert educational content creator specialized in personalized professional development.
-Your task is to create comprehensive, highly tailored course content that fits the specific needs, background, and career goals of the employee.
+    const systemPrompt = `
+You are an expert instructional designer. 
+Generate deeply personalized, workplace-relevant course content for professional learners.
 
-GUIDELINES FOR CONTENT GENERATION:
-1. PERSONALIZATION PRINCIPLES
-   - Deeply analyze the employee's CV data to identify relevant skills, experience, and knowledge gaps
-   - Adapt content difficulty and examples to match the employee's experience level and domain expertise
-   - Connect new concepts to the employee's current role, department context, and industry background
-   - Reference relevant technologies, methodologies, and terminology from their field when appropriate
-
-2. CONTENT STRUCTURE REQUIREMENTS
-   - Create a compelling, personalized course title that reflects the adaptation to the employee's needs
-   - Write a concise but comprehensive course description (150-300 words)
-   - Develop 5-8 specific learning objectives tailored to the employee's development needs
-   - Organize content into logical modules with clear progression
-   - Each module should contain 3-5 sections with distinct concepts
-   - Ensure each section has sufficient depth (minimum 800 words of actual instructional content)
-
-3. PEDAGOGICAL APPROACH
-   - Begin each section with a clear introduction connecting to the employee's context
-   - Include real-world examples related to the employee's industry and role
-   - Incorporate both theoretical knowledge and practical applications
-   - Provide actionable takeaways that the employee can immediately apply
-   - Include reflective questions that connect content to the employee's specific work context
-   - Add challenge exercises appropriate to the employee's skill level
-
-4. CONTENT QUALITY STANDARDS
-   - Use clear, professional language appropriate for workplace learning
-   - Structure content with proper headings, subheadings, and formatting
-   - Include bullet points, tables, and other visual elements to enhance readability
-   - Balance brevity with comprehensiveness - be thorough but concise
-   - Ensure HTML formatting is correct and enhances readability
-
-5. OUTPUT FORMAT
-   - Return formatted JSON exactly matching the required structure
-   - Ensure all HTML content is properly formatted and escaped as needed
-   - Validate that all module_id values are consistent across sections
-   - Verify that all required fields are included and properly formatted
-
-The final content should be transformative, directly applicable to the employee's work context, and designed to advance their specific career trajectory.`;
+CONTENT REQUIREMENTS:
+- Analyze the employee's CV and role for context.
+- Each module must include:
+  - A real-world case study relevant to the employee's field.
+  - At least one actionable takeaway per section.
+  - A quiz (question and answer) at the end of each section.
+  - Rich HTML structure: <h2>, <h3>, <ul>, <ol>, <blockquote>, <table> as appropriate.
+- All output must be valid JSON as per the structure below.
+`;
 
     // Construct a detailed user prompt with more specific requirements
     const userPrompt = `
-Generate personalized course content for the course "${courseData.title}" based on the following employee data.
+Generate a personalized course for "${courseData.title}" for the following employee:
 
-COURSE INFORMATION:
-- Title: ${courseData.title}
-- Description: ${courseData.description}
-
-EMPLOYEE INFORMATION:
+EMPLOYEE:
 - Name: ${employeeData.name}
 - Department: ${employeeData.department_name || 'Not specified'}
 - Position: ${employeeData.position_title || 'Not specified'}
 - CV Data: ${JSON.stringify(employeeData.cv_extracted_data)}
 
-PERSONALIZATION REQUIREMENTS:
-1. Analyze the employee's background, skills, and experience from their CV
-2. Adapt the original course content to be specifically relevant to their role and career path
-3. Use examples and scenarios that would be encountered in their specific position
-4. Adjust the complexity level based on their experience and existing knowledge
-5. Focus on practical applications they can implement in their current role
-
-CONTENT STRUCTURE:
-Create a minimum of 3 modules with 3-5 sections each. Each section should include:
-- A personalized introduction connecting the topic to the employee's context
-- Thorough explanations with examples relevant to their field
-- Practical applications specific to their role
-- Reflective questions that relate to their specific work environment
-- Summary of key takeaways with personalized action items
-
 OUTPUT FORMAT:
-Return the content in the following JSON structure:
 {
-  "title": "Personalized title that references both the course topic and employee context",
-  "description": "Detailed description that explains how this content has been tailored for the employee's specific needs and goals (150-300 words)",
-  "learning_objectives": [
-    "Objective 1 specific to employee's role",
-    "Objective 2 specific to employee's development needs",
-    "At least 5 total objectives"
-  ],
-  "sections": [
+  "title": "Personalized course title",
+  "description": "Detailed, personalized course description",
+  "learning_objectives": ["Objective 1", "Objective 2", "..."],
+  "modules": [
     {
       "module_id": "module-1",
-      "title": "Module 1, Section 1 Title",
-      "content": "Detailed HTML content for section 1.1... (minimum 800 words)"
-    },
-    {
-      "module_id": "module-1",
-      "title": "Module 1, Section 2 Title",
-      "content": "Detailed HTML content for section 1.2... (minimum 800 words)"
-    },
-    {
-      "module_id": "module-2",
-      "title": "Module 2, Section 1 Title",
-      "content": "Detailed HTML content for section 2.1... (minimum 800 words)"
+      "title": "Module 1 Title",
+      "sections": [
+        {
+          "section_id": "section-1-1",
+          "title": "Section 1.1 Title",
+          "content": "<h2>...</h2><p>...</p>",
+          "case_study": "<blockquote>...</blockquote>",
+          "actionable_takeaway": "A specific, actionable step for the learner",
+          "quiz": {
+            "question": "Quiz question?",
+            "answer": "Correct answer"
+          }
+        }
+        // More sections...
+      ]
     }
-    // Additional sections...
+    // More modules...
   ]
 }
-
-Ensure the HTML content includes proper formatting with headings, paragraphs, lists, and other elements to enhance readability.`;
+- All fields must be present. Use clear, professional language.
+- Do not include any explanations or text outside the JSON.
+`;
 
     // Log the full prompts for debugging (but truncate if very long)
     const systemPromptForLog = systemPrompt.length > 1000 ? 
@@ -513,8 +466,8 @@ Ensure the HTML content includes proper formatting with headings, paragraphs, li
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userPrompt }
         ],
-        model: 'llama-3.3-70b-versatile', // Using the latest versatile model
-        temperature: 0.7,
+        model: 'qwen-qwq-32b', // Switched to Qwen model for experimentation
+        temperature: 0.4, // Lowered for more focused output
         max_tokens: 8192, // Increased token limit for longer content
         response_format: { type: "json_object" }, // Request JSON output
     });
@@ -535,18 +488,29 @@ Ensure the HTML content includes proper formatting with headings, paragraphs, li
         updated_at: new Date().toISOString() 
     }).eq('id', jobId);
 
-    // Parse the JSON response from Groq
+    // Parse the JSON response from Groq (expecting new structure)
     let parsedContent: {
         title: string;
         description: string;
         learning_objectives: string[];
-        sections: { module_id: string; title: string; content: string }[];
+        modules: Array<{
+          module_id: string;
+          title: string;
+          sections: Array<{
+            section_id: string;
+            title: string;
+            content: string;
+            case_study: string;
+            actionable_takeaway: string;
+            quiz: { question: string; answer: string };
+          }>;
+        }>;
     };
     try {
         parsedContent = JSON.parse(groqResponseContent);
         // Basic validation of parsed structure
-        if (!parsedContent.title || !parsedContent.sections || !Array.isArray(parsedContent.sections)) {
-            throw new Error('Parsed Groq response is missing required fields (title, sections).');
+        if (!parsedContent.title || !parsedContent.modules || !Array.isArray(parsedContent.modules)) {
+            throw new Error('Parsed Groq response is missing required fields (title, modules).');
         }
     } catch (parseError: any) {
         logWithTimestamp(`Error parsing Groq JSON response:`, parseError, requestId);
@@ -594,7 +558,7 @@ Ensure the HTML content includes proper formatting with headings, paragraphs, li
           personalization_context: employeeData?.cv_extracted_data || {},
           metadata: { 
               generation_method: 'groq', 
-              model_used: 'llama-3.3-70b-versatile',
+              model_used: 'qwen-qwq-32b',
               job_id: jobId,
               request_id: requestId,
               updated: new Date().toISOString()
@@ -639,7 +603,7 @@ Ensure the HTML content includes proper formatting with headings, paragraphs, li
           personalization_context: employeeData?.cv_extracted_data || {},
           metadata: { 
               generation_method: 'groq', 
-              model_used: 'llama-3.3-70b-versatile',
+              model_used: 'qwen-qwq-32b',
               job_id: jobId,
               request_id: requestId 
           },
@@ -655,24 +619,29 @@ Ensure the HTML content includes proper formatting with headings, paragraphs, li
     
     logWithTimestamp(`Content ${existingContent ? 'updated' : 'created'} with ID: ${actualContentId}`, undefined, requestId);
 
-    // Prepare sections, generating UUIDs for modules
+    // Prepare sections, generating UUIDs for modules and sections
     const moduleUuidMap = new Map<string, string>();
-    const sectionsToInsert = parsedContent.sections.map((section, index) => {
-        const originalModuleId = section.module_id || `module-${index + 1}`;
-        if (!moduleUuidMap.has(originalModuleId)) {
-            moduleUuidMap.set(originalModuleId, uuidv4());
-        }
-        const moduleUuid = moduleUuidMap.get(originalModuleId)!;
-        
-        return {
-            id: uuidv4(),
-            content_id: actualContentId, // Use the retrieved ID
-            module_id: moduleUuid,
-            section_id: uuidv4(),
-            title: section.title,
-            content: section.content,
-            order_index: index,
-        };
+    const sectionsToInsert: any[] = [];
+    parsedContent.modules.forEach((module, moduleIdx) => {
+      let moduleUuid = moduleUuidMap.get(module.module_id);
+      if (!moduleUuid) {
+        moduleUuid = uuidv4();
+        moduleUuidMap.set(module.module_id, moduleUuid);
+      }
+      module.sections.forEach((section, sectionIdx) => {
+        sectionsToInsert.push({
+          id: uuidv4(),
+          content_id: actualContentId,
+          module_id: moduleUuid,
+          section_id: section.section_id || uuidv4(),
+          title: section.title,
+          content: section.content,
+          case_study: section.case_study,
+          actionable_takeaway: section.actionable_takeaway,
+          quiz: section.quiz,
+          order_index: moduleIdx * 100 + sectionIdx,
+        });
+      });
     });
 
     // 2. Insert into ai_course_content_sections
