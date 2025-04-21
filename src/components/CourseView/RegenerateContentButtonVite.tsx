@@ -3,29 +3,30 @@ import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { RotateCcwIcon } from "@/components/ui/custom-icons";
 import { toast } from "@/components/ui/use-toast";
-import { useAuth } from "@/contexts/AuthContext";
 
 /**
  * RegenerateContentButtonVite - pure Vite/React version
  * Props:
  *   courseId (string, required): ID of the course to regenerate.
+ *   userId (string, optional): ID of the user/employee to regenerate content for.
  *   onSuccess?: callback to trigger on successful regeneration.
  *   onError?: callback for errors.
  */
 interface RegenerateContentButtonViteProps {
   courseId: string;
+  userId?: string;
   onSuccess?: (jobId: string) => void;
   onError?: (error: Error) => void;
 }
 
 const RegenerateContentButtonVite = ({
   courseId,
+  userId,
   onSuccess,
   onError,
 }: RegenerateContentButtonViteProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const [currentStep, setCurrentStep] = useState<string>("");
-  const { user } = useAuth();
 
   // Helper function to log with identifier for easier debugging
   const logOperation = (message: string, data?: any) => {
@@ -43,12 +44,14 @@ const RegenerateContentButtonVite = ({
   const fetchEmployeeDataForCourse = async (courseId: string) => {
     updateProgress("Fetching employee data...");
     try {
-      if (!user?.id) {
+      const currentUserId = userId || localStorage.getItem('userId') || sessionStorage.getItem('userId');
+      
+      if (!currentUserId) {
         throw new Error("User ID not available. Please login again.");
       }
 
       // Get course enrollment to find the employee - now with userId in query params
-      const enrollmentResponse = await fetch(`/api/hr/courses/${courseId}/enrollment?userId=${user.id}`, {
+      const enrollmentResponse = await fetch(`/api/hr/courses/${courseId}/enrollment?userId=${currentUserId}`, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",

@@ -420,6 +420,7 @@ const CourseView: React.FC<CourseViewProps> = ({
                 </p>
                 <RegenerateContentButtonVite
                   courseId={courseId}
+                  userId={employeeId || undefined}
                   onSuccess={() => {
                     setHasPersonalizedContent(false);
                     setTimeout(() => {

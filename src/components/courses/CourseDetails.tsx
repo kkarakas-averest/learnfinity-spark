@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React from "@/lib/react-helpers";
+import { useState, useEffect } from "@/lib/react-helpers";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -224,7 +225,10 @@ export function CourseDetails({ course }: CourseDetailsProps) {
         </div>
         <div className="flex flex-col items-end gap-2">
           <Button>Start Course</Button>
-          <RegenerateContentButtonVite courseId={course.id} />
+          <RegenerateContentButtonVite 
+            courseId={course.id} 
+            userId={employeeId || undefined} 
+          />
         </div>
       </div>
 
