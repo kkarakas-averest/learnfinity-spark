@@ -35,9 +35,8 @@ const HARDCODED_SUPABASE_URL = 'https://ujlqzkkkfatehxeqtbdl.supabase.co';
 // and only use this hardcoded key for development/debugging
 // DO NOT COMMIT YOUR ACTUAL SERVICE KEY TO GIT
 // Instead, add SUPABASE_SERVICE_ROLE_KEY to Vercel environment variables for Production, Preview, and Development
-// ⚠️ WARNING: Replace the placeholder below with your actual Supabase service role key before deployment ⚠️
-// Then after testing, revert this change before committing to avoid exposing your key in source code
-const HARDCODED_SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.INSERT_YOUR_ACTUAL_SERVICE_KEY_HERE'; // REPLACE THIS
+// ⚠️ TESTING ONLY: Replace this placeholder with your actual key, test, THEN REMOVE IT AFTER TESTING ⚠️
+const HARDCODED_SERVICE_KEY = 'REPLACE_THIS_WITH_YOUR_ACTUAL_SERVICE_KEY'; // REPLACE THIS ENTIRE STRING
 
 export default async function handler(
   req: VercelRequest,
@@ -108,13 +107,17 @@ export default async function handler(
   }
 
   // Check if the essential variables were found and EXIT EARLY if service key is missing or invalid
-  if (!supabaseServiceKey || supabaseServiceKey === '' || 
-      supabaseServiceKey.includes('INSERT_YOUR_ACTUAL_SERVICE_KEY_HERE')) {
+  if (!supabaseServiceKey || 
+      (supabaseServiceKey === '') || 
+      (supabaseServiceKey.includes('REPLACE_THIS_WITH_YOUR_ACTUAL_SERVICE_KEY')) || 
+      // Skip check if it's a valid-looking JWT (for testing mode)
+      (!supabaseServiceKey.startsWith('eyJ'))) {
     console.error('CRITICAL ERROR: Missing or invalid Supabase Service Key. Check Vercel Environment Variables.', { 
       supabaseUrlValue: supabaseUrl ? supabaseUrl.substring(0, 8) + '...' : 'MISSING',
       hasServiceKeyValue: Boolean(supabaseServiceKey),
       isEmpty: supabaseServiceKey === '',
-      isUnmodifiedPlaceholder: supabaseServiceKey.includes('INSERT_YOUR_ACTUAL_SERVICE_KEY_HERE'),
+      isUnmodifiedPlaceholder: supabaseServiceKey.includes('REPLACE_THIS_WITH_YOUR_ACTUAL_SERVICE_KEY'),
+      startsWithEyJ: supabaseServiceKey?.startsWith('eyJ') || false,
       envDetails: {
         SUPABASE_URL: process.env.SUPABASE_URL ? 'Defined' : 'Undefined',
         VITE_SUPABASE_URL: process.env.VITE_SUPABASE_URL ? 'Defined' : 'Undefined',
@@ -125,7 +128,7 @@ export default async function handler(
     });
     // EXIT HERE if config is missing or using placeholder
     return res.status(500).json({ 
-      error: 'Server configuration error - missing or invalid Supabase service key',
+      error: 'Server configuration error - missing Supabase service key',
       details: 'You need to either:',
       options: [
         '1. Replace the placeholder in HARDCODED_SERVICE_KEY with your actual Supabase service key in the code (for development only)',
