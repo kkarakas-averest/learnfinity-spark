@@ -1,6 +1,6 @@
 import React from '@/lib/react-helpers';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -12,7 +12,25 @@ import CourseModuleList from './CourseModuleList';
 import CourseContentSection from './CourseContentSection';
 import PersonalizedCourseContent from './PersonalizedCourseContent';
 import RegenerateContentButtonVite from '@/components/CourseView/RegenerateContentButtonVite';
+import { Progress } from '@/components/ui/progress';
 import { AICourseContentSection } from '@/lib/types/content';
+import { Badge } from '@/components/ui/badge';
+import { 
+  BookOpen, 
+  CheckCircle, 
+  ChevronRight, 
+  Clock, 
+  FileText, 
+  Sparkles, 
+  BarChart2, 
+  Award,
+  Library,
+  Book
+} from 'lucide-react';
+import type { IconProps } from 'lucide-react';
+
+// Define a type for the Lucide icon component
+type IconComponent = React.ForwardRefExoticComponent<IconProps & React.RefAttributes<SVGSVGElement>>;
 
 interface CourseViewProps {
   courseId: string;
@@ -40,6 +58,23 @@ const CourseView: React.FC<CourseViewProps> = ({
     startedAt?: string;
     estimatedCompletion?: string;
   }>({ isGenerating: false });
+  const [pollingIntervalId, setPollingIntervalId] = React.useState<NodeJS.Timeout | null>(null);
+  const [activeTab, setActiveTab] = React.useState<string>('content');
+  const [courseProgress, setCourseProgress] = React.useState<number>(0);
+  const [completedModules, setCompletedModules] = React.useState<string[]>([]);
+
+  const stopPolling = () => {
+    if (pollingIntervalId) {
+      clearInterval(pollingIntervalId);
+      setPollingIntervalId(null);
+    }
+  };
+
+  React.useEffect(() => {
+    return () => {
+      stopPolling();
+    };
+  }, [pollingIntervalId]);
 
   React.useEffect(() => {
     const loadCourseData = async () => {
@@ -60,6 +95,16 @@ const CourseView: React.FC<CourseViewProps> = ({
         
         if (employeeId) {
           await checkForPersonalizedContent();
+          // Fetch progress data (mock for now)
+          const mockProgress = Math.floor(Math.random() * 100);
+          setCourseProgress(mockProgress);
+          
+          // Simulate completed modules for demonstration
+          if (data?.modules?.length > 0) {
+            const moduleIds = data.modules.map((m: any) => m.id);
+            const completed = moduleIds.slice(0, Math.floor(mockProgress / 33));
+            setCompletedModules(completed);
+          }
         }
       } catch (error) {
         console.error('Error loading course:', error);
@@ -76,12 +121,14 @@ const CourseView: React.FC<CourseViewProps> = ({
     loadCourseData();
   }, [courseId, employeeId]);
 
-  const checkForPersonalizedContent = async () => {
+  const checkForPersonalizedContent = async (isPolling: boolean = false) => {
     if (!courseId || !employeeId) return;
     
+    if (!isPolling) {
+        setLoadingPersonalization(true);
+    }
+    
     try {
-      setLoadingPersonalization(true);
-      
       const contentService = PersonalizedContentService.getInstance();
       const enrollmentIdResult = await contentService.getEnrollmentId(courseId, employeeId);
       
@@ -91,7 +138,23 @@ const CourseView: React.FC<CourseViewProps> = ({
         const statusResult = await contentService.getContentGenerationStatus(enrollmentIdResult);
         setContentGenerationStatus(statusResult);
         
-        if (!statusResult.isGenerating) {
+        if (isPolling && !statusResult.isGenerating) {
+            stopPolling();
+            console.log('[Polling] Content generation finished according to status.');
+            const hasContent = await contentService.hasPersonalizedContent(courseId, employeeId);
+            setHasPersonalizedContent(hasContent);
+            
+            if (hasContent) {
+              const { content, sections } = await contentService.getPersonalizedContent(courseId, employeeId);
+              setPersonalizedContent(content);
+              setPersonalizedContentSections(sections);
+              
+              if (sections && sections.length > 0) {
+                const firstModuleId = sections[0].module_id;
+                setSelectedModuleId(firstModuleId);
+              }
+            }
+        } else if (!statusResult.isGenerating) {
           const hasContent = await contentService.hasPersonalizedContent(courseId, employeeId);
           setHasPersonalizedContent(hasContent);
           
@@ -99,7 +162,6 @@ const CourseView: React.FC<CourseViewProps> = ({
             const { content, sections } = await contentService.getPersonalizedContent(courseId, employeeId);
             setPersonalizedContent(content);
             setPersonalizedContentSections(sections);
-            
             if (sections && sections.length > 0) {
               const firstModuleId = sections[0].module_id;
               setSelectedModuleId(firstModuleId);
@@ -109,8 +171,11 @@ const CourseView: React.FC<CourseViewProps> = ({
       }
     } catch (error) {
       console.error('Error checking personalized content:', error);
+      stopPolling();
     } finally {
-      setLoadingPersonalization(false);
+        if (!isPolling) {
+             setLoadingPersonalization(false);
+        }
     }
   };
 
@@ -292,227 +357,309 @@ const CourseView: React.FC<CourseViewProps> = ({
   };
 
   const renderModuleContent = () => {
-    if (!selectedModuleId) {
+    if (!course || !course.modules || !selectedModuleId) {
       return (
-        <div className="p-4 text-center">
-          <p className="text-muted-foreground">Select a module to view its content</p>
-        </div>
+        <Card>
+          <CardContent className="p-8 text-center">
+            <BookOpen className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+            <h3 className="text-xl font-medium mb-2">Select a module to begin</h3>
+            <p className="text-muted-foreground">Choose a module from the list to view its content.</p>
+          </CardContent>
+        </Card>
       );
     }
-    
-    const moduleSections = personalizedContentSections.filter(
-      (section: AICourseContentSection) => section.module_id === selectedModuleId
-    ).sort((a: AICourseContentSection, b: AICourseContentSection) => a.order_index - b.order_index);
-    
-    if (moduleSections.length === 0) {
-      return (
-        <div className="p-4 text-center">
-          <p className="text-muted-foreground">No content available for this module</p>
-        </div>
-      );
-    }
-    
+
+    const selectedModule = course.modules.find((m: any) => m.id === selectedModuleId);
+    if (!selectedModule) return null;
+
     return (
       <div className="space-y-6">
-        {moduleSections.map((section: AICourseContentSection) => (
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-bold">{selectedModule.title}</h2>
+          {completedModules.includes(selectedModuleId) && (
+            <Badge variant="success" className="flex items-center gap-1 bg-green-100 text-green-800 border-green-300">
+              <CheckCircle className="h-3.5 w-3.5" />
+              <span>Completed</span>
+            </Badge>
+          )}
+        </div>
+        
+        {selectedModule.sections && selectedModule.sections.map((section: any, index: number) => (
           <CourseContentSection 
-            key={section.id} 
-            title={section.title}
-            content={section.content}
+            key={index} 
+            title={section.title} 
+            content={section.content} 
           />
         ))}
       </div>
     );
   };
 
+  const renderCourseContentArea = () => {
+    if (hasPersonalizedContent && personalizedContent && personalizedContentSections.length > 0) {
+      return (
+        <PersonalizedCourseContent 
+          content={personalizedContent} 
+          sections={personalizedContentSections}
+          isLoading={loadingPersonalization}
+        />
+      );
+    }
+
+    return renderModuleContent();
+  };
+
+  const renderCourseStats = () => {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <StatCard 
+          title="Progress" 
+          value={`${courseProgress}%`} 
+          description="Course completion" 
+          icon={BarChart2} 
+          color="bg-blue-50 text-blue-500"
+        />
+        <StatCard 
+          title="Estimated Time" 
+          value={course?.estimated_hours ? `${course.estimated_hours} hours` : "2-3 hours"} 
+          description="To complete" 
+          icon={Clock} 
+          color="bg-amber-50 text-amber-500"
+        />
+        <StatCard 
+          title="Certificate" 
+          value={courseProgress >= 100 ? "Available" : "On completion"} 
+          description="Course achievement" 
+          icon={Award} 
+          color="bg-green-50 text-green-500"
+        />
+      </div>
+    );
+  };
+
   if (loading) {
     return (
-      <div className="container mx-auto p-6">
-        <div className="space-y-4">
-          <Skeleton className="h-12 w-3/4" />
-          <Skeleton className="h-64 w-full" />
-          <Skeleton className="h-32 w-full" />
+      <div className="container mx-auto p-4">
+        <div className="space-y-6">
+          <div className="space-y-2">
+            <Skeleton className="h-12 w-3/4" />
+            <Skeleton className="h-6 w-1/2" />
+          </div>
+          <Skeleton className="h-64 w-full rounded-lg" />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Skeleton className="h-28 w-full rounded-lg" />
+            <Skeleton className="h-28 w-full rounded-lg" />
+            <Skeleton className="h-28 w-full rounded-lg" />
+          </div>
         </div>
       </div>
     );
   }
 
-  if (!course) {
-    return (
-      <div className="container mx-auto p-6">
-        <Card>
-          <CardContent className="p-6">
-            <h2 className="text-2xl font-bold mb-2">Course Not Found</h2>
-            <p className="text-muted-foreground">The requested course could not be found.</p>
-            <Button 
-              onClick={() => navigate(-1)}
-              className="mt-4"
-            >
-              Go Back
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   return (
-    <div className="container mx-auto p-6">
-      <Card className="mb-6">
-        <CardHeader>
-          <div className="flex justify-between">
+    <div className="container mx-auto p-4">
+      {/* Hero Section with Course Info */}
+      <div className="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-lg shadow-lg mb-8 overflow-hidden">
+        <div className="p-8 text-white">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4">
             <div>
-              <CardTitle className="text-2xl">{course?.title}</CardTitle>
-              {course?.skill_level && (
-                <div className="mt-2 text-sm font-medium text-muted-foreground">
-                  Level: {course.skill_level.charAt(0).toUpperCase() + course.skill_level.slice(1)}
-                </div>
-              )}
-            </div>
-            <Button 
-              variant="outline"
-              onClick={() => navigate(-1)}
-            >
-              Back to Courses
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <p>{course?.description}</p>
-          
-          {employeeId && (
-            <div className="mt-4 p-4 bg-muted rounded-md">
-              <h3 className="text-lg font-medium mb-2">Personalized Learning</h3>
+              <h1 className="text-3xl font-bold mb-2">{course?.title}</h1>
+              <p className="text-blue-100 mb-4 max-w-3xl">{course?.description}</p>
               
-              {loadingPersonalization ? (
-                <div className="flex items-center space-x-2">
-                  <Skeleton className="h-4 w-4 rounded-full" />
-                  <p className="text-sm text-muted-foreground">Checking personalization status...</p>
-                </div>
-              ) : contentGenerationStatus.isGenerating ? (
-                <div className="space-y-2">
-                  <div className="flex items-center space-x-2">
-                    <div className="animate-pulse h-3 w-3 bg-blue-500 rounded-full" />
-                    <p className="text-sm font-medium">Generating personalized content...</p>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    This may take a few minutes. You can refresh the page to check progress.
-                  </p>
-                  {contentGenerationStatus.estimatedCompletion && (
-                    <p className="text-xs">
-                      Estimated completion: {new Date(contentGenerationStatus.estimatedCompletion).toLocaleTimeString()}
-                    </p>
-                  )}
-                </div>
-              ) : (
-                <div className="flex items-center space-x-2">
-                  {hasPersonalizedContent && (
-                    <>
-                      <div className="h-3 w-3 bg-green-500 rounded-full" />
-                      <p className="text-sm">Personalized content is available for you</p>
-                    </>
-                  )}
-                </div>
-              )}
-              <div className="flex items-center justify-between mt-2">
-                <p className="text-sm text-muted-foreground">
-                  Personalize this course based on your profile
-                </p>
-                <RegenerateContentButtonVite
-                  courseId={courseId}
-                  userId={employeeId || undefined}
-                  onSuccess={() => {
-                    setHasPersonalizedContent(false);
-                    setTimeout(() => {
-                      if (typeof window !== "undefined") {
-                        window.location.reload();
-                      }
-                    }, 2000);
-                  }}
-                  onError={(error) => {
-                    toast({
-                      title: "Failed to regenerate content",
-                      description: error.message,
-                      variant: "destructive",
-                    });
-                  }}
-                />
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <Tabs defaultValue={hasPersonalizedContent ? "personalized" : "overview"} className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          {hasPersonalizedContent && <TabsTrigger value="personalized">Personalized Content</TabsTrigger>}
-          <TabsTrigger value="discussions">Discussions</TabsTrigger>
-          <TabsTrigger value="resources">Resources</TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="overview" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Course Details</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <h3 className="font-medium">Duration</h3>
-                  <p>{course?.duration || course?.estimated_duration || 'Not specified'} {course?.duration ? 'hours' : ''}</p>
-                </div>
-                <div>
-                  <h3 className="font-medium">Category</h3>
-                  <p>{course?.category || 'General'}</p>
-                </div>
-                {course?.skills && course.skills.length > 0 && (
-                  <div className="col-span-2">
-                    <h3 className="font-medium">Skills</h3>
-                    <div className="flex flex-wrap gap-2 mt-1">
-                      {course.skills.map((skill: string, index: number) => (
-                        <div 
-                          key={index} 
-                          className="px-2 py-1 bg-secondary text-secondary-foreground rounded-md text-xs"
-                        >
-                          {skill}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+              <div className="flex flex-wrap gap-2 mb-4">
+                {course?.tags?.map((tag: string, index: number) => (
+                  <Badge key={index} variant="secondary" className="bg-white/20 text-white hover:bg-white/30">
+                    {tag}
+                  </Badge>
+                ))}
+                {!course?.tags?.length && (
+                  <>
+                    <Badge variant="secondary" className="bg-white/20 text-white hover:bg-white/30">
+                      Professional Skills
+                    </Badge>
+                    <Badge variant="secondary" className="bg-white/20 text-white hover:bg-white/30">
+                      Career Development
+                    </Badge>
+                  </>
                 )}
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
-        {hasPersonalizedContent && (
-          <TabsContent value="personalized" className="space-y-4">
-            <PersonalizedCourseContent
-              content={personalizedContent}
-              sections={personalizedContentSections}
-              isLoading={loadingPersonalization}
+            </div>
+            
+            {hasPersonalizedContent ? (
+              <Badge className="bg-gradient-to-r from-purple-500 to-pink-500 text-white border-none px-3 py-1.5 flex items-center gap-1.5">
+                <Sparkles className="h-4 w-4" />
+                <span className="font-medium">Personalized</span>
+              </Badge>
+            ) : employeeId && (
+              <Button
+                onClick={generatePersonalizedContent}
+                variant="secondary"
+                disabled={generatingContent || contentGenerationStatus.isGenerating}
+                className="bg-white text-blue-700 hover:bg-blue-50 flex items-center gap-2"
+              >
+                <Sparkles className="h-4 w-4" />
+                {generatingContent || contentGenerationStatus.isGenerating
+                  ? "Generating..."
+                  : "Personalize Content"}
+              </Button>
+            )}
+          </div>
+          
+          <div className="w-full bg-white/20 rounded-full h-2 mb-2">
+            <div 
+              className="bg-white h-2 rounded-full transition-all duration-500" 
+              style={{ width: `${courseProgress}%` }}
             />
-          </TabsContent>
-        )}
-        
-        <TabsContent value="discussions">
-          <Card>
-            <CardContent className="p-6">
-              <p className="text-center text-muted-foreground">Discussion feature coming soon</p>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span>{courseProgress}% complete</span>
+            <span>{Math.round((completedModules.length / (course?.modules?.length || 1)) * 100)}% of modules completed</span>
+          </div>
+        </div>
+      </div>
+      
+      {/* Stats Cards */}
+      {renderCourseStats()}
+      
+      {/* Main Content Area */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        {/* Sidebar - Module Navigation */}
+        <div className="md:col-span-1">
+          <Card className="sticky top-4">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg flex items-center">
+                <Library className="mr-2 h-5 w-5 text-blue-600" />
+                Course Modules
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-1.5">
+                {course?.modules?.map((module: any, index: number) => (
+                  <Button
+                    key={module.id}
+                    variant={selectedModuleId === module.id ? "default" : "ghost"}
+                    className={`w-full justify-start ${
+                      selectedModuleId === module.id 
+                        ? "bg-blue-100 text-blue-800 hover:bg-blue-200 hover:text-blue-900"
+                        : "hover:bg-gray-100"
+                    }`}
+                    onClick={() => setSelectedModuleId(module.id)}
+                  >
+                    <div className="flex items-center w-full gap-2">
+                      {completedModules.includes(module.id) ? (
+                        <div className="flex-shrink-0 h-5 w-5 rounded-full bg-green-100 flex items-center justify-center">
+                          <CheckCircle className="h-3.5 w-3.5 text-green-600" />
+                        </div>
+                      ) : (
+                        <div className="flex-shrink-0 h-5 w-5 rounded-full bg-gray-100 text-gray-500 flex items-center justify-center text-xs">
+                          {index + 1}
+                        </div>
+                      )}
+                      <span className="truncate">{module.title}</span>
+                      <ChevronRight className="h-4 w-4 ml-auto text-gray-400" />
+                    </div>
+                  </Button>
+                ))}
+              </div>
             </CardContent>
+            {hasPersonalizedContent && (
+              <CardFooter className="pt-0">
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => setHasPersonalizedContent(false)}
+                >
+                  View Standard Content
+                </Button>
+              </CardFooter>
+            )}
           </Card>
-        </TabsContent>
+        </div>
         
-        <TabsContent value="resources">
-          <Card>
-            <CardContent className="p-6">
-              <p className="text-center text-muted-foreground">Resources feature coming soon</p>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+        {/* Main Content */}
+        <div className="md:col-span-3">
+          <Tabs defaultValue="content" className="mb-6">
+            <TabsList className="w-full grid grid-cols-3">
+              <TabsTrigger value="content" onClick={() => setActiveTab('content')}>
+                <FileText className="h-4 w-4 mr-2" />
+                Content
+              </TabsTrigger>
+              <TabsTrigger value="discussion" onClick={() => setActiveTab('discussion')}>
+                <div className="flex items-center">
+                  <BookOpen className="h-4 w-4 mr-2" />
+                  Discussion
+                </div>
+              </TabsTrigger>
+              <TabsTrigger value="resources" onClick={() => setActiveTab('resources')}>
+                <div className="flex items-center">
+                  <Book className="h-4 w-4 mr-2" />
+                  Resources
+                </div>
+              </TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="content" className="mt-4">
+              {renderCourseContentArea()}
+            </TabsContent>
+            
+            <TabsContent value="discussion" className="mt-4">
+              <Card>
+                <CardContent className="p-8 text-center">
+                  <h3 className="text-xl font-medium mb-2">Discussion Board</h3>
+                  <p className="text-muted-foreground mb-4">
+                    Connect with fellow learners and discuss course content.
+                  </p>
+                  <Button variant="outline">View Discussions</Button>
+                </CardContent>
+              </Card>
+            </TabsContent>
+            
+            <TabsContent value="resources" className="mt-4">
+              <Card>
+                <CardContent className="p-8 text-center">
+                  <h3 className="text-xl font-medium mb-2">Additional Resources</h3>
+                  <p className="text-muted-foreground mb-4">
+                    Explore supplementary materials to enhance your learning.
+                  </p>
+                  <Button variant="outline">Browse Resources</Button>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        </div>
+      </div>
     </div>
+  );
+};
+
+interface StatCardProps {
+  title: string;
+  value: string;
+  description: string;
+  icon: IconComponent;
+  color: string;
+}
+
+const StatCard: React.FC<StatCardProps> = ({
+  title,
+  value,
+  description,
+  icon: Icon,
+  color
+}: StatCardProps) => {
+  return (
+    <Card>
+      <CardContent className="p-4 flex items-start gap-4">
+        <div className={`p-2 rounded-full ${color}`}>
+          <Icon className="h-5 w-5" />
+        </div>
+        <div>
+          <p className="text-sm font-medium text-muted-foreground">{title}</p>
+          <h3 className="text-2xl font-bold">{value}</h3>
+          <p className="text-sm text-muted-foreground">{description}</p>
+        </div>
+      </CardContent>
+    </Card>
   );
 };
 
