@@ -182,6 +182,9 @@ const EmployeesPage: React.FC = () => {
       setLoading(true);
       setError(null);
       
+      // Add console log here to check the hrUser object and company_id
+      console.log('HR User Context:', hrUser); 
+      
       console.log('Fetching employees with filters:', {
         searchTerm,
         departmentFilter,
