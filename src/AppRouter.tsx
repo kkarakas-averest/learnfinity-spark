@@ -79,10 +79,46 @@ const AppRouter: React.FC = () => {
         </TypeSafeRoute>
 
         {/* Course Routes */}
-        <TypeSafeRoute path={ROUTES.COURSE_LIST} element={<CourseListPage />} />
-        <TypeSafeRoute path={ROUTES.COURSE_VIEW} element={<CourseViewPage />} />
-        <TypeSafeRoute path="/course/:id" element={<CourseDetailsPage />} />
-        <TypeSafeRoute path={ROUTES.COURSE_CREATE} element={<CreateCoursePage />} />
+        <TypeSafeRoute 
+          path={ROUTES.COURSE_LIST} 
+          element={
+            <LearnerProtectedRoute>
+              <LearnerLayout>
+                <CourseListPage />
+              </LearnerLayout>
+            </LearnerProtectedRoute>
+          } 
+        />
+        <TypeSafeRoute 
+          path={ROUTES.COURSE_VIEW} 
+          element={
+            <LearnerProtectedRoute>
+              <LearnerLayout>
+                <CourseViewPage />
+              </LearnerLayout>
+            </LearnerProtectedRoute>
+          } 
+        />
+        <TypeSafeRoute 
+          path="/course/:id" 
+          element={
+            <LearnerProtectedRoute>
+              <LearnerLayout>
+                <CourseDetailsPage />
+              </LearnerLayout>
+            </LearnerProtectedRoute>
+          } 
+        />
+        <TypeSafeRoute 
+          path={ROUTES.COURSE_CREATE} 
+          element={
+            <LearnerProtectedRoute>
+              <LearnerLayout>
+                <CreateCoursePage />
+              </LearnerLayout>
+            </LearnerProtectedRoute>
+          } 
+        />
       </Routes>
     </BrowserRouter>
   );

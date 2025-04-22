@@ -123,6 +123,14 @@ const PersonalizedCourseContent: React.FC<PersonalizedCourseContentProps> = ({
         </CardContent>
       </Card>
       
+      <Card className="mb-4">
+        <CardContent>
+          <div className="flex justify-end">
+            <RegenerateContentButton courseId={content?.id || ''} />
+          </div>
+        </CardContent>
+      </Card>
+      
       {modules.length > 0 ? (
         <Tabs defaultValue={modules[0].id}>
           <TabsList className="mb-4">
