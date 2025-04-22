@@ -19,6 +19,36 @@ declare module 'react' {
   export const useDebugValue: typeof React.useDebugValue;
 }
 
+// Fix for JSX IntrinsicElements error
+declare namespace JSX {
+  interface IntrinsicElements {
+    div: React.DetailedHTMLProps<React.HTMLAttributes<HTMLDivElement>, HTMLDivElement>;
+    span: React.DetailedHTMLProps<React.HTMLAttributes<HTMLSpanElement>, HTMLSpanElement>;
+    p: React.DetailedHTMLProps<React.HTMLAttributes<HTMLParagraphElement>, HTMLParagraphElement>;
+    h1: React.DetailedHTMLProps<React.HTMLAttributes<HTMLHeadingElement>, HTMLHeadingElement>;
+    h2: React.DetailedHTMLProps<React.HTMLAttributes<HTMLHeadingElement>, HTMLHeadingElement>;
+    h3: React.DetailedHTMLProps<React.HTMLAttributes<HTMLHeadingElement>, HTMLHeadingElement>;
+    h4: React.DetailedHTMLProps<React.HTMLAttributes<HTMLHeadingElement>, HTMLHeadingElement>;
+    h5: React.DetailedHTMLProps<React.HTMLAttributes<HTMLHeadingElement>, HTMLHeadingElement>;
+    h6: React.DetailedHTMLProps<React.HTMLAttributes<HTMLHeadingElement>, HTMLHeadingElement>;
+    ul: React.DetailedHTMLProps<React.HTMLAttributes<HTMLUListElement>, HTMLUListElement>;
+    li: React.DetailedHTMLProps<React.LiHTMLAttributes<HTMLLIElement>, HTMLLIElement>;
+    a: React.DetailedHTMLProps<React.AnchorHTMLAttributes<HTMLAnchorElement>, HTMLAnchorElement>;
+    img: React.DetailedHTMLProps<React.ImgHTMLAttributes<HTMLImageElement>, HTMLImageElement>;
+    form: React.DetailedHTMLProps<React.FormHTMLAttributes<HTMLFormElement>, HTMLFormElement>;
+    input: React.DetailedHTMLProps<React.InputHTMLAttributes<HTMLInputElement>, HTMLInputElement>;
+    button: React.DetailedHTMLProps<React.ButtonHTMLAttributes<HTMLButtonElement>, HTMLButtonElement>;
+    label: React.DetailedHTMLProps<React.LabelHTMLAttributes<HTMLLabelElement>, HTMLLabelElement>;
+    main: React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement>, HTMLElement>;
+    header: React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement>, HTMLElement>;
+    footer: React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement>, HTMLElement>;
+    blockquote: React.DetailedHTMLProps<React.BlockquoteHTMLAttributes<HTMLQuoteElement>, HTMLQuoteElement>;
+    strong: React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement>, HTMLElement>;
+    details: React.DetailedHTMLProps<React.DetailsHTMLAttributes<HTMLDetailsElement>, HTMLDetailsElement>;
+    summary: React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement>, HTMLElement>;
+  }
+}
+
 // React Router DOM declarations
 declare module 'react-router-dom' {
   export interface LinkProps {
@@ -161,4 +191,29 @@ declare module '@/components/ui/badge' {
   
   export const Badge: React.FC<BadgeProps>;
   export const badgeVariants: (props: { variant?: BadgeProps['variant'], className?: string }) => string;
+}
+
+// Type definitions for missing libraries
+declare module 'sonner' {
+  export const toast: {
+    success: (message: string, options?: any) => void;
+    error: (message: string, options?: any) => void;
+    warning: (message: string, options?: any) => void;
+    info: (message: string, options?: any) => void;
+    loading: (message: string, options?: any) => void;
+    custom: (message: string, options?: any) => void;
+    dismiss: () => void;
+  };
+}
+
+declare module 'react-markdown' {
+  interface ReactMarkdownProps {
+    children: string;
+    className?: string;
+    components?: Record<string, React.ComponentType<any>>;
+    remarkPlugins?: any[];
+    rehypePlugins?: any[];
+  }
+  const ReactMarkdown: React.FC<ReactMarkdownProps>;
+  export default ReactMarkdown;
 }

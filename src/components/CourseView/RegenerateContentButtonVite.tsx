@@ -1,5 +1,5 @@
-import React from "@/lib/react-helpers";
-import { useState } from "@/lib/react-helpers";
+import React from "@/utils/react-import";
+import { useState } from "@/utils/react-import";
 import { Button } from "@/components/ui/button";
 import { Loader2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
@@ -12,12 +12,14 @@ import { useAuth } from "@/hooks/useAuth";
  *   userId (string, optional): ID of the user/employee to regenerate content for. If not provided, attempts to use authenticated user's ID.
  *   onSuccess?: callback to trigger on successful regeneration.
  *   onError?: callback for errors.
+ *   className?: additional CSS classes to apply to the button.
  */
 interface RegenerateContentButtonProps {
   courseId: string;
   userId?: string;
   onSuccess?: () => void;
   onError?: (error: Error) => void;
+  className?: string;
 }
 
 /**
@@ -29,6 +31,7 @@ export default function RegenerateContentButtonVite({
   userId: propUserId,
   onSuccess,
   onError,
+  className,
 }: RegenerateContentButtonProps) {
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState<string | null>(null);
@@ -292,7 +295,7 @@ export default function RegenerateContentButtonVite({
   return (
     <Button
       onClick={handleRegenerate}
-      className="flex items-center gap-2 bg-green-600 text-white hover:bg-green-700"
+      className={`flex items-center gap-2 bg-green-600 text-white hover:bg-green-700 ${className || ''}`}
       disabled={isDisabled} // Use combined disabled state
       title={titleText} // Add tooltip for disabled state
       data-testid="regenerate-content-button"

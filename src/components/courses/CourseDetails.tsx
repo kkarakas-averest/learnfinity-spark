@@ -1,13 +1,12 @@
 "use client";
 
-import React from "@/lib/react-helpers";
-import { useState, useEffect } from "@/lib/react-helpers";
+import React from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BookOpen, Clock, Award, ArrowLeft } from "lucide-react";
-import Link from "next/link";
+import { Link } from "react-router-dom";
 import { ModuleList } from "./ModuleList";
 import { QuizList } from "./QuizList";
 import { ResourceList } from "./ResourceList";
@@ -71,15 +70,15 @@ interface CourseDetailsProps {
 }
 
 export function CourseDetails({ course }: CourseDetailsProps) {
-  const [activeTab, setActiveTab] = useState("modules");
-  const [personalizedContent, setPersonalizedContent] = useState<AICourseContent | null>(null);
-  const [personalizedSections, setPersonalizedSections] = useState<AICourseContentSection[]>([]);
-  const [isLoadingPersonalized, setIsLoadingPersonalized] = useState(false);
-  const [hasPersonalized, setHasPersonalized] = useState(false);
-  const [employeeId, setEmployeeId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = React.useState("modules");
+  const [personalizedContent, setPersonalizedContent] = React.useState<AICourseContent | null>(null);
+  const [personalizedSections, setPersonalizedSections] = React.useState<AICourseContentSection[]>([]);
+  const [isLoadingPersonalized, setIsLoadingPersonalized] = React.useState(false);
+  const [hasPersonalized, setHasPersonalized] = React.useState(false);
+  const [employeeId, setEmployeeId] = React.useState<string | null>(null);
   const { toast } = useToast();
 
-  useEffect(() => {
+  React.useEffect(() => {
     const fetchPersonalizedContent = async () => {
       try {
         setIsLoadingPersonalized(true);
@@ -198,7 +197,7 @@ export function CourseDetails({ course }: CourseDetailsProps) {
       <div className="flex flex-col space-y-4 md:flex-row md:justify-between md:space-y-0">
         <div>
           <div className="flex items-center space-x-4">
-            <Link href="/courses" passHref>
+            <Link to="/courses" passHref>
               <Button variant="ghost" size="sm" className="p-0">
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Back to courses
@@ -227,7 +226,8 @@ export function CourseDetails({ course }: CourseDetailsProps) {
           <Button>Start Course</Button>
           <RegenerateContentButtonVite 
             courseId={course.id} 
-            userId={employeeId || undefined} 
+            userId={employeeId || undefined}
+            className="bg-green-600 text-white hover:bg-green-700" 
           />
         </div>
       </div>

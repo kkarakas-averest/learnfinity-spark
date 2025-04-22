@@ -4,7 +4,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { AICourseContent, AICourseContentSection } from '@/lib/types/content';
 import { Skeleton } from '@/components/ui/skeleton';
-import { RegenerateContentButton } from '@/components/CourseView/RegenerateContentButton';
 import ReactMarkdown from 'react-markdown';
 
 interface PersonalizedCourseContentProps {
@@ -98,7 +97,6 @@ const PersonalizedCourseContent: React.FC<PersonalizedCourseContentProps> = ({
           <div className="flex items-center justify-between">
             <CardTitle>Personalized Learning: {content.title}</CardTitle>
             <div className="flex items-center gap-2">
-              <RegenerateContentButton courseId={content.course_id} />
               <Badge variant="outline">Personalized</Badge>
             </div>
           </div>
@@ -120,14 +118,6 @@ const PersonalizedCourseContent: React.FC<PersonalizedCourseContentProps> = ({
               </ul>
             </div>
           )}
-        </CardContent>
-      </Card>
-      
-      <Card className="mb-4">
-        <CardContent>
-          <div className="flex justify-end">
-            <RegenerateContentButton courseId={content?.id || ''} />
-          </div>
         </CardContent>
       </Card>
       

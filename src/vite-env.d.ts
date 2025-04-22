@@ -1,15 +1,28 @@
 /// <reference types="vite/client" />
 
+interface ImportMetaEnv {
+  readonly VITE_SUPABASE_URL: string;
+  readonly VITE_SUPABASE_ANON_KEY: string;
+  readonly VITE_SUPABASE_SERVICE_KEY?: string;
+  readonly VITE_API_BASE_URL?: string;
+  readonly VITE_ENVIRONMENT?: 'development' | 'production' | 'staging';
+  readonly VITE_VERCEL_URL?: string;
+  readonly VITE_VERCEL_ENV?: string;
+  readonly DEV: boolean;
+  readonly PROD: boolean;
+  readonly MODE: string;
+  readonly SSR: boolean;
+}
+
 interface ImportMeta {
-  readonly env: {
-    readonly [key: string]: string | undefined;
-    readonly VITE_SUPABASE_URL: string;
-    readonly VITE_SUPABASE_ANON_KEY: string;
-    readonly VITE_GROQ_API_KEY?: string;
-    readonly VITE_ENABLE_LLM?: string;
-    readonly VITE_SUPABASE_SERVICE_KEY?: string;
-    readonly NODE_ENV: 'development' | 'production' | 'test';
-  };
+  readonly env: ImportMetaEnv;
+}
+
+// This file declares global variables as needed for JSX/React
+declare namespace React {
+  interface JSX {
+    // JSX declarations
+  }
 }
 
 // Add missing Lucide icon declarations

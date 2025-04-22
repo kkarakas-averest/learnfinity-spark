@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from '@/lib/react-helpers';
+import React from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Clock, BarChart2, Users, FileText, Sparkles } from "lucide-react";
+import { Clock, BarChart2, Users, FileText, Sparkles, User, LogOut, Settings, GraduationCap, Book, RefreshCw } from "lucide-react";
 import NavbarMigrated from "@/components/NavbarMigrated";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -10,6 +10,16 @@ import { useAuth } from '@/state';
 import { useToast } from '@/components/ui/use-toast';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { supabase } from '@/lib/supabase';
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuLabel, 
+  DropdownMenuSeparator, 
+  DropdownMenuTrigger 
+} from "@/components/ui/dropdown-menu";
+import RegenerateContentButtonVite from "@/components/CourseView/RegenerateContentButtonVite";
 
 // Mock data (replace with actual data fetching)
 const mockCourse = {
@@ -28,6 +38,86 @@ const mockCourse = {
     { title: "Module 4: Model Evaluation", duration: "1.5 hours" },
     { title: "Module 5: Case Studies", duration: "1.5 hours" },
   ],
+};
+
+// User avatar component
+const UserAvatar = ({ name }: { name?: string }) => {
+  const getInitials = (name: string) => {
+    return name
+      ? name.split(" ").map((n) => n[0]).join("").toUpperCase()
+      : "";
+  };
+
+  return (
+    <Avatar className="h-8 w-8">
+      <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${name}`} alt={name} />
+      <AvatarFallback>{name ? getInitials(name) : <User size={14} />}</AvatarFallback>
+    </Avatar>
+  );
+};
+
+// MenuItem component for dropdown menu
+const NavMenuItem = ({ to, icon, label }: { to: string; icon: React.ReactNode; label: string }) => (
+  <DropdownMenuItem asChild>
+    <Link to={to} className="flex items-center">
+      {icon}
+      <span>{label}</span>
+    </Link>
+  </DropdownMenuItem>
+);
+
+// User menu component
+const UserMenu = ({ user }: { user: any }) => {
+  if (!user) return null;
+  
+  const userData = { 
+    name: user.email?.split('@')[0] || "User", 
+    email: user.email || "", 
+    role: "learner" as const 
+  };
+  
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    window.location.href = '/login';
+  };
+  
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+          <UserAvatar name={userData.name} />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="w-56" align="end" forceMount>
+        <DropdownMenuLabel className="font-normal">
+          <div className="flex flex-col space-y-1">
+            <p className="text-sm font-medium leading-none">{userData.name}</p>
+            <p className="text-xs leading-none text-muted-foreground">
+              {userData.email}
+            </p>
+            {userData.role && (
+              <Badge className="mt-1 w-fit">
+                {userData.role}
+              </Badge>
+            )}
+          </div>
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <NavMenuItem to="/profile" icon={<User className="mr-2 h-4 w-4" />} label="Profile" />
+        <NavMenuItem to="/dashboard" icon={<GraduationCap className="mr-2 h-4 w-4" />} label="Dashboard" />
+        <NavMenuItem to="/courses" icon={<Book className="mr-2 h-4 w-4" />} label="Courses" />
+        <NavMenuItem to="/settings" icon={<Settings className="mr-2 h-4 w-4" />} label="Settings" />
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          className="cursor-pointer text-red-500 focus:text-red-500"
+          onClick={handleSignOut}
+        >
+          <LogOut className="mr-2 h-4 w-4" />
+          <span>Log out</span>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 };
 
 const CourseDetail = () => {
@@ -51,11 +141,11 @@ const CourseDetail = () => {
   // New state and function for enrollment
   const { user } = useAuth();
   const { toast } = useToast();
-  const [isEnrolled, setIsEnrolled] = useState(false);
-  const [isEnrolling, setIsEnrolling] = useState(false);
+  const [isEnrolled, setIsEnrolled] = React.useState(false);
+  const [isEnrolling, setIsEnrolling] = React.useState(false);
   
   // Check if user is enrolled
-  useEffect(() => {
+  React.useEffect(() => {
     if (user?.id && courseId) {
       checkEnrollmentStatus();
     }
@@ -123,7 +213,18 @@ const CourseDetail = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-secondary/20">
-      <NavbarMigrated />
+      <div className="bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-40 fixed top-0 left-0 right-0">
+        <div className="container flex h-16 items-center justify-between">
+          <div className="flex gap-6 md:gap-10">
+            <Link to="/" className="hidden md:block">
+              <h1 className="text-xl font-bold tracking-tight">Learnfinity</h1>
+            </Link>
+          </div>
+          <div className="flex items-center gap-4">
+            {user && <UserMenu user={user} />}
+          </div>
+        </div>
+      </div>
 
       <main className="flex-1 pt-24 pb-16">
         <div className="container px-4 md:px-6">
@@ -182,14 +283,24 @@ const CourseDetail = () => {
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
+                    <RegenerateContentButtonVite 
+                      courseId={courseId || ""}
+                      className="bg-green-600 text-white hover:bg-green-700"
+                    />
                   </>
                 ) : (
-                  <Button 
-                    onClick={handleEnroll} 
-                    disabled={isEnrolling}
-                  >
-                    {isEnrolling ? 'Enrolling...' : 'Enroll in Course'}
-                  </Button>
+                  <>
+                    <Button 
+                      onClick={handleEnroll} 
+                      disabled={isEnrolling}
+                    >
+                      {isEnrolling ? 'Enrolling...' : 'Enroll in Course'}
+                    </Button>
+                    <RegenerateContentButtonVite 
+                      courseId={courseId || ""}
+                      className="bg-green-600 text-white hover:bg-green-700"
+                    />
+                  </>
                 )}
               </div>
             </div>
