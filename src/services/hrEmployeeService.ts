@@ -373,6 +373,7 @@ const hrEmployeeService: EmployeeService = {
         console.log(`Total employees for company ${effectiveCompanyId}: ${totalEmployees || 0}`);
       }
 
+      // Simplified query approach to avoid potential issues with filters
       let query = supabase
         .from('hr_employees')
         .select(`
@@ -385,20 +386,10 @@ const hrEmployeeService: EmployeeService = {
             id,
             title
           )
-        `);
-
-      // Always apply company_id filter to ensure employees are company-scoped
-      // Check if company_id is in valid UUID format
-      const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(effectiveCompanyId);
+        `)
+        .eq('company_id', effectiveCompanyId);
       
-      if (isValidUUID) {
-        query = query.eq('company_id', effectiveCompanyId);
-      } else {
-        console.warn('Company ID is not in valid UUID format, using OR query with string comparison');
-        query = query.or(`company_id.eq.${effectiveCompanyId},company_id.eq."${effectiveCompanyId}"`);
-      }
-
-      // Apply filters only if they're provided and non-empty
+      // Apply filters only if they're non-empty
       if (searchTerm && searchTerm.trim()) {
         query = query.or(`name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`);
       }
@@ -411,11 +402,10 @@ const hrEmployeeService: EmployeeService = {
         query = query.eq('status', status);
       }
 
-      // Add pagination - but only if we're not in an empty results case
-      if (totalEmployees && totalEmployees > 0) {
-        const from = (page - 1) * pageSize;
-        query = query.range(from, from + pageSize - 1);
-      }
+      // Always add pagination
+      const from = (page - 1) * pageSize;
+      query = query.range(from, from + pageSize - 1)
+                  .order('created_at', { ascending: false });
 
       // Debug info
       console.log('Executing employee query with company_id filter and params:', {
