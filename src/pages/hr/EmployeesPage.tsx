@@ -157,13 +157,11 @@ const EmployeesPage: React.FC = () => {
   const [showImportDialog, setShowImportDialog] = useState(false);
   
   // Log auth state on each render for debugging
-  console.log('EmployeesPage - Auth State:', {
-    fullContext: hrAuthContext,
-    hrUser,
-    authLoading,
-    companyId: hrUser?.company_id,
-    hasHrUser: !!hrUser
-  });
+  console.log('EmployeesPage - HR Auth Props:', JSON.stringify({
+    user: hrUser ? 'exists' : 'null',
+    loading: authLoading,
+    companyId: hrUser?.company_id || 'none'
+  }));
   
   // Use a local state to track if we've tried to fetch employees
   const [hasFetchedEmployees, setHasFetchedEmployees] = useState(false);
@@ -172,26 +170,31 @@ const EmployeesPage: React.FC = () => {
     fetchDepartments();
   }, []);
   
+  // New simpler approach: Wait for auth loading to complete before fetching
   useEffect(() => {
-    // Only fetch employees if we have the company ID within the user object
-    console.log('Effect triggered - Current hrUser:', hrUser, 'authLoading:', authLoading, 'hasFetched:', hasFetchedEmployees);
+    console.log('Auth loading status change:', authLoading);
     
-    if (hrUser?.company_id && !hasFetchedEmployees) {
-      console.log('HR User context updated with company_id, fetching employees...', hrUser.company_id);
-      setHasFetchedEmployees(true); // Mark that we've started a fetch
-      fetchEmployees();
-    } else if (!authLoading && !hrUser) { // Check if still loading or if user is genuinely null
-      console.log('Waiting for HR User context (or company_id)...');
-      setEmployees([]);
-      setLoading(false); // Important: Update loading state so UI doesn't show spinner forever
-    } else if (!authLoading && hrUser && !hrUser.company_id) {
-      console.warn('HR User context available but company_id is missing.', hrUser);
-      setError('Could not determine company to fetch employees for.');
-      setEmployees([]);
-      setLoading(false); // Stop loading as we can't proceed
+    // Only proceed when auth loading is complete
+    if (authLoading === false && !hasFetchedEmployees) {
+      console.log('Auth loading complete. HR User:', hrUser ? JSON.stringify(hrUser) : 'null');
+      
+      if (hrUser?.company_id) {
+        console.log('Company ID found:', hrUser.company_id);
+        // Add a slight delay to ensure context is fully populated
+        const timer = setTimeout(() => {
+          console.log('Fetching employees after delay...');
+          setHasFetchedEmployees(true);
+          fetchEmployees();
+        }, 500);
+        
+        return () => clearTimeout(timer);
+      } else {
+        console.warn('Auth loading complete but no company_id available.');
+        setLoading(false);
+        setError('Could not determine company to fetch employees for.');
+      }
     }
-  // Rerun this effect when filters change OR when the hrUser object itself changes OR loading state changes
-  }, [departmentFilter, statusFilter, hrUser, authLoading, hasFetchedEmployees]);
+  }, [authLoading, hasFetchedEmployees, hrUser]);
   
   // Add a cleanup log to check for unmounting
   useEffect(() => {
