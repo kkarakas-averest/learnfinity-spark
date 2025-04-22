@@ -160,7 +160,16 @@ const EmployeesPage: React.FC = () => {
   }, []);
   
   useEffect(() => {
-    fetchEmployees();
+    // Only fetch employees if we have the company ID
+    if (hrUser?.company_id) {
+      fetchEmployees();
+    } else {
+      // Optional: Set loading to false or handle the state where company_id is missing
+      setLoading(false);
+      setEmployees([]); // Clear employees if company_id is not yet available
+      console.log('Waiting for company_id before fetching employees...');
+    }
+  // Rerun this effect when filters change OR when company_id becomes available
   }, [departmentFilter, statusFilter, hrUser?.company_id]);
 
   const fetchDepartments = async () => {
