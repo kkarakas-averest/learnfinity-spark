@@ -27,6 +27,7 @@ import SystemHealthCheck from "./pages/SystemHealthCheck";
 import React, { useEffect } from "@/lib/react-helpers";
 import { toast } from './components/ui/use-toast';
 import databaseInitService from "./services/databaseInitService";
+import LearnerLayout from './layouts/LearnerLayout';
 
 // Import HR dashboard pages
 import EmployeesPage from "./pages/hr/EmployeesPage";
@@ -236,7 +237,9 @@ function App() {
             path="/learner/courses/view/:id" 
             element={
               <ProtectedRouteMigrated allowedRoles={["learner", "mentor", "hr", "superadmin"]}>
-                <CourseViewPage />
+                <LearnerLayout>
+                  <CourseViewPage />
+                </LearnerLayout>
               </ProtectedRouteMigrated>
             } 
           />
