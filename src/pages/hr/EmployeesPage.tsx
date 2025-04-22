@@ -70,6 +70,7 @@ interface GetEmployeesOptions {
   page?: number;
   pageSize?: number;
   companyId?: string;
+  useRLS?: boolean;
 }
 
 // Add interface for the API response
@@ -230,14 +231,15 @@ const EmployeesPage: React.FC = () => {
       console.log('Fetching employees with filters:', {
         searchTerm,
         departmentFilter,
-        statusFilter
+        statusFilter,
+        useRLS: true
       });
       
       const options: GetEmployeesOptions = {
         searchTerm,
         departmentId: departmentFilter === 'all' ? null : departmentFilter,
         status: statusFilter === 'all' ? null : statusFilter,
-        // No need to specify company_id, it will be handled by RLS
+        useRLS: true // Enable RLS-based filtering
       };
       
       // Type assertion to overcome the linter error about parameters
@@ -322,7 +324,7 @@ const EmployeesPage: React.FC = () => {
   const handleExportCSV = async () => {
     try {
       const options: GetEmployeesOptions = {
-        // No need to specify company_id, it will be handled by RLS
+        useRLS: true // Enable RLS for export as well
       };
       
       // Type assertion to overcome the linter error about parameters

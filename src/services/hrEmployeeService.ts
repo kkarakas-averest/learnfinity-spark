@@ -72,6 +72,7 @@ interface GetEmployeesOptions {
   page?: number;
   pageSize?: number;
   companyId?: string;
+  useRLS?: boolean;
 }
 
 // Export types
@@ -354,23 +355,33 @@ const hrEmployeeService: EmployeeService = {
         status = null,
         page = 1,
         pageSize = 50,
-        companyId
+        companyId,
+        useRLS = false
       } = options;
 
-      // Use provided companyId if available, otherwise fall back to default
-      const effectiveCompanyId = companyId || DEFAULT_COMPANY_ID;
-      console.log('Using company ID for employee query:', effectiveCompanyId);
+      let totalEmployees = 0;
+      let effectiveCompanyId = '';
 
-      // First do a count query to see if there are any employees at all for this company
-      const { count: totalEmployees, error: countError } = await supabase
-        .from('hr_employees')
-        .select('*', { count: 'exact', head: true })
-        .eq('company_id', effectiveCompanyId);
-      
-      if (countError) {
-        console.error('Error counting employees:', countError);
+      // If using RLS, skip applying company_id filter explicitly
+      if (useRLS) {
+        console.log('Using Row Level Security for company filtering - authenticated user context will be used');
       } else {
-        console.log(`Total employees for company ${effectiveCompanyId}: ${totalEmployees || 0}`);
+        // Use provided companyId if available, otherwise fall back to default
+        effectiveCompanyId = companyId || DEFAULT_COMPANY_ID;
+        console.log('Using company ID for employee query:', effectiveCompanyId);
+
+        // First do a count query to see if there are any employees at all for this company
+        const { count, error: countError } = await supabase
+          .from('hr_employees')
+          .select('*', { count: 'exact', head: true })
+          .eq('company_id', effectiveCompanyId);
+        
+        if (countError) {
+          console.error('Error counting employees:', countError);
+        } else {
+          totalEmployees = count || 0;
+          console.log(`Total employees for company ${effectiveCompanyId}: ${totalEmployees}`);
+        }
       }
 
       // Simplified query approach to avoid potential issues with filters
@@ -386,9 +397,14 @@ const hrEmployeeService: EmployeeService = {
             id,
             title
           )
-        `)
-        .eq('company_id', effectiveCompanyId);
+        `);
       
+      // Apply company_id filter only if NOT using RLS
+      if (!useRLS && (companyId || DEFAULT_COMPANY_ID)) {
+        effectiveCompanyId = companyId || DEFAULT_COMPANY_ID;
+        query = query.eq('company_id', effectiveCompanyId);
+      }
+
       // Apply filters only if they're non-empty
       if (searchTerm && searchTerm.trim()) {
         query = query.or(`name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`);
@@ -429,7 +445,7 @@ const hrEmployeeService: EmployeeService = {
       }
 
       // If no employees found but we know there should be employees, try a simpler query
-      if ((!employees || employees.length === 0) && totalEmployees && totalEmployees > 0) {
+      if ((!employees || employees.length === 0) && totalEmployees > 0 && !useRLS) {
         console.log('No employees found with filters, trying fallback query without filters');
         
         // Fallback query - just company ID without other filters
@@ -461,7 +477,11 @@ const hrEmployeeService: EmployeeService = {
         }
       }
 
-      console.log(`Found ${employees?.length || 0} employees for company ID: ${effectiveCompanyId}`);
+      if (useRLS) {
+        console.log(`Found ${employees?.length || 0} employees via RLS policies`);
+      } else {
+        console.log(`Found ${employees?.length || 0} employees for company ID: ${effectiveCompanyId}`);
+      }
       return {
         success: true,
         employees: employees as Employee[]
