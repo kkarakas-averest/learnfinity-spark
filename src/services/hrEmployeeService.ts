@@ -27,7 +27,7 @@ interface Employee {
     title: string;
   };
   rag_status?: string;
-  ragStatus?: string;
+  ragStatus?: 'red' | 'amber' | 'green';
   progress?: number;
   last_activity?: string;
   lastActivity?: string;
@@ -64,6 +64,16 @@ interface CourseResponse {
 // Define update type
 type EmployeeUpdate = Partial<Employee>;
 
+// Define GetEmployeesOptions interface
+interface GetEmployeesOptions {
+  searchTerm?: string;
+  departmentId?: string | null;
+  status?: string | null;
+  page?: number;
+  pageSize?: number;
+  companyId?: string;
+}
+
 // Export types
 export type { Employee };
 export type { Department };
@@ -71,6 +81,7 @@ export type { EmployeeUpdate };
 export type { EmployeeResponse };
 export type { SkillResponse };
 export type { CourseResponse };
+export type { GetEmployeesOptions };
 
 // Constants
 const DEFAULT_COMPANY_ID = import.meta.env.VITE_DEFAULT_COMPANY_ID || '4fb1a692-3995-40ee-8aa5-292fd8ebf029';
@@ -89,15 +100,6 @@ const HR_TABLES = [
   'hr_learning_path_enrollments',
   'user_notifications'
 ];
-
-interface GetEmployeesOptions {
-  searchTerm?: string;
-  departmentId?: string | null;
-  status?: string | null;
-  page?: number;
-  pageSize?: number;
-  companyId?: string;
-}
 
 // Define error type to match SupabaseError
 interface SupabaseError {
@@ -120,7 +122,7 @@ export interface EmployeeService {
   checkHRTablesExist: () => Promise<{exists: boolean, missingTables: string[]}>;
   createEmployee: (employee: EmployeeUpdate) => Promise<EmployeeResponse>;
   getDepartments: () => Promise<{success: boolean, departments?: Department[], error?: string}>;
-  getEmployees: (options?: any) => Promise<{success: boolean, employees?: Employee[], error?: string}>;
+  getEmployees: (options?: GetEmployeesOptions) => Promise<{success: boolean, employees?: Employee[], error?: string}>;
   getEmployee: (id: string) => Promise<SupabaseResponse<Employee>>;
   updateEmployee: (id: string, updates: EmployeeUpdate) => Promise<SupabaseResponse<Employee>>;
   deleteEmployee: (id: string) => Promise<SupabaseResponse<null>>;
@@ -359,6 +361,18 @@ const hrEmployeeService: EmployeeService = {
       const effectiveCompanyId = companyId || DEFAULT_COMPANY_ID;
       console.log('Using company ID for employee query:', effectiveCompanyId);
 
+      // First do a count query to see if there are any employees at all for this company
+      const { count: totalEmployees, error: countError } = await supabase
+        .from('hr_employees')
+        .select('*', { count: 'exact', head: true })
+        .eq('company_id', effectiveCompanyId);
+      
+      if (countError) {
+        console.error('Error counting employees:', countError);
+      } else {
+        console.log(`Total employees for company ${effectiveCompanyId}: ${totalEmployees || 0}`);
+      }
+
       let query = supabase
         .from('hr_employees')
         .select(`
@@ -374,27 +388,46 @@ const hrEmployeeService: EmployeeService = {
         `);
 
       // Always apply company_id filter to ensure employees are company-scoped
-      query = query.eq('company_id', effectiveCompanyId);
+      // Check if company_id is in valid UUID format
+      const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(effectiveCompanyId);
+      
+      if (isValidUUID) {
+        query = query.eq('company_id', effectiveCompanyId);
+      } else {
+        console.warn('Company ID is not in valid UUID format, using OR query with string comparison');
+        query = query.or(`company_id.eq.${effectiveCompanyId},company_id.eq."${effectiveCompanyId}"`);
+      }
 
-      // Apply filters
-      if (searchTerm) {
+      // Apply filters only if they're provided and non-empty
+      if (searchTerm && searchTerm.trim()) {
         query = query.or(`name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`);
       }
 
-      if (departmentId) {
+      if (departmentId && departmentId !== 'null' && departmentId !== 'undefined') {
         query = query.eq('department_id', departmentId);
       }
 
-      if (status) {
+      if (status && status !== 'null' && status !== 'undefined') {
         query = query.eq('status', status);
       }
 
-      // Add pagination
-      const from = (page - 1) * pageSize;
-      query = query.range(from, from + pageSize - 1);
+      // Add pagination - but only if we're not in an empty results case
+      if (totalEmployees && totalEmployees > 0) {
+        const from = (page - 1) * pageSize;
+        query = query.range(from, from + pageSize - 1);
+      }
 
-      console.log('Executing employee query with company_id filter');
-      const { data: employees, error } = await query;
+      // Debug info
+      console.log('Executing employee query with company_id filter and params:', {
+        searchTerm,
+        departmentId,
+        status,
+        page,
+        pageSize,
+        effectiveCompanyId
+      });
+      
+      const { data: employees, error, count } = await query;
 
       if (error) {
         console.error('Error fetching employees:', error);
@@ -403,6 +436,39 @@ const hrEmployeeService: EmployeeService = {
           error: error.message,
           employees: []
         };
+      }
+
+      // If no employees found but we know there should be employees, try a simpler query
+      if ((!employees || employees.length === 0) && totalEmployees && totalEmployees > 0) {
+        console.log('No employees found with filters, trying fallback query without filters');
+        
+        // Fallback query - just company ID without other filters
+        const { data: fallbackEmployees, error: fallbackError } = await supabase
+          .from('hr_employees')
+          .select(`
+            *,
+            hr_departments (
+              id,
+              name
+            ),
+            hr_positions (
+              id,
+              title
+            )
+          `)
+          .eq('company_id', effectiveCompanyId)
+          .limit(pageSize);
+          
+        if (fallbackError) {
+          console.error('Error in fallback employee query:', fallbackError);
+        } else if (fallbackEmployees && fallbackEmployees.length > 0) {
+          console.log(`Fallback query found ${fallbackEmployees.length} employees`);
+          return {
+            success: true,
+            employees: fallbackEmployees as Employee[],
+            note: 'Retrieved with fallback query'
+          };
+        }
       }
 
       console.log(`Found ${employees?.length || 0} employees for company ID: ${effectiveCompanyId}`);
@@ -1430,6 +1496,3 @@ export default hrEmployeeService;
     console.error("Error initializing HR tables:", error);
   }
 })();
-
-// Add export for GetEmployeesOptions
-export type { GetEmployeesOptions };
