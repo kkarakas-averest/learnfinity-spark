@@ -11,7 +11,6 @@ import { PersonalizedContentService } from '@/services/personalized-content-serv
 import CourseModuleList from './CourseModuleList';
 import CourseContentSection from './CourseContentSection';
 import PersonalizedCourseContent from './PersonalizedCourseContent';
-import RegenerateContentButtonVite from '@/components/CourseView/RegenerateContentButtonVite';
 import { Progress } from '@/components/ui/progress';
 import { AICourseContentSection } from '@/lib/types/content';
 import { Badge } from '@/components/ui/badge';
@@ -483,12 +482,6 @@ const CourseView: React.FC<CourseViewProps> = ({
                 )}
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <RegenerateContentButtonVite
-                courseId={courseId}
-                userId={employeeId || undefined}
-              />
-            </div>
           </div>
           
           <div className="w-full bg-white/20 rounded-full h-2 mb-2">
@@ -519,62 +512,62 @@ const CourseView: React.FC<CourseViewProps> = ({
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-1.5">
-                {course?.modules?.map((module: any, index: number) => (
-                  <Button
-                    key={module.id}
-                    variant={selectedModuleId === module.id ? "default" : "ghost"}
-                    className={`w-full justify-start ${
-                      selectedModuleId === module.id 
-                        ? "bg-blue-100 text-blue-800 hover:bg-blue-200 hover:text-blue-900"
-                        : "hover:bg-gray-100"
-                    }`}
-                    onClick={() => setSelectedModuleId(module.id)}
+              {/* Coursera-style Accordion for Weeks */}
+              <div className="space-y-2">
+                {/* Week 1 - Expanded by default, unlocked */}
+                <div className="border rounded-lg shadow-sm bg-white">
+                  <button
+                    className="w-full flex items-center justify-between px-4 py-3 text-left font-semibold text-blue-700 hover:bg-blue-50 transition-colors group"
+                    onClick={() => setSelectedModuleId(course?.modules?.[0]?.id)}
+                    aria-expanded="true"
                   >
-                    <div className="flex items-center w-full gap-2">
-                      {completedModules.includes(module.id) ? (
-                        <div className="flex-shrink-0 h-5 w-5 rounded-full bg-green-100 flex items-center justify-center">
-                          <CheckCircle className="h-3.5 w-3.5 text-green-600" />
-                        </div>
-                      ) : (
-                        <div className="flex-shrink-0 h-5 w-5 rounded-full bg-gray-100 text-gray-500 flex items-center justify-center text-xs">
-                          {index + 1}
-                        </div>
-                      )}
-                      <span className="truncate">{module.title}</span>
-                      <ChevronRight className="h-4 w-4 ml-auto text-gray-400" />
+                    <span className="flex items-center gap-2">
+                      <ChevronRight className="h-4 w-4 mr-1 transform rotate-90 transition-transform" />
+                      Week 1
+                    </span>
+                  </button>
+                  {/* Expanded content for Week 1 */}
+                  <div className="px-4 pb-3 pt-1 animate-accordion-down">
+                    {course?.modules?.filter((module: any, idx: number) => idx === 0).map((module: any, idx: number) => (
+                      <button
+                        key={module.id}
+                        className={`w-full flex items-center gap-2 px-2 py-2 rounded-md text-left transition-colors ${selectedModuleId === module.id ? 'bg-blue-100 text-blue-800' : 'hover:bg-gray-100 text-gray-700'}`}
+                        onClick={() => setSelectedModuleId(module.id)}
+                      >
+                        <span className="flex-shrink-0 h-5 w-5 rounded-full flex items-center justify-center border border-blue-200 bg-blue-50 text-blue-700 font-bold text-xs">
+                          {idx + 1}
+                        </span>
+                        <span className="truncate">{module.title}</span>
+                        {completedModules.includes(module.id) && (
+                          <CheckCircle className="h-4 w-4 text-green-500 ml-auto" />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {/* Weeks 2-4 - Locked */}
+                {[2, 3, 4].map((week) => (
+                  <div key={week} className="border rounded-lg bg-gray-50 opacity-60 cursor-not-allowed">
+                    <div className="w-full flex items-center justify-between px-4 py-3 text-left font-semibold text-gray-400 select-none">
+                      <span className="flex items-center gap-2">
+                        <ChevronRight className="h-4 w-4 mr-1" />
+                        Week {week} <span className="ml-2 text-base">🔒</span>
+                      </span>
                     </div>
-                  </Button>
+                  </div>
                 ))}
               </div>
             </CardContent>
-            {hasPersonalizedContent && (
-              <CardFooter className="pt-0">
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => setHasPersonalizedContent(false)}
-                >
-                  View Standard Content
-                </Button>
-              </CardFooter>
-            )}
           </Card>
         </div>
         
         {/* Main Content */}
         <div className="md:col-span-3">
           <Tabs defaultValue="content" className="mb-6">
-            <TabsList className="w-full grid grid-cols-3">
+            <TabsList className="w-full grid grid-cols-2">
               <TabsTrigger value="content" onClick={() => setActiveTab('content')}>
                 <FileText className="h-4 w-4 mr-2" />
                 Content
-              </TabsTrigger>
-              <TabsTrigger value="discussion" onClick={() => setActiveTab('discussion')}>
-                <div className="flex items-center">
-                  <BookOpen className="h-4 w-4 mr-2" />
-                  Discussion
-                </div>
               </TabsTrigger>
               <TabsTrigger value="resources" onClick={() => setActiveTab('resources')}>
                 <div className="flex items-center">
@@ -583,23 +576,9 @@ const CourseView: React.FC<CourseViewProps> = ({
                 </div>
               </TabsTrigger>
             </TabsList>
-            
             <TabsContent value="content" className="mt-4">
               {renderCourseContentArea()}
             </TabsContent>
-            
-            <TabsContent value="discussion" className="mt-4">
-              <Card>
-                <CardContent className="p-8 text-center">
-                  <h3 className="text-xl font-medium mb-2">Discussion Board</h3>
-                  <p className="text-muted-foreground mb-4">
-                    Connect with fellow learners and discuss course content.
-                  </p>
-                  <Button variant="outline">View Discussions</Button>
-                </CardContent>
-              </Card>
-            </TabsContent>
-            
             <TabsContent value="resources" className="mt-4">
               <Card>
                 <CardContent className="p-8 text-center">
