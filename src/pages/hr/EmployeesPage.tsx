@@ -37,6 +37,8 @@ import {
   Settings
 } from 'lucide-react';
 import BulkEmployeeImport from '@/components/hr/BulkEmployeeImport';
+import { supabase } from '@/lib/supabase';
+import { fetchEmployeesDirectWithKey } from '@/services/direct-employee-service';
 
 interface Department {
   id: string;
@@ -137,6 +139,49 @@ interface Employee {
   user_id?: string;
 }
 
+// Debug function to check authentication status and try direct query
+const checkAuthAndDirectQuery = async () => {
+  try {
+    // Check current session
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    console.log('Current Supabase session:', session ? 'Authenticated' : 'Not authenticated');
+    if (session) {
+      console.log('Auth user:', session.user.id, session.user.email);
+      
+      // Try to get the user's company_id
+      const { data: userProfile, error: profileError } = await supabase
+        .from('user_profiles')
+        .select('company_id, role')
+        .eq('id', session.user.id)
+        .single();
+        
+      if (profileError) {
+        console.error('Error fetching user profile:', profileError);
+        console.log('User might not have a corresponding entry in user_profiles table');
+      } else {
+        console.log('User profile:', userProfile);
+      }
+      
+      // Try a direct query with the current session
+      console.log('Attempting direct query for employees...');
+      const { data: employees, error: queryError } = await supabase
+        .from('hr_employees')
+        .select()
+        .limit(5);
+        
+      if (queryError) {
+        console.error('Direct query error:', queryError);
+      } else {
+        console.log(`Direct query found ${employees.length} employees:`, employees);
+      }
+    } else if (sessionError) {
+      console.error('Session error:', sessionError);
+    }
+  } catch (err) {
+    console.error('Error in auth check:', err);
+  }
+};
+
 const EmployeesPage: React.FC = () => {
   const navigate = useNavigate();
   const hrAuthContext = useHRAuth();
@@ -157,6 +202,8 @@ const EmployeesPage: React.FC = () => {
     newThisMonth: 0
   });
   const [showImportDialog, setShowImportDialog] = useState(false);
+  const [serviceKey, setServiceKey] = useState('');
+  const [showServiceKeyDialog, setShowServiceKeyDialog] = useState(false);
   
   // Log auth state on each render for debugging
   console.log('EmployeesPage - HR Auth Props:', JSON.stringify({
@@ -202,6 +249,10 @@ const EmployeesPage: React.FC = () => {
   // Add a cleanup log to check for unmounting
   useEffect(() => {
     console.log('EmployeesPage mounted');
+    
+    // Run the auth check and direct query after mounting
+    checkAuthAndDirectQuery();
+    
     return () => {
       console.log('EmployeesPage - Effect cleanup: Component unmounting?');
     };
@@ -366,11 +417,130 @@ const EmployeesPage: React.FC = () => {
     }
   };
 
+  // Try a more direct approach to fetch employees
+  const fetchEmployeesDirectly = async () => {
+    try {
+      console.log('Attempting to fetch employees directly...');
+      
+      // Try to use a server endpoint that might use service role (if it exists)
+      // This might not work if the endpoint doesn't exist, but it's worth trying
+      const response = await fetch('/api/employees');
+      
+      if (!response.ok) {
+        console.error('Direct API fetch failed:', response.status);
+        
+        // If the API fails, try fetching using a GET request that might bypass RLS
+        console.log('Trying alternative direct fetch...');
+        const { data: employees, error } = await supabase
+          .from('hr_employees')
+          .select('*')
+          .limit(10);
+        
+        if (error) {
+          console.error('Alternative fetch error:', error);
+        } else {
+          console.log(`Found ${employees.length} employees directly:`, employees);
+          
+          // If we get employees this way, we could use them to populate the UI
+          if (employees.length > 0) {
+            return employees;
+          }
+        }
+        return null;
+      }
+      
+      const data = await response.json();
+      console.log('Direct API fetch succeeded:', data);
+      return data.employees;
+    } catch (error) {
+      console.error('Error in direct fetch:', error);
+      return null;
+    }
+  };
+
+  // Try to query directly with a server-side function that might bypass RLS
+  const queryWithServerFunction = async () => {
+    try {
+      console.log('Attempting to query with server function...');
+      
+      // Try using the server function that might use service role
+      const response = await fetch('/api/debug/query-employees', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          company_id: '4fb1a692-3995-40ee-8aa5-292fd8ebf029',
+          limit: 10
+        })
+      });
+      
+      if (!response.ok) {
+        console.error('Server function query failed:', response.status);
+        return;
+      }
+      
+      const data = await response.json();
+      console.log('Server function query succeeded:', data);
+      
+      if (data.employees && data.employees.length > 0) {
+        // Success - we could use this data to populate the UI
+        return data.employees;
+      }
+    } catch (error) {
+      console.error('Error in server function query:', error);
+    }
+    
+    return null;
+  };
+
   return (
     <div className="container mx-auto space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Employee Management</h1>
         <div className="flex space-x-2">
+          <Button variant="outline" onClick={checkAuthAndDirectQuery}>
+            Debug Auth
+          </Button>
+          <Button variant="outline" onClick={async () => {
+            const employees = await fetchEmployeesDirectly();
+            if (employees && employees.length > 0) {
+              const transformedEmployees = employees.map((emp: any) => {
+                return {
+                  ...emp,
+                  ragStatus: (emp.rag_status || 'green').toLowerCase() as 'red' | 'amber' | 'green',
+                  lastActivity: emp.last_activity || 'Never',
+                  progress: emp.progress || 0
+                };
+              });
+              setEmployees(transformedEmployees);
+              setLoading(false);
+              calculateMetrics(transformedEmployees);
+            }
+          }}>
+            Direct Fetch
+          </Button>
+          <Button variant="outline" onClick={async () => {
+            const employees = await queryWithServerFunction();
+            if (employees && employees.length > 0) {
+              const transformedEmployees = employees.map((emp: any) => {
+                return {
+                  ...emp,
+                  ragStatus: (emp.rag_status || 'green').toLowerCase() as 'red' | 'amber' | 'green',
+                  lastActivity: emp.last_activity || 'Never',
+                  progress: emp.progress || 0
+                };
+              });
+              setEmployees(transformedEmployees);
+              setLoading(false);
+              calculateMetrics(transformedEmployees);
+            }
+          }}>
+            Server Query
+          </Button>
+          <Button variant="outline" onClick={() => setShowServiceKeyDialog(true)}>
+            Service Role
+          </Button>
           <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
             <DialogTrigger asChild>
               <Button variant="outline">
@@ -566,6 +736,50 @@ const EmployeesPage: React.FC = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Service Key Dialog */}
+      <Dialog open={showServiceKeyDialog} onOpenChange={setShowServiceKeyDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Enter Service Role Key</DialogTitle>
+            <DialogDescription>
+              This is for debugging only. Enter your Supabase service role key to bypass RLS.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Input
+                type="password"
+                placeholder="Supabase service role key"
+                value={serviceKey}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setServiceKey(e.target.value)}
+              />
+            </div>
+            <Button onClick={async () => {
+              if (!serviceKey) return;
+              
+              const result = await fetchEmployeesDirectWithKey(serviceKey);
+              
+              if (result.success && result.employees.length > 0) {
+                const transformedEmployees = result.employees.map((emp: any) => {
+                  return {
+                    ...emp,
+                    ragStatus: (emp.rag_status || 'green').toLowerCase() as 'red' | 'amber' | 'green',
+                    lastActivity: emp.last_activity || 'Never',
+                    progress: emp.progress || 0
+                  };
+                });
+                setEmployees(transformedEmployees);
+                setLoading(false);
+                calculateMetrics(transformedEmployees);
+                setShowServiceKeyDialog(false);
+              }
+            }}>
+              Fetch Employees
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
