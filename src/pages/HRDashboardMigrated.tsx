@@ -5,8 +5,6 @@ import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 // Import the services for database initialization
 import { hrServices } from '@/services/hrServices';
-// Import the agent system hook
-import { useAgentSystem } from '@/hooks/useAgentSystem';
 // Import the DashboardOverview component
 import DashboardOverview from '@/components/hr/DashboardOverview';
 
@@ -23,17 +21,6 @@ const HRDashboardMigrated: React.FC = () => {
   // Add a ref to track if initialization has been completed
   const hasInitializedRef = React.useRef(false);
   
-  // Initialize the agent system
-  const { 
-    isInitialized: isAgentSystemInitialized, 
-    isInitializing: isAgentSystemInitializing,
-    initError: agentSystemError,
-    initialize: initializeAgentSystem
-  } = useAgentSystem({ 
-    autoInitialize: false, // We'll initialize manually after DB is ready
-    debug: import.meta.env.MODE === 'development'
-  });
-  
   // Handle database initialization
   const initializeDatabase = React.useCallback(async () => {
     if (hasInitializedRef.current || initializingDB) return;
@@ -48,10 +35,6 @@ const HRDashboardMigrated: React.FC = () => {
         toastError(`Missing tables: ${result.missingTables.join(', ')}. Please contact support.`);
       } else {
         toastSuccess('HR Dashboard ready');
-        // Initialize the agent system after DB is ready
-        if (!isAgentSystemInitialized && !isAgentSystemInitializing) {
-          initializeAgentSystem();
-        }
       }
       
       hasInitializedRef.current = true;
@@ -61,7 +44,7 @@ const HRDashboardMigrated: React.FC = () => {
     } finally {
       setInitializingDB(false);
     }
-  }, [initializingDB, toastSuccess, toastError, isAgentSystemInitialized, isAgentSystemInitializing, initializeAgentSystem]);
+  }, [initializingDB, toastSuccess, toastError]);
   
   // Initialize on component mount if authenticated
   React.useEffect(() => {

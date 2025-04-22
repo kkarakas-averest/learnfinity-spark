@@ -2,12 +2,11 @@ import React from "@/lib/react-helpers";
 import { useState } from "@/lib/react-helpers";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import LLMConfig from "@/components/settings/LLMConfig";
 import { Separator } from "@/components/ui/separator";
 import { useHRAuth } from "@/state";
 import { Navigate } from "react-router-dom";
 
-type SettingsTab = "general" | "ai" | "notifications" | "advanced";
+type SettingsTab = "general" | "notifications" | "advanced";
 
 const SettingsPage: React.FC = () => {
   const { hrUser, isAuthenticated, isLoading } = useHRAuth();
@@ -31,12 +30,11 @@ const SettingsPage: React.FC = () => {
       <Tabs 
         defaultValue="general" 
         value={activeTab}
-        onValueChange={(value) => setActiveTab(value as SettingsTab)}
+        onValueChange={(value: string) => setActiveTab(value as SettingsTab)}
         className="w-full"
       >
-        <TabsList className="grid grid-cols-4 w-full max-w-xl mb-6">
+        <TabsList className="grid grid-cols-3 w-full max-w-xl mb-6">
           <TabsTrigger value="general">General</TabsTrigger>
-          <TabsTrigger value="ai">AI & Automation</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
           <TabsTrigger value="advanced">Advanced</TabsTrigger>
         </TabsList>
@@ -61,26 +59,6 @@ const SettingsPage: React.FC = () => {
                   timezone settings, and other basic configuration options.
                 </p>
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
-        <TabsContent value="ai" className="space-y-6">
-          <LLMConfig />
-          
-          <Card>
-            <CardHeader>
-              <CardTitle>AI Analysis Settings</CardTitle>
-              <CardDescription>
-                Configure how AI analyzes employee data
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-gray-500">
-                This section allows you to adjust the sensitivity and thresholds for
-                the RAG status determination system. These settings will be implemented
-                in a future update.
-              </p>
             </CardContent>
           </Card>
         </TabsContent>

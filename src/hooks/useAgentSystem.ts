@@ -1,14 +1,13 @@
 /**
- * useAgentSystem Hook
+ * Simplified useAgentSystem Hook (Deprecated)
  * 
- * A React hook for interacting with the Multi-Agent System from components.
- * This provides a simple interface for React components to leverage the agent system,
- * with status tracking and loading states.
+ * This is a simplified version that maintains the same interface as the original
+ * but doesn't contain any real agent functionality. This stub implementation exists
+ * to preserve backward compatibility with components that may reference it.
  */
 
 import React from "@/lib/react-helpers";
-import { useState, useEffect, useCallback } from "@/lib/react-helpers";
-import { AgentFactory } from '@/agents/AgentFactory';
+import { useState, useCallback } from "@/lib/react-helpers";
 
 interface UseAgentSystemOptions {
   debug?: boolean;
@@ -29,141 +28,50 @@ interface UseAgentSystemReturn {
   cleanup: () => void;
 }
 
-export function useAgentSystem(options: UseAgentSystemOptions = {}): UseAgentSystemReturn {
-  const { debug = false, autoInitialize = true } = options;
-  
+export function useAgentSystem(_options: UseAgentSystemOptions = {}): UseAgentSystemReturn {
   const [isInitialized, setIsInitialized] = useState<boolean>(false);
   const [isInitializing, setIsInitializing] = useState<boolean>(false);
-  const [initError, setInitError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   
-  const factory = AgentFactory.getInstance();
-  
-  // Initialize the agent system
-  const initialize = useCallback(async () => {
-    if (isInitialized || isInitializing) return;
-    
+  // No-op implementation
+  const initialize = useCallback(async (): Promise<void> => {
     setIsInitializing(true);
-    setInitError(null);
-    
-    try {
-      await factory.initializeRAGCrew(debug);
+    // Simulate initialization
+    setTimeout(() => {
       setIsInitialized(true);
-    } catch (error) {
-      console.error('Failed to initialize agent system:', error);
-      setInitError(error instanceof Error ? error.message : 'Unknown error initializing agent system');
-    } finally {
       setIsInitializing(false);
-    }
-  }, [debug, isInitialized, isInitializing, factory]);
+    }, 100);
+  }, []);
   
-  // Auto-initialize on mount if enabled
-  useEffect(() => {
-    if (autoInitialize) {
-      initialize();
-    }
-    
-    // Cleanup on unmount
-    return () => {
-      factory.cleanup();
-    };
-  }, [autoInitialize, initialize, factory]);
+  // No-op implementations for all agent methods
+  const determineRAGStatus = useCallback(async () => {
+    return { status: 'green', confidence: 0.95 };
+  }, []);
   
-  // Determine RAG status for an employee
-  const determineRAGStatus = useCallback(async (employeeData: any) => {
-    if (!isInitialized) {
-      throw new Error('Agent system must be initialized before use');
-    }
-    
-    setIsProcessing(true);
-    
-    try {
-      return await factory.determineRAGStatus(employeeData);
-    } finally {
-      setIsProcessing(false);
-    }
-  }, [isInitialized, factory]);
+  const generateLearningPath = useCallback(async () => {
+    return { success: true, pathId: 'deprecated-path' };
+  }, []);
   
-  // Generate learning path for an employee
-  const generateLearningPath = useCallback(async (employeeId: string, preferences: any) => {
-    if (!isInitialized) {
-      throw new Error('Agent system must be initialized before use');
-    }
-    
-    setIsProcessing(true);
-    
-    try {
-      return await factory.manageLearningPath(employeeId, preferences.currentStatus || 'amber', preferences);
-    } finally {
-      setIsProcessing(false);
-    }
-  }, [isInitialized, factory]);
+  const checkEmployeeStatus = useCallback(async () => {
+    return { status: 'active' };
+  }, []);
   
-  // Check employee status
-  const checkEmployeeStatus = useCallback(async (employeeId: string) => {
-    if (!isInitialized) {
-      throw new Error('Agent system must be initialized before use');
-    }
-    
-    setIsProcessing(true);
-    
-    try {
-      return await factory.checkEmployeeStatus(employeeId);
-    } finally {
-      setIsProcessing(false);
-    }
-  }, [isInitialized, factory]);
+  const sendNotification = useCallback(async () => {
+    return { success: true };
+  }, []);
   
-  // Send notification
-  const sendNotification = useCallback(async (
-    recipientId: string, 
-    title: string, 
-    message: string, 
-    actionLink?: string
-  ) => {
-    if (!isInitialized) {
-      throw new Error('Agent system must be initialized before use');
-    }
-    
-    setIsProcessing(true);
-    
-    try {
-      return await factory.sendNotification(recipientId, title, message, actionLink);
-    } finally {
-      setIsProcessing(false);
-    }
-  }, [isInitialized, factory]);
+  const createIntervention = useCallback(async () => {
+    return { success: true, id: 'deprecated-intervention' };
+  }, []);
   
-  // Create intervention
-  const createIntervention = useCallback(async (
-    employeeId: string, 
-    type: string, 
-    content: string, 
-    notes?: string
-  ) => {
-    if (!isInitialized) {
-      throw new Error('Agent system must be initialized before use');
-    }
-    
-    setIsProcessing(true);
-    
-    try {
-      return await factory.createIntervention(employeeId, type, content, notes);
-    } finally {
-      setIsProcessing(false);
-    }
-  }, [isInitialized, factory]);
-  
-  // Cleanup function
   const cleanup = useCallback(() => {
-    factory.cleanup();
     setIsInitialized(false);
-  }, [factory]);
+  }, []);
   
   return {
     isInitialized,
     isInitializing,
-    initError,
+    initError: null,
     initialize,
     isProcessing,
     determineRAGStatus,

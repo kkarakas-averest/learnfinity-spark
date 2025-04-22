@@ -11,8 +11,6 @@ import {
   FileText, 
   Layers, 
   Library,
-  Bot,
-  Sparkles,
   Activity
 } from 'lucide-react';
 
@@ -33,7 +31,7 @@ const NavItem: React.FC<NavItemProps> = ({
   href, 
   icon, 
   isActive = false 
-}) => {
+}: NavItemProps) => {
   return (
     <Link
       to={href}
@@ -50,12 +48,12 @@ const NavItem: React.FC<NavItemProps> = ({
   );
 };
 
-const NavSection: React.FC<NavSectionProps> = ({ title, items }) => {
+const NavSection: React.FC<NavSectionProps> = ({ title, items }: NavSectionProps) => {
   return (
     <div className="py-2">
       <h3 className="px-3 text-xs font-medium text-muted-foreground mb-1">{title}</h3>
       <div className="space-y-1">
-        {items.map((item, index) => (
+        {items.map((item: NavItemProps, index: number) => (
           <NavItem 
             key={index} 
             title={item.title} 
@@ -135,17 +133,6 @@ const DashboardSidebar: React.FC = () => {
           href: "/hr-dashboard/course-builder/library",
           icon: <Library className="h-4 w-4" />,
           isActive: currentPath === "/hr-dashboard/course-builder/library"
-        }
-      ]
-    },
-    {
-      title: "AI Systems",
-      items: [
-        {
-          title: "Agent Management",
-          href: "/hr-dashboard/agent-management",
-          icon: <Bot className="h-4 w-4" />,
-          isActive: currentPath === "/hr-dashboard/agent-management"
         }
       ]
     },

@@ -88,7 +88,7 @@ export interface RAGStatusSummary {
   greenPercentage: number;
 }
 
-export type HRDashboardTab = 'overview' | 'employees' | 'courses' | 'reports' | 'analytics' | 'agents';
+export type HRDashboardTab = 'overview' | 'employees' | 'courses' | 'reports' | 'analytics';
 
 export interface Employee {
   id: string;

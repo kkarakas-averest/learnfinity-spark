@@ -31,6 +31,13 @@ import { User as UserType } from '@/types/hr.types';
 // Import from our new state management system
 import { useAuth, useUser, useUI } from "@/state";
 
+// Define NavItem interface at the top
+interface NavItem {
+  name: string;
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+}
+
 // Navigation items configuration
 const NAV_ITEMS = {
   public: [
@@ -41,7 +48,6 @@ const NAV_ITEMS = {
     { name: "Home", href: "/", icon: Home },
     { name: "Courses", href: "/courses", icon: Book },
     { name: "My Learning", href: "/dashboard", icon: GraduationCap },
-    { name: "AI Testing", href: "/ai-testing", icon: Sparkles },
   ]
 };
 
@@ -63,26 +69,33 @@ const UserAvatar = ({ name, email, role }: { name?: string; email?: string; role
   );
 };
 
+// Utility to get display name from user object
+function getDisplayName(user: Partial<UserType> | null | undefined): string {
+  if (!user) return "User";
+  // @ts-expect-error: 'name' may exist on some user objects for display
+  return user.name || user.username || "User";
+}
+
 // User menu component
 const UserMenu = ({ userDetails, signOut }: { userDetails: UserType | null; signOut: () => Promise<void> }) => {
-  // Don't return null anymore, use fallback data instead
-  const userData = userDetails || { 
-    name: "User", 
+  // Fallback userData with username for compatibility
+  const userData: Partial<UserType> = userDetails || { 
+    username: "User", 
     email: "", 
-    role: "learner" as const 
+    role: "learner" 
   };
   
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-          <UserAvatar name={userData.name} email={userData.email} role={userData.role} />
+          <UserAvatar name={getDisplayName(userData)} email={userData.email} role={userData.role as UserRole} />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56" align="end" forceMount>
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
-            <p className="text-sm font-medium leading-none">{userData.name}</p>
+            <p className="text-sm font-medium leading-none">{getDisplayName(userData)}</p>
             <p className="text-xs leading-none text-muted-foreground">
               {userData.email}
             </p>
@@ -121,13 +134,6 @@ const NavMenuItem = ({ to, icon, label }: { to: string; icon: React.ReactNode; l
   </DropdownMenuItem>
 );
 
-// Define NavItem interface
-interface NavItem {
-  name: string;
-  href: string;
-  icon: React.ComponentType<{ className?: string }>;
-}
-
 // Mobile menu component
 const MobileMenu = ({ 
   isOpen, 
@@ -160,9 +166,9 @@ const MobileMenu = ({
         <div className="mt-8 space-y-4">
           {userDetails && (
             <div className="mb-4 flex items-center space-x-3 rounded-lg border p-3">
-              <UserAvatar name={userDetails.name} email={userDetails.email} role={userDetails.role} />
+              <UserAvatar name={getDisplayName(userDetails)} email={userDetails.email} role={userDetails.role as UserRole} />
               <div className="flex-1 overflow-hidden">
-                <p className="font-medium leading-none">{userDetails.name}</p>
+                <p className="font-medium leading-none">{getDisplayName(userDetails)}</p>
                 <p className="text-sm text-muted-foreground truncate">{userDetails.email}</p>
                 {userDetails.role && (
                   <Badge variant="outline" className="mt-1">
@@ -173,7 +179,7 @@ const MobileMenu = ({
             </div>
           )}
           
-          {navItems.map((item) => {
+          {navItems.map((item: NavItem) => {
             const IconComponent = item.icon;
             return (
               <Link
@@ -244,7 +250,7 @@ const NavbarMigrated: React.FC = () => {
         </div>
         
         <nav className="hidden md:flex md:items-center md:space-x-4">
-          {navItems.map((item) => {
+          {navItems.map((item: NavItem) => {
             const IconComponent = item.icon;
             return (
               <Link
@@ -259,7 +265,7 @@ const NavbarMigrated: React.FC = () => {
           })}
           
           {isAuthenticated ? (
-            <UserMenu userDetails={userDetails} signOut={signOut} />
+            <UserMenu userDetails={userDetails as UserType | null} signOut={signOut} />
           ) : (
             <div className="flex items-center space-x-1">
               <Link to="/login">
@@ -287,7 +293,7 @@ const NavbarMigrated: React.FC = () => {
           isOpen={isMenuOpen}
           navItems={navItems}
           onClose={() => setIsMenuOpen(false)}
-          userDetails={userDetails}
+          userDetails={userDetails as UserType | null}
           signOut={signOut}
         />
       </div>

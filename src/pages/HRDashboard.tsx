@@ -20,7 +20,6 @@ const DashboardOverview = React.lazy(() => import('@/components/hr/DashboardOver
 const EmployeeManagement = React.lazy(() => import('@/components/hr/EmployeeManagement'));
 const EmployeeDataDashboard = React.lazy(() => import('@/components/hr/EmployeeDataDashboard'));
 const CourseCreationWizard = React.lazy(() => import('@/components/hr/CourseCreationWizard'));
-const AgentManagement = React.lazy(() => import('@/components/hr/AgentManagement'));
 
 // Define an extended type for hrServices
 type HRServicesExtended = typeof hrServices & {
@@ -184,7 +183,7 @@ export default function HRDashboard() {
         )}
         
         <Tabs defaultValue="overview" value={activeTab} onValueChange={handleTabChange}>
-          <TabsList className="grid w-full max-w-3xl grid-cols-6 mb-8">
+          <TabsList className="grid w-full max-w-3xl grid-cols-5 mb-8">
             <TabsTrigger value="overview" className="flex items-center">
               <BarChart2 className="mr-2 h-4 w-4" />
               Overview
@@ -205,10 +204,6 @@ export default function HRDashboard() {
               <Activity className="mr-2 h-4 w-4" />
               Analytics
             </TabsTrigger>
-            <TabsTrigger value="agents" className="flex items-center">
-              <BookOpen className="mr-2 h-4 w-4" />
-              Agents
-            </TabsTrigger>
           </TabsList>
           
           <React.Suspense fallback={
@@ -222,7 +217,7 @@ export default function HRDashboard() {
             
             <TabsContent value="employees">
               <EmployeeManagement 
-                onViewDetails={(employee) => console.log('View details:', employee)} 
+                onViewDetails={(employee: Employee) => console.log('View details:', employee)} 
                 onIntervene={handleInterventionClick}
               />
             </TabsContent>
@@ -263,10 +258,6 @@ export default function HRDashboard() {
             
             <TabsContent value="analytics">
               <EmployeeDataDashboard />
-            </TabsContent>
-            
-            <TabsContent value="agents">
-              <AgentManagement />
             </TabsContent>
           </React.Suspense>
         </Tabs>

@@ -10,7 +10,7 @@ const menuItems = [
   { label: 'Settings', icon: Settings, to: '/settings' },
 ];
 
-const LearnerLayout: React.FC<{ children: ReactNode }> = ({ children }) => {
+const LearnerLayout: React.FC<React.PropsWithChildren<{}>> = ({ children }: { children: React.ReactNode }) => {
   const [open, setOpen] = React.useState(false);
   const navigate = useNavigate();
   const dropdownRef = React.useRef<HTMLDivElement>(null);

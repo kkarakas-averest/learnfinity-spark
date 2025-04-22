@@ -1,6 +1,7 @@
 import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { Loader2, RefreshCw } from "lucide-react";
+// @ts-ignore
 import { toast } from "sonner";
 import { useAuth } from "@/state";
 
