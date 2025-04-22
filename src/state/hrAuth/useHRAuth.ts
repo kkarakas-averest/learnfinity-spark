@@ -8,6 +8,7 @@ import {
   hrSignOut as signOutAction,
 } from './hrAuthActions';
 import { HRUser } from '../types';
+import { supabase } from '@/lib/supabase';
 
 /**
  * Custom hook for HR authentication
@@ -49,6 +50,27 @@ export function useHRAuth() {
         role: matchedUser.role,
       };
       
+      // Authenticate with Supabase to get a valid session
+      // This is critical for RLS policies to work properly
+      try {
+        const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+          email: username,
+          password: password
+        });
+        
+        if (authError) {
+          console.warn('Supabase authentication failed, but proceeding with in-memory auth:', authError.message);
+          // Continue with in-memory authentication even if Supabase auth fails
+          // This ensures backwards compatibility
+        } else {
+          console.log('Supabase authentication successful:', authData.user?.id);
+          // We could enhance hrUser with data from authData if needed
+        }
+      } catch (authError) {
+        console.warn('Exception during Supabase authentication:', authError);
+        // Continue with in-memory authentication
+      }
+      
       // In a real application, you might store a token here
       localStorage.setItem('hrUser', JSON.stringify(hrUser));
       
@@ -68,9 +90,17 @@ export function useHRAuth() {
    * Logout function for HR users
    */
   const logout = useCallback(() => {
-    localStorage.removeItem('hrUser');
-    dispatch(signOutAction());
-    toastSuccess('Logout successful', 'You have been logged out');
+    // Sign out from Supabase first
+    supabase.auth.signOut().then(() => {
+      console.log('Successfully signed out from Supabase');
+    }).catch(error => {
+      console.error('Error signing out from Supabase:', error);
+    }).finally(() => {
+      // Always clean up the local state regardless of Supabase success
+      localStorage.removeItem('hrUser');
+      dispatch(signOutAction());
+      toastSuccess('Logout successful', 'You have been logged out');
+    });
   }, [dispatch, toastSuccess]);
   
   /**

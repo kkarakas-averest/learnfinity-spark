@@ -140,9 +140,7 @@ const EmployeesPage: React.FC = () => {
   const navigate = useNavigate();
   const hrAuthContext = useHRAuth();
   const { hrUser, isLoading: authLoading } = hrAuthContext;
-  // Hard-coded company ID for testing - in production, this would come from a database query or API
-  // based on the authenticated user's permissions
-  const defaultCompanyId = "4fb1a692-3995-40ee-8aa5-292fd8ebf029";
+  // We'll let Supabase handle company_id via RLS now that we authenticate with Supabase
   const [employees, setEmployees] = useState<DisplayEmployee[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
@@ -181,14 +179,14 @@ const EmployeesPage: React.FC = () => {
     if (authLoading === false && !hasFetchedEmployees) {
       console.log('Auth loading complete. HR User:', hrUser ? JSON.stringify(hrUser) : 'null');
       
-      // Authenticated user exists, we can fetch employees using the default company ID
+      // Authenticated user exists, we can fetch employees
       if (hrUser) {
-        console.log('Using default company ID for fetching:', defaultCompanyId);
+        console.log('Authenticated user found, fetching employees through Supabase RLS');
         // Add a slight delay to ensure context is fully populated
         const timer = setTimeout(() => {
           console.log('Fetching employees after delay...');
           setHasFetchedEmployees(true);
-          fetchEmployees(defaultCompanyId);
+          fetchEmployees();
         }, 500);
         
         return () => clearTimeout(timer);
@@ -222,26 +220,24 @@ const EmployeesPage: React.FC = () => {
     }
   };
 
-  const fetchEmployees = async (companyId: string) => {
+  const fetchEmployees = async () => {
     try {
       setLoading(true);
       setError(null);
       
-      // Add console log here to check company ID
-      console.log('In fetchEmployees - Using company ID:', companyId); 
+      console.log('In fetchEmployees - Using authenticated Supabase session for RLS');
       
       console.log('Fetching employees with filters:', {
         searchTerm,
         departmentFilter,
-        statusFilter,
-        companyId
+        statusFilter
       });
       
       const options: GetEmployeesOptions = {
         searchTerm,
         departmentId: departmentFilter === 'all' ? null : departmentFilter,
         status: statusFilter === 'all' ? null : statusFilter,
-        companyId: companyId,
+        // No need to specify company_id, it will be handled by RLS
       };
       
       // Type assertion to overcome the linter error about parameters
@@ -326,7 +322,7 @@ const EmployeesPage: React.FC = () => {
   const handleExportCSV = async () => {
     try {
       const options: GetEmployeesOptions = {
-        companyId: defaultCompanyId,
+        // No need to specify company_id, it will be handled by RLS
       };
       
       // Type assertion to overcome the linter error about parameters
@@ -389,7 +385,7 @@ const EmployeesPage: React.FC = () => {
               </DialogHeader>
               <BulkEmployeeImport onComplete={() => {
                 setShowImportDialog(false);
-                fetchEmployees(defaultCompanyId);
+                fetchEmployees();
               }} />
             </DialogContent>
           </Dialog>
