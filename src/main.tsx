@@ -1,5 +1,3 @@
-
-// Import debug script first
 import './supabase-debug';
 
 import React from 'react';
