@@ -1,9 +1,8 @@
-import React from "@/utils/react-import";
-import { useState } from "@/utils/react-import";
+import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { Loader2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/state";
 
 /**
  * RegenerateContentButtonVite - pure Vite/React version
@@ -33,8 +32,8 @@ export default function RegenerateContentButtonVite({
   onError,
   className,
 }: RegenerateContentButtonProps) {
-  const [loading, setLoading] = useState(false);
-  const [progress, setProgress] = useState<string | null>(null);
+  const [loading, setLoading] = React.useState(false);
+  const [progress, setProgress] = React.useState<string | null>(null);
   const auth = useAuth();
 
   // Helper for operation logging (useful for debugging)
