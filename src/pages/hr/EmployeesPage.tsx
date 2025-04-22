@@ -185,6 +185,13 @@ const EmployeesPage: React.FC = () => {
     }
   // Rerun this effect when filters change OR when the hrUser object itself changes OR loading state changes
   }, [departmentFilter, statusFilter, hrUser, authLoading]); // <-- Use authLoading from context instead of loading state
+  
+  // Add a cleanup log to check for unmounting
+  useEffect(() => {
+    return () => {
+      console.log('EmployeesPage - Effect cleanup: Component unmounting?');
+    };
+  }, []); // Empty dependency array means this runs only on mount and unmount
 
   const fetchDepartments = async () => {
     try {
