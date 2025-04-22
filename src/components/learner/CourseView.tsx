@@ -27,6 +27,7 @@ import {
   Book
 } from 'lucide-react';
 import type { IconProps } from 'lucide-react';
+import RegenerateContentButtonVite from '@/components/CourseView/RegenerateContentButtonVite';
 
 // Define a type for the Lucide icon component
 type IconComponent = React.ForwardRefExoticComponent<IconProps & React.RefAttributes<SVGSVGElement>>;
@@ -481,6 +482,11 @@ const CourseView: React.FC<CourseViewProps> = ({
                   </>
                 )}
               </div>
+              <RegenerateContentButtonVite
+                courseId={courseId}
+                userId={employeeId || undefined}
+                className="bg-green-600 text-white hover:bg-green-700 my-4"
+              />
             </div>
           </div>
           
