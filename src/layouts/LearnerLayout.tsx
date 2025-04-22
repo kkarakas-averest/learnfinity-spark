@@ -1,7 +1,7 @@
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { LogOut, Settings, User, BookOpen } from 'lucide-react';
-import React from '@/lib/react-helpers';
-import { Outlet, useNavigate } from 'react-router-dom';
+import React, { ReactNode } from '@/lib/react-helpers';
+import { useNavigate } from 'react-router-dom';
 
 const menuItems = [
   { label: 'My Profile', icon: User, to: '/profile' },
@@ -9,7 +9,7 @@ const menuItems = [
   { label: 'Settings', icon: Settings, to: '/settings' },
 ];
 
-const LearnerLayout: React.FC = () => {
+const LearnerLayout: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [open, setOpen] = React.useState(false);
   const navigate = useNavigate();
   const dropdownRef = React.useRef<HTMLDivElement>(null);
@@ -74,7 +74,7 @@ const LearnerLayout: React.FC = () => {
           </div>
         </header>
         <main className="container mx-auto py-6 px-6">
-          <Outlet />
+          {children}
         </main>
       </div>
     </div>
