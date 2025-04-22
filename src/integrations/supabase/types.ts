@@ -424,34 +424,46 @@ export type Database = {
       }
       ai_course_content_sections: {
         Row: {
+          actionable_takeaway: string | null
+          case_study: string | null
           content: string
           content_id: string | null
           created_at: string | null
           id: string
+          logical_section_id: string | null
           module_id: string
           order_index: number
+          quiz: Json | null
           section_id: string
           title: string
           updated_at: string | null
         }
         Insert: {
+          actionable_takeaway?: string | null
+          case_study?: string | null
           content: string
           content_id?: string | null
           created_at?: string | null
           id?: string
+          logical_section_id?: string | null
           module_id: string
           order_index?: number
+          quiz?: Json | null
           section_id: string
           title: string
           updated_at?: string | null
         }
         Update: {
+          actionable_takeaway?: string | null
+          case_study?: string | null
           content?: string
           content_id?: string | null
           created_at?: string | null
           id?: string
+          logical_section_id?: string | null
           module_id?: string
           order_index?: number
+          quiz?: Json | null
           section_id?: string
           title?: string
           updated_at?: string | null
