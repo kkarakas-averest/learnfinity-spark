@@ -160,17 +160,21 @@ const EmployeesPage: React.FC = () => {
   }, []);
   
   useEffect(() => {
-    // Only fetch employees if we have the company ID
+    // Only fetch employees if we have the company ID within the user object
     if (hrUser?.company_id) {
+      console.log('HR User context updated with company_id, fetching employees...', hrUser.company_id);
       fetchEmployees();
-    } else {
-      // Optional: Set loading to false or handle the state where company_id is missing
-      setLoading(false);
-      setEmployees([]); // Clear employees if company_id is not yet available
-      console.log('Waiting for company_id before fetching employees...');
+    } else if (!loading && !hrUser) { // Check if still loading or if user is genuinely null
+       console.log('Waiting for HR User context (or company_id)...');
+       setEmployees([]); // Clear employees if company_id is not yet available
+    } else if (!loading && hrUser && !hrUser.company_id) {
+       console.warn('HR User context available but company_id is missing.');
+       setError('Could not determine company to fetch employees for.');
+       setEmployees([]);
+       setLoading(false); // Stop loading as we can't proceed
     }
-  // Rerun this effect when filters change OR when company_id becomes available
-  }, [departmentFilter, statusFilter, hrUser?.company_id]);
+  // Rerun this effect when filters change OR when the hrUser object itself changes OR loading state changes
+  }, [departmentFilter, statusFilter, hrUser, loading]); // <-- Depend on hrUser object and loading state
 
   const fetchDepartments = async () => {
     try {
