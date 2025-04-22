@@ -138,7 +138,7 @@ interface Employee {
 
 const EmployeesPage: React.FC = () => {
   const navigate = useNavigate();
-  const { hrUser } = useHRAuth();
+  const { hrUser, isLoading: authLoading } = useHRAuth();
   const [employees, setEmployees] = useState<DisplayEmployee[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
@@ -155,26 +155,36 @@ const EmployeesPage: React.FC = () => {
   });
   const [showImportDialog, setShowImportDialog] = useState(false);
   
+  // Log auth state on each render for debugging
+  console.log('EmployeesPage - Auth State:', {
+    hrUser,
+    authLoading,
+    companyId: hrUser?.company_id,
+    hasHrUser: !!hrUser
+  });
+  
   useEffect(() => {
     fetchDepartments();
   }, []);
   
   useEffect(() => {
     // Only fetch employees if we have the company ID within the user object
+    console.log('Effect triggered - Current hrUser:', hrUser);
     if (hrUser?.company_id) {
       console.log('HR User context updated with company_id, fetching employees...', hrUser.company_id);
       fetchEmployees();
-    } else if (!loading && !hrUser) { // Check if still loading or if user is genuinely null
-       console.log('Waiting for HR User context (or company_id)...');
-       setEmployees([]); // Clear employees if company_id is not yet available
-    } else if (!loading && hrUser && !hrUser.company_id) {
-       console.warn('HR User context available but company_id is missing.');
-       setError('Could not determine company to fetch employees for.');
-       setEmployees([]);
-       setLoading(false); // Stop loading as we can't proceed
+    } else if (!authLoading && !hrUser) { // Check if still loading or if user is genuinely null
+      console.log('Waiting for HR User context (or company_id)...');
+      setEmployees([]); // Clear employees if company_id is not yet available
+      setLoading(false); // Important: Update loading state so UI doesn't show spinner forever
+    } else if (!authLoading && hrUser && !hrUser.company_id) {
+      console.warn('HR User context available but company_id is missing.', hrUser);
+      setError('Could not determine company to fetch employees for.');
+      setEmployees([]);
+      setLoading(false); // Stop loading as we can't proceed
     }
   // Rerun this effect when filters change OR when the hrUser object itself changes OR loading state changes
-  }, [departmentFilter, statusFilter, hrUser, loading]); // <-- Depend on hrUser object and loading state
+  }, [departmentFilter, statusFilter, hrUser, authLoading]); // <-- Use authLoading from context instead of loading state
 
   const fetchDepartments = async () => {
     try {
@@ -196,7 +206,7 @@ const EmployeesPage: React.FC = () => {
       setError(null);
       
       // Add console log here to check the hrUser object and company_id
-      console.log('HR User Context:', hrUser); 
+      console.log('In fetchEmployees - HR User:', hrUser); 
       
       console.log('Fetching employees with filters:', {
         searchTerm,
