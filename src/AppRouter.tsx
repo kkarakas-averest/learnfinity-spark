@@ -6,12 +6,14 @@ import { ROUTES, buildRoute } from '@/lib/routes';
 import MainLayout from './layouts/MainLayout';
 import HRLayout from './layouts/HRLayout';
 import LearnerLayout from './layouts/LearnerLayout';
+import { SuperAdminLayout } from '@/features/super-admin/components/SuperAdminLayout';
 
 // Pages
 import HomePage from './pages/HomePage';
 import HRDashboardRoot from './pages/hr/HRDashboardRoot';
 import LoginPage from './pages/auth/LoginPage';
 import HRLoginPage from './pages/auth/HRLoginPage';
+import AcceptInvitePage from './pages/auth/AcceptInvitePage';
 import NotFoundPage from './pages/NotFoundPage';
 import LearnerDashboardPage from './pages/learner/LearnerDashboardPage';
 import LearnerCoursesPage from './pages/learner/LearnerCoursesPage';
@@ -26,6 +28,12 @@ import EmployeeProfilePage from './pages/hr/EmployeeProfilePage';
 import EditEmployeePage from './components/hr/EditEmployeePage';
 import CreateEmployeePage from './components/hr/CreateEmployeePage';
 
+// Super Admin Pages
+import SuperAdminDashboard from '@/features/super-admin/pages/SuperAdminDashboard';
+import ManageCompaniesPage from '@/features/super-admin/pages/ManageCompaniesPage';
+import ManageUsersPage from '@/features/super-admin/pages/ManageUsersPage';
+import InviteUserPage from '@/features/super-admin/pages/InviteUserPage';
+
 // Protected Routes
 import HRProtectedRoute from './components/auth/HRProtectedRoute';
 import LearnerProtectedRoute from './components/auth/LearnerProtectedRoute';
@@ -38,12 +46,12 @@ const AppRouter: React.FC = () => {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Main Layout Routes */}
+        {/* Main Layout Routes (Public/Auth) */}
         <TypeSafeRoute path={ROUTES.HOME} element={<MainLayout />}>
           <TypeSafeRoute index element={<HomePage />} />
           <TypeSafeRoute path={ROUTES.LOGIN} element={<LoginPage />} />
           <TypeSafeRoute path={ROUTES.HR_LOGIN} element={<HRLoginPage />} />
-          <TypeSafeRoute path="*" element={<NotFoundPage />} />
+          <TypeSafeRoute path="/accept-invite" element={<AcceptInvitePage />} />
         </TypeSafeRoute>
 
         {/* HR Dashboard Routes */}
@@ -60,7 +68,14 @@ const AppRouter: React.FC = () => {
           <TypeSafeRoute path="employees/new" element={<CreateEmployeePage />} />
           <TypeSafeRoute path="employees/:id" element={<EmployeeProfilePage />} />
           <TypeSafeRoute path="employees/:id/edit" element={<EditEmployeePage />} />
-          {/* Add other HR routes as needed */}
+        </TypeSafeRoute>
+
+        {/* Super Admin Routes */}
+        <TypeSafeRoute path="/super-admin" element={<SuperAdminLayout />}>
+          <TypeSafeRoute index element={<SuperAdminDashboard />} />
+          <TypeSafeRoute path="companies" element={<ManageCompaniesPage />} />
+          <TypeSafeRoute path="users" element={<ManageUsersPage />} />
+          <TypeSafeRoute path="invite" element={<InviteUserPage />} />
         </TypeSafeRoute>
 
         {/* Learner Routes */}
@@ -112,13 +127,16 @@ const AppRouter: React.FC = () => {
         <TypeSafeRoute 
           path={ROUTES.COURSE_CREATE} 
           element={
-            <LearnerProtectedRoute>
-              <LearnerLayout>
+            <HRProtectedRoute>
+              <HRLayout>
                 <CreateCoursePage />
-              </LearnerLayout>
-            </LearnerProtectedRoute>
+              </HRLayout>
+            </HRProtectedRoute>
           } 
         />
+
+        {/* Catch-all 404 Route - Must be last */}
+        <TypeSafeRoute path="*" element={<NotFoundPage />} />
       </Routes>
     </BrowserRouter>
   );

@@ -21,9 +21,10 @@
     "paths": {
       "@/*": ["./src/*"]
     },
-    "jsxImportSource": "react"
+    "jsxImportSource": "react",
+    "typeRoots": ["./node_modules/@types", "./src/types"]
   },
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.d.ts"],
   "references": [{ "path": "./tsconfig.node.json" }],
-  "exclude": ["node_modules"]
+  "exclude": ["node_modules", "supabase/functions/**/*"]
 }
