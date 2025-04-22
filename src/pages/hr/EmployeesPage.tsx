@@ -2,6 +2,7 @@ import React, { useState, useEffect } from '@/lib/react-helpers';
 import { Link, useNavigate } from 'react-router-dom';
 import { ROUTES, buildRoute } from '@/lib/routes';
 import { hrEmployeeService } from '@/services/hrEmployeeService';
+import { useHRAuth } from '@/contexts/HRAuthContext';
 import { RAGStatusBadge } from '@/components/hr/RAGStatusBadge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -35,6 +36,7 @@ import {
   Settings
 } from 'lucide-react';
 import BulkEmployeeImport from '@/components/hr/BulkEmployeeImport';
+import { GetEmployeesOptions } from '@/services/hrEmployeeService';
 
 interface Employee {
   id: string;
@@ -77,6 +79,7 @@ interface BulkEmployeeImportProps {
 
 const EmployeesPage: React.FC = () => {
   const navigate = useNavigate();
+  const { hrUser } = useHRAuth();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
@@ -99,7 +102,7 @@ const EmployeesPage: React.FC = () => {
   
   useEffect(() => {
     fetchEmployees();
-  }, [departmentFilter, statusFilter]);
+  }, [departmentFilter, statusFilter, hrUser?.company_id]);
 
   const fetchDepartments = async () => {
     try {
@@ -119,25 +122,19 @@ const EmployeesPage: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      console.log('Fetching employees with filters:', {
+      const options: GetEmployeesOptions = {
         searchTerm,
         departmentId: departmentFilter === 'all' ? null : departmentFilter,
-        status: statusFilter === 'all' ? null : statusFilter
-      });
+        status: statusFilter === 'all' ? null : statusFilter,
+        companyId: hrUser?.company_id || undefined,
+      };
+      const result = await hrEmployeeService.getEmployees(options);
       
-      const result = await hrEmployeeService.getEmployees({
-        searchTerm,
-        departmentId: departmentFilter === 'all' ? null : departmentFilter,
-        status: statusFilter === 'all' ? null : statusFilter
-      });
-      
-      if (result.success) {
-        // Transform the employee data to match our interface
-        const transformedEmployees = result.employees.map(emp => {
-          // Ensure ragStatus is normalized to one of the valid values
+      if (result.success && result.employees) {
+        const transformedEmployees = result.employees.map((emp: Employee) => {
           let normalizedRagStatus = (emp.ragStatus || emp.rag_status || 'green').toLowerCase();
           if (!['red', 'amber', 'green'].includes(normalizedRagStatus)) {
-            normalizedRagStatus = 'green'; // Default to green if invalid value
+            normalizedRagStatus = 'green';
           }
           
           return {
@@ -196,41 +193,40 @@ const EmployeesPage: React.FC = () => {
 
   const handleExportCSV = async () => {
     try {
-      // Get all employees for export
-      const result = await hrEmployeeService.getEmployees({});
+      const options: GetEmployeesOptions = {
+        companyId: hrUser?.company_id || undefined,
+      };
+      const result = await hrEmployeeService.getEmployees(options);
       
-      if (!result.success || !result.employees) {
+      if (result.success && result.employees) {
+        const csvData = result.employees.map((emp: Employee) => ({
+          Name: emp.name,
+          Email: emp.email,
+          Department: emp.hr_departments?.name || '',
+          Position: emp.hr_positions?.title || '',
+          Status: emp.status || '',
+          "Hire Date": emp.hire_date || '',
+          "Last Activity": emp.last_activity || ''
+        }));
+        
+        const headers = Object.keys(csvData[0]);
+        const csvContent = [
+          headers.join(','),
+          ...csvData.map(row => headers.map(header => JSON.stringify(row[header])).join(','))
+        ].join('\n');
+        
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.setAttribute('href', url);
+        link.setAttribute('download', `employees_export_${new Date().toISOString().slice(0, 10)}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else {
         throw new Error('Failed to fetch employees for export');
       }
-      
-      // Format data for CSV
-      const csvData = result.employees.map(emp => ({
-        Name: emp.name,
-        Email: emp.email,
-        Department: emp.hr_departments?.name || '',
-        Position: emp.hr_positions?.title || '',
-        Status: emp.status || '',
-        "Hire Date": emp.hire_date || '',
-        "Last Activity": emp.last_activity || ''
-      }));
-      
-      // Convert to CSV string
-      const headers = Object.keys(csvData[0]);
-      const csvContent = [
-        headers.join(','),
-        ...csvData.map(row => headers.map(header => JSON.stringify(row[header])).join(','))
-      ].join('\n');
-      
-      // Create download link
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.setAttribute('href', url);
-      link.setAttribute('download', `employees_export_${new Date().toISOString().slice(0, 10)}.csv`);
-      link.style.visibility = 'hidden';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
     } catch (error) {
       console.error('Error exporting employees:', error);
       alert('Failed to export employees. Please try again.');
@@ -328,7 +324,7 @@ const EmployeesPage: React.FC = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Departments</SelectItem>
-                {departments.map((dept) => (
+                {departments.map((dept: Department) => (
                   <SelectItem key={dept.id} value={dept.id}>
                     {dept.name}
                   </SelectItem>
@@ -376,7 +372,7 @@ const EmployeesPage: React.FC = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {employees.map((employee) => (
+                {employees.map((employee: Employee) => (
                   <TableRow key={employee.id}>
                     <TableCell>
                       <div className="flex items-center">

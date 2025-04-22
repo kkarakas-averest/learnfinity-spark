@@ -96,6 +96,7 @@ interface GetEmployeesOptions {
   status?: string | null;
   page?: number;
   pageSize?: number;
+  companyId?: string;
 }
 
 // Define error type to match SupabaseError
@@ -350,12 +351,13 @@ const hrEmployeeService: EmployeeService = {
         departmentId = null,
         status = null,
         page = 1,
-        pageSize = 50
+        pageSize = 50,
+        companyId
       } = options;
 
-      // Get the current company ID from environment variable if available
-      const companyId = DEFAULT_COMPANY_ID;
-      console.log('Using company ID for employee query:', companyId);
+      // Use provided companyId if available, otherwise fall back to default
+      const effectiveCompanyId = companyId || DEFAULT_COMPANY_ID;
+      console.log('Using company ID for employee query:', effectiveCompanyId);
 
       let query = supabase
         .from('hr_employees')
@@ -372,7 +374,7 @@ const hrEmployeeService: EmployeeService = {
         `);
 
       // Always apply company_id filter to ensure employees are company-scoped
-      query = query.eq('company_id', companyId);
+      query = query.eq('company_id', effectiveCompanyId);
 
       // Apply filters
       if (searchTerm) {
@@ -403,7 +405,7 @@ const hrEmployeeService: EmployeeService = {
         };
       }
 
-      console.log(`Found ${employees?.length || 0} employees for company ID: ${companyId}`);
+      console.log(`Found ${employees?.length || 0} employees for company ID: ${effectiveCompanyId}`);
       return {
         success: true,
         employees: employees as Employee[]
@@ -1428,3 +1430,6 @@ export default hrEmployeeService;
     console.error("Error initializing HR tables:", error);
   }
 })();
+
+// Add export for GetEmployeesOptions
+export type { GetEmployeesOptions };
