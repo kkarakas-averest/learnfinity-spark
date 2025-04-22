@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { ROUTES, buildRoute } from '@/lib/routes';
 import { hrEmployeeService } from '@/services/hrEmployeeService';
 // import type { Employee } from '@/services/hrEmployeeService';
-import { useHRAuth } from '@/contexts/HRAuthContext';
+import { useHRAuth } from '@/state';
 import { RAGStatusBadge } from '@/components/hr/RAGStatusBadge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -140,6 +140,9 @@ const EmployeesPage: React.FC = () => {
   const navigate = useNavigate();
   const hrAuthContext = useHRAuth();
   const { hrUser, isLoading: authLoading } = hrAuthContext;
+  // Hard-coded company ID for testing - in production, this would come from a database query or API
+  // based on the authenticated user's permissions
+  const defaultCompanyId = "4fb1a692-3995-40ee-8aa5-292fd8ebf029";
   const [employees, setEmployees] = useState<DisplayEmployee[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
@@ -160,7 +163,7 @@ const EmployeesPage: React.FC = () => {
   console.log('EmployeesPage - HR Auth Props:', JSON.stringify({
     user: hrUser ? 'exists' : 'null',
     loading: authLoading,
-    companyId: hrUser?.company_id || 'none'
+    username: hrUser?.username || 'none'
   }));
   
   // Use a local state to track if we've tried to fetch employees
@@ -178,20 +181,21 @@ const EmployeesPage: React.FC = () => {
     if (authLoading === false && !hasFetchedEmployees) {
       console.log('Auth loading complete. HR User:', hrUser ? JSON.stringify(hrUser) : 'null');
       
-      if (hrUser?.company_id) {
-        console.log('Company ID found:', hrUser.company_id);
+      // Authenticated user exists, we can fetch employees using the default company ID
+      if (hrUser) {
+        console.log('Using default company ID for fetching:', defaultCompanyId);
         // Add a slight delay to ensure context is fully populated
         const timer = setTimeout(() => {
           console.log('Fetching employees after delay...');
           setHasFetchedEmployees(true);
-          fetchEmployees();
+          fetchEmployees(defaultCompanyId);
         }, 500);
         
         return () => clearTimeout(timer);
       } else {
-        console.warn('Auth loading complete but no company_id available.');
+        console.warn('Auth loading complete but no HR user available.');
         setLoading(false);
-        setError('Could not determine company to fetch employees for.');
+        setError('Could not authenticate user to fetch employees.');
       }
     }
   }, [authLoading, hasFetchedEmployees, hrUser]);
@@ -218,26 +222,26 @@ const EmployeesPage: React.FC = () => {
     }
   };
 
-  const fetchEmployees = async () => {
+  const fetchEmployees = async (companyId: string) => {
     try {
       setLoading(true);
       setError(null);
       
-      // Add console log here to check the hrUser object and company_id
-      console.log('In fetchEmployees - HR User:', hrUser); 
+      // Add console log here to check company ID
+      console.log('In fetchEmployees - Using company ID:', companyId); 
       
       console.log('Fetching employees with filters:', {
         searchTerm,
         departmentFilter,
         statusFilter,
-        companyId: hrUser?.company_id
+        companyId
       });
       
       const options: GetEmployeesOptions = {
         searchTerm,
         departmentId: departmentFilter === 'all' ? null : departmentFilter,
         status: statusFilter === 'all' ? null : statusFilter,
-        companyId: hrUser?.company_id || undefined,
+        companyId: companyId,
       };
       
       // Type assertion to overcome the linter error about parameters
@@ -322,7 +326,7 @@ const EmployeesPage: React.FC = () => {
   const handleExportCSV = async () => {
     try {
       const options: GetEmployeesOptions = {
-        companyId: hrUser?.company_id || undefined,
+        companyId: defaultCompanyId,
       };
       
       // Type assertion to overcome the linter error about parameters
@@ -385,7 +389,7 @@ const EmployeesPage: React.FC = () => {
               </DialogHeader>
               <BulkEmployeeImport onComplete={() => {
                 setShowImportDialog(false);
-                fetchEmployees();
+                fetchEmployees(defaultCompanyId);
               }} />
             </DialogContent>
           </Dialog>
