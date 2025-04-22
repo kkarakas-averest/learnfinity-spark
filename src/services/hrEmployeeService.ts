@@ -98,12 +98,24 @@ interface GetEmployeesOptions {
   pageSize?: number;
 }
 
+// Define error type to match SupabaseError
+interface SupabaseError {
+  message: string;
+  code?: string;
+}
+
+// Update return type for initialize and createMissingTables methods
+interface InitResult {
+  success: boolean;
+  error?: Error | SupabaseError | unknown;
+}
+
 /**
  * Define the type for the EmployeeService
  */
 export interface EmployeeService {
-  initialize: () => Promise<{success: boolean, error?: Error}>;
-  createMissingTables: (missingTables: string[]) => Promise<{success: boolean, error?: Error}>;
+  initialize: () => Promise<InitResult>;
+  createMissingTables: (missingTables: string[]) => Promise<InitResult>;
   checkHRTablesExist: () => Promise<{exists: boolean, missingTables: string[]}>;
   createEmployee: (employee: EmployeeUpdate) => Promise<EmployeeResponse>;
   getDepartments: () => Promise<{success: boolean, departments?: Department[], error?: string}>;
@@ -129,9 +141,9 @@ export interface EmployeeService {
 const hrEmployeeService: EmployeeService = {
   /**
    * Initialize the HR system
-   * @returns {Promise<{success: boolean, error?: Error}>}
+   * @returns {Promise<InitResult>}
    */
-  async initialize() {
+  async initialize(): Promise<InitResult> {
     try {
       console.log('Initializing HR system...');
       
@@ -162,9 +174,9 @@ const hrEmployeeService: EmployeeService = {
   /**
    * Create missing HR tables
    * @param {string[]} missingTables
-   * @returns {Promise<{success: boolean, error?: Error}>}
+   * @returns {Promise<InitResult>}
    */
-  async createMissingTables(missingTables) {
+  async createMissingTables(missingTables): Promise<InitResult> {
     try {
       console.log('Creating missing HR tables:', missingTables);
       
@@ -341,6 +353,10 @@ const hrEmployeeService: EmployeeService = {
         pageSize = 50
       } = options;
 
+      // Get the current company ID from environment variable if available
+      const companyId = DEFAULT_COMPANY_ID;
+      console.log('Using company ID for employee query:', companyId);
+
       let query = supabase
         .from('hr_employees')
         .select(`
@@ -354,6 +370,9 @@ const hrEmployeeService: EmployeeService = {
             title
           )
         `);
+
+      // Always apply company_id filter to ensure employees are company-scoped
+      query = query.eq('company_id', companyId);
 
       // Apply filters
       if (searchTerm) {
@@ -372,6 +391,7 @@ const hrEmployeeService: EmployeeService = {
       const from = (page - 1) * pageSize;
       query = query.range(from, from + pageSize - 1);
 
+      console.log('Executing employee query with company_id filter');
       const { data: employees, error } = await query;
 
       if (error) {
@@ -383,6 +403,7 @@ const hrEmployeeService: EmployeeService = {
         };
       }
 
+      console.log(`Found ${employees?.length || 0} employees for company ID: ${companyId}`);
       return {
         success: true,
         employees: employees as Employee[]
@@ -415,7 +436,7 @@ const hrEmployeeService: EmployeeService = {
         .single();
 
       if (error) {
-        return { data: null, error };
+        return { data: null, error: error as SupabaseError };
       }
 
       // Map the joined data to the employee object
@@ -428,7 +449,7 @@ const hrEmployeeService: EmployeeService = {
       return { data: employeeData, error: null };
     } catch (error) {
       console.error('Error in getEmployee:', error);
-      return { data: null, error };
+      return { data: null, error: error as SupabaseError };
     }
   },
 
@@ -446,7 +467,10 @@ const hrEmployeeService: EmployeeService = {
         status: employee.status || 'active',
         phone: employee.phone || null,
         hire_date: new Date().toISOString(), // Add current date as hire_date
+        company_id: employee.company_id || DEFAULT_COMPANY_ID, // Ensure company_id is always set
       };
+      
+      console.log('Creating employee with company_id:', cleanEmployee.company_id);
       
       // Only add department_id if it's a valid non-empty value
       if (employee.department_id && typeof employee.department_id === 'string' && employee.department_id.trim() !== '') {
@@ -579,7 +603,7 @@ const hrEmployeeService: EmployeeService = {
         }
       });
       
-      if (authError) {
+      if (authError || !authData.user) {
         console.error('Error creating user account:', authError);
         
         // If creating the user fails, delete the employee record to maintain consistency
@@ -661,7 +685,7 @@ const hrEmployeeService: EmployeeService = {
       return { data, error: null };
     } catch (error) {
       console.error('Error in updateEmployee:', error);
-      return { data: null, error };
+      return { data: null, error: error as SupabaseError };
     }
   },
 
@@ -680,7 +704,7 @@ const hrEmployeeService: EmployeeService = {
       return { data: null, error };
     } catch (error) {
       console.error('Error in deleteEmployee:', error);
-      return { data: null, error };
+      return { data: null, error: error as SupabaseError };
     }
   },
 
@@ -709,13 +733,13 @@ const hrEmployeeService: EmployeeService = {
       
       if (error) {
         console.error('Failed to update password:', error);
-        return { data: null, error };
+        return { data: null, error: error as SupabaseError };
       }
       
       return { data, error: null };
     } catch (error) {
       console.error('Error in updateEmployeePassword:', error);
-      return { data: null, error };
+      return { data: null, error: error as SupabaseError };
     }
   },
   
@@ -733,7 +757,7 @@ const hrEmployeeService: EmployeeService = {
       return { data: { success: !!data }, error };
     } catch (error) {
       console.error('Error in resetEmployeePassword:', error);
-      return { data: { success: false }, error };
+      return { data: { success: false }, error: error as SupabaseError };
     }
   },
   
@@ -771,9 +795,10 @@ const hrEmployeeService: EmployeeService = {
       };
     } catch (error) {
       console.error('Exception during API test:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       return { 
         success: false, 
-        responseText: `Exception during API test: ${error.message}`, 
+        responseText: `Exception during API test: ${errorMessage}`, 
         error 
       };
     }
@@ -827,7 +852,7 @@ const hrEmployeeService: EmployeeService = {
       
       if (uploadError) {
         console.error('Error uploading resume:', uploadError);
-        return { data: null, error: uploadError };
+        return { data: null, error: uploadError as SupabaseError };
       }
       
       // Get the public URL
@@ -851,7 +876,7 @@ const hrEmployeeService: EmployeeService = {
       
       if (updateError) {
         console.error('Error updating employee with resume URL:', updateError);
-        return { data: null, error: updateError };
+        return { data: null, error: updateError as SupabaseError };
       }
       
       return { 
@@ -860,7 +885,7 @@ const hrEmployeeService: EmployeeService = {
       };
     } catch (error) {
       console.error('Error in uploadEmployeeResume:', error);
-      return { data: null, error };
+      return { data: null, error: error as SupabaseError };
     }
   },
   
@@ -919,7 +944,7 @@ const hrEmployeeService: EmployeeService = {
         }
       });
       
-      if (authError) {
+      if (authError || !authData.user) {
         console.error('Error creating user account:', authError);
         return { 
           data: employeeData, 
@@ -968,7 +993,7 @@ const hrEmployeeService: EmployeeService = {
       }
       
       // If there's a resume file, upload it
-      if (resumeFile) {
+      if (resumeFile && employeeData) {
         const { error: resumeError } = await this.uploadEmployeeResume(employeeData.id, resumeFile);
         if (resumeError) {
           console.error('Error uploading resume:', resumeError);
@@ -977,10 +1002,10 @@ const hrEmployeeService: EmployeeService = {
       }
       
       // Enroll in courses
-      if (courseIds && courseIds.length > 0) {
+      if (courseIds && courseIds.length > 0 && employeeData) {
         try {
           // Map course IDs to enrollment records
-          const enrollments = courseIds.map(courseId => ({
+          const enrollments = courseIds.map((courseId: string) => ({
             employee_id: employeeData.id,
             course_id: courseId,
             enrollment_date: new Date().toISOString(),
