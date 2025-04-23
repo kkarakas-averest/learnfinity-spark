@@ -1,13 +1,10 @@
 
 import React from '@/lib/react-helpers';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { ROUTES } from '@/lib/routes';
-
-// This is a temporary placeholder for the real authentication logic
-const useHRAuth = () => ({
-  isAuthenticated: true, // For testing purposes, assume authenticated
-  isLoading: false
-});
+import { useHRAuth } from '@/state/hrAuth/useHRAuth';
+import { Loader2 } from "lucide-react";
+import { supabase } from '@/lib/supabase';
 
 interface HRProtectedRouteProps {
   children: React.ReactNode;
@@ -15,17 +12,45 @@ interface HRProtectedRouteProps {
 
 const HRProtectedRoute: React.FC<HRProtectedRouteProps> = ({ children }) => {
   const { isAuthenticated, isLoading } = useHRAuth();
+  const [roleVerified, setRoleVerified] = React.useState<boolean | null>(null);
+  const location = useLocation();
+
+  React.useEffect(() => {
+    const verifyHRRole = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          setRoleVerified(false);
+          return;
+        }
+
+        const { data: profile } = await supabase
+          .from('user_profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single();
+
+        setRoleVerified(profile?.role === 'hr');
+      } catch (error) {
+        console.error('Role verification error:', error);
+        setRoleVerified(false);
+      }
+    };
+
+    verifyHRRole();
+  }, []);
   
-  if (isLoading) {
+  if (isLoading || roleVerified === null) {
     return (
       <div className="flex items-center justify-center h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="mt-4 text-sm text-muted-foreground">Verifying access...</p>
       </div>
     );
   }
   
-  if (!isAuthenticated) {
-    return <Navigate to={ROUTES.HR_LOGIN} replace />;
+  if (!isAuthenticated || !roleVerified) {
+    return <Navigate to={ROUTES.HR_LOGIN} state={{ from: location }} replace />;
   }
   
   return <>{children}</>;
