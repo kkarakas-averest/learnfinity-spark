@@ -1,3 +1,4 @@
+
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useToast } from './use-toast';
@@ -282,17 +283,33 @@ export const useLearningData = () => {
 
   // Get course data in the format expected by CourseCard
   const getActiveCourses = () => {
-    if (!learnerCourses) return [];
+    if (!learnerCourses || !Array.isArray(learnerCourses)) return [];
     
     return learnerCourses.map(courseWithModules => {
+      // Ensure we have a valid course object before accessing its properties
+      if (!courseWithModules || !courseWithModules.course) {
+        console.warn('Invalid course data found:', courseWithModules);
+        return {
+          id: 'invalid-course',
+          title: 'Unavailable Course',
+          description: 'Course information unavailable',
+          category: 'Unknown',
+          duration: 'Unknown',
+          level: 'Beginner' as const,
+          enrolled: 0,
+          image: 'https://images.unsplash.com/photo-1620712943543-bcc4688e7485?q=80&w=1600&auto=format&fit=crop',
+          progress: 0,
+        };
+      }
+      
       const progress = calculateCourseProgress(courseWithModules);
       
       return {
-        id: courseWithModules.course.id,
-        title: courseWithModules.course.title,
-        description: courseWithModules.course.description || '',
+        id: courseWithModules.course.id || 'unknown',
+        title: courseWithModules.course.title || 'Untitled Course',
+        description: courseWithModules.course.description || 'No description available',
         category: courseWithModules.course.ai_generated ? 'AI-Generated' : 'Standard',
-        duration: `${courseWithModules.modules.length} modules`,
+        duration: `${courseWithModules.modules.length || 0} modules`,
         level: 'Beginner' as const, // This would come from the course data in a real app
         enrolled: 0, // This would come from a count query in a real app
         image: 'https://images.unsplash.com/photo-1620712943543-bcc4688e7485?q=80&w=1600&auto=format&fit=crop',
@@ -303,13 +320,27 @@ export const useLearningData = () => {
 
   // Get learning paths data in the format expected by LearningPathCard
   const getLearningPaths = () => {
-    if (!learningPaths) return [];
+    if (!learningPaths || !Array.isArray(learningPaths)) return [];
     
     return learningPaths.map(path => {
+      // Ensure we have a valid path object and courses property before accessing them
+      if (!path || !path.courses) {
+        return {
+          id: 'invalid-path',
+          title: 'Unavailable Path',
+          description: 'Learning path information unavailable',
+          courseCount: 0,
+          estimatedTime: 'Unknown',
+          progress: 0,
+          recommended: false,
+          tags: ['Unavailable'],
+        };
+      }
+      
       return {
-        id: path.id,
-        title: path.courses.title,
-        description: path.courses.description || '',
+        id: path.id || 'unknown',
+        title: path.courses.title || 'Untitled Learning Path',
+        description: path.courses.description || 'No description available',
         courseCount: 1, // This would be calculated in a real app
         estimatedTime: '8 hours', // This would be calculated in a real app
         progress: 0, // This would be calculated based on module progress

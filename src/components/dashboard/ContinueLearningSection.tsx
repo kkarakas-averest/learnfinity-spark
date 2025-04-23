@@ -1,3 +1,4 @@
+
 import React from "@/lib/react-helpers";
 import CourseCard from "@/components/CourseCard";
 import { useLearningData } from "@/hooks/useLearningData";
@@ -43,14 +44,17 @@ const ContinueLearningSection = () => {
             </div>
           </div>
         </div>
-      ) : coursesError || activeCourses.length === 0 ? (
+      ) : coursesError || !activeCourses || activeCourses.length === 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <CourseCard {...fallbackCourse} />
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {activeCourses.slice(0, 1).map((course) => (
-            <CourseCard key={course.id} {...course} />
+            <CourseCard 
+              key={course.id} 
+              {...course} 
+            />
           ))}
         </div>
       )}

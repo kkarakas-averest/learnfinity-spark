@@ -19,15 +19,15 @@ interface CourseCardProps {
 }
 
 const CourseCard = ({
-  id,
-  title,
-  description,
-  category,
-  duration,
-  level,
-  enrolled,
-  image,
-  progress,
+  id = "unknown",
+  title = "Untitled Course",
+  description = "No description available",
+  category = "Uncategorized",
+  duration = "Unknown duration",
+  level = "Beginner",
+  enrolled = 0,
+  image = "https://images.unsplash.com/photo-1620712943543-bcc4688e7485?q=80&w=1600&auto=format&fit=crop",
+  progress = 0,
 }: CourseCardProps) => {
   const [isHovered, setIsHovered] = React.useState(false);
 
@@ -47,59 +47,68 @@ const CourseCard = ({
   return (
     <Card
       className={`overflow-hidden transition-all duration-300 h-full flex flex-col ${
-        isHovered ? "shadow-lg transform translate-y-[-4px]" : "shadow-md"
+        isHovered ? "shadow-lg" : "shadow"
       }`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <div className="relative aspect-video overflow-hidden">
-        <img
-          src={image}
-          alt={title}
-          className={`object-cover w-full h-full transition-transform duration-700 ${
-            isHovered ? "scale-105" : "scale-100"
-          }`}
+      <div className="relative aspect-video w-full">
+        <img 
+          src={image} 
+          alt={title} 
+          className="object-cover w-full h-full" 
+          onError={(e) => {
+            e.currentTarget.src = "https://images.unsplash.com/photo-1620712943543-bcc4688e7485?q=80&w=1600&auto=format&fit=crop";
+          }}
         />
-        <Badge className="absolute top-3 left-3">{category}</Badge>
-        {progress !== undefined && (
-          <div className="absolute bottom-0 left-0 right-0 h-1 bg-secondary">
-            <div
-              className="h-full bg-primary transition-all duration-300"
-              style={{ width: `${progress}%` }}
-            />
+        {progress !== undefined && progress > 0 && (
+          <div className="absolute bottom-0 w-full bg-gray-800 bg-opacity-75 px-4 py-1 text-white">
+            <div className="flex items-center justify-between text-xs">
+              <span>Progress: {progress}%</span>
+              <span className="font-medium">{progress < 100 ? "In Progress" : "Completed"}</span>
+            </div>
+            <div className="w-full bg-gray-600 h-1 mt-1 rounded-full overflow-hidden">
+              <div 
+                className="bg-primary h-full rounded-full" 
+                style={{ width: `${progress}%` }}
+              />
+            </div>
           </div>
         )}
+        <Badge 
+          className={`absolute top-2 right-2 ${getLevelColor(level)}`}
+        >
+          {level}
+        </Badge>
       </div>
-      <CardContent className="flex-grow p-6">
-        <h3 className="text-xl font-semibold mb-2 line-clamp-2">{title}</h3>
-        <p className="text-muted-foreground text-sm mb-4 line-clamp-2">
-          {description}
-        </p>
-        <div className="flex flex-wrap gap-3 mb-2">
-          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-            <Clock size={14} />
+
+      <CardContent className="flex-grow p-4">
+        <h3 className="font-bold text-xl mb-2 line-clamp-1">{title}</h3>
+        <p className="text-muted-foreground mb-4 text-sm line-clamp-2">{description}</p>
+        <div className="flex flex-wrap gap-2 mb-3">
+          <Badge variant="outline" className="text-xs">{category}</Badge>
+        </div>
+        <div className="flex items-center justify-between text-sm text-muted-foreground">
+          <div className="flex items-center">
+            <Clock className="h-3 w-3 mr-1" />
             <span>{duration}</span>
           </div>
-          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-            <BarChart2 size={14} />
-            <span className={`px-2 py-0.5 rounded-full ${getLevelColor(level)}`}>
-              {level}
-            </span>
-          </div>
-          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-            <Users size={14} />
+          <div className="flex items-center">
+            <Users className="h-3 w-3 mr-1" />
             <span>{enrolled.toLocaleString()} enrolled</span>
           </div>
         </div>
       </CardContent>
-      <CardFooter className="px-6 pb-6 pt-0">
-        <Button asChild className="w-full">
-          <Link to={`/courses/${id}`}>
-            {progress !== undefined && progress > 0
-              ? "Continue Learning"
-              : "Start Course"}
-          </Link>
-        </Button>
+
+      <CardFooter className="p-4 pt-0">
+        <Link 
+          to={`/course/${id}`} 
+          className="w-full"
+        >
+          <Button variant="default" className="w-full">
+            {progress && progress > 0 ? "Continue Learning" : "Start Course"}
+          </Button>
+        </Link>
       </CardFooter>
     </Card>
   );
