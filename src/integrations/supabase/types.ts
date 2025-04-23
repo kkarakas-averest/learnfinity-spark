@@ -2016,6 +2016,7 @@ export type Database = {
       }
       hr_course_enrollments: {
         Row: {
+          company_id: string | null
           completed_modules: number | null
           completion_date: string | null
           course_id: string | null
@@ -2038,6 +2039,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          company_id?: string | null
           completed_modules?: number | null
           completion_date?: string | null
           course_id?: string | null
@@ -2060,6 +2062,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          company_id?: string | null
           completed_modules?: number | null
           completion_date?: string | null
           course_id?: string | null
@@ -2082,6 +2085,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "hr_course_enrollments_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "hr_course_enrollments_course_id_fkey"
             columns: ["course_id"]
@@ -2115,6 +2125,7 @@ export type Database = {
       hr_courses: {
         Row: {
           category: string | null
+          company_id: string | null
           created_at: string | null
           department_id: string | null
           description: string | null
@@ -2134,6 +2145,7 @@ export type Database = {
         }
         Insert: {
           category?: string | null
+          company_id?: string | null
           created_at?: string | null
           department_id?: string | null
           description?: string | null
@@ -2153,6 +2165,7 @@ export type Database = {
         }
         Update: {
           category?: string | null
+          company_id?: string | null
           created_at?: string | null
           department_id?: string | null
           description?: string | null
@@ -2171,6 +2184,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "hr_courses_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "hr_courses_department_id_fkey"
             columns: ["department_id"]
@@ -2533,6 +2553,7 @@ export type Database = {
       }
       hr_learning_paths: {
         Row: {
+          company_id: string | null
           course_count: number | null
           created_at: string | null
           description: string | null
@@ -2545,6 +2566,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          company_id?: string | null
           course_count?: number | null
           created_at?: string | null
           description?: string | null
@@ -2557,6 +2579,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          company_id?: string | null
           course_count?: number | null
           created_at?: string | null
           description?: string | null
@@ -2568,7 +2591,15 @@ export type Database = {
           title?: string
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "hr_learning_paths_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       hr_personalized_course_content: {
         Row: {
@@ -2776,6 +2807,50 @@ export type Database = {
             columns: ["employee_id"]
             isOneToOne: false
             referencedRelation: "hr_employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invites: {
+        Row: {
+          accepted_at: string | null
+          company_id: string | null
+          created_at: string | null
+          email: string
+          expires_at: string | null
+          id: string
+          invite_token: string
+          role: string
+          status: string | null
+        }
+        Insert: {
+          accepted_at?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          email: string
+          expires_at?: string | null
+          id?: string
+          invite_token: string
+          role: string
+          status?: string | null
+        }
+        Update: {
+          accepted_at?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          email?: string
+          expires_at?: string | null
+          id?: string
+          invite_token?: string
+          role?: string
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invites_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]
@@ -4183,6 +4258,7 @@ export type Database = {
       }
       user_profiles: {
         Row: {
+          company_id: string | null
           completed_courses: Json | null
           created_at: string | null
           department: string | null
@@ -4198,6 +4274,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          company_id?: string | null
           completed_courses?: Json | null
           created_at?: string | null
           department?: string | null
@@ -4213,6 +4290,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          company_id?: string | null
           completed_courses?: Json | null
           created_at?: string | null
           department?: string | null
@@ -4227,7 +4305,15 @@ export type Database = {
           skills?: Json | null
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "user_profiles_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {
@@ -4316,6 +4402,14 @@ export type Database = {
       exec_sql: {
         Args: { sql: string }
         Returns: undefined
+      }
+      get_my_company_id: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      get_my_role: {
+        Args: Record<PropertyKey, never>
+        Returns: string
       }
       halfvec_avg: {
         Args: { "": number[] }
