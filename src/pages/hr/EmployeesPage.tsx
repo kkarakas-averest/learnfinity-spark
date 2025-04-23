@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { ROUTES, buildRoute } from '@/lib/routes';
 import { hrEmployeeService } from '@/services/hrEmployeeService';
 import { useHRAuth } from '@/state';
-import { RAGStatusBadge } from '@/components/hr/RAGStatusBadge';
+import RAGStatusBadge from '@/components/hr/RAGStatusBadge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';

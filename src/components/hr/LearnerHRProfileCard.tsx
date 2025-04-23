@@ -1,11 +1,10 @@
-
 import React from 'react';
 import { format } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { CalendarIcon, BriefcaseIcon, PhoneIcon, MailIcon, UserIcon } from 'lucide-react';
-import { RAGStatusBadge } from './RAGStatusBadge';
+import { Calendar, Building, PhoneCall, Mail, User } from 'lucide-react';
+import RAGStatusBadge from './RAGStatusBadge';
 
 interface HREmployeeProfile {
   id: string;
@@ -37,7 +36,10 @@ interface LearnerHRProfileCardProps {
   className?: string;
 }
 
-const LearnerHRProfileCard: React.FC<LearnerHRProfileCardProps> = ({ hrProfile, className }) => {
+const LearnerHRProfileCard: React.FC<LearnerHRProfileCardProps> = ({ 
+  hrProfile, 
+  className 
+}: LearnerHRProfileCardProps) => {
   if (!hrProfile) {
     return null;
   }
@@ -78,7 +80,7 @@ const LearnerHRProfileCard: React.FC<LearnerHRProfileCardProps> = ({ hrProfile, 
               <div className="flex items-center text-muted-foreground text-sm">
                 {positionTitle && (
                   <span className="flex items-center">
-                    <BriefcaseIcon className="h-3.5 w-3.5 mr-1" />
+                    <Building className="h-3.5 w-3.5 mr-1" />
                     {positionTitle}
                   </span>
                 )}
@@ -92,27 +94,27 @@ const LearnerHRProfileCard: React.FC<LearnerHRProfileCardProps> = ({ hrProfile, 
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
               <div className="flex items-center text-muted-foreground">
-                <MailIcon className="h-3.5 w-3.5 mr-2" />
+                <Mail className="h-3.5 w-3.5 mr-2" />
                 {hrProfile.email}
               </div>
               
               {hrProfile.phone && (
                 <div className="flex items-center text-muted-foreground">
-                  <PhoneIcon className="h-3.5 w-3.5 mr-2" />
+                  <PhoneCall className="h-3.5 w-3.5 mr-2" />
                   {hrProfile.phone}
                 </div>
               )}
               
               {hrProfile.hire_date && (
                 <div className="flex items-center text-muted-foreground">
-                  <CalendarIcon className="h-3.5 w-3.5 mr-2" />
+                  <Calendar className="h-3.5 w-3.5 mr-2" />
                   Hired: {format(new Date(hrProfile.hire_date), 'MMM d, yyyy')}
                 </div>
               )}
               
               {managerName && (
                 <div className="flex items-center text-muted-foreground">
-                  <UserIcon className="h-3.5 w-3.5 mr-2" />
+                  <User className="h-3.5 w-3.5 mr-2" />
                   Manager: {managerName}
                 </div>
               )}
@@ -122,7 +124,7 @@ const LearnerHRProfileCard: React.FC<LearnerHRProfileCardProps> = ({ hrProfile, 
               <div className="mt-2">
                 <h4 className="text-sm font-medium mb-1">Skills</h4>
                 <div className="flex flex-wrap gap-1">
-                  {hrProfile.skills.map((skill, i) => (
+                  {hrProfile.skills.map((skill: string, i: number) => (
                     <Badge key={i} variant="outline">{skill}</Badge>
                   ))}
                 </div>
