@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from '@/lib/react-helpers';
 import { useParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,8 +9,8 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase-client';
 import { format } from 'date-fns';
 import { 
-  User, Mail, Phone, Building, Calendar, Award, 
-  FileText, BarChart, Loader2
+  User, Mail, PhoneCall, Building, Calendar, Award, 
+  FileText, BarChart2, Loader2
 } from 'lucide-react';
 import EmployeeProfileSummary from '@/components/hr/EmployeeProfileSummary';
 import RAGStatusBadge from '@/components/hr/RAGStatusBadge';
@@ -76,7 +75,11 @@ const EmployeeProfilePage = () => {
         }
       } catch (err) {
         console.error('Exception fetching employee:', err);
-        setError(`An unexpected error occurred: ${err.message}`);
+        let errorMessage = 'An unexpected error occurred';
+        if (err && typeof err === 'object' && 'message' in err && typeof (err as { message?: string }).message === 'string') {
+          errorMessage = (err as { message: string }).message;
+        }
+        setError(`An unexpected error occurred: ${errorMessage}`);
         toast({
           title: 'Error',
           description: 'An unexpected error occurred while loading employee data',
@@ -91,7 +94,7 @@ const EmployeeProfilePage = () => {
   }, [employeeId, toast]);
 
   // Handle tab change
-  const handleTabChange = (value) => {
+  const handleTabChange = (value: string) => {
     setActiveTab(value);
   };
 
@@ -170,7 +173,7 @@ const EmployeeProfilePage = () => {
               {/* Phone */}
               {employeeData.phone && (
                 <div className="flex items-start">
-                  <Phone className="h-5 w-5 mr-2 text-muted-foreground mt-0.5" />
+                  <PhoneCall className="h-5 w-5 mr-2 text-muted-foreground mt-0.5" />
                   <div>
                     <p className="text-sm font-medium">Phone</p>
                     <p className="text-sm text-muted-foreground">{employeeData.phone}</p>
@@ -249,7 +252,7 @@ const EmployeeProfilePage = () => {
             <CardContent>
               {employeeData.skills && employeeData.skills.length > 0 ? (
                 <div className="flex flex-wrap gap-2">
-                  {employeeData.skills.map((skill, index) => (
+                  {employeeData.skills.map((skill: string, index: number) => (
                     <Badge key={index} variant="secondary">{skill}</Badge>
                   ))}
                 </div>
