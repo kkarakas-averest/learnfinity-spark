@@ -15,7 +15,6 @@ export function useHRAuth() {
   const state = useHRAuthState();
   const dispatch = useHRAuthDispatch();
   const { toastError, toastSuccess } = useUI();
-  const [isLoading, setIsLoading] = useState(false);
 
   const login = useCallback(async (email: string, password: string): Promise<boolean> => {
     try {
