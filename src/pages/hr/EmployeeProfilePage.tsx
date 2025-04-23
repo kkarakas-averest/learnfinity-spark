@@ -60,67 +60,20 @@ import { supabase } from '@/lib/supabase';
 import { uploadFileToStorage, fixStorageUrl, getPublicUrl } from '@/utils/storageHelpers';
 import { useResumeHandler } from './resumeHandler';
 import EnhanceCourseContentButton from '@/components/hr/EnhanceCourseContentButton';
+import type { Employee as HREmployee } from '@/services/hrEmployeeService';
 
-// Define interfaces for the data
-interface Employee {
-  id: string;
-  name: string;
-  email: string;
-  phone?: string;
-  hire_date?: string;
-  department_id?: string;
-  position_id?: string;
+// Define a unique type for this page that extends the service Employee type
+type EmployeeProfile = HREmployee & {
   profile_image_url?: string | null;
   resume_url?: string | null;
-  last_active_at?: string;
-  current_rag_status?: 'green' | 'amber' | 'red';
-  last_rag_update?: string;
-  user_id?: string | null;
-  status?: string;
   cv_file_url?: string | null;
+  cv_extracted_data?: any;
+  skills?: string[] | null;
+  hr_departments?: { id: string; name: string } | null;
+  hr_positions?: { id: string; title: string } | null;
   department?: string;
   position?: string;
-  hr_departments?: {
-    id: string;
-    name: string;
-  } | null;
-  hr_positions?: {
-    id: string;
-    title: string;
-  } | null;
-  rag_status?: string;
-  skills?: string[] | null;
-  cv_extracted_data?: {
-    summary?: string;
-    extraction_date?: string;
-    source?: string;
-    model?: string;
-    skills?: string[];
-    experience?: {
-      title: string;
-      company?: string;
-      duration?: string;
-      highlights?: string[];
-    }[];
-    education?: {
-      degree?: string;
-      institution?: string;
-      year?: string;
-    }[];
-    certifications?: string[];
-    languages?: string[];
-    keyAchievements?: string[];
-    professionalInterests?: string[];
-    personalInsights?: {
-      yearsOfExperience?: string;
-      industries?: string[];
-      toolsAndTechnologies?: string[];
-      projectManagement?: string[];
-      softSkills?: string[];
-      publications?: string[];
-    };
-  } | string | null;
-}
+};
 
 interface Course {
   id: string;
@@ -175,19 +128,7 @@ const EmployeeProfilePage: React.FC = () => {
   
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [employee, setEmployee] = useState<Employee | null>({
-    id: '',
-    name: 'Loading...',
-    email: '',
-    department: '',
-    position: '',
-    status: 'unknown',
-    phone: '',
-    hire_date: '',
-    profile_image_url: '',
-    resume_url: '',
-    current_rag_status: 'amber'
-  } as Employee);
+  const [employee, setEmployee] = useState<EmployeeProfile | null>(null);
   const [courses, setCourses] = useState<Course[]>([]);
   const [skills, setSkills] = useState<Skill[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
@@ -265,31 +206,57 @@ const EmployeeProfilePage: React.FC = () => {
         }
         
         // Set profile image URL if it exists
-        if (data.profile_image_url) {
+        if ('profile_image_url' in data && data.profile_image_url) {
           setProfileImageUrl(data.profile_image_url);
         } else {
           setProfileImageUrl(null);
         }
         
-        // Ensure employee data has all required fields
-        const sanitizedEmployeeData: Employee = {
-          ...data,
-          name: data.name || 'Unknown',
-          email: data.email || '',
-          status: data.status || 'unknown',
-          profile_image_url: data.profile_image_url || null,
-          resume_url: data.resume_url || null,
-          cv_file_url: data.cv_file_url || null,
-          // Ensure cv_extracted_data is properly initialized
-          cv_extracted_data: data.cv_extracted_data || null,
-          // Ensure skills array exists
-          skills: Array.isArray(data.skills) ? data.skills : [],
-          // Handle more potential missing properties
-          hr_departments: data.hr_departments || null,
-          hr_positions: data.hr_positions || null,
-          department: data.hr_departments?.name || '',
-          position: data.hr_positions?.title || ''
-        };
+        // Cast the data to any to extract values without type-checking
+        const anyData = data as any;
+
+        // Create a new object that matches the EmployeeProfile type with all required fields
+        const sanitizedEmployeeData = {
+          // Required fields from base Employee
+          id: typeof anyData.id === 'string' ? anyData.id : '',
+          company_id: typeof anyData.company_id === 'string' ? anyData.company_id : '',
+          name: typeof anyData.name === 'string' ? anyData.name : 'Unknown',
+          email: typeof anyData.email === 'string' ? anyData.email : '',
+          status: typeof anyData.status === 'string' ? anyData.status : 'unknown',
+          phone: anyData.phone,
+          hire_date: anyData.hire_date,
+          department_id: anyData.department_id,
+          position_id: anyData.position_id,
+          last_active_at: anyData.last_active_at,
+          current_rag_status: anyData.current_rag_status,
+          
+          // Extended fields for EmployeeProfile
+          profile_image_url: typeof anyData.profile_image_url === 'string' ? anyData.profile_image_url : null,
+          resume_url: typeof anyData.resume_url === 'string' ? anyData.resume_url : undefined,
+          cv_file_url: typeof anyData.cv_file_url === 'string' ? anyData.cv_file_url : null,
+          cv_extracted_data: anyData.cv_extracted_data ?? null,
+          skills: Array.isArray(anyData.skills) ? anyData.skills : [],
+          
+          // Process hr_departments
+          hr_departments: anyData.hr_departments && 
+            typeof anyData.hr_departments === 'object' && 
+            'id' in anyData.hr_departments && 
+            'name' in anyData.hr_departments
+              ? { id: String(anyData.hr_departments.id), name: String(anyData.hr_departments.name) }
+              : null,
+          
+          // Process hr_positions
+          hr_positions: anyData.hr_positions && 
+            typeof anyData.hr_positions === 'object' && 
+            'id' in anyData.hr_positions && 
+            'title' in anyData.hr_positions
+              ? { id: String(anyData.hr_positions.id), title: String(anyData.hr_positions.title) }
+              : null,
+        } as EmployeeProfile;
+        
+        // Add computed fields
+        sanitizedEmployeeData.department = sanitizedEmployeeData.hr_departments?.name || '';
+        sanitizedEmployeeData.position = sanitizedEmployeeData.hr_positions?.title || '';
         
         setEmployee(sanitizedEmployeeData);
         console.log('DEBUG - Sanitized employee data:', sanitizedEmployeeData);
@@ -608,7 +575,7 @@ const EmployeeProfilePage: React.FC = () => {
     }
   };
 
-  const handleProfileImageChange = (e) => {
+  const handleProfileImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     
@@ -955,7 +922,7 @@ const EmployeeProfilePage: React.FC = () => {
                             <div className="mt-2">
                               <h4 className="text-xs font-medium text-gray-700 mb-1">Key Skills</h4>
                               <div className="flex flex-wrap gap-1">
-                                {employee.cv_extracted_data.skills.slice(0, 5).map((skill, index) => (
+                                {employee.cv_extracted_data.skills.slice(0, 5).map((skill: string, index: number) => (
                                   <span key={index} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
                                     {skill}
                                   </span>
@@ -1015,7 +982,7 @@ const EmployeeProfilePage: React.FC = () => {
                             <div className="mt-2">
                               <h4 className="text-xs font-medium text-gray-700 mb-1">Certifications</h4>
                               <div className="flex flex-wrap gap-1">
-                                {employee.cv_extracted_data.certifications.map((cert, index) => (
+                                {employee.cv_extracted_data.certifications.map((cert: string, index: number) => (
                                   <span key={index} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
                                     {cert}
                                   </span>
@@ -1032,7 +999,7 @@ const EmployeeProfilePage: React.FC = () => {
                             <div className="mt-2">
                               <h4 className="text-xs font-medium text-gray-700 mb-1">Languages</h4>
                               <div className="flex flex-wrap gap-1">
-                                {employee.cv_extracted_data.languages.map((lang, index) => (
+                                {employee.cv_extracted_data.languages.map((lang: string, index: number) => (
                                   <span key={index} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800">
                                     {lang}
                                   </span>
@@ -1270,7 +1237,7 @@ const EmployeeProfilePage: React.FC = () => {
                   <CardContent>
                     {courses.length > 0 ? (
                       <div className="space-y-4">
-                        {courses.map((course, index) => (
+                        {courses.map((course: Course, index: number) => (
                           <div key={index} className="border rounded-md p-4">
                             <div className="flex justify-between mb-2">
                               <h3 className="font-medium">{course.title}</h3>
@@ -1345,7 +1312,7 @@ const EmployeeProfilePage: React.FC = () => {
                   <CardContent>
                     {(activities && activities.length > 0) ? (
                       <div className="space-y-4">
-                        {activities.map((activity, index) => (
+                        {activities.map((activity: Activity, index: number) => (
                           <div key={index} className="flex border-b pb-3 last:border-b-0">
                             <div className="w-10 mr-4 flex justify-center pt-1">
                               {activity.activity_type === 'course_progress' ? (
@@ -1516,13 +1483,13 @@ const EmployeeProfilePage: React.FC = () => {
                   <Label htmlFor="department">Department</Label>
                   <Select
                     value={editFormData.department_id || ''}
-                    onValueChange={(value) => handleSelectChange('department_id', value)}
+                    onValueChange={(value: string) => handleSelectChange('department_id', value)}
                   >
                     <SelectTrigger id="department">
                       <SelectValue placeholder="Select department" />
                     </SelectTrigger>
                     <SelectContent>
-                      {departments.map((dept) => (
+                      {departments.map((dept: Department) => (
                         <SelectItem key={dept.id} value={dept.id}>
                           {dept.name}
                         </SelectItem>
@@ -1535,14 +1502,14 @@ const EmployeeProfilePage: React.FC = () => {
                   <Label htmlFor="position">Position</Label>
                   <Select
                     value={editFormData.position_id || ''}
-                    onValueChange={(value) => handleSelectChange('position_id', value)}
+                    onValueChange={(value: string) => handleSelectChange('position_id', value)}
                     disabled={!editFormData.department_id}
                   >
                     <SelectTrigger id="position">
                       <SelectValue placeholder={!editFormData.department_id ? "Select department first" : "Select position"} />
                     </SelectTrigger>
                     <SelectContent>
-                      {filteredPositions.map((pos) => (
+                      {filteredPositions.map((pos: Position) => (
                         <SelectItem key={pos.id} value={pos.id}>
                           {pos.title}
                         </SelectItem>
@@ -1555,7 +1522,7 @@ const EmployeeProfilePage: React.FC = () => {
                   <Label htmlFor="status">Status</Label>
                   <Select
                     value={editFormData.status || 'active'}
-                    onValueChange={(value) => handleSelectChange('status', value)}
+                    onValueChange={(value: string) => handleSelectChange('status', value)}
                   >
                     <SelectTrigger id="status">
                       <SelectValue placeholder="Select status" />
@@ -1642,7 +1609,7 @@ const EmployeeProfilePage: React.FC = () => {
                   <h3 className="text-lg font-semibold mb-2">Skills & Competencies</h3>
                   <div className="bg-gray-50 p-4 rounded-md border">
                     <div className="flex flex-wrap gap-2">
-                      {employee.cv_extracted_data.skills.map((skill, index) => (
+                      {employee.cv_extracted_data.skills.map((skill: string, index: number) => (
                         <span key={index} className="inline-flex items-center px-2.5 py-1 rounded text-sm font-medium bg-blue-100 text-blue-800">
                           {skill}
                         </span>
@@ -1657,7 +1624,7 @@ const EmployeeProfilePage: React.FC = () => {
                 <div>
                   <h3 className="text-lg font-semibold mb-2">Professional Experience</h3>
                   <div className="space-y-4">
-                    {employee.cv_extracted_data.experience.map((exp, index) => (
+                    {employee.cv_extracted_data.experience.map((exp: any, index: number) => (
                       <div key={index} className="bg-gray-50 p-4 rounded-md border">
                         <div className="flex flex-wrap justify-between mb-2">
                           <h4 className="font-medium text-gray-900">{exp.title}</h4>
@@ -1668,13 +1635,9 @@ const EmployeeProfilePage: React.FC = () => {
                         {exp.company && (
                           <p className="text-sm text-gray-700 mb-2">{exp.company}</p>
                         )}
-                        {exp.highlights && exp.highlights.length > 0 && (
-                          <ul className="list-disc list-inside space-y-1 text-sm text-gray-600">
-                            {exp.highlights.map((highlight, hIndex) => (
-                              <li key={hIndex}>{highlight}</li>
-                            ))}
-                          </ul>
-                        )}
+                        {exp.highlights && exp.highlights.length > 0 && exp.highlights.map((highlight: string, hIndex: number) => (
+                          <p key={hIndex} className="text-sm text-gray-600">{highlight}</p>
+                        ))}
                       </div>
                     ))}
                   </div>
@@ -1686,7 +1649,7 @@ const EmployeeProfilePage: React.FC = () => {
                 <div>
                   <h3 className="text-lg font-semibold mb-2">Education</h3>
                   <div className="space-y-4">
-                    {employee.cv_extracted_data.education.map((edu, index) => (
+                    {employee.cv_extracted_data.education.map((edu: any, index: number) => (
                       <div key={index} className="bg-gray-50 p-4 rounded-md border">
                         <div className="flex flex-wrap justify-between mb-1">
                           <h4 className="font-medium text-gray-900">{edu.degree}</h4>
@@ -1709,7 +1672,7 @@ const EmployeeProfilePage: React.FC = () => {
                   <h3 className="text-lg font-semibold mb-2">Certifications</h3>
                   <div className="bg-gray-50 p-4 rounded-md border">
                     <ul className="list-disc list-inside space-y-1 text-sm text-gray-600">
-                      {employee.cv_extracted_data.certifications.map((cert, index) => (
+                      {employee.cv_extracted_data.certifications.map((cert: string, index: number) => (
                         <li key={index}>{cert}</li>
                       ))}
                     </ul>
@@ -1723,7 +1686,7 @@ const EmployeeProfilePage: React.FC = () => {
                   <h3 className="text-lg font-semibold mb-2">Languages</h3>
                   <div className="bg-gray-50 p-4 rounded-md border">
                     <div className="flex flex-wrap gap-2">
-                      {employee.cv_extracted_data.languages.map((lang, index) => (
+                      {employee.cv_extracted_data.languages.map((lang: string, index: number) => (
                         <span key={index} className="inline-flex items-center px-2.5 py-1 rounded text-sm font-medium bg-purple-100 text-purple-800">
                           {lang}
                         </span>
@@ -1778,7 +1741,7 @@ const EmployeeProfilePage: React.FC = () => {
                         <div className="col-span-2">
                           <h4 className="text-sm font-medium text-gray-700">Publications</h4>
                           <ul className="list-disc list-inside space-y-1 text-sm text-gray-600">
-                            {employee.cv_extracted_data.personalInsights.publications.map((pub, index) => (
+                            {employee.cv_extracted_data.personalInsights.publications.map((pub: string, index: number) => (
                               <li key={index}>{pub}</li>
                             ))}
                           </ul>
@@ -1795,7 +1758,7 @@ const EmployeeProfilePage: React.FC = () => {
                   <h3 className="text-lg font-semibold mb-2">Key Achievements</h3>
                   <div className="bg-gray-50 p-4 rounded-md border">
                     <ul className="list-disc list-inside space-y-1 text-sm text-gray-600">
-                      {employee.cv_extracted_data.keyAchievements.map((achievement, index) => (
+                      {employee.cv_extracted_data.keyAchievements.map((achievement: string, index: number) => (
                         <li key={index}>{achievement}</li>
                       ))}
                     </ul>
@@ -1809,7 +1772,7 @@ const EmployeeProfilePage: React.FC = () => {
                   <h3 className="text-lg font-semibold mb-2">Professional Interests</h3>
                   <div className="bg-gray-50 p-4 rounded-md border">
                     <div className="flex flex-wrap gap-2">
-                      {employee.cv_extracted_data.professionalInterests.map((interest, index) => (
+                      {employee.cv_extracted_data.professionalInterests.map((interest: string, index: number) => (
                         <span key={index} className="inline-flex items-center px-2.5 py-1 rounded text-sm font-medium bg-amber-100 text-amber-800">
                           {interest}
                         </span>
