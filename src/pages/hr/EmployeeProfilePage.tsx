@@ -8,7 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase-client';
 import { format } from 'date-fns';
-import { 
+import {
   User, Mail, PhoneCall, Building, Calendar, Award, 
   FileText, BarChart2, Loader2
 } from 'lucide-react';
@@ -17,8 +17,15 @@ import RAGStatusBadge from '@/components/hr/RAGStatusBadge';
 import RAGStatusHistory from '@/components/hr/RAGStatusHistory';
 import { useHRAuth } from '@/state';
 
-const EmployeeProfilePage = () => {
-  const { employeeId } = useParams();
+// Add prop type
+type EmployeeProfilePageProps = {
+  employeeId?: string;
+};
+
+// Update component to accept prop
+const EmployeeProfilePage: React.FC<EmployeeProfilePageProps> = ({ employeeId: propEmployeeId }: EmployeeProfilePageProps) => {
+  const { employeeId: paramEmployeeId } = useParams();
+  const employeeId = propEmployeeId || paramEmployeeId;
   const { toast } = useToast();
   const { hrUser } = useHRAuth();
   
@@ -27,16 +34,16 @@ const EmployeeProfilePage = () => {
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('overview');
   const [resumeUrl, setResumeUrl] = useState('');
-
+  
   // Fetch employee data
   useEffect(() => {
     const fetchEmployeeData = async () => {
       if (!employeeId) {
         setError('Employee ID is missing');
-        setLoading(false);
-        return;
-      }
-
+          setLoading(false);
+          return;
+        }
+        
       try {
         // Fetch the employee data
         const { data, error } = await supabase
@@ -49,7 +56,7 @@ const EmployeeProfilePage = () => {
           `)
           .eq('id', employeeId)
           .single();
-
+        
         if (error) {
           console.error('Error fetching employee data:', error);
           setError(`Failed to load employee data: ${error.message}`);
@@ -89,7 +96,7 @@ const EmployeeProfilePage = () => {
         setLoading(false);
       }
     };
-
+    
     fetchEmployeeData();
   }, [employeeId, toast]);
 
@@ -108,18 +115,18 @@ const EmployeeProfilePage = () => {
             <Skeleton className="h-64" />
             <div className="md:col-span-2">
               <Skeleton className="h-64" />
-            </div>
+      </div>
           </div>
         </div>
       </div>
     );
   }
-
+  
   // Error state
   if (error || !employeeData) {
     return (
       <div className="container mx-auto p-6">
-        <Card>
+      <Card>
           <CardHeader>
             <CardTitle className="text-red-500">Error</CardTitle>
           </CardHeader>
@@ -131,18 +138,18 @@ const EmployeeProfilePage = () => {
             >
               Go Back
             </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+        </CardContent>
+      </Card>
+        </div>
+      );
+    }
 
   // Formatted data
   const department = employeeData.hr_departments?.name || 'Not assigned';
   const position = employeeData.hr_positions?.title || 'Not assigned';
   const manager = employeeData.manager || null;
-  
-  return (
+
+    return (
     <div className="container mx-auto p-6">
       <div className="mb-6">
         <h1 className="text-2xl font-bold">{employeeData.name}</h1>
@@ -150,13 +157,13 @@ const EmployeeProfilePage = () => {
           <Badge variant="outline">{position}</Badge>
           <Badge variant="outline">{department}</Badge>
           <RAGStatusBadge status={employeeData.rag_status || 'green'} />
-        </div>
-      </div>
+            </div>
+          </div>
       
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Profile Sidebar */}
         <div className="space-y-6">
-          <Card>
+        <Card>
             <CardHeader>
               <CardTitle className="text-lg">Employee Information</CardTitle>
             </CardHeader>
@@ -174,21 +181,21 @@ const EmployeeProfilePage = () => {
               {employeeData.phone && (
                 <div className="flex items-start">
                   <PhoneCall className="h-5 w-5 mr-2 text-muted-foreground mt-0.5" />
-                  <div>
+              <div>
                     <p className="text-sm font-medium">Phone</p>
                     <p className="text-sm text-muted-foreground">{employeeData.phone}</p>
-                  </div>
-                </div>
-              )}
-              
+              </div>
+                        </div>
+                      )}
+                      
               {/* Department */}
               <div className="flex items-start">
                 <Building className="h-5 w-5 mr-2 text-muted-foreground mt-0.5" />
                 <div>
                   <p className="text-sm font-medium">Department</p>
                   <p className="text-sm text-muted-foreground">{department}</p>
-                </div>
-              </div>
+                          </div>
+                        </div>
               
               {/* Position */}
               <div className="flex items-start">
@@ -196,39 +203,39 @@ const EmployeeProfilePage = () => {
                 <div>
                   <p className="text-sm font-medium">Position</p>
                   <p className="text-sm text-muted-foreground">{position}</p>
-                </div>
-              </div>
-              
+                          </div>
+                        </div>
+                      
               {/* Hire Date */}
               {employeeData.hire_date && (
                 <div className="flex items-start">
                   <Calendar className="h-5 w-5 mr-2 text-muted-foreground mt-0.5" />
-                  <div>
+                              <div>
                     <p className="text-sm font-medium">Hire Date</p>
                     <p className="text-sm text-muted-foreground">
                       {format(new Date(employeeData.hire_date), 'MMM d, yyyy')}
                     </p>
-                  </div>
-                </div>
-              )}
-              
+                              </div>
+                              </div>
+                            )}
+                            
               {/* Manager */}
               {manager && (
                 <div className="flex items-start">
                   <User className="h-5 w-5 mr-2 text-muted-foreground mt-0.5" />
-                  <div>
+                          <div>
                     <p className="text-sm font-medium">Manager</p>
                     <p className="text-sm text-muted-foreground">{manager.name}</p>
                     <p className="text-xs text-muted-foreground">{manager.email}</p>
-                  </div>
-                </div>
-              )}
+                          </div>
+                        </div>
+                      )}
               
               {/* Resume Link */}
               {resumeUrl && (
                 <div className="flex items-start">
                   <FileText className="h-5 w-5 mr-2 text-muted-foreground mt-0.5" />
-                  <div>
+              <div>
                     <p className="text-sm font-medium">Resume</p>
                     <a 
                       href={resumeUrl} 
@@ -239,8 +246,8 @@ const EmployeeProfilePage = () => {
                       View Resume
                     </a>
                   </div>
-                </div>
-              )}
+                  </div>
+                )}
             </CardContent>
           </Card>
           
@@ -255,7 +262,7 @@ const EmployeeProfilePage = () => {
                   {employeeData.skills.map((skill: string, index: number) => (
                     <Badge key={index} variant="secondary">{skill}</Badge>
                   ))}
-                </div>
+                      </div>
               ) : (
                 <p className="text-sm text-muted-foreground">No skills listed</p>
               )}
@@ -269,8 +276,8 @@ const EmployeeProfilePage = () => {
             </CardHeader>
             <CardContent>
               <RAGStatusHistory employeeId={employeeId} />
-            </CardContent>
-          </Card>
+          </CardContent>
+        </Card>
         </div>
         
         {/* Main Content */}
@@ -281,14 +288,14 @@ const EmployeeProfilePage = () => {
               <TabsTrigger value="learning">Learning</TabsTrigger>
               <TabsTrigger value="activities">Activities</TabsTrigger>
               <TabsTrigger value="assessments">Assessments</TabsTrigger>
-            </TabsList>
-            
+          </TabsList>
+          
             <TabsContent value="overview" className="pt-4">
-              <Card>
+            <Card>
                 <CardHeader>
                   <CardTitle>Employee Overview</CardTitle>
-                </CardHeader>
-                <CardContent>
+              </CardHeader>
+              <CardContent>
                   <p className="text-muted-foreground">Employee overview will be displayed here.</p>
                   
                   {/* CV Extracted Data */}
@@ -299,34 +306,34 @@ const EmployeeProfilePage = () => {
                         <pre className="whitespace-pre-wrap text-sm">
                           {JSON.stringify(employeeData.cv_extracted_data, null, 2)}
                         </pre>
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-            
+                        </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+          
             <TabsContent value="learning" className="pt-4">
-              <Card>
-                <CardHeader>
+            <Card>
+              <CardHeader>
                   <CardTitle>Learning Data</CardTitle>
-                </CardHeader>
-                <CardContent>
+              </CardHeader>
+              <CardContent>
                   <p className="text-muted-foreground">Learning data will be displayed here.</p>
-                </CardContent>
-              </Card>
-            </TabsContent>
-            
+              </CardContent>
+            </Card>
+          </TabsContent>
+          
             <TabsContent value="activities" className="pt-4">
-              <Card>
-                <CardHeader>
+            <Card>
+              <CardHeader>
                   <CardTitle>Activities</CardTitle>
-                </CardHeader>
-                <CardContent>
+              </CardHeader>
+              <CardContent>
                   <p className="text-muted-foreground">Activities will be displayed here.</p>
-                </CardContent>
-              </Card>
-            </TabsContent>
+              </CardContent>
+            </Card>
+          </TabsContent>
             
             <TabsContent value="assessments" className="pt-4">
               <Card>
@@ -339,8 +346,8 @@ const EmployeeProfilePage = () => {
               </Card>
             </TabsContent>
           </Tabs>
+          </div>
         </div>
-      </div>
     </div>
   );
 };

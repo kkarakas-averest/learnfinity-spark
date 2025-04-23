@@ -74,7 +74,7 @@ const HRDashboardRoot: React.FC = () => {
       }
       
       // Otherwise render the EmployeeProfilePage with the specific ID
-      return <EmployeeProfilePage key={employeeId} />; // Add key to force re-render
+      return <EmployeeProfilePage key={employeeId} employeeId={employeeId} />; // Pass employeeId as prop
     }
     
     if (path.startsWith('/hr-dashboard/course-builder/modules/')) {
