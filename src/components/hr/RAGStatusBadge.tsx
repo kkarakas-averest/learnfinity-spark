@@ -1,3 +1,4 @@
+
 import React from "react"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
@@ -24,7 +25,7 @@ const statusConfig = {
   },
 }
 
-export function RAGStatusBadge({ status, className }: RAGStatusBadgeProps) {
+const RAGStatusBadge: React.FC<RAGStatusBadgeProps> = ({ status, className }) => {
   const config = statusConfig[status]
 
   return (
@@ -35,4 +36,6 @@ export function RAGStatusBadge({ status, className }: RAGStatusBadgeProps) {
       {config.label}
     </Badge>
   )
-} 
+}
+
+export default RAGStatusBadge
