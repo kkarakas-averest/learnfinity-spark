@@ -1,28 +1,79 @@
 
 import { useState, useEffect, useCallback } from 'react';
-import { toast as toastFunction } from '@/components/ui/toast';
+import * as ToastPrimitives from "@radix-ui/react-toast";
+import {
+  ToastActionElement,
+  ToastProps as ShadcnToastProps
+} from '@/components/ui/toast';
 
-export type ToastProps = {
+export type ToastProps = ShadcnToastProps & {
+  id?: string;
   title?: string;
   description?: string;
   action?: React.ReactNode;
   variant?: 'default' | 'destructive';
 };
 
-export const toast = toastFunction;
+const TOAST_LIMIT = 5;
+const TOAST_REMOVE_DELAY = 1000000;
+
+let count = 0;
+
+function genId() {
+  count = (count + 1) % Number.MAX_SAFE_INTEGER;
+  return count.toString();
+}
+
+const toasts: Map<string, ToastProps> = new Map();
+
+const listeners: Array<(toasts: Map<string, ToastProps>) => void> = [];
+
+function emitChange() {
+  listeners.forEach((listener) => {
+    listener(toasts);
+  });
+}
+
+export function toast(props: ToastProps) {
+  const id = props.id || genId();
+  const timeoutId = setTimeout(() => {
+    dismissToast(id);
+  }, TOAST_REMOVE_DELAY);
+
+  toasts.set(id, { ...props, id });
+  emitChange();
+
+  return id;
+}
+
+export function dismissToast(id: string) {
+  toasts.delete(id);
+  emitChange();
+}
 
 export function useToast() {
-  const [toasts, setToasts] = useState<ToastProps[]>([]);
+  const [toastState, setToastState] = useState<Map<string, ToastProps>>(new Map());
 
-  const showToast = useCallback((props: ToastProps) => {
-    const id = Date.now().toString();
-    setToasts((prevToasts) => [...prevToasts, { ...props, id }]);
-    toastFunction({ ...props });
-    return id;
+  useEffect(() => {
+    const listener = (newToasts: Map<string, ToastProps>) => {
+      setToastState(new Map(newToasts));
+    };
+
+    listeners.push(listener);
+    return () => {
+      const index = listeners.indexOf(listener);
+      if (index > -1) {
+        listeners.splice(index, 1);
+      }
+    };
   }, []);
 
-  const dismissToast = useCallback((id: string) => {
-    setToasts((prevToasts) => prevToasts.filter((toast) => toast.id !== id));
+  const showToast = useCallback((props: ToastProps) => {
+    return toast(props);
+  }, []);
+
+  const dismissToastById = useCallback((id: string) => {
+    dismissToast(id);
   }, []);
 
   const error = useCallback((title: string, description?: string) => {
@@ -42,9 +93,10 @@ export function useToast() {
   }, [showToast]);
 
   return {
-    toasts,
+    toast: showToast,
+    toasts: Array.from(toastState.values()),
     showToast,
-    dismissToast,
+    dismissToast: dismissToastById,
     error,
     success,
   };
