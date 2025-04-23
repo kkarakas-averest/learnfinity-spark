@@ -1167,7 +1167,7 @@ const hrEmployeeService: EmployeeService = {
           enrollment_date,
           completion_date,
           progress,
-          courses:course_id (
+          hr_courses:course_id (
             id,
             title,
             description
@@ -1180,8 +1180,8 @@ const hrEmployeeService: EmployeeService = {
       // Format the data to match our Course interface
       const formattedCourses = data.map(enrollment => ({
         id: enrollment.course_id,
-        title: enrollment.courses ? (enrollment.courses as any).title : '',
-        description: enrollment.courses ? (enrollment.courses as any).description : '',
+        title: enrollment.hr_courses ? (enrollment.hr_courses as any).title : '',
+        description: enrollment.hr_courses ? (enrollment.hr_courses as any).description : '',
         progress: enrollment.progress,
         enrollment_date: enrollment.enrollment_date,
         completion_date: enrollment.completion_date

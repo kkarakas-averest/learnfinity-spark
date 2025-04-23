@@ -35,7 +35,6 @@ import {
   FileText,
   Settings,
   AlertTriangle,
-  Terminal,
   Info
 } from 'lucide-react';
 import BulkEmployeeImport from '@/components/hr/BulkEmployeeImport';
@@ -151,7 +150,7 @@ const EmployeesPage: React.FC = () => {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [debugInfo, setDebugInfo] = useState<any>(null);
+  const [debugInfo, setDebugInfo] = useState<Record<string, any>>({});
   const [searchTerm, setSearchTerm] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -215,7 +214,7 @@ const EmployeesPage: React.FC = () => {
 
   const checkAuthStatus = async () => {
     const connectionInfo = await checkSupabaseConnection();
-    setDebugInfo(prev => ({ ...prev, authStatus: connectionInfo }));
+    setDebugInfo((prev: Record<string, any>) => ({ ...prev, authStatus: connectionInfo }));
     
     if (!connectionInfo.authenticated) {
       setShowAuthWarning(true);
@@ -230,14 +229,14 @@ const EmployeesPage: React.FC = () => {
       if (result.success) {
         console.log('Fetched departments:', result.departments);
         setDepartments(result.departments);
-        setDebugInfo(prev => ({ ...prev, departments: result.departments }));
+        setDebugInfo((prev: Record<string, any>) => ({ ...prev, departments: result.departments }));
       } else {
         console.error('Failed to fetch departments:', result.error);
-        setDebugInfo(prev => ({ ...prev, departmentError: result.error }));
+        setDebugInfo((prev: Record<string, any>) => ({ ...prev, departmentError: result.error }));
       }
     } catch (error) {
       console.error('Error fetching departments:', error);
-      setDebugInfo(prev => ({ ...prev, departmentError: error }));
+      setDebugInfo((prev: Record<string, any>) => ({ ...prev, departmentError: error }));
     }
   };
 
@@ -267,13 +266,13 @@ const EmployeesPage: React.FC = () => {
       const result = await hrEmployeeService.getEmployees(options) as EmployeeApiResponse;
       
       // Store debug info
-      setDebugInfo(prev => ({ ...prev, standardFetch: result }));
+      setDebugInfo((prev: Record<string, any>) => ({ ...prev, standardFetch: result }));
       
       // If standard fetch fails or returns empty, try the direct auth method
       if (!result.success || !result.employees || result.employees.length === 0) {
         console.log('Standard fetch failed or returned empty. Trying direct auth method...');
         const directResult = await fetchEmployeesWithAuthSession();
-        setDebugInfo(prev => ({ ...prev, directAuthFetch: directResult }));
+        setDebugInfo((prev: Record<string, any>) => ({ ...prev, directAuthFetch: directResult }));
         
         // If direct auth method succeeds, use those results
         if (directResult.success && directResult.employees && directResult.employees.length > 0) {
@@ -293,7 +292,7 @@ const EmployeesPage: React.FC = () => {
       setEmployees([]);
       setError('An error occurred while fetching employees');
       console.error('Error fetching employees:', error);
-      setDebugInfo(prev => ({ ...prev, fetchError: error }));
+      setDebugInfo((prev: Record<string, any>) => ({ ...prev, fetchError: error }));
     } finally {
       setLoading(false);
     }
@@ -411,7 +410,7 @@ const EmployeesPage: React.FC = () => {
     const result = await fetchEmployeesDirectWithKey(serviceKey);
     
     // Store debug info
-    setDebugInfo(prev => ({ ...prev, serviceKeyFetch: result }));
+    setDebugInfo((prev: Record<string, any>) => ({ ...prev, serviceKeyFetch: result }));
     
     if (result.success && result.employees && result.employees.length > 0) {
       const transformedEmployees = result.employees.map((emp: any) => {
@@ -467,21 +466,6 @@ const EmployeesPage: React.FC = () => {
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Employee Management</h1>
         <div className="flex space-x-2">
-          <Button variant="outline" onClick={runAuthCheck}>
-            <Info className="mr-2 h-4 w-4" />
-            Auth Check
-          </Button>
-          <Button 
-            variant="outline" 
-            onClick={() => setShowDebugDialog(true)}
-          >
-            <Terminal className="mr-2 h-4 w-4" />
-            Debug Info
-          </Button>
-          <Button variant="outline" onClick={() => setShowServiceKeyDialog(true)}>
-            <Settings className="mr-2 h-4 w-4" />
-            Service Role
-          </Button>
           <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
             <DialogTrigger asChild>
               <Button variant="outline">
@@ -785,7 +769,7 @@ const EmployeesPage: React.FC = () => {
               </pre>
               <Button size="sm" onClick={async () => {
                 const result = await fetchEmployeesWithAuthSession();
-                setDebugInfo(prev => ({ ...prev, directAuthFetch: result }));
+                setDebugInfo((prev: Record<string, any>) => ({ ...prev, directAuthFetch: result }));
               }}>
                 Try Direct Auth Fetch
               </Button>
