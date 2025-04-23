@@ -70,23 +70,26 @@ interface Employee {
   hire_date?: string;
   department_id?: string;
   position_id?: string;
-  profile_image_url?: string;
-  resume_url?: string;
+  profile_image_url?: string | null;
+  resume_url?: string | null;
   last_active_at?: string;
   current_rag_status?: 'green' | 'amber' | 'red';
   last_rag_update?: string;
-  user_id?: string;
+  user_id?: string | null;
   status?: string;
-  cv_file_url?: string;
+  cv_file_url?: string | null;
+  department?: string;
+  position?: string;
   hr_departments?: {
     id: string;
     name: string;
-  };
+  } | null;
   hr_positions?: {
     id: string;
     title: string;
-  };
+  } | null;
   rag_status?: string;
+  skills?: string[] | null;
   cv_extracted_data?: {
     summary?: string;
     extraction_date?: string;
@@ -116,7 +119,7 @@ interface Employee {
       softSkills?: string[];
       publications?: string[];
     };
-  } | string;
+  } | string | null;
 }
 
 interface Course {
@@ -207,7 +210,7 @@ const EmployeeProfilePage: React.FC = () => {
   const [notStartedCourses, setNotStartedCourses] = useState(0);
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
   
-  // Add this right after where the component gets the ID
+  // Update the useResumeHandler call to handle undefined
   const {
     resumeFile,
     resumeFileName,
@@ -215,7 +218,7 @@ const EmployeeProfilePage: React.FC = () => {
     handleResumeFileChange,
     uploadResume,
     viewResume
-  } = useResumeHandler(extractedId);
+  } = useResumeHandler(extractedId || '');
 
   useEffect(() => {
     const loadEmployeeData = async () => {
@@ -251,14 +254,23 @@ const EmployeeProfilePage: React.FC = () => {
         // Set profile image URL if it exists
         if (data.profile_image_url) {
           setProfileImageUrl(data.profile_image_url);
+        } else {
+          setProfileImageUrl(null);
         }
         
         // Ensure employee data has all required fields
-        const sanitizedEmployeeData = {
+        const sanitizedEmployeeData: Employee = {
           ...data,
           name: data.name || 'Unknown',
           email: data.email || '',
           status: data.status || 'unknown',
+          profile_image_url: data.profile_image_url || null,
+          resume_url: data.resume_url || null,
+          cv_file_url: data.cv_file_url || null,
+          // Ensure cv_extracted_data is properly initialized
+          cv_extracted_data: data.cv_extracted_data || null,
+          // Ensure skills array exists
+          skills: Array.isArray(data.skills) ? data.skills : []
         };
         
         setEmployee(sanitizedEmployeeData);
@@ -442,8 +454,9 @@ const EmployeeProfilePage: React.FC = () => {
     return Math.floor(courses.reduce((sum: number, course: Course) => sum + (course.progress || 0), 0) / courses.length);
   };
   
-  const SkillsSection: React.FC<{ skills: Skill[] }> = ({ skills }) => {
-    if (skills.length === 0) {
+  // Fix the typing in SkillsSection 
+  const SkillsSection: React.FC<{ skills: Skill[] }> = ({ skills }: { skills: Skill[] }) => {
+    if (!skills || skills.length === 0) {
       return (
         <div className="text-center py-4 text-gray-500">
           <Award className="h-10 w-10 mx-auto mb-2 text-gray-400" />
@@ -464,7 +477,7 @@ const EmployeeProfilePage: React.FC = () => {
 
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {skills.map((skill, index) => (
+        {skills.map((skill: Skill, index: number) => (
           <div key={index} className="border rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow">
             <div className="flex justify-between items-start mb-2">
               <h3 className="font-medium">{skill.name}</h3>
@@ -555,20 +568,22 @@ const EmployeeProfilePage: React.FC = () => {
     setIsEditModalOpen(true);
   };
 
+  // Fix the typing in handleInputChange
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setEditFormData(prev => ({ ...prev, [name]: value }));
+    setEditFormData((prev: any) => ({ ...prev, [name]: value }));
   };
 
-  const handleSelectChange = (name, value) => {
-    setEditFormData(prev => ({ ...prev, [name]: value }));
+  // Fix the typing in handleSelectChange
+  const handleSelectChange = (name: string, value: string) => {
+    setEditFormData((prev: any) => ({ ...prev, [name]: value }));
     
     // Reset position when department changes
     if (name === 'department_id') {
-      setEditFormData(prev => ({ ...prev, position_id: '' }));
+      setEditFormData((prev: any) => ({ ...prev, position_id: '' }));
       
       // Filter positions based on selected department
-      const filtered = positions.filter(pos => pos.department_id === value);
+      const filtered = positions.filter((pos: Position) => pos.department_id === value);
       setFilteredPositions(filtered);
     }
   };
@@ -645,7 +660,15 @@ const EmployeeProfilePage: React.FC = () => {
     }
   };
 
-  const testAndOpenCvLink = async (url: string) => {
+  const testAndOpenCvLink = async (url?: string | null) => {
+    if (!url) {
+      toast({
+        variant: 'destructive',
+        title: 'Resume Unavailable',
+        description: 'No resume has been uploaded for this employee.'
+      });
+      return;
+    }
     await viewResume(url);
   };
 
@@ -991,7 +1014,17 @@ const EmployeeProfilePage: React.FC = () => {
                             variant="ghost" 
                             size="sm" 
                             className="text-xs text-blue-600 p-0"
-                            onClick={() => setCvProfileDialogOpen(true)}
+                            onClick={() => {
+                              if (typeof employee?.cv_extracted_data === 'object' && employee?.cv_extracted_data) {
+                                setCvProfileDialogOpen(true);
+                              } else {
+                                toast({
+                                  title: "CV Profile Unavailable",
+                                  description: "No CV profile data is available for this employee.",
+                                  variant: "default"
+                                });
+                              }
+                            }}
                           >
                             View Full CV Profile
                           </Button>
@@ -1047,7 +1080,7 @@ const EmployeeProfilePage: React.FC = () => {
               </div>
 
               <div>
-                {(employee?.cv_file_url || employee?.resume_url) && (
+                {(employee?.cv_file_url || employee?.resume_url) ? (
                   <div className="flex items-center">
                     <FileText className="h-4 w-4 mr-2 text-gray-500" />
                     <span className="text-sm text-gray-500">Resume:</span>
@@ -1055,12 +1088,18 @@ const EmployeeProfilePage: React.FC = () => {
                       href="#"
                       onClick={(e) => {
                         e.preventDefault();
-                        testAndOpenCvLink(employee?.cv_file_url || employee?.resume_url || '');
+                        testAndOpenCvLink(employee?.cv_file_url || employee?.resume_url);
                       }}
                       className="ml-2 text-blue-600 hover:underline"
                     >
                       View Resume
                     </a>
+                  </div>
+                ) : (
+                  <div className="flex items-center">
+                    <FileText className="h-4 w-4 mr-2 text-gray-500" />
+                    <span className="text-sm text-gray-500">Resume:</span>
+                    <span className="ml-2 text-gray-400">No resume available</span>
                   </div>
                 )}
                 
