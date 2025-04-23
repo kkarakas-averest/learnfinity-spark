@@ -656,7 +656,10 @@ const EmployeeProfilePage: React.FC = () => {
       });
       return;
     }
-    await viewResume(url);
+    // Defensively clean the URL: Remove potential trailing colons and digits (e.g., ":1")
+    const cleanedUrl = url.replace(/(:\d+)$/, '');
+    console.log(`Original URL: ${url}, Cleaned URL: ${cleanedUrl}`); // Add logging
+    await viewResume(cleanedUrl);
   };
 
   const fetchEmployeeData = async () => {
