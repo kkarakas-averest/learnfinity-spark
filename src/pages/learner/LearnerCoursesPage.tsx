@@ -6,7 +6,7 @@ import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { RAGStatusBadge } from '@/components/hr/RAGStatusBadge';
+import RAGStatusBadge from '@/components/hr/RAGStatusBadge';
 import { 
   Calendar, 
   Clock, 
