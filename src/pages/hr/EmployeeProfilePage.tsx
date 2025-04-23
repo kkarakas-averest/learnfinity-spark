@@ -70,8 +70,6 @@ interface Employee {
   hire_date?: string;
   department_id?: string;
   position_id?: string;
-  department?: string;
-  position?: string;
   profile_image_url?: string;
   resume_url?: string;
   last_active_at?: string;
@@ -80,6 +78,15 @@ interface Employee {
   user_id?: string;
   status?: string;
   cv_file_url?: string;
+  hr_departments?: {
+    id: string;
+    name: string;
+  };
+  hr_positions?: {
+    id: string;
+    title: string;
+  };
+  rag_status?: string;
   cv_extracted_data?: {
     summary?: string;
     extraction_date?: string;
@@ -160,7 +167,19 @@ const EmployeeProfilePage: React.FC = () => {
   
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [employee, setEmployee] = useState<Employee | null>(null);
+  const [employee, setEmployee] = useState<Employee | null>({
+    id: '',
+    name: 'Loading...',
+    email: '',
+    department: '',
+    position: '',
+    status: 'unknown',
+    phone: '',
+    hire_date: '',
+    profile_image_url: '',
+    resume_url: '',
+    current_rag_status: 'amber'
+  } as Employee);
   const [courses, setCourses] = useState<Course[]>([]);
   const [skills, setSkills] = useState<Skill[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
@@ -200,24 +219,63 @@ const EmployeeProfilePage: React.FC = () => {
 
   useEffect(() => {
     const loadEmployeeData = async () => {
-      if (!extractedId) return;
+      if (!extractedId) {
+        setError('No employee ID provided');
+        setLoading(false);
+        return;
+      }
       
       setLoading(true);
+      setError(null); // Reset any previous error
+      
       try {
         console.log('Fetching employee with ID:', extractedId);
         const { data, error } = await hrEmployeeService.getEmployee(extractedId);
         
-        if (error) throw error;
+        if (error) {
+          console.error('Error fetching employee:', error);
+          setError(`Failed to load employee data: ${error.message || 'Unknown error'}`);
+          setLoading(false);
+          return;
+        }
         
-        console.log('Employee data response:', { data, error });
-        setEmployee(data);
+        if (!data) {
+          console.error('No employee data returned for ID:', extractedId);
+          setError('Employee not found');
+          setLoading(false);
+          return;
+        }
         
-        // Fetch employee's courses
+        console.log('Employee data response:', data);
+        
+        // Set profile image URL if it exists
+        if (data.profile_image_url) {
+          setProfileImageUrl(data.profile_image_url);
+        }
+        
+        // Ensure employee data has all required fields
+        const sanitizedEmployeeData = {
+          ...data,
+          name: data.name || 'Unknown',
+          email: data.email || '',
+          status: data.status || 'unknown',
+        };
+        
+        setEmployee(sanitizedEmployeeData);
+        
+        // Fetch employee's courses with proper null check for extractedId
         console.log('Fetching courses for employee:', extractedId);
-        const { data: coursesData, error: coursesError } = await hrEmployeeService.getEmployeeCourses(extractedId);
-        console.log('Courses data response:', { data: coursesData, error: coursesError });
+        const { data: coursesData, error: coursesError } = await hrEmployeeService.getEmployeeCourses(extractedId || '');
         
-        if (!coursesError && coursesData) {
+        if (coursesError) {
+          console.error('Error fetching courses:', coursesError);
+          // Set empty courses but don't return early
+          setCourses([]);
+          setCompletedCourses(0);
+          setNotStartedCourses(0);
+          setInProgressCourses(0);
+        } else if (coursesData && Array.isArray(coursesData)) {
+          console.log('Courses data response:', coursesData);
           setCourses(coursesData);
           
           // Calculate course statistics
@@ -228,18 +286,38 @@ const EmployeeProfilePage: React.FC = () => {
           setCompletedCourses(completed);
           setNotStartedCourses(notStarted);
           setInProgressCourses(inProgress);
+        } else {
+          console.warn('No valid courses data returned for employee:', extractedId);
+          setCourses([]);
+          setCompletedCourses(0);
+          setNotStartedCourses(0);
+          setInProgressCourses(0);
         }
         
         // Fetch employee skills
-        const { data: skillsData } = await hrEmployeeService.getEmployeeSkills(extractedId);
-        if (skillsData) {
-          setSkills(skillsData);
+        try {
+          const { data: skillsData } = await hrEmployeeService.getEmployeeSkills(extractedId || '');
+          if (skillsData && Array.isArray(skillsData)) {
+            setSkills(skillsData);
+          } else {
+            setSkills([]);
+          }
+        } catch (skillsError) {
+          console.error('Error fetching employee skills:', skillsError);
+          setSkills([]);
         }
         
         // Fetch employee activities
-        const { data: activitiesData } = await hrEmployeeService.getEmployeeActivities(extractedId);
-        if (activitiesData) {
-          setActivities(activitiesData);
+        try {
+          const { data: activitiesData } = await hrEmployeeService.getEmployeeActivities(extractedId || '');
+          if (activitiesData && Array.isArray(activitiesData)) {
+            setActivities(activitiesData);
+          } else {
+            setActivities([]);
+          }
+        } catch (activitiesError) {
+          console.error('Error fetching employee activities:', activitiesError);
+          setActivities([]);
         }
       } catch (error) {
         console.error('Error loading employee data:', error);
@@ -360,9 +438,8 @@ const EmployeeProfilePage: React.FC = () => {
   
   // Calculate overall learning progress
   const calculateOverallProgress = (): number => {
-    if (!courses.length) return 0;
-    const total = courses.reduce((sum, course) => sum + course.progress, 0);
-    return Math.round(total / courses.length);
+    if (!courses || courses.length === 0) return 0;
+    return Math.floor(courses.reduce((sum: number, course: Course) => sum + (course.progress || 0), 0) / courses.length);
   };
   
   const SkillsSection: React.FC<{ skills: Skill[] }> = ({ skills }) => {

@@ -1159,6 +1159,13 @@ const hrEmployeeService: EmployeeService = {
    */
   async getEmployeeCourses(employeeId: string) {
     try {
+      console.log('Getting courses for employee ID:', employeeId);
+      
+      if (!employeeId) {
+        console.error('Invalid employee ID provided to getEmployeeCourses');
+        return { data: [], error: new Error('Invalid employee ID') };
+      }
+      
       const { data, error } = await supabase
         .from('hr_course_enrollments')
         .select(`
@@ -1175,22 +1182,50 @@ const hrEmployeeService: EmployeeService = {
         `)
         .eq('employee_id', employeeId);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error fetching employee courses:', error);
+        return { data: [], error };
+      }
 
+      if (!data || !Array.isArray(data)) {
+        console.warn('No course data returned or invalid data format for employee:', employeeId);
+        return { data: [], error: null };
+      }
+
+      console.log('Raw courses data from Supabase:', JSON.stringify(data));
+      
       // Format the data to match our Course interface
-      const formattedCourses = data.map(enrollment => ({
-        id: enrollment.course_id,
-        title: enrollment.hr_courses ? (enrollment.hr_courses as any).title : '',
-        description: enrollment.hr_courses ? (enrollment.hr_courses as any).description : '',
-        progress: enrollment.progress,
-        enrollment_date: enrollment.enrollment_date,
-        completion_date: enrollment.completion_date
-      }));
+      const formattedCourses = data.map(enrollment => {
+        // Log the enrollment record to help diagnose issues
+        console.log('Processing enrollment record:', JSON.stringify(enrollment));
+        
+        // Check if hr_courses exists and has the expected structure
+        if (!enrollment || !enrollment.course_id) {
+          console.warn('Invalid enrollment record:', enrollment);
+          return null;
+        }
+        
+        if (!enrollment.hr_courses || typeof enrollment.hr_courses !== 'object') {
+          console.warn('Missing hr_courses data for course_id:', enrollment.course_id);
+        }
+        
+        const hr_courses = enrollment.hr_courses as { id?: string; title?: string; description?: string } | null;
+        
+        return {
+          id: enrollment.course_id || '',
+          title: hr_courses?.title || 'Untitled Course',
+          description: hr_courses?.description || 'No description available',
+          progress: typeof enrollment.progress === 'number' ? enrollment.progress : 0,
+          enrollment_date: enrollment.enrollment_date || new Date().toISOString(),
+          completion_date: enrollment.completion_date || undefined
+        };
+      }).filter(course => course !== null) as any[];
 
+      console.log('Formatted courses data:', JSON.stringify(formattedCourses));
       return { data: formattedCourses, error: null };
     } catch (error) {
       console.error('Error fetching employee courses:', error);
-      return { data: null, error };
+      return { data: [], error };
     }
   },
 
