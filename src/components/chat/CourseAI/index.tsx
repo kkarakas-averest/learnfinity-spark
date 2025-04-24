@@ -201,46 +201,76 @@ export function CourseAI({ employeeId, initialMessage }: CourseAIProps) {
         console.log('Course IDs for lookup:', courseIds);
 
         if (courseIds.length > 0) {
-          // Fetch course details
-          const { data: courseData, error: courseDetailsError } = await supabase
-            .from('hr_courses')
-            .select(`
-              id,
-              title,
-              description,
-              estimated_duration,
-              difficulty_level,
-              is_active
-            `)
-            .in('id', courseIds);
-          
-          if (courseDetailsError) {
-            console.error('Error fetching course details:', courseDetailsError);
-            // Don't throw error, just log it - we can continue with limited data
-          } else {
-            console.log('Fetched course details:', courseData);
-            // Combine course details with enrollment data
-            courses = courseEnrollments.map(enrollment => {
-              const courseDetails = courseData?.find(course => course.id === enrollment.course_id) || {
-                title: 'Unknown Course',
-                description: null,
-                estimated_duration: null,
-                difficulty_level: null,
-                is_active: null
-              };
-              return {
+          try {
+            // Fetch course details
+            const { data: courseData, error: courseDetailsError } = await supabase
+              .from('hr_courses')
+              .select(`
+                id,
+                title,
+                description,
+                estimated_duration,
+                difficulty_level,
+                is_active
+              `)
+              .in('id', courseIds);
+            
+            if (courseDetailsError) {
+              console.error('Error fetching course details:', courseDetailsError);
+              // Don't throw error, just log it - we can continue with limited data
+            } 
+            
+            console.log('Fetched course data:', courseData);
+            
+            // If we have course data, use it to populate courses
+            if (courseData && courseData.length > 0) {
+              console.log('Using course data from hr_courses table');
+              courses = courseEnrollments.map(enrollment => {
+                const courseDetails = courseData?.find(course => course.id === enrollment.course_id) || {
+                  title: 'Unknown Course',
+                  description: null,
+                  estimated_duration: null,
+                  difficulty_level: null,
+                  is_active: null
+                };
+                return {
+                  id: enrollment.course_id,
+                  title: courseDetails.title,
+                  description: courseDetails.description,
+                  estimatedDuration: courseDetails.estimated_duration,
+                  difficultyLevel: courseDetails.difficulty_level,
+                  isActive: courseDetails.is_active,
+                  status: enrollment.status,
+                  progress: enrollment.progress
+                };
+              });
+            } else {
+              // If no course data found, use enrollment data directly
+              console.log('No course data found in hr_courses. Using enrollments directly.');
+              courses = courseEnrollments.map(enrollment => ({
                 id: enrollment.course_id,
-                title: courseDetails.title,
-                description: courseDetails.description,
-                estimatedDuration: courseDetails.estimated_duration,
-                difficultyLevel: courseDetails.difficulty_level,
-                isActive: courseDetails.is_active,
+                title: `Course ID: ${enrollment.course_id.substring(0, 8)}...`,
+                description: 'Course details not available',
                 status: enrollment.status,
-                progress: enrollment.progress
-              };
-            });
+                progress: enrollment.progress || 0
+              }));
+            }
+          } catch (error) {
+            console.error('Error in course data processing:', error);
+            // Fallback to using enrollment data directly
+            courses = courseEnrollments.map(enrollment => ({
+              id: enrollment.course_id,
+              title: `Course ID: ${enrollment.course_id.substring(0, 8)}...`,
+              description: 'Course details not available',
+              status: enrollment.status,
+              progress: enrollment.progress || 0
+            }));
           }
+        } else {
+          console.log('No valid course IDs found in enrollments');
         }
+        
+        console.log('Final courses data:', courses);
       }
       
       // Get employee skills from assessments
@@ -424,7 +454,7 @@ export function CourseAI({ employeeId, initialMessage }: CourseAIProps) {
       
       setEmployeeContext(context);
       
-      // Update the context message to include knowledge management info
+      // Update the context message to remove references to knowledge
       const contextMessage: Message = {
         id: crypto.randomUUID(),
         role: 'system',
@@ -432,11 +462,9 @@ export function CourseAI({ employeeId, initialMessage }: CourseAIProps) {
 • ${context.skills.length} existing skills
 • ${context.missingSkills?.length || 0} skill gaps to address
 • ${context.courses.length} current course enrollments
-• ${context.knowledgeBase?.length || 0} knowledge areas 
-• ${context.knowledgeGaps?.length || 0} knowledge gaps identified
 ${employee.cv_extracted_data ? '• CV data extracted for personalized recommendations' : ''}
 
-I'll use this information to provide highly tailored course suggestions and knowledge management recommendations. What would you like to know?`,
+I'll use this information to provide highly tailored course suggestions. What would you like to know?`,
         timestamp: new Date()
       };
       
