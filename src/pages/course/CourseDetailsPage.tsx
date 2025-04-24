@@ -254,7 +254,7 @@ const CourseDetailsPage: React.FC = () => {
       
       // Update the course progress in course_enrollments
       const totalModules = courseDetails.modules.length;
-      const completedModules = courseDetails.modules.filter(m => m.id === moduleId || m.completed).length;
+      const completedModules = courseDetails.modules.filter((m: CourseModule) => m.id === moduleId || m.completed).length;
       const newProgress = Math.round((completedModules / totalModules) * 100);
       
       const { error: updateError } = await supabase
@@ -270,10 +270,10 @@ const CourseDetailsPage: React.FC = () => {
       if (updateError) throw updateError;
       
       // Update the local state
-      setCourseDetails(prev => {
+      setCourseDetails((prev: CourseDetails | null) => {
         if (!prev) return null;
         
-        const updatedModules = prev.modules.map(module => 
+        const updatedModules = prev.modules.map((module: CourseModule) => 
           module.id === moduleId ? { ...module, completed: true } : module
         );
         
@@ -458,7 +458,7 @@ const CourseDetailsPage: React.FC = () => {
     
     return (
       <div className="space-y-2">
-        {courseDetails.modules.map((module, index) => (
+        {courseDetails.modules.map((module: CourseModule, index: number) => (
           <div
             key={module.id}
             className={`p-3 rounded-md cursor-pointer flex items-center gap-3 ${
@@ -617,7 +617,7 @@ const CourseDetailsPage: React.FC = () => {
                   <div className="flex justify-between">
                     <Button
                       variant="outline"
-                      onClick={() => setCurrentModuleIndex(prev => Math.max(0, prev - 1))}
+                      onClick={() => setCurrentModuleIndex((prev: number) => Math.max(0, prev - 1))}
                       disabled={currentModuleIndex === 0}
                     >
                       <ChevronLeft className="mr-2 h-4 w-4" />
@@ -625,7 +625,7 @@ const CourseDetailsPage: React.FC = () => {
                     </Button>
                     <Button
                       variant="outline"
-                      onClick={() => setCurrentModuleIndex(prev => Math.min(courseDetails.modules.length - 1, prev + 1))}
+                      onClick={() => setCurrentModuleIndex((prev: number) => Math.min(courseDetails.modules.length - 1, prev + 1))}
                       disabled={currentModuleIndex === courseDetails.modules.length - 1}
                     >
                       Next
