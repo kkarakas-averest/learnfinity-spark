@@ -737,72 +737,155 @@ export const BulkSkillsAssessment: React.FC<BulkSkillsAssessmentProps> = ({ empl
     
     try {
       // For each employee in assessmentResults
+      console.log("Assessment Results:", JSON.stringify(assessmentResults, null, 2));
+
+      if (!assessmentResults || !Array.isArray(assessmentResults) || assessmentResults.length === 0) {
+        throw new Error("No assessment results to save");
+      }
+
       const savedIds = await Promise.all(
-        assessmentResults.map(async (result: AssessmentResult) => {
-          // 1. Create assessment record
-          const { data: assessment, error: assessmentError } = await supabase
-            .from('hr_skill_assessments')
-            .insert({
-              employee_id: result.employee.id,
-              assessed_at: new Date().toISOString(),
-              assessed_by: userId,
-              notes: `Skills assessment from CV analysis`
-            })
-            .select('id')
-            .single();
+        assessmentResults.map(async (result: AssessmentResult, index: number) => {
+          try {
+            if (!result || !result.employee || !result.employee.id || !result.course || !result.course.id) {
+              console.error(`Invalid result at index ${index}:`, result);
+              return null;
+            }
+
+            console.log("Processing result:", result.employee.name, "Missing skills:", result.missingSkills);
             
-          if (assessmentError) throw assessmentError;
-          
-          // 2. Create detail records for each missing skills
-          const detailRecords = result.missingSkills.flatMap((missingCourse: any) => 
-            missingCourse.missingSkills.map((skill: string) => ({
-              assessment_id: assessment.id,
-              skill_name: skill,
-              proficiency_level: 0, // Missing skills default to 0
-              gap_level: 3, // Arbitrary gap level
-              course_id: missingCourse.id,
-              is_missing: true
-            }))
-          );
-          
-          // Add records for matched skills too
-          const matchedRecords = result.employeeSkills.map((skill: string) => ({
-            assessment_id: assessment.id,
-            skill_name: skill,
-            proficiency_level: 3, // Arbitrary proficiency for matched
-            gap_level: 0, // No gap
-            course_id: result.course.id,
-            is_missing: false
-          }));
-          
-          const allRecords = [...detailRecords, ...matchedRecords];
-          
-          if (allRecords.length > 0) {
-            const { error: detailsError } = await supabase
-              .from('hr_skill_assessment_details')
-              .insert(allRecords);
+            // 1. Create assessment record
+            const { data: assessment, error: assessmentError } = await supabase
+              .from('hr_skill_assessments')
+              .insert({
+                employee_id: result.employee.id,
+                assessed_at: new Date().toISOString(),
+                assessed_by: userId,
+                notes: `Skills assessment from CV analysis`
+              })
+              .select('id')
+              .single();
               
-            if (detailsError) throw detailsError;
+            if (assessmentError) {
+              console.error(`Error creating assessment for ${result.employee.name}:`, assessmentError);
+              throw assessmentError;
+            }
+            
+            if (!assessment || !assessment.id) {
+              console.error(`No assessment ID returned for ${result.employee.name}`);
+              return null;
+            }
+            
+            // 2. Create detail records for each missing skill
+            let detailRecords: any[] = [];
+            
+            // Safe handling of missingSkills regardless of structure
+            if (result.missingSkills) {
+              if (typeof result.missingSkills === 'string') {
+                // Handle if it's just a single string
+                detailRecords = [{
+                  assessment_id: assessment.id,
+                  skill_name: result.missingSkills,
+                  proficiency_level: 0,
+                  gap_level: 3,
+                  course_id: result.course.id,
+                  is_missing: true
+                }];
+              } else if (Array.isArray(result.missingSkills)) {
+                // If it's a simple array of strings
+                if (result.missingSkills.length > 0 && typeof result.missingSkills[0] === 'string') {
+                  detailRecords = result.missingSkills.map((skill: string) => ({
+                    assessment_id: assessment.id,
+                    skill_name: skill,
+                    proficiency_level: 0,
+                    gap_level: 3,
+                    course_id: result.course.id,
+                    is_missing: true
+                  }));
+                }
+                // If it has nested structure (complex object with missingSkills property)
+                else if (result.missingSkills.length > 0 && typeof result.missingSkills[0] === 'object') {
+                  detailRecords = result.missingSkills.flatMap((item: any) => {
+                    if (item && item.missingSkills && Array.isArray(item.missingSkills)) {
+                      return item.missingSkills.map((skill: string) => ({
+                        assessment_id: assessment.id,
+                        skill_name: skill,
+                        proficiency_level: 0,
+                        gap_level: 3,
+                        course_id: item.id || result.course.id,
+                        is_missing: true
+                      }));
+                    }
+                    return [];
+                  });
+                }
+              }
+            }
+            
+            // Add records for matched skills too
+            if (Array.isArray(result.employeeSkills) && Array.isArray(result.missingSkills)) {
+              const matchedSkills = result.employeeSkills.filter((skill: string) => 
+                typeof skill === 'string' && !result.missingSkills.includes(skill)
+              );
+              
+              matchedSkills.forEach((skill: string) => {
+                if (typeof skill === 'string') {
+                  detailRecords.push({
+                    assessment_id: assessment.id,
+                    skill_name: skill,
+                    proficiency_level: 3, // Matched skills default to high proficiency
+                    gap_level: 0, // No gap for matched skills
+                    course_id: result.course.id,
+                    is_missing: false
+                  });
+                }
+              });
+            } else {
+              console.warn(`Invalid employeeSkills or missingSkills for ${result.employee.name}`);
+            }
+            
+            // Only attempt to insert if we have records
+            if (detailRecords.length > 0) {
+              const { error: detailsError } = await supabase
+                .from('hr_skill_assessment_details')
+                .insert(detailRecords);
+                
+              if (detailsError) {
+                console.error(`Error inserting skill details for ${result.employee.name}:`, detailsError);
+                throw detailsError;
+              }
+            } else {
+              console.warn(`No skill details to save for employee ${result.employee.name}`);
+            }
+            
+            return assessment.id;
+          } catch (resultError) {
+            console.error(`Error processing result for employee ${result?.employee?.name || 'unknown'}:`, resultError);
+            return null;
           }
-          
-          return assessment.id;
         })
       );
       
-      setSaveSuccess(true);
+      // Filter out nulls from failed operations
+      const successIds = savedIds.filter(id => id !== null);
       
-      toast({
-        title: "Success",
-        description: `Saved skills assessment for ${assessmentResults.length} employees`,
-      });
-      
-      // Switch to the Skills Matrix tab after saving
-      const skillMatrixTab = document.querySelector('button[value="skill-matrix"]');
-      if (skillMatrixTab) {
-        (skillMatrixTab as HTMLElement).click();
+      if (successIds.length > 0) {
+        setSaveSuccess(true);
+        
+        toast({
+          title: "Success",
+          description: `Saved skills assessment for ${successIds.length} of ${assessmentResults.length} employees`,
+        });
+        
+        // Switch to the Skills Matrix tab after saving
+        const skillMatrixTab = document.querySelector('button[value="skill-matrix"]');
+        if (skillMatrixTab) {
+          (skillMatrixTab as HTMLElement).click();
+        }
+        
+        return successIds;
+      } else {
+        throw new Error("Failed to save any assessment results");
       }
-      
-      return savedIds;
     } catch (error: any) {
       console.error('Error saving assessment:', error);
       toast({
@@ -810,6 +893,7 @@ export const BulkSkillsAssessment: React.FC<BulkSkillsAssessmentProps> = ({ empl
         description: `Failed to save assessment results: ${error.message}`,
         variant: "destructive"
       });
+      return [];
     } finally {
       setIsSaving(false);
     }
