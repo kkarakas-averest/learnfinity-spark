@@ -11,6 +11,29 @@ import { Progress } from "@/components/ui/progress";
 // HARDCODED GROQ API KEY (as per requirement)
 const HARDCODED_GROQ_API_KEY = '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';
 
+// Configuration for skill similarity matching
+const SKILL_MATCHING = {
+  // Minimum threshold for considering skills similar (0-1)
+  SIMILARITY_THRESHOLD: 0.65,
+  // Enable/disable semantic matching via Groq API (more accurate but slower)
+  USE_SEMANTIC_MATCHING: true,
+  // Maximum semantic API calls per assessment to avoid rate limits
+  MAX_SEMANTIC_CALLS: 30,
+  // Cache expiration time in milliseconds (1 hour)
+  CACHE_EXPIRATION_MS: 60 * 60 * 1000,
+};
+
+// Cache for similarity results to avoid redundant API calls
+interface SimilarityCache {
+  [key: string]: {
+    similarity: number;
+    timestamp: number;
+  };
+}
+
+// Initialize similarity cache (persists between assessments)
+const similarityCache: SimilarityCache = {};
+
 // Mock data for fallback when APIs fail
 const MOCK_EMPLOYEE_SKILLS = [
   "JavaScript", "React", "TypeScript", "Node.js", "HTML/CSS", 
@@ -53,6 +76,185 @@ type AssessmentResult = {
 interface BulkSkillsAssessmentProps {
   employees: Employee[];
 }
+
+// Skill similarity helpers
+// -----------------------
+
+/**
+ * Calculate word-based similarity between two skills
+ * This is fast but less accurate than semantic similarity
+ */
+const getWordSimilarity = (skill1: string, skill2: string): number => {
+  // Normalize and tokenize skills
+  const normalizedSkill1 = skill1.toLowerCase().trim();
+  const normalizedSkill2 = skill2.toLowerCase().trim();
+  
+  // If exact match after normalization, return 1
+  if (normalizedSkill1 === normalizedSkill2) return 1;
+  
+  // Extract words (remove non-word characters)
+  const words1 = normalizedSkill1.split(/\W+/).filter(Boolean);
+  const words2 = normalizedSkill2.split(/\W+/).filter(Boolean);
+  
+  // If either has no valid words, return 0
+  if (words1.length === 0 || words2.length === 0) return 0;
+  
+  // Calculate word overlap and importance
+  let matches = 0;
+  const uniqueWords1 = new Set(words1);
+  const uniqueWords2 = new Set(words2);
+  
+  // Check word equality and similarity
+  for (const word1 of uniqueWords1) {
+    // Skip very short words (articles, etc.)
+    if (word1.length <= 2) continue;
+    
+    // Check for exact word match
+    if (uniqueWords2.has(word1)) {
+      matches += 1;
+      continue;
+    }
+    
+    // Check for word containment (e.g., 'react' in 'reactjs')
+    for (const word2 of uniqueWords2) {
+      if (word2.length <= 2) continue;
+      if (word1.includes(word2) || word2.includes(word1)) {
+        matches += 0.8; // Partial credit for containment
+        break;
+      }
+    }
+  }
+  
+  // Calculate similarity score (0-1)
+  return matches / Math.max(uniqueWords1.size, uniqueWords2.size);
+};
+
+/**
+ * Get semantic similarity between skills using Groq API
+ * This is more accurate but requires API call
+ */
+const getSemanticSimilarity = async (
+  skill1: string, 
+  skill2: string,
+  semanticCallsRemaining: { count: number }
+): Promise<number> => {
+  // Don't make API call if we're over the limit
+  if (semanticCallsRemaining.count <= 0) {
+    console.log('Skipping semantic similarity check - over API call limit');
+    return 0;
+  }
+  
+  // Decrement remaining calls counter
+  semanticCallsRemaining.count--;
+  
+  try {
+    const prompt = `
+      You are a specialized AI that compares skills for similarity.
+      
+      SKILL 1: "${skill1}"
+      SKILL 2: "${skill2}"
+      
+      On a scale of 0 to 1, how similar are these skills semantically?
+      
+      Consider:
+      - Same skill with different wording (e.g., "React development" vs "React.js programming")
+      - Same domain but different specificity (e.g., "UI Design" vs "User Interface Design")
+      - Related skills in the same area (e.g., "Time Management" vs "Task Prioritization")
+      
+      Rules:
+      - Exact matches = 1.0
+      - Complete different areas = 0.0
+      - Provide only a numeric score between 0 and 1 with up to 2 decimal places
+      - RESPOND WITH ONLY A NUMBER, NO OTHER TEXT
+    `;
+    
+    console.log(`Getting semantic similarity for "${skill1}" and "${skill2}"`);
+    
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${HARDCODED_GROQ_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        messages: [
+          { role: 'system', content: 'You are a skill similarity scoring engine. Respond only with a number between 0 and 1.' },
+          { role: 'user', content: prompt }
+        ],
+        temperature: 0.0,
+        max_tokens: 10
+      })
+    });
+    
+    if (!response.ok) {
+      console.error(`Groq API similarity error: ${response.status}`);
+      return 0;
+    }
+    
+    const result = await response.json();
+    const content = result.choices[0]?.message?.content?.trim();
+    const similarityScore = parseFloat(content);
+    
+    // Validate the result is a number between 0 and 1
+    if (isNaN(similarityScore) || similarityScore < 0 || similarityScore > 1) {
+      console.error(`Invalid similarity score: ${content}`);
+      return 0;
+    }
+    
+    console.log(`Semantic similarity for "${skill1}" and "${skill2}": ${similarityScore}`);
+    return similarityScore;
+  } catch (error) {
+    console.error('Error getting semantic similarity:', error);
+    return 0;
+  }
+};
+
+/**
+ * Check if two skills are similar enough to be considered a match
+ * Uses combination of word-based and semantic similarity with caching
+ */
+const areSkillsSimilar = async (
+  employeeSkill: string,
+  courseSkill: string,
+  semanticCallsRemaining: { count: number },
+  threshold = SKILL_MATCHING.SIMILARITY_THRESHOLD
+): Promise<boolean> => {
+  // Generate cache key (order doesn't matter)
+  const skills = [employeeSkill.toLowerCase(), courseSkill.toLowerCase()].sort();
+  const cacheKey = skills.join('|');
+  
+  // Check cache first
+  const now = Date.now();
+  const cachedResult = similarityCache[cacheKey];
+  if (cachedResult && (now - cachedResult.timestamp) < SKILL_MATCHING.CACHE_EXPIRATION_MS) {
+    return cachedResult.similarity >= threshold;
+  }
+  
+  // Calculate word-based similarity (fast)
+  const wordSimilarity = getWordSimilarity(employeeSkill, courseSkill);
+  
+  // If word similarity is conclusive, don't use semantic API
+  if (wordSimilarity >= 0.9 || wordSimilarity < 0.3) {
+    similarityCache[cacheKey] = { similarity: wordSimilarity, timestamp: now };
+    return wordSimilarity >= threshold;
+  }
+  
+  // If enabled and not conclusive, get semantic similarity
+  let finalSimilarity = wordSimilarity;
+  if (SKILL_MATCHING.USE_SEMANTIC_MATCHING) {
+    const semanticSimilarity = await getSemanticSimilarity(
+      employeeSkill, 
+      courseSkill,
+      semanticCallsRemaining
+    );
+    finalSimilarity = Math.max(wordSimilarity, semanticSimilarity);
+  }
+  
+  // Cache the result
+  similarityCache[cacheKey] = { similarity: finalSimilarity, timestamp: now };
+  return finalSimilarity >= threshold;
+};
 
 export const BulkSkillsAssessment: React.FC<BulkSkillsAssessmentProps> = ({ employees }: BulkSkillsAssessmentProps) => {
   const [selectedEmployeeIds, setSelectedEmployeeIds] = React.useState<string[]>([]);
@@ -398,6 +600,8 @@ export const BulkSkillsAssessment: React.FC<BulkSkillsAssessmentProps> = ({ empl
 
     try {
       const results: AssessmentResult[] = [];
+      // Track number of semantic API calls remaining for this assessment
+      const semanticCallsRemaining = { count: SKILL_MATCHING.MAX_SEMANTIC_CALLS };
       
       for (const employeeId of selectedEmployeeIds) {
         try {
@@ -429,13 +633,31 @@ export const BulkSkillsAssessment: React.FC<BulkSkillsAssessmentProps> = ({ empl
             console.log('Employee Skills:', employeeSkills);
             console.log('Course Required Skills:', courseSkills);
             
-            // Calculate missing skills (case-insensitive matching)
-            const missingSkills = courseSkills.filter(courseSkill => {
-              const courseSkillLower = courseSkill.toLowerCase();
-              return !employeeSkills.some((employeeSkill: string) => 
-                employeeSkill.toLowerCase() === courseSkillLower
-              );
-            });
+            // Calculate missing skills with semantic similarity matching
+            const missingSkills: string[] = [];
+            
+            for (const courseSkill of courseSkills) {
+              let hasMatchingSkill = false;
+              
+              // Check if any employee skill is similar to this course skill
+              for (const employeeSkill of employeeSkills) {
+                if (await areSkillsSimilar(
+                  employeeSkill, 
+                  courseSkill, 
+                  semanticCallsRemaining,
+                  SKILL_MATCHING.SIMILARITY_THRESHOLD
+                )) {
+                  hasMatchingSkill = true;
+                  console.log(`✅ Matched "${courseSkill}" with "${employeeSkill}"`);
+                  break;
+                }
+              }
+              
+              if (!hasMatchingSkill) {
+                missingSkills.push(courseSkill);
+                console.log(`❌ Missing skill: "${courseSkill}"`);
+              }
+            }
             
             // Calculate skills coverage percentage
             const skillsCoverage = courseSkills.length > 0 
@@ -445,6 +667,7 @@ export const BulkSkillsAssessment: React.FC<BulkSkillsAssessmentProps> = ({ empl
             console.log('Missing Skills:', missingSkills);
             console.log('Skills Coverage:', `${skillsCoverage}%`);
             console.log('CV Data:', cvData);
+            console.log('Semantic API Calls Remaining:', semanticCallsRemaining.count);
             console.groupEnd();
 
             // Add result to our assessment results array
