@@ -12,7 +12,8 @@ import {
   Layers, 
   Library,
   Activity,
-  Award
+  Award,
+  Bot
 } from 'lucide-react';
 
 type NavItemProps = {
@@ -140,6 +141,12 @@ const DashboardSidebar: React.FC = () => {
           href: "/hr-dashboard/course-builder/library",
           icon: <Library className="h-4 w-4" />,
           isActive: currentPath === "/hr-dashboard/course-builder/library"
+        },
+        {
+          title: "AI Course Generator",
+          href: "/hr-dashboard/course-generator",
+          icon: <Bot className="h-4 w-4" />,
+          isActive: currentPath === "/hr-dashboard/course-generator"
         }
       ]
     },

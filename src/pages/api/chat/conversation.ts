@@ -1,8 +1,8 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { createServerSupabaseClient } from '@supabase/auth-helpers-nextjs';
+import { createClient } from '@supabase/supabase-js';
 
 // Your Groq API key - accessing GROQ_API_KEY env variable if available, otherwise using hardcoded key for demo
-const GROQ_API_KEY = process.env.GROQ_API_KEY || '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';
+const GROQ_API_KEY = process.env.GROQ_API_KEY || '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';
 const GROQ_MODEL = 'llama-3.3-70b-versatile';
 
 // Response types
@@ -21,16 +21,39 @@ export default async function handler(
   }
 
   try {
-    // Create Supabase server client for auth
-    const supabase = createServerSupabaseClient({ req, res });
+    // Create Supabase client directly
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
     
-    // Get the session
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
+    if (!supabaseUrl || !supabaseServiceKey) {
+      return res.status(500).json({ error: 'Supabase credentials not configured' });
+    }
+    
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    
+    // Get user from authorization header
+    const authHeader = req.headers.authorization;
+    let userId = null;
+    
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.replace('Bearer ', '');
+      try {
+        const { data: { user }, error } = await supabase.auth.getUser(token);
+        
+        if (error || !user) {
+          return res.status(401).json({ error: 'Unauthorized' });
+        }
+        
+        userId = user.id;
+      } catch (authError) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+    } else {
+      return res.status(401).json({ error: 'No authorization header' });
+    }
+    
     // Check if the user is authenticated
-    if (!session) {
+    if (!userId) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
@@ -55,7 +78,7 @@ export default async function handler(
 
     // Log the conversation for easier debugging
     console.log('Chat conversation request:', {
-      userId: session.user.id,
+      userId: userId,
       messageCount: messages.length,
       hasEmployeeContext: !!employeeContext
     });
@@ -96,7 +119,7 @@ export default async function handler(
     const { error: dbError } = await supabase
       .from('chat_conversations')
       .insert({
-        user_id: session.user.id,
+        user_id: userId,
         employee_id: employeeContext?.employeeId || null,
         messages: apiMessages,
         response: aiResponse,

@@ -10,7 +10,7 @@ import { Progress } from "@/components/ui/progress";
 import { supabase } from '@/lib/supabase';
 
 // HARDCODED GROQ API KEY (as per requirement)
-const HARDCODED_GROQ_API_KEY = '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';
+const HARDCODED_GROQ_API_KEY = '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';
 
 // Configuration for skill similarity matching
 const SKILL_MATCHING = {

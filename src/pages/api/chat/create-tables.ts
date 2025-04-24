@@ -1,20 +1,43 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { createServerSupabaseClient } from '@supabase/auth-helpers-nextjs';
+import { createClient } from '@supabase/supabase-js';
 
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  // Create Supabase server client for auth
-  const supabase = createServerSupabaseClient({ req, res });
+  // Create Supabase client directly
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
   
-  // Get the session
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-
+  if (!supabaseUrl || !supabaseServiceKey) {
+    return res.status(500).json({ error: 'Supabase credentials not configured' });
+  }
+  
+  const supabase = createClient(supabaseUrl, supabaseServiceKey);
+  
+  // Get user from authorization header
+  const authHeader = req.headers.authorization;
+  let userId = null;
+  
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.replace('Bearer ', '');
+    try {
+      const { data: { user }, error } = await supabase.auth.getUser(token);
+      
+      if (error || !user) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+      
+      userId = user.id;
+    } catch (authError) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+  } else {
+    return res.status(401).json({ error: 'No authorization header' });
+  }
+  
   // Only allow authorized users
-  if (!session || !session.user) {
+  if (!userId) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
   
@@ -65,27 +88,33 @@ export default async function handler(
     console.log('Setting up RLS policies for chat_conversations...');
     
     // Enable RLS on chat_conversations
-    await supabase.query(`ALTER TABLE chat_conversations ENABLE ROW LEVEL SECURITY;`);
+    await supabase.rpc('execute_sql', {
+      sql: `ALTER TABLE chat_conversations ENABLE ROW LEVEL SECURITY;`
+    });
     
     // Create policy for users to see only their own conversations
-    const { error: policyError1 } = await supabase.query(`
-      CREATE POLICY "Users can view their own conversations"
-      ON chat_conversations
-      FOR SELECT
-      USING (auth.uid() = user_id);
-    `);
+    const { error: policyError1 } = await supabase.rpc('execute_sql', {
+      sql: `
+        CREATE POLICY "Users can view their own conversations"
+        ON chat_conversations
+        FOR SELECT
+        USING (auth.uid() = user_id);
+      `
+    });
     
     if (policyError1) {
       console.error('Error creating select policy for chat_conversations:', policyError1);
     }
     
     // Create policy for users to insert their own conversations
-    const { error: policyError2 } = await supabase.query(`
-      CREATE POLICY "Users can insert their own conversations"
-      ON chat_conversations
-      FOR INSERT
-      WITH CHECK (auth.uid() = user_id);
-    `);
+    const { error: policyError2 } = await supabase.rpc('execute_sql', {
+      sql: `
+        CREATE POLICY "Users can insert their own conversations"
+        ON chat_conversations
+        FOR INSERT
+        WITH CHECK (auth.uid() = user_id);
+      `
+    });
     
     if (policyError2) {
       console.error('Error creating insert policy for chat_conversations:', policyError2);
@@ -95,27 +124,33 @@ export default async function handler(
     console.log('Setting up RLS policies for chat_course_generations...');
     
     // Enable RLS on chat_course_generations
-    await supabase.query(`ALTER TABLE chat_course_generations ENABLE ROW LEVEL SECURITY;`);
+    await supabase.rpc('execute_sql', {
+      sql: `ALTER TABLE chat_course_generations ENABLE ROW LEVEL SECURITY;`
+    });
     
     // Create policy for users to see only their own course generations
-    const { error: policyError3 } = await supabase.query(`
-      CREATE POLICY "Users can view their own course generations"
-      ON chat_course_generations
-      FOR SELECT
-      USING (auth.uid() = user_id);
-    `);
+    const { error: policyError3 } = await supabase.rpc('execute_sql', {
+      sql: `
+        CREATE POLICY "Users can view their own course generations"
+        ON chat_course_generations
+        FOR SELECT
+        USING (auth.uid() = user_id);
+      `
+    });
     
     if (policyError3) {
       console.error('Error creating select policy for chat_course_generations:', policyError3);
     }
     
     // Create policy for users to insert their own course generations
-    const { error: policyError4 } = await supabase.query(`
-      CREATE POLICY "Users can insert their own course generations"
-      ON chat_course_generations
-      FOR INSERT
-      WITH CHECK (auth.uid() = user_id);
-    `);
+    const { error: policyError4 } = await supabase.rpc('execute_sql', {
+      sql: `
+        CREATE POLICY "Users can insert their own course generations"
+        ON chat_course_generations
+        FOR INSERT
+        WITH CHECK (auth.uid() = user_id);
+      `
+    });
     
     if (policyError4) {
       console.error('Error creating insert policy for chat_course_generations:', policyError4);

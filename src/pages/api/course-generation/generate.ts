@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { createServerSupabaseClient } from '@supabase/auth-helpers-nextjs';
+import { createClient } from '@supabase/supabase-js';
 
 // A more specific version of the regenerate-content API but optimized for
 // courses generated from chat interactions
@@ -21,16 +21,39 @@ export default async function handler(
   }
 
   try {
-    // Create Supabase server client for auth
-    const supabase = createServerSupabaseClient({ req, res });
+    // Create Supabase client directly
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
     
-    // Get the session
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
+    if (!supabaseUrl || !supabaseServiceKey) {
+      return res.status(500).json({ error: 'Supabase credentials not configured' });
+    }
+    
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    
+    // Get user from authorization header
+    const authHeader = req.headers.authorization;
+    let userId = null;
+    
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.replace('Bearer ', '');
+      try {
+        const { data: { user }, error } = await supabase.auth.getUser(token);
+        
+        if (error || !user) {
+          return res.status(401).json({ error: 'Unauthorized' });
+        }
+        
+        userId = user.id;
+      } catch (authError) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+    } else {
+      return res.status(401).json({ error: 'No authorization header' });
+    }
+    
     // Check if the user is authenticated
-    if (!session) {
+    if (!userId) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
@@ -65,7 +88,7 @@ export default async function handler(
         difficulty_level: difficultyLevel,
         estimated_duration: estimatedDuration,
         is_active: true,
-        created_by: session.user.id,
+        created_by: userId,
         created_at: new Date().toISOString(),
         is_ai_generated: true,
         metadata: {
@@ -107,7 +130,7 @@ export default async function handler(
         .from('chat_course_generations')
         .insert({
           course_id: courseId,
-          user_id: session.user.id,
+          user_id: userId,
           chat_history: chatHistory,
           created_at: new Date().toISOString()
         });
@@ -126,7 +149,7 @@ export default async function handler(
           course_id: courseId,
           employee_id: employeeId,
           enrolled_at: new Date().toISOString(),
-          enrolled_by: session.user.id,
+          enrolled_by: userId,
           status: 'assigned'
         });
 

@@ -213,7 +213,7 @@ export async function generatePersonalizedCourse(
   console.log('Generating personalized course for employee:', { employeeId, employeeName, position, department });
   
   // TEMPORARY FIX: Hardcoded API key (remove after troubleshooting)
-  const HARDCODED_GROQ_API_KEY = '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';
+  const HARDCODED_GROQ_API_KEY = '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';
   
   const apiKey = HARDCODED_GROQ_API_KEY || getEnv().GROQ_API_KEY || process.env.GROQ_API_KEY;
   
@@ -397,7 +397,7 @@ export async function enhanceCourseContent(
   });
   
   // TEMPORARY FIX: Hardcoded API key (remove after troubleshooting)
-  const HARDCODED_GROQ_API_KEY = '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';
+  const HARDCODED_GROQ_API_KEY = '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';
   
   const apiKey = HARDCODED_GROQ_API_KEY || getEnv().GROQ_API_KEY || process.env.GROQ_API_KEY;
   
