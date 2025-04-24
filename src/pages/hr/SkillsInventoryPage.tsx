@@ -74,7 +74,13 @@ const SkillsInventoryPage: React.FC = () => {
         // Fetch employees
         const employeesResult = await hrEmployeeService.getEmployees();
         if (employeesResult.success && employeesResult.employees) {
-          setEmployees(employeesResult.employees);
+          // Map department and position names to top-level fields
+          const mappedEmployees = employeesResult.employees.map(emp => ({
+            ...emp,
+            department: emp.hr_departments?.name || null,
+            position: emp.hr_positions?.title || null,
+          }));
+          setEmployees(mappedEmployees);
         } else {
           throw new Error(employeesResult.error || 'Failed to fetch employees');
         }
