@@ -1,18 +1,56 @@
 import React from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { Loader2, FileText, User } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from "@/components/ui/card";
+import { Loader2, FileText, User, Book, Award, BookOpen, Bookmark, BarChart2, CheckCircle, ChevronDown, ChevronUp, RefreshCw, AlertCircle, Zap } from "lucide-react";
 import SendIcon from '@/components/icons/SendIcon';
 import BotIcon from '@/components/icons/BotIcon';
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from '@/lib/supabase';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import * as AccordionPrimitive from "@radix-ui/react-accordion";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
+// Create AccordionItem since it's not exported from accordion.tsx
+const AccordionItem = AccordionPrimitive.Item;
+
+// Local PlusIcon definition
+const PlusIcon = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="24"
+    height="24" 
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    {...props}
+  >
+    <line x1="12" y1="5" x2="12" y2="19" />
+    <line x1="5" y1="12" x2="19" y2="12" />
+  </svg>
+);
 
 type Message = {
   id: string;
   role: 'system' | 'user' | 'assistant';
   content: string;
   timestamp: Date;
+  isLoading?: boolean;
 };
 
 type CourseAIProps = {
@@ -20,15 +58,41 @@ type CourseAIProps = {
   initialMessage?: string; // Optional: start with a specific message
 };
 
-// Interface for employee context data
+// Enhanced interface for employee context data
 interface EmployeeContext {
   employee: {
     id: string;
     name: string;
+    email?: string;
+    department?: string;
+    position?: string;
+    cv_file_url?: string;
+    cv_extracted_data?: any;
     [key: string]: any;
   };
-  courses: any[];
-  skills: string[];
+  courses: Array<{
+    id: string;
+    title: string;
+    description?: string;
+    [key: string]: any;
+  }>;
+  skills: Array<{
+    name: string;
+    proficiency_level?: number;
+    gap_level?: number;
+    is_missing?: boolean;
+  }>;
+  missingSkills?: Array<{
+    name: string;
+    gap_level?: number;
+  }>;
+  resources?: Array<{
+    id: string;
+    title: string;
+    type: 'article' | 'video' | 'book' | 'course' | 'other';
+    url?: string;
+    description?: string;
+  }>;
 }
 
 export function CourseAI({ employeeId, initialMessage }: CourseAIProps) {
@@ -37,6 +101,9 @@ export function CourseAI({ employeeId, initialMessage }: CourseAIProps) {
   const [isLoading, setIsLoading] = React.useState(false);
   const [isFetchingEmployeeData, setIsFetchingEmployeeData] = React.useState(false);
   const [employeeContext, setEmployeeContext] = React.useState<EmployeeContext | null>(null);
+  const [showEmployeePanel, setShowEmployeePanel] = React.useState(true);
+  const [selectedResource, setSelectedResource] = React.useState<string | null>(null);
+  const [activeTab, setActiveTab] = React.useState('chat');
   const endOfMessagesRef = React.useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
@@ -46,7 +113,7 @@ export function CourseAI({ employeeId, initialMessage }: CourseAIProps) {
     const initialSystemMessage: Message = {
       id: crypto.randomUUID(),
       role: 'system',
-      content: 'Welcome to the Course Designer AI. I can help you create custom learning content based on employee skills and needs. How would you like to start?',
+      content: 'Welcome to the Course Designer AI. I can help you create personalized learning content based on employee skills, CV data, and learning needs. How would you like to start?',
       timestamp: new Date()
     };
     setMessages([initialSystemMessage]);
@@ -69,14 +136,14 @@ export function CourseAI({ employeeId, initialMessage }: CourseAIProps) {
     endOfMessagesRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Fetch employee context (skills, courses, etc.)
+  // Enhanced fetch employee context with CV data and missing skills
   const fetchEmployeeContext = async (id: string) => {
     setIsFetchingEmployeeData(true);
     try {
-      // Fetch employee details
+      // Fetch employee details with CV data
       const { data: employee, error: employeeError } = await supabase
         .from('hr_employees')
-        .select('*')
+        .select('*, cv_extracted_data, cv_file_url')
         .eq('id', id)
         .single();
 
@@ -87,10 +154,15 @@ export function CourseAI({ employeeId, initialMessage }: CourseAIProps) {
         .from('hr_course_enrollments')
         .select(`
           course_id,
+          status,
+          progress,
           hr_courses (
             id,
             title,
-            description
+            description,
+            estimated_duration,
+            difficulty_level,
+            is_active
           )
         `)
         .eq('employee_id', id);
@@ -105,7 +177,10 @@ export function CourseAI({ employeeId, initialMessage }: CourseAIProps) {
         .eq('employee_id', id)
         .order('assessed_at', { ascending: false })
         .limit(1);
+      
       const assessmentIds = assessmentRows ? assessmentRows.map((row: { id: string }) => row.id) : [];
+      
+      // Get existing skills
       const { data: skills, error: skillsError } = await supabase
         .from('hr_skill_assessment_details')
         .select(`
@@ -119,20 +194,77 @@ export function CourseAI({ employeeId, initialMessage }: CourseAIProps) {
       
       if (skillsError) throw skillsError;
       
+      // Get missing skills
+      const { data: missingSkills, error: missingSkillsError } = await supabase
+        .from('hr_skill_assessment_details')
+        .select(`
+          skill_name,
+          gap_level
+        `)
+        .eq('is_missing', true)
+        .in('assessment_id', assessmentIds);
+      
+      if (missingSkillsError) throw missingSkillsError;
+      
+      // Generate mock resources for demo (would be fetched from database in production)
+      const mockResources = [
+        {
+          id: crypto.randomUUID(),
+          title: "Advanced JavaScript Techniques",
+          type: "article" as const,
+          url: "https://example.com/articles/javascript",
+          description: "Comprehensive guide to advanced JS patterns"
+        },
+        {
+          id: crypto.randomUUID(),
+          title: "Leadership in Tech Teams",
+          type: "video" as const,
+          url: "https://example.com/videos/leadership",
+          description: "Video series on effective leadership in technical teams"
+        },
+        {
+          id: crypto.randomUUID(),
+          title: "Data Science Fundamentals",
+          type: "course" as const,
+          url: "https://example.com/courses/data-science",
+          description: "Introduction to key data science concepts"
+        }
+      ];
+      
       // Combine data into context object
       const context: EmployeeContext = {
         employee,
-        courses: courses.map((c: any) => c.hr_courses),
-        skills: skills.map((s: any) => s.skill_name)
+        courses: courses.map((c: any) => ({
+          ...c.hr_courses,
+          status: c.status,
+          progress: c.progress
+        })),
+        skills: skills.map((s: any) => ({
+          name: s.skill_name,
+          proficiency_level: s.proficiency_level,
+          gap_level: s.gap_level,
+          is_missing: false
+        })),
+        missingSkills: missingSkills.map((s: any) => ({
+          name: s.skill_name,
+          gap_level: s.gap_level
+        })),
+        resources: mockResources
       };
       
       setEmployeeContext(context);
       
-      // Add a message about the loaded context
+      // Add a message about the loaded context with more detail
       const contextMessage: Message = {
         id: crypto.randomUUID(),
         role: 'system',
-        content: `I've loaded ${employee.name}'s profile. They have ${context.skills.length} identified skills and ${context.courses.length} assigned courses.`,
+        content: `I've loaded ${employee.name}'s profile. I found:
+• ${context.skills.length} existing skills
+• ${context.missingSkills?.length || 0} skill gaps to address
+• ${context.courses.length} current course enrollments
+${employee.cv_extracted_data ? '• CV data extracted for personalized recommendations' : ''}
+
+I'll use this information to provide highly tailored course suggestions. What would you like to know?`,
         timestamp: new Date()
       };
       
@@ -164,21 +296,34 @@ export function CourseAI({ employeeId, initialMessage }: CourseAIProps) {
       timestamp: new Date()
     };
     
-    setMessages((prev: Message[]) => [...prev, userMessage]);
+    // Add temporary loading message
+    const loadingMessage: Message = {
+      id: crypto.randomUUID(),
+      role: 'assistant',
+      content: '',
+      timestamp: new Date(),
+      isLoading: true
+    };
+    
+    setMessages((prev: Message[]) => [...prev, userMessage, loadingMessage]);
     setInput('');
     setIsLoading(true);
     
     try {
-      // Get the last few messages for context
+      // Get the last few messages for context (exclude the loading message)
       const recentMessages = [...messages.slice(-5), userMessage]
         .map((m: Message) => ({ role: m.role, content: m.content }));
       
-      // Add employee context if available
+      // Add enhanced employee context if available
       const contextData = employeeContext ? {
         employeeId: employeeContext.employee.id,
         employeeName: employeeContext.employee.name,
-        skills: employeeContext.skills,
-        courses: employeeContext.courses
+        skills: employeeContext.skills.map((s: { name: string }) => s.name),
+        missingSkills: employeeContext.missingSkills?.map((s: { name: string }) => s.name) || [],
+        courses: employeeContext.courses,
+        cvData: employeeContext.employee.cv_extracted_data || null,
+        position: employeeContext.employee.position,
+        department: employeeContext.employee.department
       } : null;
       
       // Send to the chat API
@@ -199,28 +344,36 @@ export function CourseAI({ employeeId, initialMessage }: CourseAIProps) {
       
       const data = await response.json();
       
-      // Add assistant message to chat
-      const assistantMessage: Message = {
-        id: crypto.randomUUID(),
-        role: 'assistant',
-        content: data.response,
-        timestamp: new Date()
-      };
-      
-      setMessages((prev: Message[]) => [...prev, assistantMessage]);
+      // Remove loading message and add real response
+      setMessages((prev: Message[]) => {
+        const filtered = prev.filter(m => !m.isLoading);
+        return [
+          ...filtered,
+          {
+            id: crypto.randomUUID(),
+            role: 'assistant',
+            content: data.response,
+            timestamp: new Date()
+          }
+        ];
+      });
       
     } catch (error) {
       console.error('Error in chat conversation:', error);
       
-      // Add error message
-      const errorMessage: Message = {
-        id: crypto.randomUUID(),
-        role: 'system',
-        content: 'Sorry, I encountered an error while processing your request. Please try again.',
-        timestamp: new Date()
-      };
-      
-      setMessages((prev: Message[]) => [...prev, errorMessage]);
+      // Remove loading message and add error
+      setMessages((prev: Message[]) => {
+        const filtered = prev.filter(m => !m.isLoading);
+        return [
+          ...filtered,
+          {
+            id: crypto.randomUUID(),
+            role: 'system',
+            content: 'Sorry, I encountered an error while processing your request. Please try again.',
+            timestamp: new Date()
+          }
+        ];
+      });
       
       toast({
         title: "Chat Error",
@@ -240,11 +393,27 @@ export function CourseAI({ employeeId, initialMessage }: CourseAIProps) {
     }
   };
 
-  // Render message bubble based on role
+  // Render message bubble based on role with enhanced styling
   const renderMessage = (message: Message) => {
+    if (message.isLoading) {
+      return (
+        <div className="flex justify-start mb-4">
+          <div className="flex items-start gap-2 max-w-[80%]">
+            <div className="w-8 h-8 rounded-full flex items-center justify-center bg-secondary text-secondary-foreground">
+              <BotIcon size={16} />
+            </div>
+            <div className="p-3 rounded-lg bg-secondary text-secondary-foreground rounded-tl-none flex items-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span>Generating response...</span>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    
     if (message.role === 'system') {
       return (
-        <div className="bg-muted p-3 rounded-lg text-center text-sm mx-auto max-w-[85%] text-muted-foreground">
+        <div className="bg-muted p-3 rounded-lg text-center text-sm mx-auto max-w-[85%] text-muted-foreground border border-muted-foreground/20">
           {message.content}
         </div>
       );
@@ -253,11 +422,11 @@ export function CourseAI({ employeeId, initialMessage }: CourseAIProps) {
     const isUser = message.role === 'user';
     
     return (
-      <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-2`}>
+      <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4`}>
         <div className={`flex items-start gap-2 max-w-[80%] ${isUser ? 'flex-row-reverse' : ''}`}>
           <div className={`w-8 h-8 rounded-full flex items-center justify-center 
             ${isUser ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground'}`}>
-            {isUser ? <User size={16} /> : <BotIcon size={16} className="" />}
+            {isUser ? <User size={16} /> : <BotIcon size={16} />}
           </div>
           <div className={`p-3 rounded-lg ${isUser ? 
             'bg-primary text-primary-foreground rounded-tr-none' : 
@@ -269,30 +438,301 @@ export function CourseAI({ employeeId, initialMessage }: CourseAIProps) {
     );
   };
 
+  // Employee information panel with skills, courses and CV
+  const renderEmployeePanel = () => {
+    if (!employeeContext) return null;
+    
+    const { employee, skills, missingSkills, courses, resources } = employeeContext;
+    
+    return (
+      <div className="border-l border-border p-4 w-80 bg-card overflow-y-auto h-full">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-semibold">Employee Profile</h3>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={() => setShowEmployeePanel(false)}
+            className="h-8 w-8"
+          >
+            <ChevronDown size={16} />
+          </Button>
+        </div>
+        
+        <div className="flex flex-col gap-2 mb-4">
+          <div className="flex items-center gap-2">
+            <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+              <User size={20} />
+            </div>
+            <div>
+              <h4 className="font-medium">{employee.name}</h4>
+              <p className="text-sm text-muted-foreground">{employee.position || 'No position'}</p>
+            </div>
+          </div>
+          
+          {employee.department && (
+            <Badge variant="outline" className="w-fit">
+              {employee.department}
+            </Badge>
+          )}
+        </div>
+        
+        <Tabs defaultValue="skills" className="w-full">
+          <TabsList className="w-full grid grid-cols-3">
+            <TabsTrigger value="skills">Skills</TabsTrigger>
+            <TabsTrigger value="courses">Courses</TabsTrigger>
+            <TabsTrigger value="resources">Resources</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="skills" className="max-h-[320px] overflow-y-auto mt-2">
+            <Accordion type="single" collapsible className="w-full">
+              <AccordionItem value="existing-skills">
+                <AccordionTrigger className="py-2">
+                  <div className="flex items-center gap-2 text-sm font-medium">
+                    <Award size={16} />
+                    <span>Existing Skills ({skills.length})</span>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent>
+                  <div className="space-y-2">
+                    {skills.map((skill: { name: string; proficiency_level?: number }) => (
+                      <div key={skill.name} className="text-sm flex justify-between items-center">
+                        <span>{skill.name}</span>
+                        {skill.proficiency_level && (
+                          <div className="flex items-center">
+                            <Progress value={skill.proficiency_level * 20} className="h-1.5 w-20" />
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+              
+              <AccordionItem value="missing-skills">
+                <AccordionTrigger className="py-2">
+                  <div className="flex items-center gap-2 text-sm font-medium">
+                    <AlertCircle size={16} className="text-amber-500" />
+                    <span>Skill Gaps ({missingSkills?.length || 0})</span>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent>
+                  <div className="space-y-2">
+                    {missingSkills?.map((skill: { name: string; gap_level?: number }) => (
+                      <div key={skill.name} className="text-sm flex justify-between items-center">
+                        <span>{skill.name}</span>
+                        {skill.gap_level && (
+                          <Badge variant={skill.gap_level > 3 ? "destructive" : "outline"}>
+                            Gap: {skill.gap_level}
+                          </Badge>
+                        )}
+                      </div>
+                    ))}
+                    {(!missingSkills || missingSkills.length === 0) && (
+                      <p className="text-sm text-muted-foreground">No skill gaps identified.</p>
+                    )}
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+              
+              <AccordionItem value="cv-data">
+                <AccordionTrigger className="py-2">
+                  <div className="flex items-center gap-2 text-sm font-medium">
+                    <FileText size={16} />
+                    <span>CV Data</span>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent>
+                  {employee.cv_extracted_data ? (
+                    <div className="space-y-2 text-sm">
+                      <div>
+                        <span className="font-medium">Education:</span>
+                        <p className="text-muted-foreground">{employee.cv_extracted_data.education || 'Not available'}</p>
+                      </div>
+                      <div>
+                        <span className="font-medium">Experience:</span>
+                        <p className="text-muted-foreground">{employee.cv_extracted_data.experience || 'Not available'}</p>
+                      </div>
+                      {employee.cv_file_url && (
+                        <a
+                          href={employee.cv_file_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary text-sm flex items-center gap-1 hover:underline"
+                        >
+                          <FileText size={14} /> View CV
+                        </a>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No CV data available.</p>
+                  )}
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+          </TabsContent>
+          
+          <TabsContent value="courses" className="max-h-[320px] overflow-y-auto mt-2">
+            {courses.length > 0 ? (
+              <div className="space-y-3">
+                {courses.map((course: { id: string; title: string; description?: string; progress?: number }) => (
+                  <Card key={course.id} className="overflow-hidden">
+                    <CardHeader className="p-3">
+                      <CardTitle className="text-sm flex items-center gap-1.5">
+                        <BookOpen size={14} className="flex-shrink-0" />
+                        <span className="line-clamp-1">{course.title}</span>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-3 pt-0">
+                      <div className="mb-2">
+                        <Progress value={course.progress || 0} className="h-1.5" />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {course.progress || 0}% complete
+                        </p>
+                      </div>
+                      {course.description && (
+                        <p className="text-xs text-muted-foreground line-clamp-2">
+                          {course.description}
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">No courses enrolled.</p>
+            )}
+          </TabsContent>
+          
+          <TabsContent value="resources" className="max-h-[320px] overflow-y-auto mt-2">
+            {resources && resources.length > 0 ? (
+              <div className="space-y-3">
+                {resources.map((resource: { id: string; title: string; type: string; url?: string; description?: string }) => (
+                  <Card 
+                    key={resource.id} 
+                    className={`overflow-hidden cursor-pointer hover:border-primary/50 transition-colors ${
+                      selectedResource === resource.id ? 'border-primary' : ''
+                    }`}
+                    onClick={() => setSelectedResource(
+                      selectedResource === resource.id ? null : resource.id
+                    )}
+                  >
+                    <CardHeader className="p-3">
+                      <CardTitle className="text-sm flex items-center gap-1.5">
+                        {resource.type === 'article' && <FileText size={14} />}
+                        {resource.type === 'video' && <Zap size={14} />}
+                        {resource.type === 'course' && <Book size={14} />}
+                        {resource.type === 'book' && <BookOpen size={14} />}
+                        <span className="line-clamp-1">{resource.title}</span>
+                      </CardTitle>
+                      <CardDescription className="text-xs">
+                        {resource.type.charAt(0).toUpperCase() + resource.type.slice(1)}
+                      </CardDescription>
+                    </CardHeader>
+                    {selectedResource === resource.id && resource.description && (
+                      <CardContent className="p-3 pt-0">
+                        <p className="text-xs text-muted-foreground">
+                          {resource.description}
+                        </p>
+                        {resource.url && (
+                          <a
+                            href={resource.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-primary text-xs flex items-center gap-1 hover:underline mt-2"
+                          >
+                            View resource <ChevronUp size={12} className="-rotate-45" />
+                          </a>
+                        )}
+                      </CardContent>
+                    )}
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center p-4">
+                <Bookmark className="h-8 w-8 text-muted-foreground mb-2 mx-auto" />
+                <p className="text-sm text-muted-foreground">
+                  No resources available yet. Ask the AI to suggest resources.
+                </p>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="mt-3"
+                  onClick={() => {
+                    handleSendMessage("Can you suggest some learning resources for me?");
+                  }}
+                >
+                  <PlusIcon className="h-4 w-4 mr-1" /> Request Resources
+                </Button>
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
+      </div>
+    );
+  };
+
+  // Toggle panel button
+  const renderTogglePanelButton = () => {
+    if (showEmployeePanel || !employeeContext) return null;
+    
+    return (
+      <Button
+        variant="ghost"
+        size="icon"
+        className="absolute right-2 top-2 h-8 w-8"
+        onClick={() => setShowEmployeePanel(true)}
+      >
+        <ChevronUp size={16} />
+      </Button>
+    );
+  };
+
   return (
-    <Card className="w-full h-[600px] max-h-[80vh] flex flex-col">
-      <CardHeader className="px-4 py-2 border-b">
+    <Card className="w-full h-[600px] max-h-[80vh] flex flex-col relative">
+      <CardHeader className="px-4 py-2 border-b flex-row items-center justify-between">
         <CardTitle className="text-lg flex items-center gap-2">
           <FileText size={20} />
           Course Designer AI
         </CardTitle>
+        <div className="flex items-center gap-2">
+          {employeeContext && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                    <RefreshCw size={16} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Refresh employee data</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+        </div>
       </CardHeader>
       
-      <CardContent className="flex-grow overflow-y-auto p-4">
-        <div className="space-y-4">
-          {messages.map((message: Message) => (
-            <div key={message.id} className="chat-message">
-              {renderMessage(message)}
-            </div>
-          ))}
-          {(isLoading || isFetchingEmployeeData) && (
-            <div className="flex justify-center items-center py-2">
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-            </div>
-          )}
-          <div ref={endOfMessagesRef} />
-        </div>
-      </CardContent>
+      <div className="flex flex-grow h-0 overflow-hidden">
+        <CardContent className="flex-grow overflow-y-auto p-4 pb-0 relative">
+          <div className="space-y-4">
+            {messages.map((message: Message) => (
+              <div key={message.id} className="chat-message">
+                {renderMessage(message)}
+              </div>
+            ))}
+            {(isLoading || isFetchingEmployeeData) && !messages.some((m: Message) => m.isLoading) && (
+              <div className="flex justify-center items-center py-2">
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              </div>
+            )}
+            <div ref={endOfMessagesRef} />
+          </div>
+          {renderTogglePanelButton()}
+        </CardContent>
+        
+        {employeeContext && showEmployeePanel && renderEmployeePanel()}
+      </div>
       
       <CardFooter className="p-3 border-t">
         <div className="flex w-full items-center gap-2">
@@ -300,7 +740,7 @@ export function CourseAI({ employeeId, initialMessage }: CourseAIProps) {
             value={input}
             onChange={(e: React.ChangeEvent<HTMLInputElement>) => setInput(e.target.value)}
             onKeyDown={handleKeyPress}
-            placeholder="Type your message..."
+            placeholder="Type a message or ask about designing a course..."
             disabled={isLoading}
             className="flex-grow"
           />
@@ -308,6 +748,7 @@ export function CourseAI({ employeeId, initialMessage }: CourseAIProps) {
             onClick={() => handleSendMessage()} 
             disabled={isLoading || !input.trim()} 
             size="icon"
+            variant="default"
           >
             {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <SendIcon className="h-4 w-4" />}
           </Button>
