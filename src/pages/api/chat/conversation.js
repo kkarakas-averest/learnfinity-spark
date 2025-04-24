@@ -3,7 +3,7 @@
  * @param {import('next').NextApiRequest} req
  * @param {import('next').NextApiResponse} res
  */
-import { createClient } from '@supabase/supabase-js';
+const { createClient } = require('@supabase/supabase-js');
 
 // Always use the hardcoded Groq API key
 const GROQ_API_KEY = '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';
@@ -20,7 +20,7 @@ const SUPABASE_SERVICE_ROLE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3Mi
  * @property {any=} debug
  */
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   // Set CORS headers for all responses
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -275,4 +275,6 @@ Guidelines:
   prompt += `\nYou can help with:\n1. Creating course outlines based on specific skills\n2. Developing learning objectives\n3. Structuring course content and modules\n4. Suggesting assessment methods\n5. Recommending learning resources\n6. Generating example course content`;
 
   return prompt;
-} 
+}
+
+module.exports = handler; 
