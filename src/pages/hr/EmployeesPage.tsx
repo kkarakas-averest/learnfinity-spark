@@ -498,6 +498,8 @@ const EmployeesPage: React.FC = () => {
         </div>
       </div>
 
+      <BulkSkillsAssessment employees={employees} />
+
       <Card>
         <CardHeader>
           <CardTitle>Employee Overview</CardTitle>
@@ -699,15 +701,6 @@ const EmployeesPage: React.FC = () => {
               </TableBody>
             </Table>
           )}
-        </CardContent>
-      </Card>
-
-      <Card className="mt-6">
-        <CardHeader>
-          <CardTitle>Bulk Skills Assessment</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <BulkSkillsAssessment />
         </CardContent>
       </Card>
 
