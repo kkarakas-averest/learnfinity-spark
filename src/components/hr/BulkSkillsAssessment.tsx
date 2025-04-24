@@ -122,85 +122,111 @@ export const BulkSkillsAssessment: React.FC<BulkSkillsAssessmentProps> = ({ empl
       };
     }
 
-    try {
-      const systemPrompt = `You are an expert HR recruiter and resume analyzer with years of experience extracting meaningful information from CVs and resumes.`;
+    // Prepare prompt with employee info (simulate CV content)
+    const pdfContent = `No CV available. Please analyze based on the following details:\nEmployee Name: ${employee.name}\nDepartment: ${employee.department || 'Unknown'}\nPosition: ${employee.position || 'Unknown'}`;
 
-      const userPrompt = `
-        Based on this employee profile information:
-        
-        Name: ${employee.name}
-        Position: ${employee.position || "Not specified"}
-        Department: ${employee.department || "Not specified"}
-        
-        1. Identify and extract professional skills from their background
-        2. List the key technical and soft skills relevant to their position
-        3. Provide a brief professional summary (2-3 sentences)
-        
-        Format your response as this JSON structure:
-        {
-          "skills": [
-            "Skill 1",
-            "Skill 2",
-            "Skill 3"
-          ],
-          "summary": "Brief professional summary of the employee",
-          "suggestedSkills": [
-            "Suggested Skill 1",
-            "Suggested Skill 2"
-          ]
-        }
-      `;
-
-      // Use the GROQ API to extract skills from the CV
-      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${HARDCODED_GROQ_API_KEY}`
+    const structuredPrompt = `
+      You are an expert HR recruiter and resume analyzer with years of experience extracting meaningful information from CVs and resumes.
+      
+      CV CONTENT:
+      ${pdfContent}
+      
+      EMPLOYEE: ${employee.name}
+      POSITION: ${employee.position || 'Unknown'}
+      DEPARTMENT: ${employee.department || 'Unknown'}
+      
+      TASK:
+      Your task is to create a detailed professional profile based on the CV content provided.
+      If the CV content appears to be missing, corrupted, or contains extraction errors, create a realistic
+      placeholder profile for someone with this name, position, and department, but clearly indicate it's a placeholder.
+      
+      EXTRACTION INSTRUCTIONS:
+      1. If the CV content is readable:
+         - Extract REAL information from the CV - never make assumptions
+         - Focus on specific company names, job titles, time periods, skills, and accomplishments
+         - If a section truly has no information, use empty arrays [] rather than "Not specified"
+      
+      2. If the CV content is NOT readable (contains errors or is missing):
+         - Create a realistic placeholder profile for someone in this position and department
+         - Generate reasonable skills, experience, education based on the position
+         - CLEARLY indicate in the summary that this is a generated placeholder profile
+         - Try to incorporate any readable fragments from the CV content if available
+      
+      Format your response as this JSON structure:
+      {
+        "summary": "Detailed professional profile summarizing career and expertise. If this is a placeholder, clearly state this fact.",
+        "skills": ["Skill 1", "Skill 2"],
+        "experience": [{"title": "Job title", "company": "Company name", "duration": "Time period", "highlights": ["Achievement"]}],
+        "education": [{"degree": "Degree", "institution": "Institution", "year": "Year"}],
+        "certifications": ["Certification"],
+        "languages": ["Language"],
+        "keyAchievements": ["Achievement"],
+        "personalInsights": {
+          "yearsOfExperience": "Years",
+          "industries": ["Industry"],
+          "toolsAndTechnologies": ["Tool/technology"],
+          "softSkills": ["Soft skill"]
         },
-        body: JSON.stringify({
-          model: 'llama-3.1-70b-versatile',
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userPrompt }
-          ],
-          temperature: 0.3,
-          max_tokens: 1000
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error(`API error: ${response.status} ${response.statusText}`);
+        "isPlaceholder": true/false
       }
-
-      const data = await response.json();
-      const content = data.choices[0].message.content;
       
-      // Extract the JSON from the content
+      IMPORTANT:
+      - If using real CV data, be as accurate and specific as possible
+      - If creating a placeholder, make it realistic but clearly labeled
+      - Respond ONLY with the JSON object, no explanatory text
+    `;
+
+    const systemMessage = `You are an expert CV analyzer that extracts or generates structured profile information.\nWhen provided with CV text, extract real information accurately.\nIf the CV text appears corrupted, missing, or contains extraction errors, generate a realistic placeholder profile for the person's position and department.\nAlways indicate clearly when generating placeholder information.\nReturn ONLY a properly formatted JSON object with no additional text.`;
+
+    // Retry logic for Groq API
+    let retries = 2;
+    let response;
+    while (retries >= 0) {
+      try {
+        response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${HARDCODED_GROQ_API_KEY}`
+          },
+          body: JSON.stringify({
+            model: 'llama-3.3-70b-versatile',
+            messages: [
+              { role: 'system', content: systemMessage },
+              { role: 'user', content: structuredPrompt }
+            ],
+            temperature: 0.0,
+            max_tokens: 2000
+          })
+        });
+        if (response.ok) break;
+        if (![429, 500, 503].includes(response.status)) break;
+        retries--;
+        if (retries >= 0) await new Promise(res => setTimeout(res, (2 - retries) * 1000));
+      } catch (fetchError) {
+        retries--;
+        if (retries < 0) throw fetchError;
+        await new Promise(res => setTimeout(res, 1000));
+      }
+    }
+    if (!response || !response.ok) {
+      const errorData = response ? await response.json().catch(() => ({})) : {};
+      throw new Error(`Groq API error (${response?.status}): ${errorData.error?.message || 'Unknown error'}`);
+    }
+    const result = await response.json();
+    const content = result.choices[0]?.message?.content;
+    if (!content) throw new Error('No content returned from Groq API');
+    // Robust JSON extraction
+    try {
+      return JSON.parse(content);
+    } catch {
       const jsonMatch = content.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        throw new Error("Failed to extract valid JSON from API response");
+      if (jsonMatch) {
+        try {
+          return JSON.parse(jsonMatch[0]);
+        } catch {}
       }
-      
-      const extractedData = JSON.parse(jsonMatch[0]);
-      return {
-        success: true,
-        ...extractedData
-      };
-    } catch (err: unknown) {
-      console.error(`Error extracting CV data for ${employee.name}:`, err);
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
-      
-      // Switch to fallback data on error
-      const shuffledSkills = [...MOCK_EMPLOYEE_SKILLS].sort(() => 0.5 - Math.random());
-      
-      return {
-        success: true, // Still return success to continue the flow
-        error: errorMessage,
-        summary: `${employee.name} is a ${employee.position || 'professional'} in the ${employee.department || 'industry'} field.`,
-        skills: shuffledSkills.slice(0, 5),
-        suggestedSkills: shuffledSkills.slice(5, 8)
-      };
+      throw new Error('Failed to parse Groq response as JSON');
     }
   };
 
