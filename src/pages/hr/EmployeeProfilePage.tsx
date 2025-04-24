@@ -365,14 +365,25 @@ const EmployeeProfilePage: React.FC = () => {
     return Math.round(total / courses.length);
   };
   
-  const SkillsSection: React.FC<{ skills: Skill[] }> = ({ skills }: { skills: Skill[] }) => {
-    if (skills.length === 0) {
-      return (
-        <div className="text-center py-4 text-gray-500">
-          <Award className="h-10 w-10 mx-auto mb-2 text-gray-400" />
-          <p>No skills recorded for this employee.</p>
-        </div>
-      );
+  // Defensive extraction of cv_extracted_data
+  const cvData = typeof employee.cv_extracted_data === 'object' && employee.cv_extracted_data !== null
+    ? employee.cv_extracted_data
+    : {};
+
+  const summary = cvData.summary || (typeof employee.cv_extracted_data === 'string' ? employee.cv_extracted_data : 'No profile summary available.');
+  const cvSkills = Array.isArray(cvData.skills) ? cvData.skills : [];
+  const certifications = Array.isArray(cvData.certifications) ? cvData.certifications : [];
+  const languages = Array.isArray(cvData.languages) ? cvData.languages : [];
+  const experience = Array.isArray(cvData.experience) ? cvData.experience : [];
+  const education = Array.isArray(cvData.education) ? cvData.education : [];
+  const keyAchievements = Array.isArray(cvData.keyAchievements) ? cvData.keyAchievements : [];
+  const professionalInterests = Array.isArray(cvData.professionalInterests) ? cvData.professionalInterests : [];
+  const personalInsights = typeof cvData.personalInsights === 'object' && cvData.personalInsights !== null ? cvData.personalInsights : {};
+  const publications = Array.isArray(personalInsights.publications) ? personalInsights.publications : [];
+
+  const SkillsSection: React.FC<{ skills: Skill[] | undefined | null }> = ({ skills }: { skills: Skill[] | undefined | null }) => {
+    if (!Array.isArray(skills) || skills.length === 0) {
+      return <div className="text-center py-4 text-gray-500">No skills recorded for this employee.</div>;
     }
 
     const getProficiencyColor = (level: string) => {
@@ -755,79 +766,68 @@ const EmployeeProfilePage: React.FC = () => {
                         Profile Summary
                       </h3>
                       <p className="text-sm text-gray-600 mb-3">
-                        {typeof employee.cv_extracted_data === 'object' && employee.cv_extracted_data.summary
-                          ? employee.cv_extracted_data.summary
-                          : typeof employee.cv_extracted_data === 'string'
-                            ? employee.cv_extracted_data
-                            : 'No profile summary available.'}
+                        {summary}
                       </p>
                       
                       {/* Display skills if available */}
-                      {typeof employee.cv_extracted_data === 'object' && employee.cv_extracted_data.skills && Array.isArray(employee.cv_extracted_data.skills) && employee.cv_extracted_data.skills.length > 0 && (
+                      {Array.isArray(cvSkills) && cvSkills.length > 0 ? (
                         <div className="mt-2">
                           <h4 className="text-xs font-medium text-gray-700 mb-1">Key Skills</h4>
                           <div className="flex flex-wrap gap-1">
-                            {employee.cv_extracted_data.skills.slice(0, 5).map((skill: string, index: number) => (
+                            {cvSkills.slice(0, 5).map((skill: string, index: number) => (
                               <span key={index} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
                                 {skill}
                               </span>
                             ))}
-                            {employee.cv_extracted_data.skills.length > 5 && (
+                            {cvSkills.length > 5 && (
                               <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">
-                                +{employee.cv_extracted_data.skills.length - 5} more
+                                +{cvSkills.length - 5} more
                               </span>
                             )}
                           </div>
                         </div>
+                      ) : (
+                        <div className="text-gray-500">No skills listed</div>
                       )}
                       
                       {/* Display experience if available */}
-                      {typeof employee.cv_extracted_data === 'object' && 
-                       employee.cv_extracted_data.experience && 
-                       Array.isArray(employee.cv_extracted_data.experience) &&
-                       employee.cv_extracted_data.experience.length > 0 && (
+                      {experience.length > 0 && (
                         <div className="mt-2">
                           <h4 className="text-xs font-medium text-gray-700 mb-1">Experience</h4>
                           <div className="text-xs text-gray-600">
-                            <span className="font-medium">{employee.cv_extracted_data.experience[0].title}</span>
-                            {employee.cv_extracted_data.experience[0].company && (
-                              <span> at {employee.cv_extracted_data.experience[0].company}</span>
+                            <span className="font-medium">{experience[0].title}</span>
+                            {experience[0].company && (
+                              <span> at {experience[0].company}</span>
                             )}
-                            {employee.cv_extracted_data.experience[0].duration && (
-                              <span> ({employee.cv_extracted_data.experience[0].duration})</span>
+                            {experience[0].duration && (
+                              <span> ({experience[0].duration})</span>
                             )}
                           </div>
                         </div>
                       )}
                       
                       {/* Display education if available */}
-                      {typeof employee.cv_extracted_data === 'object' && 
-                       employee.cv_extracted_data.education && 
-                       Array.isArray(employee.cv_extracted_data.education) &&
-                       employee.cv_extracted_data.education.length > 0 && (
+                      {education.length > 0 && (
                         <div className="mt-2">
                           <h4 className="text-xs font-medium text-gray-700 mb-1">Education</h4>
                           <div className="text-xs text-gray-600">
-                            <span className="font-medium">{employee.cv_extracted_data.education[0].degree}</span>
-                            {employee.cv_extracted_data.education[0].institution && (
-                              <span> from {employee.cv_extracted_data.education[0].institution}</span>
+                            <span className="font-medium">{education[0].degree}</span>
+                            {education[0].institution && (
+                              <span> from {education[0].institution}</span>
                             )}
-                            {employee.cv_extracted_data.education[0].year && (
-                              <span> ({employee.cv_extracted_data.education[0].year})</span>
+                            {education[0].year && (
+                              <span> ({education[0].year})</span>
                             )}
                           </div>
                         </div>
                       )}
                       
                       {/* Display certifications if available */}
-                      {typeof employee.cv_extracted_data === 'object' && 
-                       employee.cv_extracted_data.certifications && 
-                       Array.isArray(employee.cv_extracted_data.certifications) &&
-                       employee.cv_extracted_data.certifications.length > 0 && (
+                      {certifications.length > 0 && (
                         <div className="mt-2">
                           <h4 className="text-xs font-medium text-gray-700 mb-1">Certifications</h4>
                           <div className="flex flex-wrap gap-1">
-                            {employee.cv_extracted_data.certifications.map((cert: string, index: number) => (
+                            {certifications.map((cert: string, index: number) => (
                               <span key={index} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
                                 {cert}
                               </span>
@@ -837,14 +837,11 @@ const EmployeeProfilePage: React.FC = () => {
                       )}
                       
                       {/* Display languages if available */}
-                      {typeof employee.cv_extracted_data === 'object' && 
-                       employee.cv_extracted_data.languages && 
-                       Array.isArray(employee.cv_extracted_data.languages) &&
-                       employee.cv_extracted_data.languages.length > 0 && (
+                      {languages.length > 0 && (
                         <div className="mt-2">
                           <h4 className="text-xs font-medium text-gray-700 mb-1">Languages</h4>
                           <div className="flex flex-wrap gap-1">
-                            {employee.cv_extracted_data.languages.map((lang: string, index: number) => (
+                            {languages.map((lang: string, index: number) => (
                               <span key={index} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800">
                                 {lang}
                               </span>
@@ -854,56 +851,37 @@ const EmployeeProfilePage: React.FC = () => {
                       )}
                       
                       {/* Display personal insights if available */}
-                      {typeof employee.cv_extracted_data === 'object' && 
-                       employee.cv_extracted_data.personalInsights &&
-                       typeof employee.cv_extracted_data.personalInsights === 'object' && (
+                      {typeof personalInsights === 'object' && Object.keys(personalInsights).length > 0 && (
                         <div className="mt-3 pt-3 border-t border-dashed border-gray-200">
                           <h4 className="text-xs font-medium text-gray-700 mb-2">Professional Insights</h4>
                           
                           <div className="grid grid-cols-2 gap-2 text-xs">
-                            {employee.cv_extracted_data.personalInsights.yearsOfExperience && (
-                              <div>
-                                <span className="text-gray-500">Experience:</span>
-                                <span className="ml-1 font-medium">{employee.cv_extracted_data.personalInsights.yearsOfExperience}</span>
+                            {Object.entries(personalInsights).map(([key, value], index) => (
+                              <div key={index}>
+                                <h4 className="text-sm font-medium text-gray-700">{key.charAt(0).toUpperCase() + key.slice(1)}</h4>
+                                <p className="text-sm">{
+                                  Array.isArray(value)
+                                    ? value.filter((v): v is string => typeof v === 'string').join(", ")
+                                    : typeof value === 'string' || typeof value === 'number'
+                                      ? value.toString()
+                                      : ''
+                                }</p>
                               </div>
-                            )}
-                            
-                            {employee.cv_extracted_data.personalInsights.industries && Array.isArray(employee.cv_extracted_data.personalInsights.industries) && employee.cv_extracted_data.personalInsights.industries.length > 0 && (
-                              <div>
-                                <span className="text-gray-500">Industries:</span>
-                                <span className="ml-1 font-medium">{employee.cv_extracted_data.personalInsights.industries.slice(0, 2).join(", ")}</span>
-                              </div>
-                            )}
-                            
-                            {employee.cv_extracted_data.personalInsights.toolsAndTechnologies && Array.isArray(employee.cv_extracted_data.personalInsights.toolsAndTechnologies) && employee.cv_extracted_data.personalInsights.toolsAndTechnologies.length > 0 && (
-                              <div className="col-span-2">
-                                <span className="text-gray-500">Tools & Technologies:</span>
-                                <span className="ml-1 font-medium">{employee.cv_extracted_data.personalInsights.toolsAndTechnologies.slice(0, 3).join(", ")}</span>
-                                {employee.cv_extracted_data.personalInsights.toolsAndTechnologies.length > 3 && 
-                                  <span className="text-gray-400"> +{employee.cv_extracted_data.personalInsights.toolsAndTechnologies.length - 3} more</span>}
-                              </div>
-                            )}
-                            
-                            {employee.cv_extracted_data.personalInsights.softSkills && Array.isArray(employee.cv_extracted_data.personalInsights.softSkills) && employee.cv_extracted_data.personalInsights.softSkills.length > 0 && (
-                              <div className="col-span-2">
-                                <span className="text-gray-500">Soft Skills:</span>
-                                <span className="ml-1 font-medium">{employee.cv_extracted_data.personalInsights.softSkills.join(", ")}</span>
-                              </div>
-                            )}
+                            ))}
                           </div>
                         </div>
                       )}
                       
                       {/* Show metadata about the extraction */}
-                      {typeof employee.cv_extracted_data === 'object' && employee.cv_extracted_data.extraction_date && (
+                      {cvData.extraction_date && (
                         <div className="mt-3 text-xs text-gray-400 flex flex-wrap items-center justify-between">
                           <div>
-                            <span>Generated: {new Date(employee.cv_extracted_data.extraction_date).toLocaleDateString()}</span>
-                            {employee.cv_extracted_data.source && (
-                              <span className="ml-1">via {employee.cv_extracted_data.source}</span>
+                            <span>Generated: {new Date(cvData.extraction_date).toLocaleDateString()}</span>
+                            {cvData.source && (
+                              <span className="ml-1">via {cvData.source}</span>
                             )}
-                            {employee.cv_extracted_data.model && (
-                              <span className="ml-1">using {employee.cv_extracted_data.model}</span>
+                            {cvData.model && (
+                              <span className="ml-1">using {cvData.model}</span>
                             )}
                           </div>
                           <Button 
@@ -1425,18 +1403,18 @@ const EmployeeProfilePage: React.FC = () => {
                 <h3 className="text-lg font-semibold mb-2">Professional Summary</h3>
                 <div className="bg-gray-50 p-4 rounded-md border">
                   <p className="text-sm">
-                    {employee.cv_extracted_data.summary || 'No professional summary available.'}
+                    {summary}
                   </p>
                 </div>
               </div>
               
               {/* Skills Section */}
-              {employee.cv_extracted_data.skills && Array.isArray(employee.cv_extracted_data.skills) && employee.cv_extracted_data.skills.length > 0 && (
+              {Array.isArray(cvSkills) && cvSkills.length > 0 ? (
                 <div>
                   <h3 className="text-lg font-semibold mb-2">Skills & Competencies</h3>
                   <div className="bg-gray-50 p-4 rounded-md border">
                     <div className="flex flex-wrap gap-2">
-                      {employee.cv_extracted_data.skills.map((skill: string, index: number) => (
+                      {cvSkills.map((skill: string, index: number) => (
                         <span key={index} className="inline-flex items-center px-2.5 py-1 rounded text-sm font-medium bg-blue-100 text-blue-800">
                           {skill}
                         </span>
@@ -1444,14 +1422,16 @@ const EmployeeProfilePage: React.FC = () => {
                     </div>
                   </div>
                 </div>
+              ) : (
+                <div className="text-gray-500">No skills listed</div>
               )}
               
               {/* Experience Section */}
-              {employee.cv_extracted_data.experience && Array.isArray(employee.cv_extracted_data.experience) && employee.cv_extracted_data.experience.length > 0 && (
+              {experience.length > 0 && (
                 <div>
                   <h3 className="text-lg font-semibold mb-2">Professional Experience</h3>
                   <div className="space-y-4">
-                    {employee.cv_extracted_data.experience.map((exp: { title: string; company?: string; duration?: string; highlights?: string[]; }, index: number) => (
+                    {experience.map((exp: { title: string; company?: string; duration?: string; highlights?: string[]; }, index: number) => (
                       <div key={index} className="bg-gray-50 p-4 rounded-md border">
                         <div className="flex flex-wrap justify-between mb-2">
                           <h4 className="font-medium text-gray-900">{exp.title}</h4>
@@ -1476,11 +1456,11 @@ const EmployeeProfilePage: React.FC = () => {
               )}
               
               {/* Education Section */}
-              {employee.cv_extracted_data.education && Array.isArray(employee.cv_extracted_data.education) && employee.cv_extracted_data.education.length > 0 && (
+              {education.length > 0 && (
                 <div>
                   <h3 className="text-lg font-semibold mb-2">Education</h3>
                   <div className="space-y-4">
-                    {employee.cv_extracted_data.education.map((edu: { degree?: string; institution?: string; year?: string; }, index: number) => (
+                    {education.map((edu: { degree?: string; institution?: string; year?: string; }, index: number) => (
                       <div key={index} className="bg-gray-50 p-4 rounded-md border">
                         <div className="flex flex-wrap justify-between mb-1">
                           <h4 className="font-medium text-gray-900">{edu.degree}</h4>
@@ -1498,12 +1478,12 @@ const EmployeeProfilePage: React.FC = () => {
               )}
               
               {/* Certifications Section */}
-              {employee.cv_extracted_data.certifications && Array.isArray(employee.cv_extracted_data.certifications) && employee.cv_extracted_data.certifications.length > 0 && (
+              {certifications.length > 0 && (
                 <div>
                   <h3 className="text-lg font-semibold mb-2">Certifications</h3>
                   <div className="bg-gray-50 p-4 rounded-md border">
                     <ul className="list-disc list-inside space-y-1 text-sm text-gray-600">
-                      {employee.cv_extracted_data.certifications.map((cert: string, index: number) => (
+                      {certifications.map((cert: string, index: number) => (
                         <li key={index}>{cert}</li>
                       ))}
                     </ul>
@@ -1512,12 +1492,12 @@ const EmployeeProfilePage: React.FC = () => {
               )}
               
               {/* Languages Section */}
-              {employee.cv_extracted_data.languages && Array.isArray(employee.cv_extracted_data.languages) && employee.cv_extracted_data.languages.length > 0 && (
+              {languages.length > 0 && (
                 <div>
                   <h3 className="text-lg font-semibold mb-2">Languages</h3>
                   <div className="bg-gray-50 p-4 rounded-md border">
                     <div className="flex flex-wrap gap-2">
-                      {employee.cv_extracted_data.languages.map((lang: string, index: number) => (
+                      {languages.map((lang: string, index: number) => (
                         <span key={index} className="inline-flex items-center px-2.5 py-1 rounded text-sm font-medium bg-purple-100 text-purple-800">
                           {lang}
                         </span>
@@ -1528,68 +1508,35 @@ const EmployeeProfilePage: React.FC = () => {
               )}
               
               {/* Personal Insights Section */}
-              {employee.cv_extracted_data.personalInsights && typeof employee.cv_extracted_data.personalInsights === 'object' && (
+              {typeof personalInsights === 'object' && Object.keys(personalInsights).length > 0 && (
                 <div>
                   <h3 className="text-lg font-semibold mb-2">Professional Insights</h3>
                   <div className="bg-gray-50 p-4 rounded-md border">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {employee.cv_extracted_data.personalInsights.yearsOfExperience && (
-                        <div>
-                          <h4 className="text-sm font-medium text-gray-700">Years of Experience</h4>
-                          <p className="text-sm">{employee.cv_extracted_data.personalInsights.yearsOfExperience}</p>
+                      {Object.entries(personalInsights).map(([key, value], index) => (
+                        <div key={index}>
+                          <h4 className="text-sm font-medium text-gray-700">{key.charAt(0).toUpperCase() + key.slice(1)}</h4>
+                          <p className="text-sm">{
+                            Array.isArray(value)
+                              ? value.filter((v): v is string => typeof v === 'string').join(", ")
+                              : typeof value === 'string' || typeof value === 'number'
+                                ? value.toString()
+                                : ''
+                          }</p>
                         </div>
-                      )}
-                      
-                      {employee.cv_extracted_data.personalInsights.industries && Array.isArray(employee.cv_extracted_data.personalInsights.industries) && employee.cv_extracted_data.personalInsights.industries.length > 0 && (
-                        <div>
-                          <h4 className="text-sm font-medium text-gray-700">Industries</h4>
-                          <p className="text-sm">{employee.cv_extracted_data.personalInsights.industries.join(", ")}</p>
-                        </div>
-                      )}
-                      
-                      {employee.cv_extracted_data.personalInsights.toolsAndTechnologies && Array.isArray(employee.cv_extracted_data.personalInsights.toolsAndTechnologies) && employee.cv_extracted_data.personalInsights.toolsAndTechnologies.length > 0 && (
-                        <div>
-                          <h4 className="text-sm font-medium text-gray-700">Tools & Technologies</h4>
-                          <p className="text-sm">{employee.cv_extracted_data.personalInsights.toolsAndTechnologies.join(", ")}</p>
-                        </div>
-                      )}
-                      
-                      {employee.cv_extracted_data.personalInsights.projectManagement && Array.isArray(employee.cv_extracted_data.personalInsights.projectManagement) && employee.cv_extracted_data.personalInsights.projectManagement.length > 0 && (
-                        <div>
-                          <h4 className="text-sm font-medium text-gray-700">Project Management</h4>
-                          <p className="text-sm">{employee.cv_extracted_data.personalInsights.projectManagement.join(", ")}</p>
-                        </div>
-                      )}
-                      
-                      {employee.cv_extracted_data.personalInsights.softSkills && Array.isArray(employee.cv_extracted_data.personalInsights.softSkills) && employee.cv_extracted_data.personalInsights.softSkills.length > 0 && (
-                        <div>
-                          <h4 className="text-sm font-medium text-gray-700">Soft Skills</h4>
-                          <p className="text-sm">{employee.cv_extracted_data.personalInsights.softSkills.join(", ")}</p>
-                        </div>
-                      )}
-                      
-                      {employee.cv_extracted_data.personalInsights.publications && Array.isArray(employee.cv_extracted_data.personalInsights.publications) && employee.cv_extracted_data.personalInsights.publications.length > 0 && (
-                        <div className="col-span-2">
-                          <h4 className="text-sm font-medium text-gray-700">Publications</h4>
-                          <ul className="list-disc list-inside space-y-1 text-sm text-gray-600">
-                            {employee.cv_extracted_data.personalInsights.publications.map((pub: string, index: number) => (
-                              <li key={index}>{pub}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
+                      ))}
                     </div>
                   </div>
                 </div>
               )}
               
               {/* Key Achievements Section */}
-              {employee.cv_extracted_data.keyAchievements && employee.cv_extracted_data.keyAchievements.length > 0 && (
+              {keyAchievements.length > 0 && (
                 <div>
                   <h3 className="text-lg font-semibold mb-2">Key Achievements</h3>
                   <div className="bg-gray-50 p-4 rounded-md border">
                     <ul className="list-disc list-inside space-y-1 text-sm text-gray-600">
-                      {employee.cv_extracted_data.keyAchievements.map((achievement: string, index: number) => (
+                      {keyAchievements.map((achievement: string, index: number) => (
                         <li key={index}>{achievement}</li>
                       ))}
                     </ul>
@@ -1598,12 +1545,12 @@ const EmployeeProfilePage: React.FC = () => {
               )}
               
               {/* Professional Interests Section */}
-              {employee.cv_extracted_data.professionalInterests && employee.cv_extracted_data.professionalInterests.length > 0 && (
+              {professionalInterests.length > 0 && (
                 <div>
                   <h3 className="text-lg font-semibold mb-2">Professional Interests</h3>
                   <div className="bg-gray-50 p-4 rounded-md border">
                     <div className="flex flex-wrap gap-2">
-                      {employee.cv_extracted_data.professionalInterests.map((interest: string, index: number) => (
+                      {professionalInterests.map((interest: string, index: number) => (
                         <span key={index} className="inline-flex items-center px-2.5 py-1 rounded text-sm font-medium bg-amber-100 text-amber-800">
                           {interest}
                         </span>
@@ -1614,14 +1561,14 @@ const EmployeeProfilePage: React.FC = () => {
               )}
               
               {/* Metadata */}
-              {employee.cv_extracted_data.extraction_date && (
+              {cvData.extraction_date && (
                 <div className="pt-4 border-t text-xs text-gray-500">
-                  <p>Generated on {new Date(employee.cv_extracted_data.extraction_date).toLocaleString()}</p>
-                  {employee.cv_extracted_data.source && (
-                    <p>Source: {employee.cv_extracted_data.source}</p>
+                  <p>Generated on {new Date(cvData.extraction_date).toLocaleString()}</p>
+                  {cvData.source && (
+                    <p>Source: {cvData.source}</p>
                   )}
-                  {employee.cv_extracted_data.model && (
-                    <p>Model: {employee.cv_extracted_data.model}</p>
+                  {cvData.model && (
+                    <p>Model: {cvData.model}</p>
                   )}
                 </div>
               )}
