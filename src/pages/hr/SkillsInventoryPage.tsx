@@ -85,22 +85,26 @@ const SkillsInventoryPage: React.FC = () => {
           setDepartments(departmentsResult.departments);
         }
         
-        // Get unique positions from employees
-        const uniquePositions = employees.reduce((acc: Position[], emp: Employee) => {
-          if (emp.position_id && emp.position) {
-            const existingPosition = acc.find(p => p.id === emp.position_id);
-            if (!existingPosition) {
-              acc.push({
-                id: emp.position_id,
-                title: emp.position,
-                department_id: emp.department_id || ''
-              });
-            }
+        // Add a small delay to ensure employees are loaded before extracting positions
+        setTimeout(() => {
+          // Extract unique positions from employees
+          if (employeesResult.success && employeesResult.employees) {
+            const employeeList = employeesResult.employees;
+            const positionsMap = new Map();
+            
+            employeeList.forEach((emp) => {
+              if (emp.position_id && emp.position && !positionsMap.has(emp.position_id)) {
+                positionsMap.set(emp.position_id, {
+                  id: emp.position_id,
+                  title: emp.position,
+                  department_id: emp.department_id || ''
+                });
+              }
+            });
+            
+            setPositions(Array.from(positionsMap.values()));
           }
-          return acc;
-        }, []);
-        
-        setPositions(uniquePositions);
+        }, 300);
       } catch (err: any) {
         console.error('Error fetching data:', err);
         setError(err.message || 'An error occurred while fetching data');
@@ -118,7 +122,12 @@ const SkillsInventoryPage: React.FC = () => {
   }, []);
 
   const handleSelectAllEmployees = () => {
-    // This is handled by the BulkSkillsAssessment component's select all function
+    // This function will be called when the "Select All" button is clicked
+    const selectAllButton = document.querySelector('button[data-select-all="true"]');
+    if (selectAllButton) {
+      (selectAllButton as HTMLElement).click();
+    }
+    
     toast({
       title: 'All employees selected',
       description: `Selected ${filteredEmployees.length} employees for assessment.`
@@ -126,11 +135,28 @@ const SkillsInventoryPage: React.FC = () => {
   };
 
   const handleUnselectAllEmployees = () => {
-    // This is handled by the BulkSkillsAssessment component's unselect all function
+    // This function will be called when the "Clear Selection" button is clicked
+    const clearSelectionButton = document.querySelector('button[data-clear-selection="true"]');
+    if (clearSelectionButton) {
+      (clearSelectionButton as HTMLElement).click();
+    }
+    
     toast({
       title: 'Selection cleared',
       description: 'Cleared all employee selections.'
     });
+  };
+
+  const handleInitiateAssessment = () => {
+    const assessButton = document.querySelector('button[data-assess-skills="true"]');
+    if (assessButton) {
+      (assessButton as HTMLElement).click();
+    } else {
+      toast({
+        title: 'Assessment Initiated',
+        description: 'Starting skills gap assessment for selected employees.',
+      });
+    }
   };
 
   const handleToggleDepartmentFilter = (departmentId: string) => {
@@ -196,6 +222,9 @@ const SkillsInventoryPage: React.FC = () => {
                   </Button>
                   <Button size="sm" variant="outline" onClick={handleUnselectAllEmployees}>
                     Clear Selection
+                  </Button>
+                  <Button size="sm" variant="default" onClick={handleInitiateAssessment}>
+                    Start Assessment
                   </Button>
                   
                   {/* Department Filter */}

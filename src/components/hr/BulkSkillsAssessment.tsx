@@ -46,6 +46,10 @@ export const BulkSkillsAssessment: React.FC<BulkSkillsAssessmentProps> = ({ empl
     );
   };
 
+  const clearSelection = () => {
+    setSelectedEmployeeIds([]);
+  };
+
   const handleAssessSkills = async () => {
     setLoading(true);
     setShowModal(true);
@@ -154,6 +158,7 @@ export const BulkSkillsAssessment: React.FC<BulkSkillsAssessmentProps> = ({ empl
                 <Checkbox
                   checked={selectedEmployeeIds.length === employees.length && employees.length > 0}
                   onCheckedChange={(checked: boolean | 'indeterminate') => handleSelectAll(!!checked)}
+                  data-select-all="true"
                 />
               </TableHead>
               <TableHead>Name</TableHead>
@@ -179,7 +184,20 @@ export const BulkSkillsAssessment: React.FC<BulkSkillsAssessmentProps> = ({ empl
         {/* Bulk Actions Bar */}
         {selectedEmployeeIds.length > 0 && (
           <div className="flex items-center gap-4 mt-4">
-            <Button onClick={handleAssessSkills}>Assess Skills Gaps</Button>
+            <Button 
+              onClick={handleAssessSkills}
+              data-assess-skills="true"
+            >
+              Assess Skills Gaps
+            </Button>
+            <Button 
+              variant="outline" 
+              onClick={clearSelection}
+              data-clear-selection="true"
+              className="hidden"
+            >
+              Clear Selection
+            </Button>
           </div>
         )}
       </div>
