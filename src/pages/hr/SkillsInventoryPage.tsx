@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { BulkSkillsAssessment } from '@/components/hr/BulkSkillsAssessment';
+import { SkillsMatrix } from '@/components/hr/SkillsMatrix';
 import { hrEmployeeService } from '@/services/hrEmployeeService';
 import { Loader2, Users } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
@@ -394,9 +395,7 @@ const SkillsInventoryPage: React.FC = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="py-12 text-center text-muted-foreground">
-                <p>Skill Matrix feature coming soon</p>
-              </div>
+              <SkillsMatrix />
             </CardContent>
           </Card>
         </TabsContent>

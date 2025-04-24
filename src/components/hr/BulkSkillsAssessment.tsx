@@ -7,6 +7,7 @@ import { toast } from '@/components/ui/use-toast';
 import { Loader2, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { supabase } from '@/lib/supabase';
 
 // HARDCODED GROQ API KEY (as per requirement)
 const HARDCODED_GROQ_API_KEY = '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';
@@ -265,6 +266,16 @@ export const BulkSkillsAssessment: React.FC<BulkSkillsAssessmentProps> = ({ empl
   const [processingStep, setProcessingStep] = React.useState<string>('');
   const [expandedEmployees, setExpandedEmployees] = React.useState<Record<string, boolean>>({});
   const [useFallbackData, setUseFallbackData] = React.useState(false);
+  const [isSaving, setIsSaving] = React.useState(false);
+  const [saveSuccess, setSaveSuccess] = React.useState(false);
+  const [userId, setUserId] = React.useState<string | null>(null);
+
+  // Replace useSession with Supabase user fetch
+  React.useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      setUserId(data?.user?.id || null);
+    });
+  }, []);
 
   const handleSelectAll = (checked: boolean) => {
     setSelectedEmployeeIds(checked ? employees.map((e: Employee) => e.id) : []);
@@ -719,6 +730,91 @@ export const BulkSkillsAssessment: React.FC<BulkSkillsAssessmentProps> = ({ empl
     }
   };
 
+  // Add save function
+  const saveAssessmentResults = async () => {
+    setIsSaving(true);
+    setSaveSuccess(false);
+    
+    try {
+      // For each employee in assessmentResults
+      const savedIds = await Promise.all(
+        assessmentResults.map(async (result: AssessmentResult) => {
+          // 1. Create assessment record
+          const { data: assessment, error: assessmentError } = await supabase
+            .from('hr_skill_assessments')
+            .insert({
+              employee_id: result.employee.id,
+              assessed_at: new Date().toISOString(),
+              assessed_by: userId,
+              notes: `Skills assessment from CV analysis`
+            })
+            .select('id')
+            .single();
+            
+          if (assessmentError) throw assessmentError;
+          
+          // 2. Create detail records for each missing skills
+          const detailRecords = result.missingSkills.flatMap((missingCourse: any) => 
+            missingCourse.missingSkills.map((skill: string) => ({
+              assessment_id: assessment.id,
+              skill_name: skill,
+              proficiency_level: 0, // Missing skills default to 0
+              gap_level: 3, // Arbitrary gap level
+              course_id: missingCourse.id,
+              is_missing: true
+            }))
+          );
+          
+          // Add records for matched skills too
+          const matchedRecords = result.employeeSkills.map((skill: string) => ({
+            assessment_id: assessment.id,
+            skill_name: skill,
+            proficiency_level: 3, // Arbitrary proficiency for matched
+            gap_level: 0, // No gap
+            course_id: result.course.id,
+            is_missing: false
+          }));
+          
+          const allRecords = [...detailRecords, ...matchedRecords];
+          
+          if (allRecords.length > 0) {
+            const { error: detailsError } = await supabase
+              .from('hr_skill_assessment_details')
+              .insert(allRecords);
+              
+            if (detailsError) throw detailsError;
+          }
+          
+          return assessment.id;
+        })
+      );
+      
+      setSaveSuccess(true);
+      
+      toast({
+        title: "Success",
+        description: `Saved skills assessment for ${assessmentResults.length} employees`,
+      });
+      
+      // Switch to the Skills Matrix tab after saving
+      const skillMatrixTab = document.querySelector('button[value="skill-matrix"]');
+      if (skillMatrixTab) {
+        (skillMatrixTab as HTMLElement).click();
+      }
+      
+      return savedIds;
+    } catch (error: any) {
+      console.error('Error saving assessment:', error);
+      toast({
+        title: "Error",
+        description: `Failed to save assessment results: ${error.message}`,
+        variant: "destructive"
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="bg-white p-6 rounded-lg border shadow-sm">
@@ -978,6 +1074,30 @@ export const BulkSkillsAssessment: React.FC<BulkSkillsAssessmentProps> = ({ empl
               </Table>
             </div>
           )}
+
+          {/* Save button in the modal footer */}
+          <div className="flex justify-between pt-4">
+            <Button 
+              variant="outline" 
+              onClick={() => setShowModal(false)}
+            >
+              Close
+            </Button>
+            
+            <Button
+              onClick={saveAssessmentResults}
+              disabled={isSaving || assessmentResults.length === 0}
+            >
+              {isSaving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                saveSuccess ? "Saved ✓" : "Save to Skills Matrix"
+              )}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
