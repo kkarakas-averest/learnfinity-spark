@@ -100,11 +100,58 @@ export const BulkSkillsAssessment: React.FC<BulkSkillsAssessmentProps> = ({ empl
   const extractCvData = async (employee: Employee) => {
     setProcessingStep(`Extracting CV data for ${employee.name}...`);
     
+    // DIAGNOSTIC LOGGING
+    console.group(`📋 CV Extraction Diagnostics for ${employee.name} (${employee.id})`);
+    console.log('Employee Full Data:', JSON.stringify(employee, null, 2));
+    console.log('Has cv_extracted_data:', Boolean(employee.cv_extracted_data));
+    console.log('cv_extracted_data type:', employee.cv_extracted_data ? typeof employee.cv_extracted_data : 'N/A');
+    console.log('Has resume_url:', Boolean(employee.resume_url));
+    console.log('Resume URL:', employee.resume_url || 'Not available');
+    
+    // Check if we have existing CV data in the employee record
+    if (employee.cv_extracted_data) {
+      try {
+        console.log('Attempting to parse existing cv_extracted_data...');
+        let parsedData = employee.cv_extracted_data;
+        
+        // If it's stored as a string, parse it
+        if (typeof employee.cv_extracted_data === 'string') {
+          console.log('cv_extracted_data is a string, parsing as JSON...');
+          try {
+            parsedData = JSON.parse(employee.cv_extracted_data);
+            console.log('Successfully parsed cv_extracted_data as JSON');
+          } catch (e) {
+            console.error('Failed to parse cv_extracted_data string as JSON:', e);
+          }
+        }
+        
+        // Check if we have a valid skills array
+        if (parsedData.skills && Array.isArray(parsedData.skills) && parsedData.skills.length > 0) {
+          console.log('Found valid skills array in cv_extracted_data:', parsedData.skills);
+          console.log('Using existing extracted CV data instead of calling Groq API');
+          console.groupEnd();
+          
+          return {
+            success: true,
+            skills: parsedData.skills,
+            summary: parsedData.summary || `${employee.name} is a ${employee.position || 'professional'} in the ${employee.department || 'industry'} department.`,
+            suggestedSkills: parsedData.suggestedSkills || []
+          };
+        } else {
+          console.log('No valid skills array found in cv_extracted_data');
+        }
+      } catch (e) {
+        console.error('Error processing existing cv_extracted_data:', e);
+      }
+    }
+    
     // Use fallback mock data if enabled or if employee has no resume URL
     if (useFallbackData || !employee.resume_url) {
       if (!employee.resume_url) {
         console.warn(`No resume URL found for employee ${employee.name}`);
       }
+      
+      console.log('Using fallback mock data generation');
       
       // Generate some fake skills based on employee name as seed
       const nameHash = employee.name.split('').reduce((a, b) => a + b.charCodeAt(0), 0);
@@ -114,14 +161,19 @@ export const BulkSkillsAssessment: React.FC<BulkSkillsAssessmentProps> = ({ empl
       const shuffledSkills = [...MOCK_EMPLOYEE_SKILLS].sort(() => 0.5 - Math.random());
       const selectedSkills = shuffledSkills.slice(0, randomSkillsCount);
       
-      return {
+      const result = {
         success: true,
         skills: selectedSkills,
-        summary: `${employee.name} is a ${employee.position || 'professional'} with experience in various ${employee.department || 'industry'} projects. They have demonstrated strong capabilities in ${selectedSkills.slice(0, 3).join(', ')}, and continue to develop expertise in related areas.`,
+        summary: `This is a generated placeholder profile for ${employee.name}, a ${employee.position || 'professional'} in the ${employee.department || 'industry'} department, as no real CV content was available.`,
         suggestedSkills: shuffledSkills.slice(randomSkillsCount, randomSkillsCount + 3)
       };
+      
+      console.log('Generated fallback result:', result);
+      console.groupEnd();
+      return result;
     }
 
+    console.log('Proceeding with Groq API call...');
     // Prepare prompt with employee info (simulate CV content)
     const pdfContent = `No CV available. Please analyze based on the following details:\nEmployee Name: ${employee.name}\nDepartment: ${employee.department || 'Unknown'}\nPosition: ${employee.position || 'Unknown'}`;
 
@@ -183,6 +235,7 @@ export const BulkSkillsAssessment: React.FC<BulkSkillsAssessmentProps> = ({ empl
     let response;
     while (retries >= 0) {
       try {
+        console.log(`Making Groq API request (attempts remaining: ${retries})...`);
         response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
           method: 'POST',
           headers: {
@@ -199,11 +252,14 @@ export const BulkSkillsAssessment: React.FC<BulkSkillsAssessmentProps> = ({ empl
             max_tokens: 2000
           })
         });
+        
+        console.log(`Groq API response status: ${response.status}`);
         if (response.ok) break;
         if (![429, 500, 503].includes(response.status)) break;
         retries--;
         if (retries >= 0) await new Promise(res => setTimeout(res, (2 - retries) * 1000));
       } catch (fetchError) {
+        console.error('Fetch error during Groq API call:', fetchError);
         retries--;
         if (retries < 0) throw fetchError;
         await new Promise(res => setTimeout(res, 1000));
@@ -211,21 +267,42 @@ export const BulkSkillsAssessment: React.FC<BulkSkillsAssessmentProps> = ({ empl
     }
     if (!response || !response.ok) {
       const errorData = response ? await response.json().catch(() => ({})) : {};
+      console.error('Groq API error:', errorData);
+      console.groupEnd();
       throw new Error(`Groq API error (${response?.status}): ${errorData.error?.message || 'Unknown error'}`);
     }
+    
+    console.log('Successfully received Groq API response');
     const result = await response.json();
+    console.log('Groq API full response:', result);
+    
     const content = result.choices[0]?.message?.content;
-    if (!content) throw new Error('No content returned from Groq API');
+    if (!content) {
+      console.error('No content returned from Groq API');
+      console.groupEnd();
+      throw new Error('No content returned from Groq API');
+    }
+    
     // Robust JSON extraction
     try {
-      return JSON.parse(content);
-    } catch {
+      const parsedResult = JSON.parse(content);
+      console.log('Successfully parsed Groq response as JSON:', parsedResult);
+      console.groupEnd();
+      return parsedResult;
+    } catch (e) {
+      console.error('Failed to parse Groq response as JSON:', e);
       const jsonMatch = content.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         try {
-          return JSON.parse(jsonMatch[0]);
-        } catch {}
+          const parsedResult = JSON.parse(jsonMatch[0]);
+          console.log('Successfully parsed extracted JSON from Groq response:', parsedResult);
+          console.groupEnd();
+          return parsedResult;
+        } catch (e2) {
+          console.error('Failed to parse extracted JSON from Groq response:', e2);
+        }
       }
+      console.groupEnd();
       throw new Error('Failed to parse Groq response as JSON');
     }
   };
@@ -347,35 +424,37 @@ export const BulkSkillsAssessment: React.FC<BulkSkillsAssessmentProps> = ({ empl
             setProcessingStep(`Analyzing skills gap for ${employee.name} - ${course.title}...`);
             
             // Get course skills
-            let courseSkills = course.skills || [];
-            if (courseSkills.length === 0) {
-              const skills = await fetchCourseSkills(course.id);
-              courseSkills = skills;
-            }
-
-            // Skip courses with no skills
-            if (courseSkills.length === 0) {
-              continue;
-            }
-
-            // Step 4: Create the skills gap analysis
-            const missingSkills = courseSkills.filter(
-              skill => !employeeSkills.includes(skill)
-            );
+            const courseSkills = course.skills || [];
+            console.group(`🔍 Skills Assessment: ${employee.name} - ${course.title}`);
+            console.log('Employee Skills:', employeeSkills);
+            console.log('Course Required Skills:', courseSkills);
+            
+            // Calculate missing skills (case-insensitive matching)
+            const missingSkills = courseSkills.filter(courseSkill => {
+              const courseSkillLower = courseSkill.toLowerCase();
+              return !employeeSkills.some((employeeSkill: string) => 
+                employeeSkill.toLowerCase() === courseSkillLower
+              );
+            });
             
             // Calculate skills coverage percentage
-            const skillsCoverage = courseSkills.length > 0
-              ? Math.round(((courseSkills.length - missingSkills.length) / courseSkills.length) * 100)
-              : 0;
+            const skillsCoverage = courseSkills.length > 0 
+              ? Math.round(((courseSkills.length - missingSkills.length) / courseSkills.length) * 100) 
+              : 100;
+            
+            console.log('Missing Skills:', missingSkills);
+            console.log('Skills Coverage:', `${skillsCoverage}%`);
+            console.log('CV Data:', cvData);
+            console.groupEnd();
 
-            // Step 5: Add to results with employee summary and suggested skills
+            // Add result to our assessment results array
             results.push({
               employee,
-              course: { ...course, skills: courseSkills },
+              course,
               employeeSkills,
               missingSkills,
               extractedCvData: cvData,
-              employeeSummary: cvData.summary || "No summary available",
+              employeeSummary: cvData.summary || `No summary available for ${employee.name}`,
               suggestedSkills: cvData.suggestedSkills || [],
               skillsCoverage
             });
