@@ -140,6 +140,8 @@ export function CourseAI({ employeeId, initialMessage }: CourseAIProps) {
   const fetchEmployeeContext = async (id: string) => {
     setIsFetchingEmployeeData(true);
     try {
+      console.log('Fetching employee data for ID:', id);
+      
       // Fetch employee details with CV data
       const { data: employee, error: employeeError } = await supabase
         .from('hr_employees')
@@ -147,10 +149,15 @@ export function CourseAI({ employeeId, initialMessage }: CourseAIProps) {
         .eq('id', id)
         .single();
 
-      if (employeeError) throw employeeError;
+      if (employeeError) {
+        console.error('Error fetching employee:', employeeError);
+        throw employeeError;
+      }
+      
+      console.log('Employee data fetched successfully');
       
       // Fetch employee's assigned courses
-      const { data: courses, error: coursesError } = await supabase
+      const { data: courseEnrollments, error: coursesError } = await supabase
         .from('hr_course_enrollments')
         .select(`
           course_id,
@@ -167,44 +174,78 @@ export function CourseAI({ employeeId, initialMessage }: CourseAIProps) {
         `)
         .eq('employee_id', id);
         
-      if (coursesError) throw coursesError;
+      if (coursesError) {
+        console.error('Error fetching course enrollments:', coursesError);
+        throw coursesError;
+      }
+      
+      console.log(`Found ${courseEnrollments?.length || 0} course enrollments`);
       
       // Get employee skills from assessments
       // Get the latest assessment id for this employee
-      const { data: assessmentRows } = await supabase
+      const { data: assessmentRows, error: assessmentError } = await supabase
         .from('hr_skill_assessments')
         .select('id')
         .eq('employee_id', id)
         .order('assessed_at', { ascending: false })
         .limit(1);
       
-      const assessmentIds = assessmentRows ? assessmentRows.map((row: { id: string }) => row.id) : [];
+      if (assessmentError) {
+        console.error('Error fetching skill assessments:', assessmentError);
+        throw assessmentError;
+      }
       
-      // Get existing skills
-      const { data: skills, error: skillsError } = await supabase
-        .from('hr_skill_assessment_details')
-        .select(`
-          skill_name,
-          proficiency_level,
-          gap_level,
-          is_missing
-        `)
-        .eq('is_missing', false)
-        .in('assessment_id', assessmentIds);
+      const assessmentIds = assessmentRows && assessmentRows.length > 0 
+        ? assessmentRows.map((row: { id: string }) => row.id) 
+        : [];
       
-      if (skillsError) throw skillsError;
+      console.log('Assessment IDs:', assessmentIds);
       
-      // Get missing skills
-      const { data: missingSkills, error: missingSkillsError } = await supabase
-        .from('hr_skill_assessment_details')
-        .select(`
-          skill_name,
-          gap_level
-        `)
-        .eq('is_missing', true)
-        .in('assessment_id', assessmentIds);
+      let skills: any[] = [];
+      let missingSkills: any[] = [];
       
-      if (missingSkillsError) throw missingSkillsError;
+      // Only try to get skills if we have assessment IDs
+      if (assessmentIds.length > 0) {
+        // Get existing skills
+        const { data: skillsData, error: skillsError } = await supabase
+          .from('hr_skill_assessment_details')
+          .select(`
+            skill_name,
+            proficiency_level,
+            gap_level,
+            is_missing
+          `)
+          .eq('is_missing', false)
+          .in('assessment_id', assessmentIds);
+        
+        if (skillsError) {
+          console.error('Error fetching skills:', skillsError);
+          throw skillsError;
+        }
+        
+        skills = skillsData || [];
+        console.log(`Found ${skills.length} existing skills`);
+        
+        // Get missing skills
+        const { data: missingSkillsData, error: missingSkillsError } = await supabase
+          .from('hr_skill_assessment_details')
+          .select(`
+            skill_name,
+            gap_level
+          `)
+          .eq('is_missing', true)
+          .in('assessment_id', assessmentIds);
+        
+        if (missingSkillsError) {
+          console.error('Error fetching missing skills:', missingSkillsError);
+          throw missingSkillsError;
+        }
+        
+        missingSkills = missingSkillsData || [];
+        console.log(`Found ${missingSkills.length} missing skills`);
+      } else {
+        console.log('No assessments found, using empty skills arrays');
+      }
       
       // Generate mock resources for demo (would be fetched from database in production)
       const mockResources = [
@@ -234,23 +275,30 @@ export function CourseAI({ employeeId, initialMessage }: CourseAIProps) {
       // Combine data into context object
       const context: EmployeeContext = {
         employee,
-        courses: courses.map((c: any) => ({
+        courses: (courseEnrollments || []).map((c: any) => ({
           ...c.hr_courses,
           status: c.status,
           progress: c.progress
         })),
-        skills: skills.map((s: any) => ({
+        skills: (skills || []).map((s: any) => ({
           name: s.skill_name,
           proficiency_level: s.proficiency_level,
           gap_level: s.gap_level,
           is_missing: false
         })),
-        missingSkills: missingSkills.map((s: any) => ({
+        missingSkills: (missingSkills || []).map((s: any) => ({
           name: s.skill_name,
           gap_level: s.gap_level
         })),
         resources: mockResources
       };
+      
+      console.log('Setting employee context with data:', { 
+        employeeId: employee.id, 
+        skillsCount: context.skills.length,
+        missingSkillsCount: context.missingSkills?.length || 0,
+        coursesCount: context.courses.length
+      });
       
       setEmployeeContext(context);
       
@@ -274,7 +322,7 @@ I'll use this information to provide highly tailored course suggestions. What wo
       console.error('Error fetching employee context:', error);
       toast({
         title: "Error loading employee data",
-        description: "Could not load employee context. Some features may be limited.",
+        description: "Could not load employee context. Please verify the employee ID is correct and try again.",
         variant: "destructive"
       });
     } finally {
