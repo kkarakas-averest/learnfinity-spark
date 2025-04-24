@@ -46,6 +46,7 @@ import {
 } from '@/services/direct-employee-service';
 import { toast } from '@/components/ui/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { BulkSkillsAssessment } from '@/components/hr/BulkSkillsAssessment';
 
 // Keep all existing interfaces and type definitions
 interface Department {
@@ -698,6 +699,15 @@ const EmployeesPage: React.FC = () => {
               </TableBody>
             </Table>
           )}
+        </CardContent>
+      </Card>
+
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle>Bulk Skills Assessment</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <BulkSkillsAssessment />
         </CardContent>
       </Card>
 
