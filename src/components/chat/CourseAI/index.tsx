@@ -196,49 +196,50 @@ export function CourseAI({ employeeId, initialMessage }: CourseAIProps) {
       // Get course details for the enrolled courses
       let courses: any[] = [];
       if (courseEnrollments && courseEnrollments.length > 0) {
-        // Extract course IDs from enrollments
-        const courseIds = courseEnrollments.map(enrollment => enrollment.course_id);
-        
-        // Fetch course details
-        const { data: courseData, error: courseDetailsError } = await supabase
-          .from('hr_courses')
-          .select(`
-            id,
-            title,
-            description,
-            estimated_duration,
-            difficulty_level,
-            is_active
-          `)
-          .in('id', courseIds);
-        
-        if (courseDetailsError) {
-          console.error('Error fetching course details:', courseDetailsError);
-          // Don't throw error, just log it - we can continue with limited data
-        } else {
-          console.log(`Found ${courseData?.length || 0} course details`);
+        // Extract course IDs from enrollments, filter out null/undefined
+        const courseIds = courseEnrollments.map(enrollment => enrollment.course_id).filter(Boolean);
+        console.log('Course IDs for lookup:', courseIds);
+
+        if (courseIds.length > 0) {
+          // Fetch course details
+          const { data: courseData, error: courseDetailsError } = await supabase
+            .from('hr_courses')
+            .select(`
+              id,
+              title,
+              description,
+              estimated_duration,
+              difficulty_level,
+              is_active
+            `)
+            .in('id', courseIds);
           
-          // Combine course details with enrollment data
-          courses = courseEnrollments.map(enrollment => {
-            const courseDetails = courseData?.find(course => course.id === enrollment.course_id) || {
-              title: 'Unknown Course',
-              description: null,
-              estimated_duration: null,
-              difficulty_level: null,
-              is_active: null
-            };
-            
-            return {
-              id: enrollment.course_id,
-              title: courseDetails.title,
-              description: courseDetails.description,
-              estimatedDuration: courseDetails.estimated_duration,
-              difficultyLevel: courseDetails.difficulty_level,
-              isActive: courseDetails.is_active,
-              status: enrollment.status,
-              progress: enrollment.progress
-            };
-          });
+          if (courseDetailsError) {
+            console.error('Error fetching course details:', courseDetailsError);
+            // Don't throw error, just log it - we can continue with limited data
+          } else {
+            console.log('Fetched course details:', courseData);
+            // Combine course details with enrollment data
+            courses = courseEnrollments.map(enrollment => {
+              const courseDetails = courseData?.find(course => course.id === enrollment.course_id) || {
+                title: 'Unknown Course',
+                description: null,
+                estimated_duration: null,
+                difficulty_level: null,
+                is_active: null
+              };
+              return {
+                id: enrollment.course_id,
+                title: courseDetails.title,
+                description: courseDetails.description,
+                estimatedDuration: courseDetails.estimated_duration,
+                difficultyLevel: courseDetails.difficulty_level,
+                isActive: courseDetails.is_active,
+                status: enrollment.status,
+                progress: enrollment.progress
+              };
+            });
+          }
         }
       }
       
@@ -660,8 +661,6 @@ I'll use this information to provide highly tailored course suggestions and know
           <TabsList className="px-3 pt-2 bg-transparent">
             <TabsTrigger value="skills" className="text-xs">Skills</TabsTrigger>
             <TabsTrigger value="courses" className="text-xs">Courses</TabsTrigger>
-            <TabsTrigger value="resources" className="text-xs">Resources</TabsTrigger>
-            <TabsTrigger value="knowledge" className="text-xs">Knowledge</TabsTrigger>
           </TabsList>
           
           <div className="flex-1 overflow-auto p-3">
@@ -748,171 +747,6 @@ I'll use this information to provide highly tailored course suggestions and know
               ) : (
                 <p className="text-sm text-muted-foreground">No courses enrolled.</p>
               )}
-            </TabsContent>
-            
-            <TabsContent value="resources" className="max-h-[320px] overflow-y-auto mt-2">
-              {resources && resources.length > 0 ? (
-                <div className="space-y-3">
-                  {resources.map((resource: { id: string; title: string; type: string; url?: string; description?: string }) => (
-                    <Card 
-                      key={resource.id} 
-                      className={`overflow-hidden cursor-pointer hover:border-primary/50 transition-colors ${
-                        selectedResource === resource.id ? 'border-primary' : ''
-                      }`}
-                      onClick={() => setSelectedResource(
-                        selectedResource === resource.id ? null : resource.id
-                      )}
-                    >
-                      <CardHeader className="p-3">
-                        <CardTitle className="text-sm flex items-center gap-1.5">
-                          {resource.type === 'article' && <FileText size={14} />}
-                          {resource.type === 'video' && <Zap size={14} />}
-                          {resource.type === 'course' && <Book size={14} />}
-                          {resource.type === 'book' && <BookOpen size={14} />}
-                          <span className="line-clamp-1">{resource.title}</span>
-                        </CardTitle>
-                        <CardDescription className="text-xs">
-                          {resource.type.charAt(0).toUpperCase() + resource.type.slice(1)}
-                        </CardDescription>
-                      </CardHeader>
-                      {selectedResource === resource.id && resource.description && (
-                        <CardContent className="p-3 pt-0">
-                          <p className="text-xs text-muted-foreground">
-                            {resource.description}
-                          </p>
-                          {resource.url && (
-                            <a
-                              href={resource.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-primary text-xs flex items-center gap-1 hover:underline mt-2"
-                            >
-                              View resource <ChevronUp size={12} className="-rotate-45" />
-                            </a>
-                          )}
-                        </CardContent>
-                      )}
-                    </Card>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center p-4">
-                  <Bookmark className="h-8 w-8 text-muted-foreground mb-2 mx-auto" />
-                  <p className="text-sm text-muted-foreground">
-                    No resources available yet. Ask the AI to suggest resources.
-                  </p>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="mt-3"
-                    onClick={() => {
-                      handleSendMessage("Can you suggest some learning resources for me?");
-                    }}
-                  >
-                    <PlusIcon className="h-4 w-4 mr-1" /> Request Resources
-                  </Button>
-                </div>
-              )}
-            </TabsContent>
-            
-            <TabsContent value="knowledge" className="max-h-[320px] overflow-y-auto mt-2">
-              <Accordion type="single" collapsible className="w-full">
-                <AccordionItem value="knowledge-areas">
-                  <AccordionTrigger className="py-2">
-                    <div className="flex items-center gap-2 text-sm font-medium">
-                      <Book size={16} />
-                      <span>Knowledge Areas ({knowledgeBase?.length || 0})</span>
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent>
-                    <div className="space-y-2">
-                      {knowledgeBase && knowledgeBase.length > 0 ? (
-                        knowledgeBase.map((knowledge: { id: string; title: string; category: string; proficiency: number; importance: string }) => (
-                          <div key={knowledge.id} className="text-sm">
-                            <div className="flex justify-between items-center">
-                              <span className="font-medium">{knowledge.title}</span>
-                              <Badge variant={knowledge.importance === 'high' ? 'default' : 'outline'}>
-                                {knowledge.importance}
-                              </Badge>
-                            </div>
-                            <div className="mt-1 flex justify-between items-center">
-                              <span className="text-xs text-muted-foreground">{knowledge.category}</span>
-                              <Progress value={knowledge.proficiency} className="h-1.5 w-16" />
-                            </div>
-                          </div>
-                        ))
-                      ) : (
-                        <p className="text-sm text-muted-foreground">No knowledge areas found.</p>
-                      )}
-                    </div>
-                  </AccordionContent>
-                </AccordionItem>
-                
-                <AccordionItem value="knowledge-gaps">
-                  <AccordionTrigger className="py-2">
-                    <div className="flex items-center gap-2 text-sm font-medium">
-                      <AlertCircle size={16} className="text-amber-500" />
-                      <span>Knowledge Gaps ({knowledgeGaps?.length || 0})</span>
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent>
-                    <div className="space-y-3">
-                      {knowledgeGaps && knowledgeGaps.length > 0 ? (
-                        knowledgeGaps.map((gap: { id: string; topic: string; priority: string; relevance: number; recommendedResources?: Array<{ id: string; title: string; type: string }> }) => (
-                          <div key={gap.id} className="text-sm border-b pb-2 last:border-0 last:pb-0">
-                            <div className="flex justify-between items-center">
-                              <span className="font-medium">{gap.topic}</span>
-                              <Badge 
-                                variant={
-                                  gap.priority === 'critical' ? 'destructive' : 
-                                  gap.priority === 'important' ? 'default' : 'outline'
-                                }
-                              >
-                                {gap.priority}
-                              </Badge>
-                            </div>
-                            <div className="mt-1">
-                              <span className="text-xs text-muted-foreground">Relevance: {gap.relevance}%</span>
-                            </div>
-                            {gap.recommendedResources && gap.recommendedResources.length > 0 && (
-                              <div className="mt-2">
-                                <span className="text-xs font-medium">Recommended:</span>
-                                <div className="mt-1 space-y-1">
-                                  {gap.recommendedResources.map((resource: { id: string; title: string; type: string }) => (
-                                    <div key={resource.id} className="text-xs flex items-center gap-1">
-                                      {resource.type === 'course' ? (
-                                        <BookOpen size={12} className="text-blue-500" />
-                                      ) : (
-                                        <FileText size={12} className="text-green-500" />
-                                      )}
-                                      <span>{resource.title}</span>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        ))
-                      ) : (
-                        <p className="text-sm text-muted-foreground">No knowledge gaps identified.</p>
-                      )}
-                    </div>
-                  </AccordionContent>
-                </AccordionItem>
-              </Accordion>
-              
-              <div className="mt-4">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="w-full"
-                  onClick={() => {
-                    handleSendMessage("What knowledge areas should I focus on developing for this employee?");
-                  }}
-                >
-                  <RefreshCw size={14} className="mr-1" /> Get Knowledge Recommendations
-                </Button>
-              </div>
             </TabsContent>
           </div>
         </Tabs>

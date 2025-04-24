@@ -240,7 +240,7 @@ Your goal is to help design courses that address specific skill gaps and learnin
 
 Guidelines:
 - Be concise but informative in your responses
-- Ask clarifying questions when needed
+- Ask clarifying questions only if the information is missing
 - Focus on actionable, educational content
 - Recommend specific learning modules and topics
 - Provide clear structure for courses
@@ -249,33 +249,19 @@ Guidelines:
 
   // Add employee context if available
   if (employeeContext) {
-    const { employeeName, skills = [], courses = [] } = employeeContext;
-    
-    prompt += `\nEmployee Context:
-- Name: ${employeeName}
-- Existing Skills: ${skills.join(', ')}
-- Current Courses: ${courses.map((c: any) => c.title).join(', ')}
-`;
-
-    // If employee has skills, add more context
-    if (skills.length > 0) {
-      prompt += `\nThis employee already has proficiency in the skills listed above. Focus on complementary skills or advanced topics that build on this foundation.`;
-    }
-
-    // If employee has courses, add more context
-    if (courses.length > 0) {
-      prompt += `\nThe employee is currently enrolled in the courses listed above. Consider how your recommendations might complement or extend these existing courses.`;
-    }
+    const { employeeName, position, department, skills = [], missingSkills = [], courses = [] } = employeeContext;
+    prompt += `\nEmployee Context:\n`;
+    prompt += `- Name: ${employeeName}\n`;
+    if (position) prompt += `- Position: ${position}\n`;
+    if (department) prompt += `- Department: ${department}\n`;
+    if (skills.length > 0) prompt += `- Existing Skills: ${skills.join(', ')}\n`;
+    if (missingSkills.length > 0) prompt += `- Skill Gaps: ${missingSkills.join(', ')}\n`;
+    if (courses.length > 0) prompt += `- Current Courses: ${courses.map((c: any) => c.title).join(', ')}\n`;
+    prompt += `\nYou have all the above information about the employee. Do NOT ask for information that is already provided. Use the context to generate tailored course suggestions, learning objectives, and content structure.\n`;
   }
 
   // Add capabilities
-  prompt += `\nYou can help with:
-1. Creating course outlines based on specific skills
-2. Developing learning objectives
-3. Structuring course content and modules
-4. Suggesting assessment methods
-5. Recommending learning resources
-6. Generating example course content`;
+  prompt += `\nYou can help with:\n1. Creating course outlines based on specific skills\n2. Developing learning objectives\n3. Structuring course content and modules\n4. Suggesting assessment methods\n5. Recommending learning resources\n6. Generating example course content`;
 
   return prompt;
 } 
