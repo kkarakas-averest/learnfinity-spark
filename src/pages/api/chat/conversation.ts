@@ -16,29 +16,6 @@ type ApiResponse = {
   debug?: any;
 };
 
-// Helper function for fetch that works in both Node.js and Edge environments
-const fetchApi = async (url: string, options: RequestInit) => {
-  try {
-    // Use global fetch if available
-    if (typeof fetch === 'function') {
-      return await fetch(url, options);
-    }
-    
-    // Fallback for older Node.js versions
-    try {
-      // @ts-ignore - Node.js environment
-      const nodeFetch = require('node-fetch');
-      return await nodeFetch(url, options);
-    } catch (fetchError) {
-      console.error('Error importing node-fetch:', fetchError);
-      throw new Error('Fetch API unavailable and node-fetch could not be loaded');
-    }
-  } catch (error) {
-    console.error('Fetch error:', error);
-    throw error;
-  }
-};
-
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<ApiResponse>
@@ -141,8 +118,8 @@ export default async function handler(
     });
 
     try {
-      // Call Groq API
-      const groqResponse = await fetchApi('https://api.groq.com/openai/v1/chat/completions', {
+      // Call Groq API using global fetch
+      const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
