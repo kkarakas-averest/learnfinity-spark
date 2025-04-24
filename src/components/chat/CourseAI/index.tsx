@@ -93,6 +93,25 @@ interface EmployeeContext {
     url?: string;
     description?: string;
   }>;
+  knowledgeBase?: Array<{
+    id: string;
+    title: string;
+    category: string;
+    proficiency: number;
+    lastAccessed?: string;
+    importance: 'high' | 'medium' | 'low';
+  }>;
+  knowledgeGaps?: Array<{
+    id: string;
+    topic: string;
+    priority: 'critical' | 'important' | 'moderate' | 'low';
+    relevance: number;
+    recommendedResources?: Array<{
+      id: string;
+      title: string;
+      type: string;
+    }>;
+  }>;
 }
 
 export function CourseAI({ employeeId, initialMessage }: CourseAIProps) {
@@ -160,17 +179,10 @@ export function CourseAI({ employeeId, initialMessage }: CourseAIProps) {
       const { data: courseEnrollments, error: coursesError } = await supabase
         .from('hr_course_enrollments')
         .select(`
+          id,
           course_id,
           status,
-          progress,
-          hr_courses (
-            id,
-            title,
-            description,
-            estimated_duration,
-            difficulty_level,
-            is_active
-          )
+          progress
         `)
         .eq('employee_id', id);
         
@@ -180,6 +192,55 @@ export function CourseAI({ employeeId, initialMessage }: CourseAIProps) {
       }
       
       console.log(`Found ${courseEnrollments?.length || 0} course enrollments`);
+      
+      // Get course details for the enrolled courses
+      let courses: any[] = [];
+      if (courseEnrollments && courseEnrollments.length > 0) {
+        // Extract course IDs from enrollments
+        const courseIds = courseEnrollments.map(enrollment => enrollment.course_id);
+        
+        // Fetch course details
+        const { data: courseData, error: courseDetailsError } = await supabase
+          .from('hr_courses')
+          .select(`
+            id,
+            title,
+            description,
+            estimated_duration,
+            difficulty_level,
+            is_active
+          `)
+          .in('id', courseIds);
+        
+        if (courseDetailsError) {
+          console.error('Error fetching course details:', courseDetailsError);
+          // Don't throw error, just log it - we can continue with limited data
+        } else {
+          console.log(`Found ${courseData?.length || 0} course details`);
+          
+          // Combine course details with enrollment data
+          courses = courseEnrollments.map(enrollment => {
+            const courseDetails = courseData?.find(course => course.id === enrollment.course_id) || {
+              title: 'Unknown Course',
+              description: null,
+              estimated_duration: null,
+              difficulty_level: null,
+              is_active: null
+            };
+            
+            return {
+              id: enrollment.course_id,
+              title: courseDetails.title,
+              description: courseDetails.description,
+              estimatedDuration: courseDetails.estimated_duration,
+              difficultyLevel: courseDetails.difficulty_level,
+              isActive: courseDetails.is_active,
+              status: enrollment.status,
+              progress: enrollment.progress
+            };
+          });
+        }
+      }
       
       // Get employee skills from assessments
       // Get the latest assessment id for this employee
@@ -272,14 +333,72 @@ export function CourseAI({ employeeId, initialMessage }: CourseAIProps) {
         }
       ];
       
+      // Mock knowledge management data for demo
+      const mockKnowledgeBase = [
+        {
+          id: crypto.randomUUID(),
+          title: "Web Development Fundamentals",
+          category: "Technical",
+          proficiency: 85,
+          lastAccessed: "2023-08-15",
+          importance: "high" as const
+        },
+        {
+          id: crypto.randomUUID(),
+          title: "Project Management Methodology",
+          category: "Management",
+          proficiency: 70,
+          lastAccessed: "2023-09-22",
+          importance: "medium" as const
+        },
+        {
+          id: crypto.randomUUID(),
+          title: "Data Analysis & Interpretation",
+          category: "Analytics",
+          proficiency: 60,
+          lastAccessed: "2023-10-10",
+          importance: "high" as const
+        }
+      ];
+      
+      const mockKnowledgeGaps = [
+        {
+          id: crypto.randomUUID(),
+          topic: "Machine Learning Algorithms",
+          priority: "important" as const,
+          relevance: 80,
+          recommendedResources: [
+            {
+              id: crypto.randomUUID(),
+              title: "Introduction to Machine Learning",
+              type: "course"
+            },
+            {
+              id: crypto.randomUUID(),
+              title: "ML Algorithms Explained",
+              type: "article"
+            }
+          ]
+        },
+        {
+          id: crypto.randomUUID(),
+          topic: "Cloud Infrastructure",
+          priority: "critical" as const,
+          relevance: 90,
+          recommendedResources: [
+            {
+              id: crypto.randomUUID(),
+              title: "Cloud Computing Essentials",
+              type: "course"
+            }
+          ]
+        }
+      ];
+      
       // Combine data into context object
       const context: EmployeeContext = {
         employee,
-        courses: (courseEnrollments || []).map((c: any) => ({
-          ...c.hr_courses,
-          status: c.status,
-          progress: c.progress
-        })),
+        courses: courses,
         skills: (skills || []).map((s: any) => ({
           name: s.skill_name,
           proficiency_level: s.proficiency_level,
@@ -290,7 +409,9 @@ export function CourseAI({ employeeId, initialMessage }: CourseAIProps) {
           name: s.skill_name,
           gap_level: s.gap_level
         })),
-        resources: mockResources
+        resources: mockResources,
+        knowledgeBase: mockKnowledgeBase,
+        knowledgeGaps: mockKnowledgeGaps
       };
       
       console.log('Setting employee context with data:', { 
@@ -302,7 +423,7 @@ export function CourseAI({ employeeId, initialMessage }: CourseAIProps) {
       
       setEmployeeContext(context);
       
-      // Add a message about the loaded context with more detail
+      // Update the context message to include knowledge management info
       const contextMessage: Message = {
         id: crypto.randomUUID(),
         role: 'system',
@@ -310,9 +431,11 @@ export function CourseAI({ employeeId, initialMessage }: CourseAIProps) {
 • ${context.skills.length} existing skills
 • ${context.missingSkills?.length || 0} skill gaps to address
 • ${context.courses.length} current course enrollments
+• ${context.knowledgeBase?.length || 0} knowledge areas 
+• ${context.knowledgeGaps?.length || 0} knowledge gaps identified
 ${employee.cv_extracted_data ? '• CV data extracted for personalized recommendations' : ''}
 
-I'll use this information to provide highly tailored course suggestions. What would you like to know?`,
+I'll use this information to provide highly tailored course suggestions and knowledge management recommendations. What would you like to know?`,
         timestamp: new Date()
       };
       
@@ -490,7 +613,7 @@ I'll use this information to provide highly tailored course suggestions. What wo
   const renderEmployeePanel = () => {
     if (!employeeContext) return null;
     
-    const { employee, skills, missingSkills, courses, resources } = employeeContext;
+    const { employee, skills, missingSkills, courses, resources, knowledgeBase, knowledgeGaps } = employeeContext;
     
     return (
       <div className="border-l border-border p-4 w-80 bg-card overflow-y-auto h-full">
@@ -525,10 +648,11 @@ I'll use this information to provide highly tailored course suggestions. What wo
         </div>
         
         <Tabs defaultValue="skills" className="w-full">
-          <TabsList className="w-full grid grid-cols-3">
+          <TabsList className="w-full grid grid-cols-4">
             <TabsTrigger value="skills">Skills</TabsTrigger>
             <TabsTrigger value="courses">Courses</TabsTrigger>
             <TabsTrigger value="resources">Resources</TabsTrigger>
+            <TabsTrigger value="knowledge">Knowledge</TabsTrigger>
           </TabsList>
           
           <TabsContent value="skills" className="max-h-[320px] overflow-y-auto mt-2">
@@ -714,6 +838,106 @@ I'll use this information to provide highly tailored course suggestions. What wo
                 </Button>
               </div>
             )}
+          </TabsContent>
+          
+          <TabsContent value="knowledge" className="max-h-[320px] overflow-y-auto mt-2">
+            <Accordion type="single" collapsible className="w-full">
+              <AccordionItem value="knowledge-areas">
+                <AccordionTrigger className="py-2">
+                  <div className="flex items-center gap-2 text-sm font-medium">
+                    <Book size={16} />
+                    <span>Knowledge Areas ({knowledgeBase?.length || 0})</span>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent>
+                  <div className="space-y-2">
+                    {knowledgeBase && knowledgeBase.length > 0 ? (
+                      knowledgeBase.map((knowledge: { id: string; title: string; category: string; proficiency: number; importance: string }) => (
+                        <div key={knowledge.id} className="text-sm">
+                          <div className="flex justify-between items-center">
+                            <span className="font-medium">{knowledge.title}</span>
+                            <Badge variant={knowledge.importance === 'high' ? 'default' : 'outline'}>
+                              {knowledge.importance}
+                            </Badge>
+                          </div>
+                          <div className="mt-1 flex justify-between items-center">
+                            <span className="text-xs text-muted-foreground">{knowledge.category}</span>
+                            <Progress value={knowledge.proficiency} className="h-1.5 w-16" />
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No knowledge areas found.</p>
+                    )}
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+              
+              <AccordionItem value="knowledge-gaps">
+                <AccordionTrigger className="py-2">
+                  <div className="flex items-center gap-2 text-sm font-medium">
+                    <AlertCircle size={16} className="text-amber-500" />
+                    <span>Knowledge Gaps ({knowledgeGaps?.length || 0})</span>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent>
+                  <div className="space-y-3">
+                    {knowledgeGaps && knowledgeGaps.length > 0 ? (
+                      knowledgeGaps.map((gap: { id: string; topic: string; priority: string; relevance: number; recommendedResources?: Array<{ id: string; title: string; type: string }> }) => (
+                        <div key={gap.id} className="text-sm border-b pb-2 last:border-0 last:pb-0">
+                          <div className="flex justify-between items-center">
+                            <span className="font-medium">{gap.topic}</span>
+                            <Badge 
+                              variant={
+                                gap.priority === 'critical' ? 'destructive' : 
+                                gap.priority === 'important' ? 'default' : 'outline'
+                              }
+                            >
+                              {gap.priority}
+                            </Badge>
+                          </div>
+                          <div className="mt-1">
+                            <span className="text-xs text-muted-foreground">Relevance: {gap.relevance}%</span>
+                          </div>
+                          {gap.recommendedResources && gap.recommendedResources.length > 0 && (
+                            <div className="mt-2">
+                              <span className="text-xs font-medium">Recommended:</span>
+                              <div className="mt-1 space-y-1">
+                                {gap.recommendedResources.map((resource: { id: string; title: string; type: string }) => (
+                                  <div key={resource.id} className="text-xs flex items-center gap-1">
+                                    {resource.type === 'course' ? (
+                                      <BookOpen size={12} className="text-blue-500" />
+                                    ) : (
+                                      <FileText size={12} className="text-green-500" />
+                                    )}
+                                    <span>{resource.title}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No knowledge gaps identified.</p>
+                    )}
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+            
+            <div className="mt-4">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="w-full"
+                onClick={() => {
+                  handleSendMessage("What knowledge areas should I focus on developing for this employee?");
+                }}
+              >
+                <RefreshCw size={14} className="mr-1" /> Get Knowledge Recommendations
+              </Button>
+            </div>
           </TabsContent>
         </Tabs>
       </div>
