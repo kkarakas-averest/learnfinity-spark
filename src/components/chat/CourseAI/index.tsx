@@ -114,6 +114,37 @@ interface EmployeeContext {
   }>;
 }
 
+// Simple Markdown-to-HTML conversion function
+const convertMarkdownToHtml = (markdown: string): string => {
+  // Handle bold text
+  let html = markdown.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  
+  // Handle numbered lists
+  html = html.replace(/^\d+\.\s+(.*?)$/gm, '<li>$1</li>');
+  html = html.replace(/(<li>.*?<\/li>(\n|$))+/g, '<ol>$&</ol>');
+  
+  // Handle bullet points
+  html = html.replace(/^•\s+(.*?)$/gm, '<li>$1</li>');
+  html = html.replace(/^\*\s+(.*?)$/gm, '<li>$1</li>');
+  html = html.replace(/(<li>.*?<\/li>(\n|$))+/g, '<ul>$&</ul>');
+  
+  // Handle headers (h3)
+  html = html.replace(/^###\s+(.*?)$/gm, '<h3>$1</h3>');
+  
+  // Handle headers (h2)
+  html = html.replace(/^##\s+(.*?)$/gm, '<h2>$1</h2>');
+  
+  // Handle headers (h1)
+  html = html.replace(/^#\s+(.*?)$/gm, '<h1>$1</h1>');
+  
+  // Handle paragraphs
+  html = html.replace(/(?:\r\n|\r|\n){2,}/g, '</p><p>');
+  html = `<p>${html}</p>`;
+  html = html.replace(/<p><\/p>/g, '');
+  
+  return html;
+};
+
 export function CourseAI({ employeeId, initialMessage }: CourseAIProps) {
   const [messages, setMessages] = React.useState<Message[]>([]);
   const [input, setInput] = React.useState('');
@@ -603,7 +634,7 @@ I'll use this information to provide highly tailored course suggestions. What wo
     }
   };
 
-  // Render message bubble based on role with enhanced styling
+  // Render message bubble based on role with enhanced styling and markdown support
   const renderMessage = (message: Message) => {
     if (message.isLoading) {
       return (
@@ -630,6 +661,7 @@ I'll use this information to provide highly tailored course suggestions. What wo
     }
     
     const isUser = message.role === 'user';
+    const contentHtml = isUser ? message.content : convertMarkdownToHtml(message.content);
     
     return (
       <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4`}>
@@ -638,10 +670,13 @@ I'll use this information to provide highly tailored course suggestions. What wo
             ${isUser ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground'}`}>
             {isUser ? <User size={16} /> : <BotIcon size={16} />}
           </div>
-          <div className={`p-3 rounded-lg ${isUser ? 
-            'bg-primary text-primary-foreground rounded-tr-none' : 
-            'bg-secondary text-secondary-foreground rounded-tl-none'}`}>
-            {message.content}
+          <div 
+            className={`p-3 rounded-lg ${isUser ? 
+              'bg-primary text-primary-foreground rounded-tr-none' : 
+              'bg-secondary text-secondary-foreground rounded-tl-none markdown-content'}`}
+            dangerouslySetInnerHTML={isUser ? undefined : { __html: contentHtml }}
+          >
+            {isUser && message.content}
           </div>
         </div>
       </div>
