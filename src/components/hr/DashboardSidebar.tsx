@@ -11,7 +11,8 @@ import {
   FileText, 
   Layers, 
   Library,
-  Activity
+  Activity,
+  Award
 } from 'lucide-react';
 
 type NavItemProps = {
@@ -92,6 +93,12 @@ const DashboardSidebar: React.FC = () => {
           href: "/hr-dashboard/programs",
           icon: <BookOpen className="h-4 w-4" />,
           isActive: currentPath === "/hr-dashboard/programs"
+        },
+        {
+          title: "Skills Inventory",
+          href: "/hr-dashboard/skills-inventory",
+          icon: <Award className="h-4 w-4" />,
+          isActive: currentPath === "/hr-dashboard/skills-inventory"
         },
         {
           title: "Learner Progress",
