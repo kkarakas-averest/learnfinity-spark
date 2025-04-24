@@ -4,6 +4,8 @@ import HRDashboardHeader from '@/components/hr/HRDashboardHeader';
 import EmployeeDataDashboard from '@/components/hr/EmployeeDataDashboard';
 import CourseCreationWizard from '@/components/hr/CourseCreationWizard';
 import AssessmentBuilder from '@/components/hr/AssessmentBuilder';
+import { NavigationMenuLink } from '@/components/ui/navigation-menu';
+import Link from 'next/link';
 
 export default function HRDashboard() {
   return (
@@ -29,6 +31,32 @@ export default function HRDashboard() {
           <AssessmentBuilder />
         </TabsContent>
       </Tabs>
+
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <NavigationMenuLink asChild>
+          <Link
+            href="/hr/skills-inventory"
+            className="block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
+          >
+            <div className="text-sm font-medium leading-none">Skills Matrix & Analytics</div>
+            <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
+              View and analyze employee skills coverage and gaps
+            </p>
+          </Link>
+        </NavigationMenuLink>
+
+        <NavigationMenuLink asChild>
+          <Link
+            href="/hr/course-generator"
+            className="block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
+          >
+            <div className="text-sm font-medium leading-none">AI Course Designer</div>
+            <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
+              Create customized courses using AI conversation
+            </p>
+          </Link>
+        </NavigationMenuLink>
+      </div>
     </div>
   );
 } 
