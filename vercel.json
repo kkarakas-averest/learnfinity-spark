@@ -13,6 +13,10 @@
     "api/hr/courses/[courseId]/enrollment.ts": {
       "memory": 1024,
       "maxDuration": 10
+    },
+    "api/hr/employee-courses.ts": {
+      "memory": 1024,
+      "maxDuration": 10
     }
   },
   "routes": [
@@ -29,6 +33,10 @@
     {
       "src": "/api/hr/courses/(?<courseId>[^/]+)/enrollment",
       "dest": "/api/hr/courses/[courseId]/enrollment.ts"
+    },
+    {
+      "src": "/api/hr/employee-courses",
+      "dest": "/api/hr/employee-courses.ts"
     }
   ],
   "env": {
