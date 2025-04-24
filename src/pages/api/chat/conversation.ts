@@ -13,6 +13,7 @@ const SUPABASE_SERVICE_ROLE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3Mi
 type ApiResponse = {
   response?: string;
   error?: string;
+  debug?: any;
 };
 
 // Helper function for fetch that works in both Node.js and Edge environments
@@ -42,12 +43,49 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<ApiResponse>
 ) {
+  // Set CORS headers for all responses
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  
   // Only allow POST
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  // Create debugging information
+  const debugInfo: any = {
+    timestamp: new Date().toISOString(),
+    nodeEnv: process.env.NODE_ENV,
+    method: req.method,
+    url: req.url,
+    bodyType: typeof req.body,
+    hasMessages: false,
+    hasEmployeeContext: false
+  };
+
   try {
+    // Parse body if it's a string (Edge function behavior)
+    const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+    const { messages, employeeContext } = body;
+    
+    // Add to debug info
+    debugInfo.hasMessages = !!messages && Array.isArray(messages);
+    debugInfo.hasEmployeeContext = !!employeeContext;
+    debugInfo.messageCount = messages?.length || 0;
+    
+    if (!messages || !Array.isArray(messages)) {
+      return res.status(400).json({ 
+        error: 'Messages array is required',
+        debug: debugInfo
+      });
+    }
+
     // Create Supabase client directly with hardcoded credentials
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     
@@ -77,13 +115,6 @@ export default async function handler(
       userId = 'bec19c44-164f-4a0b-b63d-99697e15040a'; // Example test user ID
     }
     
-    // Parse request data
-    const { messages, employeeContext } = req.body;
-    
-    if (!messages || !Array.isArray(messages)) {
-      return res.status(400).json({ error: 'Messages array is required' });
-    }
-
     // Construct the prompt with context
     const systemPrompt = generateSystemPrompt(employeeContext);
     
@@ -96,6 +127,11 @@ export default async function handler(
       }))
     ];
 
+    // Add request details to debugging
+    debugInfo.userId = userId;
+    debugInfo.groqModel = GROQ_MODEL;
+    debugInfo.messageCount = messages.length;
+    
     // Log the conversation for easier debugging
     console.log('Chat conversation request:', {
       userId: userId,
@@ -104,65 +140,118 @@ export default async function handler(
       groqModel: GROQ_MODEL
     });
 
-    // Call Groq API
-    const response = await fetchApi('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${GROQ_API_KEY}`
-      },
-      body: JSON.stringify({
-        model: GROQ_MODEL,
-        messages: apiMessages,
-        temperature: 0.7,
-        max_tokens: 800
-      })
-    });
+    try {
+      // Call Groq API
+      const groqResponse = await fetchApi('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${GROQ_API_KEY}`
+        },
+        body: JSON.stringify({
+          model: GROQ_MODEL,
+          messages: apiMessages,
+          temperature: 0.7,
+          max_tokens: 800
+        })
+      });
+      
+      // Add response status to debugging
+      debugInfo.groqStatusCode = groqResponse.status;
+      debugInfo.groqStatusText = groqResponse.statusText;
+      
+      // Handle Groq API errors
+      if (!groqResponse.ok) {
+        let errorMessage = groqResponse.statusText;
+        try {
+          const errorData = await groqResponse.json();
+          debugInfo.groqError = errorData;
+          errorMessage = errorData.error?.message || groqResponse.statusText;
+        } catch (parseError) {
+          // If we can't parse JSON from the error, use text
+          const errorText = await groqResponse.text();
+          debugInfo.groqErrorText = errorText;
+          errorMessage = errorText || groqResponse.statusText;
+        }
+        
+        // Log detailed error and return standardized error
+        console.error('Groq API error:', { status: groqResponse.status, message: errorMessage, debug: debugInfo });
+        return res.status(500).json({ 
+          error: `AI service error: ${errorMessage}`,
+          debug: debugInfo
+        });
+      }
 
-    // Handle Groq API errors
-    if (!response.ok) {
-      const errorData = await response.json();
-      console.error('Groq API error:', errorData);
+      // Parse the response
+      const result = await groqResponse.json();
+      const aiResponse = result.choices?.[0]?.message?.content;
+      
+      // Add response details to debugging
+      debugInfo.hasResponse = !!aiResponse;
+      debugInfo.responseLength = aiResponse?.length || 0;
+
+      if (!aiResponse) {
+        return res.status(500).json({ 
+          error: 'No response generated from AI',
+          debug: debugInfo 
+        });
+      }
+
+      // Try to store the conversation in Supabase, but don't fail if this doesn't work
+      try {
+        const { error: dbError } = await supabase
+          .from('chat_conversations')
+          .insert({
+            user_id: userId,
+            employee_id: employeeContext?.employeeId || null,
+            messages: apiMessages,
+            response: aiResponse,
+            created_at: new Date().toISOString()
+          });
+
+        if (dbError) {
+          console.error('Error storing conversation:', dbError);
+          // Non-fatal, continue anyway
+          debugInfo.dbError = dbError.message;
+        } else {
+          debugInfo.savedToDb = true;
+        }
+      } catch (dbError: any) {
+        console.error('Database error when storing conversation:', dbError);
+        // Non-fatal, continue anyway
+        debugInfo.dbError = dbError.message;
+      }
+
+      // Return the AI response (with debug info in development)
+      if (process.env.NODE_ENV === 'development') {
+        return res.status(200).json({ 
+          response: aiResponse,
+          debug: debugInfo 
+        });
+      } else {
+        return res.status(200).json({ response: aiResponse });
+      }
+    } catch (groqError: any) {
+      // Handle fetch/network errors
+      console.error('Error calling Groq API:', groqError);
+      debugInfo.groqFetchError = groqError.message;
+      
       return res.status(500).json({ 
-        error: `AI service error: ${errorData.error?.message || response.statusText}` 
+        error: `Error calling AI service: ${groqError.message}`, 
+        debug: debugInfo 
       });
     }
-
-    // Parse the response
-    const result = await response.json();
-    const aiResponse = result.choices[0]?.message?.content;
-
-    if (!aiResponse) {
-      return res.status(500).json({ error: 'No response generated from AI' });
-    }
-
-    // Store the conversation in Supabase for history/analytics (optional)
-    try {
-      const { error: dbError } = await supabase
-        .from('chat_conversations')
-        .insert({
-          user_id: userId,
-          employee_id: employeeContext?.employeeId || null,
-          messages: apiMessages,
-          response: aiResponse,
-          created_at: new Date().toISOString()
-        });
-
-      if (dbError) {
-        console.error('Error storing conversation:', dbError);
-        // Non-fatal, continue anyway
-      }
-    } catch (dbError) {
-      console.error('Database error when storing conversation:', dbError);
-      // Non-fatal, continue anyway
-    }
-
-    // Return the AI response
-    return res.status(200).json({ response: aiResponse });
     
   } catch (error: any) {
+    // Handle all other errors
     console.error('Chat API error:', error);
-    return res.status(500).json({ error: `Internal server error: ${error.message}` });
+    debugInfo.fatalError = error.message;
+    debugInfo.errorStack = error.stack;
+    
+    return res.status(500).json({ 
+      error: `Internal server error: ${error.message}`,
+      debug: debugInfo
+    });
   }
 }
 
