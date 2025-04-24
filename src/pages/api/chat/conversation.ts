@@ -15,6 +15,10 @@ type ApiResponse = {
   error?: string;
 };
 
+export const config = {
+  runtime: 'nodejs',
+};
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<ApiResponse>

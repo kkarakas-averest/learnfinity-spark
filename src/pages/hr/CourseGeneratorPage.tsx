@@ -44,14 +44,23 @@ export default function CourseGeneratorPage() {
     try {
       const { data, error } = await supabase
         .from('hr_employees')
-        .select('id, name, email, department, position')
+        .select('id, name, email, hr_departments(name), hr_positions(title)')
         .order('name');
 
       if (error) {
         throw error;
       }
 
-      setEmployees(data || []);
+      // Map joined fields to department and position for UI
+      setEmployees(
+        (data || []).map((emp: any) => ({
+          id: emp.id,
+          name: emp.name,
+          email: emp.email,
+          department: emp.hr_departments?.name || '',
+          position: emp.hr_positions?.title || ''
+        }))
+      );
     } catch (error) {
       console.error('Error fetching employees:', error);
       toast({
