@@ -19,12 +19,10 @@
       "maxDuration": 10
     },
     "api/groq/chat.ts": {
-      "runtime": "edge",
       "memory": 1024,
       "maxDuration": 30
     },
     "api/chat/conversation.ts": {
-      "runtime": "edge",
       "memory": 1024,
       "maxDuration": 30
     }
