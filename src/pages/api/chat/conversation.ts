@@ -1,6 +1,17 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { createClient } from '@supabase/supabase-js';
 
+// Specify Node.js runtime
+export const config = {
+  runtime: 'nodejs',
+  api: {
+    // Use Node.js 18 to avoid compatibility issues
+    nodejs: {
+      version: '18.x'
+    }
+  }
+};
+
 // Always use the hardcoded Groq API key
 const GROQ_API_KEY = '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';
 const GROQ_MODEL = 'llama-3.3-70b-versatile';
