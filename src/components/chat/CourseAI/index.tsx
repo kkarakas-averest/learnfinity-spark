@@ -22,10 +22,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { chatService, type ChatMessage as ChatServiceMessage, type EmployeeContext as ChatServiceEmployeeContext } from '@/lib/chat-service';
-import { Separator } from "@/components/ui/separator";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Textarea } from "@/components/ui/textarea";
 
 // Create AccordionItem since it's not exported from accordion.tsx
 const AccordionItem = AccordionPrimitive.Item;
@@ -62,28 +58,61 @@ type CourseAIProps = {
   initialMessage?: string; // Optional: start with a specific message
 };
 
-// Enhanced interface for employee context data - update the type to include resources
-type EmployeeContext = {
+// Enhanced interface for employee context data
+interface EmployeeContext {
   employee: {
     id: string;
     name: string;
-    position: string;
-    department: string;
+    email?: string;
+    department?: string;
+    position?: string;
+    cv_file_url?: string;
     cv_extracted_data?: any;
+    [key: string]: any;
   };
-  skills: Array<{ name: string; proficiency_level?: string; [key: string]: any }>;
-  missingSkills?: Array<{ name: string; gap_level?: string; [key: string]: any }>;
-  courses: any[];
+  courses: Array<{
+    id: string;
+    title: string;
+    description?: string;
+    [key: string]: any;
+  }>;
+  skills: Array<{
+    name: string;
+    proficiency_level?: number;
+    gap_level?: number;
+    is_missing?: boolean;
+  }>;
+  missingSkills?: Array<{
+    name: string;
+    gap_level?: number;
+  }>;
   resources?: Array<{
     id: string;
     title: string;
-    type: string;
+    type: 'article' | 'video' | 'book' | 'course' | 'other';
     url?: string;
     description?: string;
   }>;
-  knowledgeBase?: Array<{ title: string; [key: string]: any }>;
-  knowledgeGaps?: Array<{ topic: string; [key: string]: any }>;
-};
+  knowledgeBase?: {
+    id: string;
+    title: string;
+    category: string;
+    importance: "high" | "medium" | "low";
+    proficiency: number;
+    lastAccessed?: string;
+  }[];
+  knowledgeGaps?: {
+    id: string;
+    topic: string;
+    priority: "important" | "critical" | "moderate" | "low";
+    relevance: number;
+    recommendedResources?: {
+      id: string;
+      title: string;
+      type: string;
+    }[];
+  }[];
+}
 
 // Simple Markdown-to-HTML conversion function
 const convertMarkdownToHtml = (markdown: string): string => {
@@ -547,41 +576,51 @@ ${employee.cv_extracted_data ? '• CV data extracted for personalized recommend
       const recentMessages = [...messages.slice(-5), userMessage]
         .map((m: Message) => ({ role: m.role, content: m.content }));
       
-      // Convert to the format expected by the chat service
-      const chatMessages: ChatServiceMessage[] = recentMessages.map(m => ({
-        role: m.role,
-        content: m.content
-      }));
-      
       // Add enhanced employee context if available
-      let chatServiceEmployeeContext: ChatServiceEmployeeContext | undefined = undefined;
+      const contextData = employeeContext ? {
+        employeeId: employeeContext.employee.id,
+        employeeName: employeeContext.employee.name,
+        skills: employeeContext.skills.map((s: { name: string }) => s.name),
+        missingSkills: employeeContext.missingSkills?.map((s: { name: string }) => s.name) || [],
+        courses: employeeContext.courses,
+        position: employeeContext.employee.position,
+        department: employeeContext.employee.department,
+        // Include knowledge base data
+        knowledgeAreas: employeeContext.knowledgeBase?.map((k: { title: string }) => k.title) || [],
+        knowledgeGaps: employeeContext.knowledgeGaps?.map((g: { topic: string }) => g.topic) || [],
+        // Include full data for more context
+        fullContext: {
+        skills: employeeContext.skills,
+          missingSkills: employeeContext.missingSkills,
+          knowledgeBase: employeeContext.knowledgeBase,
+          knowledgeGaps: employeeContext.knowledgeGaps
+        },
+        cvData: employeeContext.employee.cv_extracted_data || null
+      } : null;
       
-      if (employeeContext) {
-        chatServiceEmployeeContext = {
-          employeeId: employeeContext.employee.id,
-          name: employeeContext.employee.name,
-          position: employeeContext.employee.position,
-          department: employeeContext.employee.department,
-          skills: employeeContext.skills.map((s: { name: string; proficiency_level?: string }) => ({
-            skill_name: s.name,
-            proficiency_level: s.proficiency_level || 'intermediate'
-          })),
-          missingSkills: employeeContext.missingSkills?.map((s: { name: string; gap_level?: string }) => ({
-            skill_name: s.name,
-            gap_level: s.gap_level || 'high'
-          })),
-          career: {
-            goals: "Professional development in current role"
-          }
-        };
+      // Define the endpoint to use
+      const chatEndpoint = '/api/chat/conversation';
+      console.log(`[ChatAI] Sending message to endpoint: ${chatEndpoint}`);
+      
+      // Send to the chat API
+      const response = await fetch(chatEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          // Add Authorization header if needed by your API
+          // 'Authorization': `Bearer ${your_auth_token}` 
+        },
+        body: JSON.stringify({
+          messages: recentMessages,
+          employeeContext: contextData
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to get response from chat API');
       }
       
-      // Send to the chat service which will try multiple endpoints
-      const result = await chatService.sendMessages(chatMessages, chatServiceEmployeeContext);
-      
-      if (result.error) {
-        throw new Error(result.error);
-      }
+      const data = await response.json();
       
       // Remove loading message and add real response
       setMessages((prev: Message[]) => {
@@ -589,10 +628,10 @@ ${employee.cv_extracted_data ? '• CV data extracted for personalized recommend
         return [
           ...filtered,
           {
-            id: crypto.randomUUID(),
-            role: 'assistant',
-            content: result.response || 'No response received.',
-            timestamp: new Date()
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: data.response,
+        timestamp: new Date()
           }
         ];
       });
@@ -606,10 +645,10 @@ ${employee.cv_extracted_data ? '• CV data extracted for personalized recommend
         return [
           ...filtered,
           {
-            id: crypto.randomUUID(),
-            role: 'system',
-            content: 'Sorry, I encountered an error while processing your request. Please try again.',
-            timestamp: new Date()
+        id: crypto.randomUUID(),
+        role: 'system',
+        content: 'Sorry, I encountered an error while processing your request. Please try again.',
+        timestamp: new Date()
           }
         ];
       });
