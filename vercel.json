@@ -18,13 +18,8 @@
       "memory": 1024,
       "maxDuration": 10
     },
-    "api/groq/chat.ts": {
-      "memory": 1024,
-      "maxDuration": 30
-    },
-    "api/chat/conversation.ts": {
-      "memory": 1024,
-      "maxDuration": 30
+    "src/pages/api/chat/conversation.ts": {
+      "runtime": "nodejs18.x"
     }
   },
   "routes": [
@@ -45,14 +40,6 @@
     {
       "src": "/api/hr/employee-courses",
       "dest": "/api/hr/employee-courses.ts"
-    },
-    {
-      "src": "/api/groq/chat",
-      "dest": "/api/groq/chat.ts"
-    },
-    {
-      "src": "/api/chat/conversation",
-      "dest": "/api/chat/conversation.ts"
     }
   ],
   "env": {
