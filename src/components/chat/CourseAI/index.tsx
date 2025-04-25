@@ -93,25 +93,25 @@ interface EmployeeContext {
     url?: string;
     description?: string;
   }>;
-  knowledgeBase?: Array<{
+  knowledgeBase?: {
     id: string;
     title: string;
     category: string;
+    importance: "high" | "medium" | "low";
     proficiency: number;
     lastAccessed?: string;
-    importance: 'high' | 'medium' | 'low';
-  }>;
-  knowledgeGaps?: Array<{
+  }[];
+  knowledgeGaps?: {
     id: string;
     topic: string;
-    priority: 'critical' | 'important' | 'moderate' | 'low';
+    priority: "important" | "critical" | "moderate" | "low";
     relevance: number;
-    recommendedResources?: Array<{
+    recommendedResources?: {
       id: string;
       title: string;
       type: string;
-    }>;
-  }>;
+    }[];
+  }[];
 }
 
 // Simple Markdown-to-HTML conversion function
@@ -332,16 +332,16 @@ export function CourseAI({ employeeId, initialMessage }: CourseAIProps) {
       if (assessmentIds.length > 0) {
         // Get existing skills
         const { data: skillsData, error: skillsError } = await supabase
-          .from('hr_skill_assessment_details')
-          .select(`
-            skill_name,
-            proficiency_level,
-            gap_level,
-            is_missing
-          `)
-          .eq('is_missing', false)
-          .in('assessment_id', assessmentIds);
-        
+        .from('hr_skill_assessment_details')
+        .select(`
+          skill_name,
+          proficiency_level,
+          gap_level,
+          is_missing
+        `)
+        .eq('is_missing', false)
+        .in('assessment_id', assessmentIds);
+      
         if (skillsError) {
           console.error('Error fetching skills:', skillsError);
           throw skillsError;
@@ -371,7 +371,7 @@ export function CourseAI({ employeeId, initialMessage }: CourseAIProps) {
         console.log('No assessments found, using empty skills arrays');
       }
       
-      // Generate mock resources for demo (would be fetched from database in production)
+      // Creating a demo resources array
       const mockResources = [
         {
           id: crypto.randomUUID(),
@@ -396,63 +396,93 @@ export function CourseAI({ employeeId, initialMessage }: CourseAIProps) {
         }
       ];
       
-      // Mock knowledge management data for demo
+      // Mock knowledge base for the employee
       const mockKnowledgeBase = [
         {
-          id: crypto.randomUUID(),
-          title: "Web Development Fundamentals",
-          category: "Technical",
-          proficiency: 85,
-          lastAccessed: "2023-08-15",
-          importance: "high" as const
+          id: "kb1",
+          title: "React Component Architecture",
+          category: "Frontend Development",
+          importance: "high" as const,
+          proficiency: 85
         },
         {
-          id: crypto.randomUUID(),
-          title: "Project Management Methodology",
-          category: "Management",
-          proficiency: 70,
-          lastAccessed: "2023-09-22",
-          importance: "medium" as const
+          id: "kb2",
+          title: "State Management Patterns",
+          category: "Software Design",
+          importance: "high" as const,
+          proficiency: 70
         },
         {
-          id: crypto.randomUUID(),
-          title: "Data Analysis & Interpretation",
-          category: "Analytics",
-          proficiency: 60,
-          lastAccessed: "2023-10-10",
-          importance: "high" as const
+          id: "kb3",
+          title: "TypeScript Advanced Types",
+          category: "Programming Languages",
+          importance: "medium" as const,
+          proficiency: 65
+        },
+        {
+          id: "kb4",
+          title: "Microservices Communication",
+          category: "System Design",
+          importance: "medium" as const,
+          proficiency: 60
+        },
+        {
+          id: "kb5",
+          title: "Performance Optimization",
+          category: "Web Development",
+          importance: "high" as const,
+          proficiency: 75
         }
       ];
       
+      // Mock knowledge gaps for the employee
       const mockKnowledgeGaps = [
         {
-          id: crypto.randomUUID(),
-          topic: "Machine Learning Algorithms",
+          id: "kg1",
+          topic: "GraphQL API Design",
           priority: "important" as const,
-          relevance: 80,
+          relevance: 85,
           recommendedResources: [
             {
-              id: crypto.randomUUID(),
-              title: "Introduction to Machine Learning",
+              id: "kgr1",
+              title: "GraphQL Fundamentals",
               type: "course"
             },
             {
-              id: crypto.randomUUID(),
-              title: "ML Algorithms Explained",
+              id: "kgr2",
+              title: "Building Scalable APIs with GraphQL",
               type: "article"
             }
           ]
         },
         {
-          id: crypto.randomUUID(),
-          topic: "Cloud Infrastructure",
+          id: "kg2",
+          topic: "Containerization & Kubernetes",
           priority: "critical" as const,
           relevance: 90,
           recommendedResources: [
             {
-              id: crypto.randomUUID(),
-              title: "Cloud Computing Essentials",
+              id: "kgr3",
+              title: "Docker & Kubernetes: The Complete Guide",
               type: "course"
+            },
+            {
+              id: "kgr4",
+              title: "Microservices Deployment Patterns",
+              type: "video"
+            }
+          ]
+        },
+        {
+          id: "kg3",
+          topic: "AI/ML Integration in Web Apps",
+          priority: "moderate" as const,
+          relevance: 70,
+          recommendedResources: [
+            {
+              id: "kgr5",
+              title: "Practical Machine Learning for Frontend Devs",
+              type: "workshop"
             }
           ]
         }
@@ -560,7 +590,7 @@ ${employee.cv_extracted_data ? '• CV data extracted for personalized recommend
         knowledgeGaps: employeeContext.knowledgeGaps?.map((g: { topic: string }) => g.topic) || [],
         // Include full data for more context
         fullContext: {
-          skills: employeeContext.skills,
+        skills: employeeContext.skills,
           missingSkills: employeeContext.missingSkills,
           knowledgeBase: employeeContext.knowledgeBase,
           knowledgeGaps: employeeContext.knowledgeGaps
@@ -592,10 +622,10 @@ ${employee.cv_extracted_data ? '• CV data extracted for personalized recommend
         return [
           ...filtered,
           {
-            id: crypto.randomUUID(),
-            role: 'assistant',
-            content: data.response,
-            timestamp: new Date()
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: data.response,
+        timestamp: new Date()
           }
         ];
       });
@@ -609,10 +639,10 @@ ${employee.cv_extracted_data ? '• CV data extracted for personalized recommend
         return [
           ...filtered,
           {
-            id: crypto.randomUUID(),
-            role: 'system',
-            content: 'Sorry, I encountered an error while processing your request. Please try again.',
-            timestamp: new Date()
+        id: crypto.randomUUID(),
+        role: 'system',
+        content: 'Sorry, I encountered an error while processing your request. Please try again.',
+        timestamp: new Date()
           }
         ];
       });
@@ -673,7 +703,7 @@ ${employee.cv_extracted_data ? '• CV data extracted for personalized recommend
           </div>
           <div 
             className={`p-3 rounded-lg ${isUser ? 
-              'bg-primary text-primary-foreground rounded-tr-none' : 
+            'bg-primary text-primary-foreground rounded-tr-none' : 
               'bg-secondary text-secondary-foreground rounded-tl-none markdown-content'}`}
             dangerouslySetInnerHTML={isUser ? undefined : { __html: contentHtml }}
           >
@@ -725,6 +755,7 @@ ${employee.cv_extracted_data ? '• CV data extracted for personalized recommend
           <TabsList className="px-3 pt-2 bg-transparent">
             <TabsTrigger value="skills" className="text-xs">Skills</TabsTrigger>
             <TabsTrigger value="courses" className="text-xs">Courses</TabsTrigger>
+            <TabsTrigger value="knowledge" className="text-xs">Knowledge</TabsTrigger>
           </TabsList>
           
           <div className="flex-1 overflow-auto p-3">
@@ -812,6 +843,121 @@ ${employee.cv_extracted_data ? '• CV data extracted for personalized recommend
                 <p className="text-sm text-muted-foreground">No courses enrolled.</p>
               )}
             </TabsContent>
+            
+            <TabsContent value="knowledge" className="max-h-[320px] overflow-y-auto mt-2">
+              <Accordion type="single" collapsible className="w-full mb-4">
+                <AccordionItem value="knowledge-areas">
+                  <AccordionTrigger className="py-1.5">
+                    <div className="flex items-center gap-1.5 text-xs font-medium">
+                      <Bookmark size={14} />
+                      <span>Knowledge Areas ({knowledgeBase?.length || 0})</span>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="pt-1.5">
+                    <div className="space-y-1.5">
+                      {knowledgeBase?.map((knowledge: {
+                        id: string;
+                        title: string;
+                        category: string;
+                        importance: "high" | "medium" | "low";
+                        proficiency: number;
+                      }) => (
+                        <div key={knowledge.id} className="text-xs bg-background p-2 rounded-md border">
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="font-medium">{knowledge.title}</span>
+                            <Badge variant={knowledge.importance === 'high' ? 'default' : 'outline'} className="text-[10px] h-5">
+                              {knowledge.importance}
+                            </Badge>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-muted-foreground">{knowledge.category}</span>
+                            <span className="text-[10px] text-muted-foreground">
+                              Proficiency: {knowledge.proficiency}%
+                            </span>
+                          </div>
+                          <Progress value={knowledge.proficiency} className="h-1 mt-1" />
+                        </div>
+                      ))}
+                      {(!knowledgeBase || knowledgeBase.length === 0) && (
+                        <p className="text-xs text-muted-foreground">No knowledge areas identified.</p>
+                      )}
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+                
+                <AccordionItem value="knowledge-gaps" className="mt-1">
+                  <AccordionTrigger className="py-1.5">
+                    <div className="flex items-center gap-1.5 text-xs font-medium">
+                      <BarChart2 size={14} className="text-amber-500" />
+                      <span>Knowledge Gaps ({knowledgeGaps?.length || 0})</span>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="pt-1.5">
+                    <div className="space-y-1.5">
+                      {knowledgeGaps?.map((gap: {
+                        id: string;
+                        topic: string;
+                        priority: "important" | "critical" | "moderate" | "low";
+                        relevance: number;
+                        recommendedResources?: {
+                          id: string;
+                          title: string;
+                          type: string;
+                        }[];
+                      }) => (
+                        <div key={gap.id} className="text-xs bg-background p-2 rounded-md border">
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="font-medium">{gap.topic}</span>
+                            <Badge 
+                              variant={gap.priority === 'critical' ? 'destructive' : (gap.priority === 'important' ? 'default' : 'outline')} 
+                              className="text-[10px] h-5"
+                            >
+                              {gap.priority}
+                            </Badge>
+                          </div>
+                          <div className="mb-1">
+                            <span className="text-[10px] text-muted-foreground">
+                              Relevance: {gap.relevance}%
+                            </span>
+                            <Progress value={gap.relevance} className="h-1 mt-1" />
+                          </div>
+                          {gap.recommendedResources && gap.recommendedResources.length > 0 && (
+                            <div>
+                              <span className="text-[10px] font-medium">Recommended:</span>
+                              <div className="mt-1 space-y-1">
+                                {gap.recommendedResources.map((resource: {
+                                  id: string;
+                                  title: string;
+                                  type: string;
+                                }) => (
+                                  <div key={resource.id} className="flex items-center gap-1">
+                                    <Zap size={10} className="text-amber-500" />
+                                    <span>{resource.title}</span>
+                                    <Badge variant="outline" className="ml-auto text-[8px] h-4 px-1">
+                                      {resource.type}
+                                    </Badge>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                      {(!knowledgeGaps || knowledgeGaps.length === 0) && (
+                        <p className="text-xs text-muted-foreground">No knowledge gaps identified.</p>
+                      )}
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
+              
+              <div className="flex items-center justify-center">
+                <Button variant="outline" size="sm" className="text-xs flex items-center gap-1.5 w-full">
+                  <PlusIcon size={12} />
+                  <span>Request Knowledge Recommendations</span>
+                </Button>
+              </div>
+            </TabsContent>
           </div>
         </Tabs>
       </div>
@@ -866,21 +1012,21 @@ ${employee.cv_extracted_data ? '• CV data extracted for personalized recommend
       
       <div className="flex flex-grow h-0 overflow-hidden">
         <CardContent className="flex-grow overflow-y-auto p-4 pb-0 relative">
-          <div className="space-y-4">
-            {messages.map((message: Message) => (
-              <div key={message.id} className="chat-message">
-                {renderMessage(message)}
-              </div>
-            ))}
+        <div className="space-y-4">
+          {messages.map((message: Message) => (
+            <div key={message.id} className="chat-message">
+              {renderMessage(message)}
+            </div>
+          ))}
             {(isLoading || isFetchingEmployeeData) && !messages.some((m: Message) => m.isLoading) && (
-              <div className="flex justify-center items-center py-2">
-                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-              </div>
-            )}
-            <div ref={endOfMessagesRef} />
-          </div>
+            <div className="flex justify-center items-center py-2">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
+          )}
+          <div ref={endOfMessagesRef} />
+        </div>
           {renderTogglePanelButton()}
-        </CardContent>
+      </CardContent>
         
         {employeeContext && showEmployeePanel && renderEmployeePanel()}
       </div>
