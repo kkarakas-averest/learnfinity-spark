@@ -18,7 +18,7 @@
       "memory": 1024,
       "maxDuration": 10
     },
-    "src/pages/api/chat/conversation.ts": {
+    "src/pages/api/chat/conversation-v2.ts": {
       "memory": 1024,
       "maxDuration": 10
     }
