@@ -1,23 +1,58 @@
+import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { z } from 'zod';
 
-// Always use the hardcoded Groq API key
-const GROQ_API_KEY = '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';
-const GROQ_MODEL = 'llama-3.3-70b-versatile';
-const SUPABASE_URL = 'https://ujlqzkkkfatehxeqtbdl.supabase.co';
-const SUPABASE_SERVICE_ROLE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqbHF6a2trZmF0ZWh4ZXF0YmRsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0MDY4MDgzMiwiZXhwIjoyMDU2MjU2ODMyfQ.MZZMNbG8rpCLQ7sMGKXKQP1YL0dZ_PMVBKBrXL-k7IY';
+// Configure this endpoint to use the Edge runtime
+export const runtime = 'edge';
 
-// Define the FetchEvent interface
-interface FetchEvent extends Event {
-  request: Request;
-  respondWith(response: Response | Promise<Response>): void;
+// Environment variables
+const GROQ_API_KEY = process.env.GROQ_API_KEY || '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';
+const GROQ_MODEL = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://ujlqzkkkfatehxeqtbdl.supabase.co';
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqbHF6a2trZmF0ZWh4ZXF0YmRsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0MDY4MDgzMiwiZXhwIjoyMDU2MjU2ODMyfQ.MZZMNbG8rpCLQ7sMGKXKQP1YL0dZ_PMVBKBrXL-k7IY';
+
+// CORS Headers
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
+
+// Zod schema for request validation
+const requestSchema = z.object({
+  messages: z.array(z.object({
+    role: z.enum(['system', 'user', 'assistant']),
+    content: z.string(),
+  })),
+  employeeContext: z.object({
+    employeeId: z.string().optional(),
+    name: z.string().optional(),
+    position: z.string().optional(),
+    department: z.string().optional(),
+    skills: z.array(z.object({
+      skill_name: z.string(),
+      proficiency_level: z.string(),
+    })).optional(),
+    missingSkills: z.array(z.object({
+      skill_name: z.string(),
+      gap_level: z.string().optional(),
+    })).optional(),
+    career: z.object({
+      goals: z.string().optional(),
+      aspirations: z.string().optional(),
+    }).optional(),
+  }).optional(),
+});
+
+// Handle OPTIONS request for CORS preflight
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: corsHeaders,
+  });
 }
 
-// Setup proper fetch event listener for the Edge runtime
-addEventListener('fetch', ((event: FetchEvent) => {
-  event.respondWith(handleRequest(event.request));
-}) as EventListener);
-
-// System prompt generator
+// Generate system prompt based on employee context
 function generateSystemPrompt(employeeContext: any): string {
   let basePrompt = `You are an AI assistant specialized in HR and course content creation for Learnfinity, a corporate learning platform.
   
@@ -47,78 +82,39 @@ function generateSystemPrompt(employeeContext: any): string {
   return basePrompt;
 }
 
-// Main request handler function
-async function handleRequest(req: Request): Promise<Response> {
-  // Set CORS headers for all responses
-  const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization'
-  };
-  
-  // Handle preflight requests
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { 
-      status: 204,
-      headers: corsHeaders
-    });
-  }
-
-  // Only allow POST
-  if (req.method !== 'POST') {
-    return new Response(
-      JSON.stringify({ error: 'Method not allowed' }),
-      { 
-        status: 405, 
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json'
-        }
-      }
-    );
-  }
-
-  // Create debugging information
-  const debugInfo: any = {
-    timestamp: new Date().toISOString(),
-    method: req.method,
-    url: req.url,
-    hasMessages: false,
-    hasEmployeeContext: false
-  };
-
+// Main API handler
+export async function POST(req: NextRequest) {
   try {
     // Parse request body
     const body = await req.json();
-    const { messages, employeeContext } = body;
     
-    // Add to debug info
-    debugInfo.hasMessages = !!messages && Array.isArray(messages);
-    debugInfo.hasEmployeeContext = !!employeeContext;
-    debugInfo.messageCount = messages?.length || 0;
-    
-    if (!messages || !Array.isArray(messages)) {
-      return new Response(
-        JSON.stringify({ 
-          error: 'Messages array is required', 
-          debug: debugInfo 
-        }),
-        { 
-          status: 400, 
-          headers: {
-            ...corsHeaders,
-            'Content-Type': 'application/json'
-          }
-        }
+    // Validate request
+    const validationResult = requestSchema.safeParse(body);
+    if (!validationResult.success) {
+      return NextResponse.json(
+        { error: 'Invalid request data', details: validationResult.error.format() },
+        { status: 400, headers: corsHeaders }
       );
     }
-
-    // Create Supabase client directly with hardcoded credentials
+    
+    const { messages, employeeContext } = validationResult.data;
+    
+    // Create debugging information
+    const debugInfo: any = {
+      timestamp: new Date().toISOString(),
+      method: req.method,
+      url: req.url,
+      hasMessages: true,
+      hasEmployeeContext: !!employeeContext,
+      messageCount: messages.length
+    };
+    
+    // Create Supabase client
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     
     // Get user from authorization header or fallback to a default user for testing
     const authHeader = req.headers.get('authorization');
-    let userId: string = 'bec19c44-164f-4a0b-b63d-99697e15040a'; // Default test user ID
+    let userId = 'bec19c44-164f-4a0b-b63d-99697e15040a'; // Default test user ID
     
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.replace('Bearer ', '');
@@ -129,14 +125,14 @@ async function handleRequest(req: Request): Promise<Response> {
         }
       } catch {} // Fallback to default on error
     }
-
+    
     // Construct the prompt with context
     const systemPrompt = generateSystemPrompt(employeeContext);
     
     // Format messages for API request
     const apiMessages = [
       { role: 'system', content: systemPrompt },
-      ...messages.map((m: any) => ({
+      ...messages.map((m: { role: 'system' | 'user' | 'assistant', content: string }) => ({
         role: m.role === 'system' ? 'assistant' : m.role,
         content: m.content
       }))
@@ -145,9 +141,10 @@ async function handleRequest(req: Request): Promise<Response> {
     // Add request details to debugging
     debugInfo.userId = userId;
     debugInfo.groqModel = GROQ_MODEL;
-    debugInfo.messageCount = messages.length;
     
-    // Call Groq API using fetch
+    console.log(`[NextAPI] Processing chat request with ${messages.length} messages`);
+    
+    // Call Groq API
     const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -166,6 +163,8 @@ async function handleRequest(req: Request): Promise<Response> {
     debugInfo.groqStatusCode = groqResponse.status;
     debugInfo.groqStatusText = groqResponse.statusText;
     
+    console.log(`[NextAPI] Received response with status: ${groqResponse.status}`);
+    
     // Handle Groq API errors
     if (!groqResponse.ok) {
       let errorMessage = groqResponse.statusText;
@@ -179,18 +178,11 @@ async function handleRequest(req: Request): Promise<Response> {
         errorMessage = errorText || groqResponse.statusText;
       }
       
-      return new Response(
-        JSON.stringify({ 
-          error: `AI service error: ${errorMessage}`, 
-          debug: debugInfo 
-        }),
-        { 
-          status: 500, 
-          headers: {
-            ...corsHeaders,
-            'Content-Type': 'application/json'
-          }
-        }
+      console.error(`[NextAPI] Error from Groq API: ${errorMessage}`);
+      
+      return NextResponse.json(
+        { error: `AI service error: ${errorMessage}`, debug: debugInfo },
+        { status: 500, headers: corsHeaders }
       );
     }
     
@@ -203,20 +195,14 @@ async function handleRequest(req: Request): Promise<Response> {
     debugInfo.responseLength = aiResponse?.length || 0;
     
     if (!aiResponse) {
-      return new Response(
-        JSON.stringify({ 
-          error: 'No response generated from AI', 
-          debug: debugInfo 
-        }),
-        { 
-          status: 500, 
-          headers: {
-            ...corsHeaders,
-            'Content-Type': 'application/json'
-          }
-        }
+      console.error(`[NextAPI] No response content received from Groq API`);
+      return NextResponse.json(
+        { error: 'No response generated from AI', debug: debugInfo },
+        { status: 500, headers: corsHeaders }
       );
     }
+    
+    console.log(`[NextAPI] Successfully generated response (${aiResponse.length} chars)`);
     
     // Try to save conversation to database
     try {
@@ -231,11 +217,13 @@ async function handleRequest(req: Request): Promise<Response> {
         });
       
       if (dbError) {
+        console.warn(`[NextAPI] Failed to save conversation to database: ${dbError.message}`);
         debugInfo.dbError = dbError.message;
       } else {
         debugInfo.savedToDb = true;
       }
     } catch (dbError: any) {
+      console.warn(`[NextAPI] Exception saving conversation: ${dbError.message}`);
       debugInfo.dbError = dbError.message;
     }
     
@@ -244,35 +232,20 @@ async function handleRequest(req: Request): Promise<Response> {
       ? { response: aiResponse, debug: debugInfo }
       : { response: aiResponse };
     
-    return new Response(
-      JSON.stringify(responseObj),
-      { 
-        status: 200, 
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json'
-        }
-      }
-    );
+    return NextResponse.json(responseObj, { status: 200, headers: corsHeaders });
   } catch (error: any) {
-    debugInfo.fatalError = error.message;
-    debugInfo.errorStack = error.stack;
+    console.error(`[NextAPI] Fatal error: ${error.message}`, error);
     
-    return new Response(
-      JSON.stringify({ 
-        error: `Internal server error: ${error.message}`, 
-        debug: debugInfo 
-      }),
+    return NextResponse.json(
       { 
-        status: 500, 
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json'
+        error: `Internal server error: ${error.message}`,
+        debug: {
+          error: error.toString(),
+          stack: error.stack,
+          message: error.message,
         }
-      }
+      },
+      { status: 500, headers: corsHeaders }
     );
   }
-}
-
-// Export the handler for compatibility with Vercel Functions
-export default handleRequest; 
+} 

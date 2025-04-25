@@ -6,7 +6,7 @@ const GROQ_MODEL = 'llama-3.3-70b-versatile';
 const SUPABASE_URL = 'https://ujlqzkkkfatehxeqtbdl.supabase.co';
 const SUPABASE_SERVICE_ROLE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqbHF6a2trZmF0ZWh4ZXF0YmRsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0MDY4MDgzMiwiZXhwIjoyMDU2MjU2ODMyfQ.MZZMNbG8rpCLQ7sMGKXKQP1YL0dZ_PMVBKBrXL-k7IY';
 
-// Define the FetchEvent interface
+// Define the FetchEvent interface for Edge runtime
 interface FetchEvent extends Event {
   request: Request;
   respondWith(response: Response | Promise<Response>): void;
@@ -17,7 +17,7 @@ addEventListener('fetch', ((event: FetchEvent) => {
   event.respondWith(handleRequest(event.request));
 }) as EventListener);
 
-// System prompt generator
+// System prompt generator for personalized context
 function generateSystemPrompt(employeeContext: any): string {
   let basePrompt = `You are an AI assistant specialized in HR and course content creation for Learnfinity, a corporate learning platform.
   
@@ -147,6 +147,8 @@ async function handleRequest(req: Request): Promise<Response> {
     debugInfo.groqModel = GROQ_MODEL;
     debugInfo.messageCount = messages.length;
     
+    console.log(`[GroqChat] Processing chat request with ${messages.length} messages`);
+    
     // Call Groq API using fetch
     const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
@@ -166,6 +168,8 @@ async function handleRequest(req: Request): Promise<Response> {
     debugInfo.groqStatusCode = groqResponse.status;
     debugInfo.groqStatusText = groqResponse.statusText;
     
+    console.log(`[GroqChat] Received response with status: ${groqResponse.status}`);
+    
     // Handle Groq API errors
     if (!groqResponse.ok) {
       let errorMessage = groqResponse.statusText;
@@ -178,6 +182,8 @@ async function handleRequest(req: Request): Promise<Response> {
         debugInfo.groqErrorText = errorText;
         errorMessage = errorText || groqResponse.statusText;
       }
+      
+      console.error(`[GroqChat] Error from Groq API: ${errorMessage}`);
       
       return new Response(
         JSON.stringify({ 
@@ -203,6 +209,7 @@ async function handleRequest(req: Request): Promise<Response> {
     debugInfo.responseLength = aiResponse?.length || 0;
     
     if (!aiResponse) {
+      console.error(`[GroqChat] No response content received from Groq API`);
       return new Response(
         JSON.stringify({ 
           error: 'No response generated from AI', 
@@ -218,6 +225,8 @@ async function handleRequest(req: Request): Promise<Response> {
       );
     }
     
+    console.log(`[GroqChat] Successfully generated response (${aiResponse.length} chars)`);
+    
     // Try to save conversation to database
     try {
       const { error: dbError } = await supabase
@@ -231,11 +240,13 @@ async function handleRequest(req: Request): Promise<Response> {
         });
       
       if (dbError) {
+        console.warn(`[GroqChat] Failed to save conversation to database: ${dbError.message}`);
         debugInfo.dbError = dbError.message;
       } else {
         debugInfo.savedToDb = true;
       }
     } catch (dbError: any) {
+      console.warn(`[GroqChat] Exception saving conversation: ${dbError.message}`);
       debugInfo.dbError = dbError.message;
     }
     
@@ -257,6 +268,8 @@ async function handleRequest(req: Request): Promise<Response> {
   } catch (error: any) {
     debugInfo.fatalError = error.message;
     debugInfo.errorStack = error.stack;
+    
+    console.error(`[GroqChat] Fatal error: ${error.message}`);
     
     return new Response(
       JSON.stringify({ 

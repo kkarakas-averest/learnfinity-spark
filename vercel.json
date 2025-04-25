@@ -17,6 +17,16 @@
     "api/hr/employee-courses.ts": {
       "memory": 1024,
       "maxDuration": 10
+    },
+    "api/groq/chat.ts": {
+      "runtime": "edge",
+      "memory": 1024,
+      "maxDuration": 30
+    },
+    "api/chat/conversation.ts": {
+      "runtime": "edge",
+      "memory": 1024,
+      "maxDuration": 30
     }
   },
   "routes": [
@@ -37,6 +47,14 @@
     {
       "src": "/api/hr/employee-courses",
       "dest": "/api/hr/employee-courses.ts"
+    },
+    {
+      "src": "/api/groq/chat",
+      "dest": "/api/groq/chat.ts"
+    },
+    {
+      "src": "/api/chat/conversation",
+      "dest": "/api/chat/conversation.ts"
     }
   ],
   "env": {
