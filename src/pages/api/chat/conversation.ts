@@ -53,14 +53,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     const authHeader = req.headers.authorization;
     let userId: string = 'bec19c44-164f-4a0b-b63d-99697e15040a';
+    
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.replace('Bearer ', '');
       try {
         const { data: { user }, error } = await supabase.auth.getUser(token);
-        if (!error && user) {
+        if (error) {
+          console.warn('JWT validation error:', error.message);
+        } else if (user) {
           userId = user.id;
+        } else {
+          console.warn('Valid token but user not found for the provided JWT.');
         }
-      } catch {}
+      } catch (authError) {
+        console.error('Auth processing error:', authError);
+      }
     }
 
     const systemPrompt = generateSystemPrompt(employeeContext);
