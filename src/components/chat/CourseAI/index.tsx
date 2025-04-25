@@ -192,10 +192,10 @@ export function CourseAI({ employeeId, initialMessage }: CourseAIProps) {
     try {
       console.log('Fetching employee data for ID:', id);
       
-      // Fetch employee details with CV data
+      // Fetch employee details with CV data and position join
       const { data: employee, error: employeeError } = await supabase
         .from('hr_employees')
-        .select('*, cv_extracted_data, cv_file_url')
+        .select(`*, hr_positions ( title )`)
         .eq('id', id)
         .single();
 
@@ -203,6 +203,10 @@ export function CourseAI({ employeeId, initialMessage }: CourseAIProps) {
         console.error('Error fetching employee:', employeeError);
         throw employeeError;
       }
+      
+      // Map position from join
+      const position = employee.hr_positions?.title || 'Unknown';
+      employee.position = position;
       
       console.log('Employee data fetched successfully');
       
@@ -241,8 +245,7 @@ export function CourseAI({ employeeId, initialMessage }: CourseAIProps) {
                 title,
                 description,
                 estimated_duration,
-                difficulty_level,
-                is_active
+                difficulty_level
               `)
               .in('id', courseIds);
             
@@ -261,8 +264,7 @@ export function CourseAI({ employeeId, initialMessage }: CourseAIProps) {
                   title: 'Unknown Course',
                   description: null,
                   estimated_duration: null,
-                  difficulty_level: null,
-                  is_active: null
+                  difficulty_level: null
                 };
                 return {
                   id: enrollment.course_id,
@@ -270,7 +272,6 @@ export function CourseAI({ employeeId, initialMessage }: CourseAIProps) {
                   description: courseDetails.description,
                   estimatedDuration: courseDetails.estimated_duration,
                   difficultyLevel: courseDetails.difficulty_level,
-                  isActive: courseDetails.is_active,
                   status: enrollment.status,
                   progress: enrollment.progress
                 };
@@ -485,17 +486,17 @@ export function CourseAI({ employeeId, initialMessage }: CourseAIProps) {
       
       setEmployeeContext(context);
       
-      // Update the context message to remove references to knowledge
+      // Update the context message to always include position and courses
       const contextMessage: Message = {
         id: crypto.randomUUID(),
         role: 'system',
         content: `I've loaded ${employee.name}'s profile. I found:
+• Position: ${position}
 • ${context.skills.length} existing skills
 • ${context.missingSkills?.length || 0} skill gaps to address
-• ${context.courses.length} current course enrollments
+• ${context.courses.length ? context.courses.length : 'No'} current course enrollments
 ${employee.cv_extracted_data ? '• CV data extracted for personalized recommendations' : ''}
-
-I'll use this information to provide highly tailored course suggestions. What would you like to know?`,
+\nYou already have all the above. Do NOT ask the user for it again.\n\nI'll use this information to provide highly tailored course suggestions. What would you like to know?`,
         timestamp: new Date()
       };
       
