@@ -599,7 +599,7 @@ ${employee.cv_extracted_data ? '• CV data extracted for personalized recommend
       } : null;
       
       // Define the endpoint to use
-      const chatEndpoint = '/api/chat/conversation';
+      const chatEndpoint = '/api/chat/conversation-v2';
       console.log(`[ChatAI] Sending message to endpoint: ${chatEndpoint}`);
       
       // Send to the chat API

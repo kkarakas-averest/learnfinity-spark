@@ -19,7 +19,8 @@
       "maxDuration": 10
     },
     "src/pages/api/chat/conversation.ts": {
-      "runtime": "@vercel/node@18"
+      "memory": 1024,
+      "maxDuration": 10
     }
   },
   "routes": [
