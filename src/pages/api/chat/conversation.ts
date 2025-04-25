@@ -16,9 +16,7 @@ type ApiResponse = {
   debug?: any;
 };
 
-export const config = {
-  runtime: 'nodejs',
-};
+export const config = { runtime: 'nodejs' };
 
 export default async function handler(
   req: NextApiRequest,
