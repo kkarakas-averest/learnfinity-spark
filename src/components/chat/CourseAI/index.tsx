@@ -616,26 +616,38 @@ ${employee.cv_extracted_data ? '• CV data extracted for personalized recommend
         }),
       });
       
+      console.log(`[ChatAI] Response status: ${response.status}`);
+      
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[ChatAI] Error response:', errorText);
         throw new Error('Failed to get response from chat API');
       }
       
-      const data = await response.json();
+      const responseText = await response.text();
+      console.log(`[ChatAI] Response text: ${responseText.substring(0, 100)}...`);
       
-      // Remove loading message and add real response
-      setMessages((prev: Message[]) => {
-        const filtered = prev.filter(m => !m.isLoading);
-        return [
-          ...filtered,
-          {
-        id: crypto.randomUUID(),
-        role: 'assistant',
-        content: data.response,
-        timestamp: new Date()
-          }
-        ];
-      });
-      
+      try {
+        const data = JSON.parse(responseText);
+        console.log('[ChatAI] Parsed response data:', data);
+        
+        // Remove loading message and add real response
+        setMessages((prev: Message[]) => {
+          const filtered = prev.filter(m => !m.isLoading);
+          return [
+            ...filtered,
+            {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: data.response,
+          timestamp: new Date()
+            }
+          ];
+        });
+      } catch (parseError) {
+        console.error('[ChatAI] Error parsing JSON response:', parseError);
+        throw parseError;
+      }
     } catch (error) {
       console.error('Error in chat conversation:', error);
       
