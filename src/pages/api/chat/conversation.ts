@@ -21,16 +21,23 @@ const corsHeaders = {
 
 // Edge API handler function
 export default async function handler(req: NextRequest) {
+  console.log('Edge function executed:', req.url);
+  
   // Handle preflight OPTIONS request
   if (req.method === 'OPTIONS') {
+    console.log('OPTIONS request received');
     return new Response(null, { 
       status: 200,
       headers: corsHeaders 
     });
   }
   
+  // Verify essential headers
+  console.log('Request headers:', JSON.stringify(Object.fromEntries([...req.headers.entries()])));
+  
   // Only allow POST requests
   if (req.method !== 'POST') {
+    console.log('Invalid method:', req.method);
     return new Response(
       JSON.stringify({ error: 'Method not allowed' }),
       { 
