@@ -1,74 +1,109 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { createClient } from '@supabase/supabase-js';
+import type { NextRequest } from 'next/server';
 
-// Export region configuration for Vercel Serverless Functions
+// Export region configuration for Vercel Edge Functions
 export const config = {
-  runtime: 'nodejs18.x',
+  runtime: 'edge',
   regions: ['iad1'], // Washington DC region
 };
 
-// Always use the hardcoded Groq API key
+// Constants used for API calls
 const GROQ_API_KEY = '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';
 const GROQ_MODEL = 'llama-3.3-70b-versatile';
 const SUPABASE_URL = 'https://ujlqzkkkfatehxeqtbdl.supabase.co';
 const SUPABASE_SERVICE_ROLE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqbHF6a2trZmF0ZWh4ZXF0YmRsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0MDY4MDgzMiwiZXhwIjoyMDU2MjU2ODMyfQ.MZZMNbG8rpCLQ7sMGKXKQP1YL0dZ_PMVBKBrXL-k7IY';
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // Set CORS headers for all responses
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-
+// Handle edge function request
+export default async function handler(req: NextRequest) {
+  // Set CORS headers for the response
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  };
+  
   // Handle preflight OPTIONS request
   if (req.method === 'OPTIONS') {
-    return res.status(200).end();
+    return new Response(null, { 
+      status: 200,
+      headers: corsHeaders 
+    });
   }
   
   // Only allow POST requests
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return new Response(
+      JSON.stringify({ error: 'Method not allowed' }),
+      { 
+        status: 405, 
+        headers: { 
+          'Content-Type': 'application/json',
+          ...corsHeaders
+        } 
+      }
+    );
   }
-
+  
   const debugInfo: any = {
     timestamp: new Date().toISOString(),
-    nodeEnv: process.env.NODE_ENV,
     method: req.method,
     url: req.url,
-    bodyType: typeof req.body,
     hasMessages: false,
     hasEmployeeContext: false
   };
-
+  
   try {
-    const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+    // Parse request body
+    const body = await req.json();
     const { messages, employeeContext } = body;
+    
     debugInfo.hasMessages = !!messages && Array.isArray(messages);
     debugInfo.hasEmployeeContext = !!employeeContext;
     debugInfo.messageCount = messages?.length || 0;
+    
     if (!messages || !Array.isArray(messages)) {
-      return res.status(400).json({ error: 'Messages array is required', debug: debugInfo });
+      return new Response(
+        JSON.stringify({ error: 'Messages array is required', debug: debugInfo }),
+        { 
+          status: 400, 
+          headers: { 
+            'Content-Type': 'application/json',
+            ...corsHeaders
+          } 
+        }
+      );
     }
-
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-    const authHeader = req.headers.authorization;
-    let userId: string = 'bec19c44-164f-4a0b-b63d-99697e15040a';
+    
+    // Extract and verify auth token
+    let userId: string = 'bec19c44-164f-4a0b-b63d-99697e15040a'; // Default fallback user ID
+    const authHeader = req.headers.get('authorization');
     
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.replace('Bearer ', '');
       try {
-        const { data: { user }, error } = await supabase.auth.getUser(token);
-        if (error) {
-          console.warn('JWT validation error:', error.message);
-        } else if (user) {
-          userId = user.id;
+        // Get user from Supabase (direct API call instead of SDK)
+        const userResponse = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'apikey': SUPABASE_SERVICE_ROLE_KEY
+          }
+        });
+        
+        if (userResponse.ok) {
+          const userData = await userResponse.json();
+          if (userData.id) {
+            userId = userData.id;
+          } else {
+            console.log('Valid token but user not found for the provided JWT.');
+          }
         } else {
-          console.warn('Valid token but user not found for the provided JWT.');
+          console.log('JWT validation error:', await userResponse.text());
         }
       } catch (authError) {
         console.error('Auth processing error:', authError);
       }
     }
-
+    
+    // Generate prompt and prepare API messages
     const systemPrompt = generateSystemPrompt(employeeContext);
     const apiMessages = [
       { role: 'system', content: systemPrompt },
@@ -77,6 +112,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         content: m.content
       }))
     ];
+    
     debugInfo.userId = userId;
     debugInfo.groqModel = GROQ_MODEL;
     debugInfo.messageCount = messages.length;
@@ -90,6 +126,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
     
     try {
+      // Call GROQ API (works in Edge functions)
       const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -103,8 +140,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           max_tokens: 800
         })
       });
+      
       debugInfo.groqStatusCode = groqResponse.status;
       debugInfo.groqStatusText = groqResponse.statusText;
+      
       if (!groqResponse.ok) {
         let errorMessage = groqResponse.statusText;
         try {
@@ -116,46 +155,109 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           debugInfo.groqErrorText = errorText;
           errorMessage = errorText || groqResponse.statusText;
         }
-        return res.status(500).json({ error: `AI service error: ${errorMessage}`, debug: debugInfo });
+        
+        return new Response(
+          JSON.stringify({ error: `AI service error: ${errorMessage}`, debug: debugInfo }),
+          { 
+            status: 500, 
+            headers: { 
+              'Content-Type': 'application/json',
+              ...corsHeaders
+            }
+          }
+        );
       }
+      
       const result = await groqResponse.json();
       const aiResponse = result.choices?.[0]?.message?.content;
+      
       debugInfo.hasResponse = !!aiResponse;
       debugInfo.responseLength = aiResponse?.length || 0;
+      
       if (!aiResponse) {
-        return res.status(500).json({ error: 'No response generated from AI', debug: debugInfo });
+        return new Response(
+          JSON.stringify({ error: 'No response generated from AI', debug: debugInfo }),
+          { 
+            status: 500, 
+            headers: { 
+              'Content-Type': 'application/json',
+              ...corsHeaders
+            }
+          }
+        );
       }
+      
       try {
-        const { error: dbError } = await supabase
-          .from('chat_conversations')
-          .insert({
+        // Store conversation in database via direct API call
+        const dbResponse = await fetch(`${SUPABASE_URL}/rest/v1/chat_conversations`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': SUPABASE_SERVICE_ROLE_KEY,
+            'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+            'Prefer': 'return=minimal'
+          },
+          body: JSON.stringify({
             user_id: userId,
             employee_id: employeeContext?.employeeId || null,
             messages: apiMessages,
             response: aiResponse,
             created_at: new Date().toISOString()
-          });
-        if (dbError) {
-          debugInfo.dbError = dbError.message;
+          })
+        });
+        
+        if (!dbResponse.ok) {
+          debugInfo.dbError = await dbResponse.text();
         } else {
           debugInfo.savedToDb = true;
         }
       } catch (dbError: any) {
         debugInfo.dbError = dbError.message;
       }
-      if (process.env.NODE_ENV === 'development') {
-        return res.status(200).json({ response: aiResponse, debug: debugInfo });
-      } else {
-        return res.status(200).json({ response: aiResponse });
-      }
+      
+      // Return success response
+      const isDev = process.env.NODE_ENV === 'development';
+      const responseData = isDev 
+        ? { response: aiResponse, debug: debugInfo }
+        : { response: aiResponse };
+        
+      return new Response(
+        JSON.stringify(responseData),
+        { 
+          status: 200, 
+          headers: { 
+            'Content-Type': 'application/json',
+            ...corsHeaders
+          }
+        }
+      );
+      
     } catch (groqError: any) {
       debugInfo.groqFetchError = groqError.message;
-      return res.status(500).json({ error: `Error calling AI service: ${groqError.message}`, debug: debugInfo });
+      return new Response(
+        JSON.stringify({ error: `Error calling AI service: ${groqError.message}`, debug: debugInfo }),
+        { 
+          status: 500, 
+          headers: { 
+            'Content-Type': 'application/json',
+            ...corsHeaders
+          }
+        }
+      );
     }
   } catch (error: any) {
     debugInfo.fatalError = error.message;
     debugInfo.errorStack = error.stack;
-    return res.status(500).json({ error: `Internal server error: ${error.message}`, debug: debugInfo });
+    return new Response(
+      JSON.stringify({ error: `Internal server error: ${error.message}`, debug: debugInfo }),
+      { 
+        status: 500, 
+        headers: { 
+          'Content-Type': 'application/json',
+          ...corsHeaders
+        }
+      }
+    );
   }
 }
 
