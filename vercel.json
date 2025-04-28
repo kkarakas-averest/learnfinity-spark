@@ -17,10 +17,6 @@
     "api/hr/employee-courses.ts": {
       "memory": 1024,
       "maxDuration": 10
-    },
-    "api/chat/conversation.ts": {
-      "memory": 1024,
-      "maxDuration": 10
     }
   },
   "routes": [
@@ -41,6 +37,10 @@
     {
       "src": "/api/hr/employee-courses",
       "dest": "/api/hr/employee-courses.ts"
+    },
+    {
+      "src": "/api/chat/conversation",
+      "dest": "/src/pages/api/chat/conversation"
     }
   ],
   "env": {
