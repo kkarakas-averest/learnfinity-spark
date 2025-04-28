@@ -54,6 +54,7 @@ export default async function handler(req: NextRequest) {
   try {
     // Parse request body
     const body = await req.json();
+    console.log('Parsed request body:', JSON.stringify(body));
     const { messages, employeeContext } = body;
     
     debugInfo.hasMessages = !!messages && Array.isArray(messages);
@@ -189,6 +190,16 @@ export default async function handler(req: NextRequest) {
       
       try {
         // Store conversation in database via direct API call
+        const dbPayload = {
+          user_id: userId,
+          employee_id: employeeContext?.employeeId || null,
+          messages: apiMessages,
+          response: aiResponse,
+          created_at: new Date().toISOString()
+        };
+        
+        console.log('Saving to database with payload:', JSON.stringify(dbPayload));
+        
         const dbResponse = await fetch(`${SUPABASE_URL}/rest/v1/chat_conversations`, {
           method: 'POST',
           headers: {
@@ -197,19 +208,18 @@ export default async function handler(req: NextRequest) {
             'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
             'Prefer': 'return=minimal'
           },
-          body: JSON.stringify({
-            user_id: userId,
-            employee_id: employeeContext?.employeeId || null,
-            messages: apiMessages,
-            response: aiResponse,
-            created_at: new Date().toISOString()
-          })
+          body: JSON.stringify(dbPayload)
         });
         
+        console.log('Database response status:', dbResponse.status);
+        
         if (!dbResponse.ok) {
-          debugInfo.dbError = await dbResponse.text();
+          const dbErrorText = await dbResponse.text();
+          console.error('Database error:', dbErrorText);
+          debugInfo.dbError = dbErrorText;
         } else {
           debugInfo.savedToDb = true;
+          console.log('Successfully saved to database');
         }
       } catch (dbError: any) {
         debugInfo.dbError = dbError.message;
@@ -221,6 +231,8 @@ export default async function handler(req: NextRequest) {
         ? { response: aiResponse, debug: debugInfo }
         : { response: aiResponse };
         
+      console.log('Sending response:', JSON.stringify(responseData).substring(0, 200) + '...');
+      
       return new Response(
         JSON.stringify(responseData),
         { 
