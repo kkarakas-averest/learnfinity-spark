@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 
 // Export region configuration for Vercel Serverless Functions
 export const config = {
-  runtime: 'nodejs',
+  runtime: 'nodejs18.x',
   regions: ['iad1'], // Washington DC region
 };
 
