@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { v4 as uuidv4 } from 'uuid';
 // Revert to importing the whole legacy build; we'll safely access getDocument
 import mammoth from 'mammoth';
+import pdfParse from 'pdf-parse';
 
 // Set CORS headers helper function
 const setCorsHeaders = (res: VercelResponse) => {
@@ -29,45 +30,8 @@ const extractors: Record<string, FileExtractor> = {
  */
 async function extractFromPdf(buffer: Buffer): Promise<string> {
   try {
-    // Load pdfjs-dist dynamically
-    let pdfLib;
-    try {
-      // Try to dynamically import the module
-      // ESM import style (which works in newer Node.js environments)
-      pdfLib = await import('pdfjs-dist/legacy/build/pdf.js');
-    } catch (importError) {
-      console.error("Dynamic import failed:", importError);
-      return "Error loading PDF library. Please try again later.";
-    }
-
-    // Get the correct function
-    const getDocument = pdfLib.getDocument || (pdfLib.default && pdfLib.default.getDocument);
-    if (typeof getDocument !== 'function') {
-      throw new Error("PDF.js getDocument function not found");
-    }
-
-    // Load the PDF document
-    const data = new Uint8Array(buffer);
-    const loadingTask = getDocument({
-      data,
-      disableWorker: true,
-      disableStream: true,
-      disableAutoFetch: true
-    });
-    
-    const pdf = await loadingTask.promise;
-    
-    let extractedText = '';
-    
-    // Get all pages text
-    for (let i = 1; i <= pdf.numPages; i++) {
-      const page = await pdf.getPage(i);
-      const content = await page.getTextContent();
-      const strings = (content.items || []).map((item: any) => item.str);
-      extractedText += strings.join(' ') + '\n';
-    }
-    
-    return extractedText;
+    const data = await pdfParse(buffer);
+    return data.text;
   } catch (error) {
     console.error('Error extracting PDF text:', error);
     return 'Error extracting text from PDF. File may be corrupted or password protected.';
