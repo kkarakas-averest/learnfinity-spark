@@ -122,33 +122,43 @@ const convertMarkdownToHtml = (markdown: string): string => {
   // Escape HTML first
   let html = escapeHtml(markdown);
 
-  // Handle bold text
+  // Convert markdown features to HTML one by one
+  
+  // Bold text
   html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
   
-  // Handle numbered lists
-  html = html.replace(/^\d+\.\s+(.*?)$/gm, '<li>$1</li>');
-  html = html.replace(/(<li>.*?<\/li>(\n|$))+/, '<ol>$&</ol>');
+  // Handle lists properly (avoid potential nesting issues)
+  const bulletListItems = html.match(/^[•\*]\s+(.*?)$/gm);
+  if (bulletListItems) {
+    bulletListItems.forEach(item => {
+      const content = item.replace(/^[•\*]\s+/, '');
+      html = html.replace(item, `<li>${content}</li>`);
+    });
+    // Wrap all consecutive list items in a ul
+    html = html.replace(/(<li>.*?<\/li>(\n|$))+/g, '<ul>$&</ul>');
+  }
   
-  // Handle bullet points
-  html = html.replace(/^•\s+(.*?)$/gm, '<li>$1</li>');
-  html = html.replace(/^\*\s+(.*?)$/gm, '<li>$1</li>');
-  html = html.replace(/(<li>.*?<\/li>(\n|$))+/, '<ul>$&</ul>');
+  const numberedListItems = html.match(/^\d+\.\s+(.*?)$/gm);
+  if (numberedListItems) {
+    numberedListItems.forEach(item => {
+      const content = item.replace(/^\d+\.\s+/, '');
+      html = html.replace(item, `<li>${content}</li>`);
+    });
+    // Wrap all consecutive list items in an ol
+    html = html.replace(/(<li>.*?<\/li>(\n|$))+/g, '<ol>$&</ol>');
+  }
   
-  // Handle headers (h3)
+  // Headers (h3, h2, h1)
   html = html.replace(/^###\s+(.*?)$/gm, '<h3>$1</h3>');
-  
-  // Handle headers (h2)
   html = html.replace(/^##\s+(.*?)$/gm, '<h2>$1</h2>');
-  
-  // Handle headers (h1)
   html = html.replace(/^#\s+(.*?)$/gm, '<h1>$1</h1>');
   
-  // Handle paragraphs
-  html = html.replace(/(?:\r\n|\r|\n){2,}/g, '<br/><br/>');
-
-  // Neutralize accidental links
-  html = html.replace(/<a [^>]*href="([^"]+)"[^>]*>(.*?)<\/a>/g, '<span class="no-link">$2</span>');
-
+  // Replace double line breaks with br tags
+  html = html.replace(/\n\n+/g, '<br/><br/>');
+  
+  // Replace single line breaks with br tags
+  html = html.replace(/\n/g, '<br/>');
+  
   return html;
 };
 
@@ -758,7 +768,6 @@ ${employee.cv_extracted_data ? '• CV data extracted for personalized recommend
     }
     
     const isUser = message.role === 'user';
-    const contentHtml = isUser ? message.content : convertMarkdownToHtml(message.content);
     
     return (
       <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4`}>
@@ -769,11 +778,14 @@ ${employee.cv_extracted_data ? '• CV data extracted for personalized recommend
           </div>
           <div 
             className={`p-3 rounded-lg ${isUser ? 
-            'bg-primary text-primary-foreground rounded-tr-none' : 
+              'bg-primary text-primary-foreground rounded-tr-none' : 
               'bg-secondary text-secondary-foreground rounded-tl-none markdown-content'}`}
-            dangerouslySetInnerHTML={isUser ? undefined : { __html: contentHtml }}
           >
-            {isUser && message.content}
+            {isUser ? (
+              message.content
+            ) : (
+              <div dangerouslySetInnerHTML={{ __html: convertMarkdownToHtml(message.content) }} />
+            )}
           </div>
         </div>
       </div>
