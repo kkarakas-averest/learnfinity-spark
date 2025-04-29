@@ -30,36 +30,76 @@ const extractors: Record<string, FileExtractor> = {
  */
 async function extractFromPdf(buffer: Buffer): Promise<string> {
   try {
-    // Import directly from the legacy build which is more compatible with Node.js environments
-    const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.js');
+    // Create a safe copy of the buffer to avoid SharedArrayBuffer issues
+    const safeCopy = Buffer.from(buffer);
     
-    // Convert buffer to ArrayBuffer - more reliable in serverless
-    const arrayBuffer = buffer.buffer.slice(
-      buffer.byteOffset,
-      buffer.byteOffset + buffer.byteLength
-    );
+    // Direct CommonJS require-style import for better serverless compatibility
+    // This avoids ESM resolution issues in Vercel Functions
+    const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf');
     
-    // Load the PDF using the minimal API to avoid worker issues
-    const pdf = await pdfjsLib.getDocument({ 
-      data: arrayBuffer,
-      verbosity: 0, // Minimize console logging
-      isEvalSupported: false, // Disable eval for security
-      useSystemFonts: false, // Avoid font loading issues
-      disableFontFace: true, // Disable font face loading
-      cMapUrl: '', // Disable character map loading
-      standardFontDataUrl: '' // Disable standard font loading
-    }).promise;
-
+    // Log information about the imported module to diagnose
+    console.log("PDF.js module structure:", 
+      Object.keys(pdfjsLib).join(', '));
+    
+    // Extract the getDocument function - try multiple known patterns
+    let getDocumentFn;
+    
+    if (typeof pdfjsLib.getDocument === 'function') {
+      getDocumentFn = pdfjsLib.getDocument;
+      console.log("Using pdfjsLib.getDocument directly");
+    } else if (pdfjsLib.default && typeof pdfjsLib.default.getDocument === 'function') {
+      getDocumentFn = pdfjsLib.default.getDocument;
+      console.log("Using pdfjsLib.default.getDocument");
+    } else {
+      // Last resort - scan the module for getDocument
+      for (const key of Object.keys(pdfjsLib)) {
+        const obj = (pdfjsLib as any)[key];
+        if (obj && typeof obj.getDocument === 'function') {
+          getDocumentFn = obj.getDocument;
+          console.log(`Found getDocument on property '${key}'`);
+          break;
+        }
+      }
+    }
+    
+    if (!getDocumentFn) {
+      throw new Error('PDF.js getDocument function not found in the imported module');
+    }
+    
+    // Prepare data as Uint8Array (most compatible format)
+    const uint8Array = new Uint8Array(safeCopy);
+    
+    console.log("Creating PDF document task...");
+    
+    // Create document loading task with minimal options
+    const loadingTask = getDocumentFn({
+      data: uint8Array,
+      verbosity: 0,
+      disableFontFace: true,
+      isEvalSupported: false,
+      useSystemFonts: false
+    } as any);
+    
+    console.log("Awaiting PDF document...");
+    
+    // Access document via promise or direct (depending on PDF.js version)
+    const pdf = await (loadingTask.promise ? loadingTask.promise : loadingTask);
+    
+    console.log(`PDF loaded with ${pdf.numPages} pages`);
+    
     let textContent = '';
-
+    
     // Extract text from each page
     const numPages = pdf.numPages || 0;
     for (let pageNum = 1; pageNum <= numPages; pageNum++) {
       try {
         const page = await pdf.getPage(pageNum);
+        console.log(`Processing page ${pageNum}`);
+        
+        // Get text content from page
         const content = await page.getTextContent();
         
-        // Extract text strings from content items
+        // Extract strings from content items
         const pageText = content.items
           .filter((item: any) => item.str)
           .map((item: any) => item.str)
