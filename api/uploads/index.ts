@@ -42,8 +42,11 @@ async function extractFromPdf(buffer: Buffer): Promise<string> {
     let pdf;
     try {
       // Try Node.js / CommonJS pattern
+      // Ensure buffer is properly converted to Uint8Array that PDF.js will accept
+      const uint8Array = new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+      
       const loadingTask = pdfjsLib.getDocument({
-        data: buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer)
+        data: uint8Array
       });
       pdf = await loadingTask.promise;
     } catch (loadError) {
@@ -53,15 +56,17 @@ async function extractFromPdf(buffer: Buffer): Promise<string> {
         // Alternative loading method
         const pdfjsGetDocument = 
           pdfjsLib.getDocument || 
-          pdfjsLib.default?.getDocument || 
           pdfjsModule.getDocument;
           
         if (!pdfjsGetDocument) {
           throw new Error('PDF.js getDocument function not found');
         }
         
+        // Ensure buffer is properly converted to Uint8Array that PDF.js will accept
+        const uint8Array = new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+        
         const loadingTask = pdfjsGetDocument({
-          data: buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer)
+          data: uint8Array
         });
         pdf = await (loadingTask.promise || loadingTask);
       } catch (altLoadError) {
