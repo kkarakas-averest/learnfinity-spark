@@ -26,67 +26,37 @@ const extractors: Record<string, FileExtractor> = {
 };
 
 /**
- * Extract text from a PDF file using pdf-parse with fallback to a simpler approach
+ * Extract text from a PDF file using pdfjs-dist (Mozilla PDF.js) in a serverless-compatible way
  */
 async function extractFromPdf(buffer: Buffer): Promise<string> {
   try {
-    console.log('Using pdf-parse for PDF extraction');
-    
-    // Import pdf-parse dynamically
-    const pdfParse = (await import('pdf-parse')).default;
-    
-    // Configure pdf-parse options to avoid unnecessary file access
-    const options = {
-      // Avoid rendering - we only need text
-      max: 0,
-      // Skip rendering
-      rendering: false
-    };
-    
-    // Pass buffer directly with options
-    const result = await pdfParse(buffer, options);
-    
-    if (result.text && result.text.trim().length > 0) {
-      return result.text;
+    // Import pdfjs-dist for Node.js (serverless compatible)
+    const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.js');
+
+    // Load the PDF from buffer
+    const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(buffer) });
+    const pdf = await loadingTask.promise;
+    let textContent = '';
+
+    // Extract text from each page
+    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+      const page = await pdf.getPage(pageNum);
+      const pageText = await page.getTextContent();
+      const pageContent = pageText.items
+        .filter((item: any) => typeof item.str === 'string')
+        .map((item: any) => item.str)
+        .join(' ');
+      textContent += pageContent + '\n\n';
+    }
+
+    if (textContent && textContent.trim().length > 0) {
+      return textContent;
     } else {
-      console.warn('Extracted PDF text is empty from pdf-parse');
       return 'No text content could be extracted from this PDF. It may be scanned or contain only images.';
     }
   } catch (error) {
-    console.error('Error extracting text from PDF with pdf-parse:', error);
-    
-    // If pdf-parse fails, try a simple manual approach
-    try {
-      console.log('Attempting simplified fallback PDF extraction');
-      
-      // Simple fallback that doesn't rely on pdfjs or canvas
-      // This is a very basic approach - only works with simple text-based PDFs
-      const pdfContent = buffer.toString('utf-8', 0, Math.min(buffer.length, 10000));
-      
-      // Basic extractor that can get some text from PDFs without external dependencies
-      let extractedText = '';
-      const textMarkers = ['/Contents', '/Text', '/TJ', '/Tj', '(', ')'];
-      
-      if (textMarkers.some(marker => pdfContent.includes(marker))) {
-        // Extract basic text from PDF content by looking for common patterns
-        const textMatches = pdfContent.match(/\(([\x20-\x7E\n\r\t]+?)\)/g) || [];
-        extractedText = textMatches
-          .map(match => match.substring(1, match.length - 1))
-          .join(' ')
-          .replace(/\\(\d{3}|n|r|t|b|f|\\|\(|\))/g, ' ')
-          .replace(/\s+/g, ' ')
-          .trim();
-      }
-      
-      if (extractedText && extractedText.trim().length > 0) {
-        return extractedText;
-      } else {
-        return 'No text content could be extracted from this PDF. The file may be scanned, contain only images, or be in a format that cannot be processed in this environment.';
-      }
-    } catch (fallbackError) {
-      console.error('All PDF extraction methods failed:', fallbackError);
-      return 'Unable to extract text from this PDF. The file may be corrupted, password protected, or incompatible with our extraction methods.';
-    }
+    console.error('Error extracting text from PDF with pdfjs-dist:', error);
+    return 'Error extracting text from PDF. File may be corrupted, password protected, or incompatible with our extraction method.';
   }
 }
 
