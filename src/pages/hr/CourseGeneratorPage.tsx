@@ -25,6 +25,40 @@ type Employee = {
   position?: string;
 };
 
+// Functional ErrorBoundary
+function ChatErrorBoundary({ children }: { children: React.ReactNode }) {
+  const [hasError, setHasError] = React.useState(false);
+  
+  React.useEffect(() => {
+    const errorHandler = (error: ErrorEvent) => {
+      console.error("Error caught by error boundary:", error);
+      setHasError(true);
+      
+      // Optionally report to error monitoring service
+      // if (window && (window as any).Sentry) (window as any).Sentry.captureException(error);
+      
+      // Prevent the error from bubbling up
+      error.preventDefault();
+    };
+    
+    window.addEventListener('error', errorHandler);
+    
+    return () => {
+      window.removeEventListener('error', errorHandler);
+    };
+  }, []);
+  
+  if (hasError) {
+    return (
+      <div className="p-8 text-center text-red-600">
+        Something went wrong in the chat. Please refresh the page.
+      </div>
+    );
+  }
+  
+  return <>{children}</>;
+}
+
 export default function CourseGeneratorPage() {
   const [activeTab, setActiveTab] = React.useState('chat');
   const [employees, setEmployees] = React.useState<Employee[]>([]);
@@ -110,7 +144,9 @@ export default function CourseGeneratorPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <CourseAI />
+                <ChatErrorBoundary>
+                  <CourseAI />
+                </ChatErrorBoundary>
               </CardContent>
             </Card>
           </TabsContent>
@@ -176,10 +212,12 @@ export default function CourseGeneratorPage() {
                   </div>
 
                   {selectedEmployeeId ? (
-                    <CourseAI 
-                      employeeId={selectedEmployeeId} 
-                      initialMessage="I'd like to create a course for this employee based on their skill gaps and current role." 
-                    />
+                    <ChatErrorBoundary>
+                      <CourseAI 
+                        employeeId={selectedEmployeeId} 
+                        initialMessage="I'd like to create a course for this employee based on their skill gaps and current role." 
+                      />
+                    </ChatErrorBoundary>
                   ) : (
                     <div className="bg-muted rounded-lg p-8 text-center">
                       <h3 className="text-lg font-medium mb-2">Select an Employee</h3>

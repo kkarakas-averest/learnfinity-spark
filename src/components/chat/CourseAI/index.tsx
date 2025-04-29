@@ -115,18 +115,24 @@ interface EmployeeContext {
 }
 
 // Simple Markdown-to-HTML conversion function
+const escapeHtml = (text: string) =>
+  text.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));
+
 const convertMarkdownToHtml = (markdown: string): string => {
+  // Escape HTML first
+  let html = escapeHtml(markdown);
+
   // Handle bold text
-  let html = markdown.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
   
   // Handle numbered lists
   html = html.replace(/^\d+\.\s+(.*?)$/gm, '<li>$1</li>');
-  html = html.replace(/(<li>.*?<\/li>(\n|$))+/g, '<ol>$&</ol>');
+  html = html.replace(/(<li>.*?<\/li>(\n|$))+/, '<ol>$&</ol>');
   
   // Handle bullet points
   html = html.replace(/^•\s+(.*?)$/gm, '<li>$1</li>');
   html = html.replace(/^\*\s+(.*?)$/gm, '<li>$1</li>');
-  html = html.replace(/(<li>.*?<\/li>(\n|$))+/g, '<ul>$&</ul>');
+  html = html.replace(/(<li>.*?<\/li>(\n|$))+/, '<ul>$&</ul>');
   
   // Handle headers (h3)
   html = html.replace(/^###\s+(.*?)$/gm, '<h3>$1</h3>');
@@ -141,7 +147,10 @@ const convertMarkdownToHtml = (markdown: string): string => {
   html = html.replace(/(?:\r\n|\r|\n){2,}/g, '</p><p>');
   html = `<p>${html}</p>`;
   html = html.replace(/<p><\/p>/g, '');
-  
+
+  // Neutralize accidental links
+  html = html.replace(/<a [^>]*href="([^"]+)"[^>]*>(.*?)<\/a>/g, '<span class="no-link">$2</span>');
+
   return html;
 };
 
@@ -1090,7 +1099,7 @@ ${employee.cv_extracted_data ? '• CV data extracted for personalized recommend
       </div>
       
       <CardFooter className="py-3 px-4 border-t">
-        <form onSubmit={(e) => {
+        <form onSubmit={(e: React.FormEvent<HTMLFormElement>) => {
           e.preventDefault();
           handleSendMessage();
         }} className="w-full flex gap-2">
