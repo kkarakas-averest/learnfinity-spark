@@ -114,53 +114,9 @@ interface EmployeeContext {
   }[];
 }
 
-// Simple Markdown-to-HTML conversion function
+// Simple HTML escape function
 const escapeHtml = (text: string) =>
   text.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));
-
-const convertMarkdownToHtml = (markdown: string): string => {
-  // Escape HTML first
-  let html = escapeHtml(markdown);
-
-  // Convert markdown features to HTML one by one
-  
-  // Bold text
-  html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-  
-  // Handle lists properly (avoid potential nesting issues)
-  const bulletListItems = html.match(/^[•\*]\s+(.*?)$/gm);
-  if (bulletListItems) {
-    bulletListItems.forEach(item => {
-      const content = item.replace(/^[•\*]\s+/, '');
-      html = html.replace(item, `<li>${content}</li>`);
-    });
-    // Wrap all consecutive list items in a ul
-    html = html.replace(/(<li>.*?<\/li>(\n|$))+/g, '<ul>$&</ul>');
-  }
-  
-  const numberedListItems = html.match(/^\d+\.\s+(.*?)$/gm);
-  if (numberedListItems) {
-    numberedListItems.forEach(item => {
-      const content = item.replace(/^\d+\.\s+/, '');
-      html = html.replace(item, `<li>${content}</li>`);
-    });
-    // Wrap all consecutive list items in an ol
-    html = html.replace(/(<li>.*?<\/li>(\n|$))+/g, '<ol>$&</ol>');
-  }
-  
-  // Headers (h3, h2, h1)
-  html = html.replace(/^###\s+(.*?)$/gm, '<h3>$1</h3>');
-  html = html.replace(/^##\s+(.*?)$/gm, '<h2>$1</h2>');
-  html = html.replace(/^#\s+(.*?)$/gm, '<h1>$1</h1>');
-  
-  // Replace double line breaks with br tags
-  html = html.replace(/\n\n+/g, '<br/><br/>');
-  
-  // Replace single line breaks with br tags
-  html = html.replace(/\n/g, '<br/>');
-  
-  return html;
-};
 
 export function CourseAI({ employeeId, initialMessage }: CourseAIProps) {
   const [messages, setMessages] = React.useState<Message[]>([]);
@@ -779,13 +735,15 @@ ${employee.cv_extracted_data ? '• CV data extracted for personalized recommend
           <div 
             className={`p-3 rounded-lg ${isUser ? 
               'bg-primary text-primary-foreground rounded-tr-none' : 
-              'bg-secondary text-secondary-foreground rounded-tl-none markdown-content'}`}
+              'bg-secondary text-secondary-foreground rounded-tl-none'}`}
           >
-            {isUser ? (
-              message.content
-            ) : (
-              <div dangerouslySetInnerHTML={{ __html: convertMarkdownToHtml(message.content) }} />
-            )}
+            {/* Always use plain text */}
+            {message.content.split('\n').map((line, i) => (
+              <React.Fragment key={i}>
+                {line}
+                {i < message.content.split('\n').length - 1 && <br />}
+              </React.Fragment>
+            ))}
           </div>
         </div>
       </div>
