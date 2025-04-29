@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { v4 as uuidv4 } from 'uuid';
 // Revert to importing the whole legacy build; we'll safely access getDocument
 import mammoth from 'mammoth';
-import pdfParse from 'pdf-parse';
+import PDFParser from 'pdf2json';
 
 // Set CORS headers helper function
 const setCorsHeaders = (res: VercelResponse) => {
@@ -26,16 +26,54 @@ const extractors: Record<string, FileExtractor> = {
 };
 
 /**
- * Extract text from a PDF file
+ * Extract text from a PDF file using pdf2json, which works well in serverless environments
  */
 async function extractFromPdf(buffer: Buffer): Promise<string> {
-  try {
-    const data = await pdfParse(buffer);
-    return data.text;
-  } catch (error) {
-    console.error('Error extracting PDF text:', error);
-    return 'Error extracting text from PDF. File may be corrupted or password protected.';
-  }
+  return new Promise((resolve, reject) => {
+    try {
+      const pdfParser = new PDFParser();
+      
+      // Handle the "pdfParser.on('pdfParser.dataReady', callback)" event
+      pdfParser.on("pdfParser.dataReady" as any, (pdfData: any) => {
+        try {
+          // Extract text from the parsed data
+          let text = '';
+          if (pdfData && pdfData.Pages) {
+            for (const page of pdfData.Pages) {
+              if (page.Texts) {
+                for (const textItem of page.Texts) {
+                  if (textItem.R) {
+                    for (const r of textItem.R) {
+                      // Decode the URI-encoded text
+                      text += decodeURIComponent(r.T) + ' ';
+                    }
+                  }
+                }
+                text += '\n';
+              }
+            }
+          }
+          resolve(text);
+        } catch (error) {
+          console.error('Error processing PDF text:', error);
+          resolve('Error extracting text: PDF content processing failed');
+        }
+      });
+
+      // Handle errors
+      pdfParser.on("pdfParser.dataError" as any, (err: Error) => {
+        console.error('PDF parsing error:', err);
+        resolve('Error extracting text: PDF parsing failed');
+      });
+
+      // Parse the PDF buffer
+      pdfParser.parseBuffer(buffer);
+      
+    } catch (error) {
+      console.error('Error in PDF extraction:', error);
+      resolve('Error extracting text from PDF. File may be corrupted or password protected.');
+    }
+  });
 }
 
 /**
