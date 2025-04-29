@@ -31,22 +31,63 @@ const extractors: Record<string, FileExtractor> = {
 async function extractFromPdf(buffer: Buffer): Promise<string> {
   try {
     // Import pdfjs-dist for Node.js (serverless compatible)
-    const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.js');
+    // The correct way to import and access PDF.js in Node.js/serverless
+    const pdfjsModule = await import('pdfjs-dist/legacy/build/pdf.js');
+    const pdfjsLib = pdfjsModule.default || pdfjsModule;
 
-    // Load the PDF from buffer
-    const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(buffer) });
-    const pdf = await loadingTask.promise;
+    // Log warning that canvas warnings are expected and can be ignored
+    console.log('PDF.js canvas warnings can be safely ignored for text extraction');
+
+    // Load the PDF from buffer (handle API differences in environments)
+    let pdf;
+    try {
+      // Try Node.js / CommonJS pattern
+      const loadingTask = pdfjsLib.getDocument({
+        data: buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer)
+      });
+      pdf = await loadingTask.promise;
+    } catch (loadError) {
+      console.error('Initial PDF loading method failed:', loadError);
+      
+      try {
+        // Alternative loading method
+        const pdfjsGetDocument = 
+          pdfjsLib.getDocument || 
+          pdfjsLib.default?.getDocument || 
+          pdfjsModule.getDocument;
+          
+        if (!pdfjsGetDocument) {
+          throw new Error('PDF.js getDocument function not found');
+        }
+        
+        const loadingTask = pdfjsGetDocument({
+          data: buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer)
+        });
+        pdf = await (loadingTask.promise || loadingTask);
+      } catch (altLoadError) {
+        throw new Error(`Failed to load PDF after trying alternative methods: ${altLoadError}`);
+      }
+    }
+
     let textContent = '';
 
     // Extract text from each page
-    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-      const page = await pdf.getPage(pageNum);
-      const pageText = await page.getTextContent();
-      const pageContent = pageText.items
-        .filter((item: any) => typeof item.str === 'string')
-        .map((item: any) => item.str)
-        .join(' ');
-      textContent += pageContent + '\n\n';
+    const numPages = pdf.numPages || 0;
+    for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+      try {
+        const page = await pdf.getPage(pageNum);
+        const pageText = await page.getTextContent();
+        
+        const pageContent = pageText.items
+          .filter((item: any) => typeof item.str === 'string')
+          .map((item: any) => item.str)
+          .join(' ');
+          
+        textContent += pageContent + '\n\n';
+      } catch (pageError) {
+        console.error(`Error extracting text from page ${pageNum}:`, pageError);
+        textContent += `[Error extracting text from page ${pageNum}]\n\n`;
+      }
     }
 
     if (textContent && textContent.trim().length > 0) {
