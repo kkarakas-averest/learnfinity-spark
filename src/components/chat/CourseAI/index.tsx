@@ -630,6 +630,7 @@ ${employee.cv_extracted_data ? '• CV data extracted for personalized recommend
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': 'Bearer dev-hr-dashboard-token',
         },
         body: JSON.stringify({
           messages: recentMessages,
