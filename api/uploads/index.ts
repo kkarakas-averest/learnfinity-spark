@@ -40,7 +40,7 @@ async function extractFromPdf(buffer: Buffer): Promise<string> {
       throw new Error('pdfjs getDocument method not found in the imported module');
     }
 
-    const loadingTask = getDocumentFn({ data });
+    const loadingTask = getDocumentFn({ data, disableWorker: true });
     const pdf = await loadingTask.promise;
     
     let extractedText = '';

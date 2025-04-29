@@ -372,17 +372,22 @@ Do not include any explanations or text outside the JSON structure.
     }
     
     // Create section records for each module section
-    for (const module of courseData.modules) {
-      for (const section of module.sections) {
+    for (let mIndex = 0; mIndex < courseData.modules.length; mIndex++) {
+      const module = courseData.modules[mIndex];
+      const moduleUuid = uuidv4();
+
+      for (let sIndex = 0; sIndex < module.sections.length; sIndex++) {
+        const section = module.sections[sIndex];
+        const sectionUuid = uuidv4();
         const { error: sectionError } = await supabase
           .from('ai_course_content_sections')
           .insert({
             content_id: contentId,
-            module_id: module.module_id,
-            section_id: section.section_id,
+            module_id: moduleUuid,
+            section_id: sectionUuid,
             title: section.title,
             content: section.content,
-            order_index: parseInt(section.section_id.split('-')[2], 10) || 0,
+            order_index: sIndex,
             case_study: section.case_study,
             actionable_takeaway: section.actionable_takeaway,
             quiz: section.quiz,

@@ -132,7 +132,6 @@ export default async function handler(
         id: courseId,
         title: title || contentData.title,
         description: description || contentData.description,
-        ai_generated: true,
         difficulty_level: 'intermediate',
         status: 'active',
         created_at: new Date().toISOString(),
