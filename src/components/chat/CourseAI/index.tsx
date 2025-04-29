@@ -54,7 +54,9 @@ const CommandPalette = ({ onCommandClick }: { onCommandClick: (command: string) 
       {[
         { command: "/upload", description: "Upload documents", color: "bg-blue-500" },
         { command: "/generate", description: "Create a course", color: "bg-green-500" },
-        { command: "/publish", description: "Publish to employees", color: "bg-amber-500" }
+        { command: "/publish", description: "Publish to employees", color: "bg-amber-500" },
+        { command: "/bulk", description: "Bulk course generation", color: "bg-purple-500" },
+        { command: "/employees", description: "List all employees", color: "bg-teal-500" }
       ].map((cmd) => (
         <button
           key={cmd.command}
@@ -75,6 +77,11 @@ const CommandAutocomplete = ({ onSelect }: { onSelect: (command: string) => void
     { command: "/upload", description: "Upload documents for course generation" },
     { command: "/generate", description: "Create a new course with the given title" },
     { command: "/publish", description: "Publish a course to employees" },
+    { command: "/bulk", description: "Start bulk course generation by group" },
+    { command: "/employees", description: "List all employees and their info" },
+    { command: "/departments", description: "List all departments" },
+    { command: "/positions", description: "List all job positions" },
+    { command: "/courses", description: "List existing courses" }
   ];
   
   return (
@@ -248,7 +255,7 @@ export function CourseAI({ employeeId, initialMessage }: CourseAIProps) {
     const initialSystemMessage: Message = {
       id: crypto.randomUUID(),
       role: 'system',
-      content: 'Welcome to the Course Designer AI. I can help you create personalized learning content based on employee skills, CV data, and learning needs.\n\nCommands you can use:\n- `/upload` - Upload files for course content generation\n- `/generate [title]` - Create a course with the given title\n- `/publish [contentId]` - Publish a generated course to employees\n\nHow would you like to start?',
+      content: 'Welcome to the Course Designer AI. I can help you create personalized learning content based on employee skills, CV data, and learning needs.\n\nCommands you can use:\n- `/upload` - Upload files for course content generation\n- `/generate [title]` - Create a course with the given title\n- `/publish [contentId]` - Publish a generated course to employees\n- `/bulk [by:position|department|course]` - Generate courses for groups of employees\n- `/employees` - View list of all employees\n- `/departments` - View all departments\n- `/positions` - View all job positions\n- `/courses` - View existing courses\n\nHow would you like to start?',
       timestamp: new Date()
     };
     setMessages([initialSystemMessage]);
@@ -1119,6 +1126,493 @@ ${employee.cv_extracted_data ? '• CV data extracted for personalized recommend
     }
   };
 
+  // Handle bulk generation command
+  const handleBulkCommand = async (params: string) => {
+    const [byType, groupId] = parseParams(params);
+    
+    if (!byType || !['position', 'department', 'course'].includes(byType.toLowerCase())) {
+      setMessages((prev: Message[]) => [
+        ...prev, 
+        {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: 'Please specify how you want to group employees for bulk generation. Example: `/bulk by:department` or `/bulk by:position` or `/bulk by:course`',
+          timestamp: new Date()
+        }
+      ]);
+      return;
+    }
+    
+    // Set command state for bulk generation
+    setCommandState({
+      processing: true,
+      type: 'generate',
+      progress: 10,
+      status: `Fetching ${byType} data...`
+    });
+    
+    try {
+      // Fetch group data based on type
+      let groups: any[] = [];
+      let groupMessage = '';
+      
+      if (byType.toLowerCase() === 'department') {
+        const { data, error } = await supabase
+          .from('hr_departments')
+          .select('id, name, hr_employees(id)')
+          .order('name');
+          
+        if (error) throw error;
+        
+        groups = (data || []).map((dept: any) => ({
+          id: dept.id,
+          name: dept.name,
+          employee_count: Array.isArray(dept.hr_employees) ? dept.hr_employees.length : 0
+        }));
+        
+        groupMessage = "Select a department for bulk course generation:\n\n" + 
+          groups.map((dept: any, index: number) => 
+            `${index + 1}. ${dept.name} (${dept.employee_count} employees)`
+          ).join('\n');
+        
+      } else if (byType.toLowerCase() === 'position') {
+        const { data, error } = await supabase
+          .from('hr_positions')
+          .select('id, title, hr_employees(id)')
+          .order('title');
+          
+        if (error) throw error;
+        
+        groups = (data || []).map((pos: any) => ({
+          id: pos.id,
+          name: pos.title,
+          employee_count: Array.isArray(pos.hr_employees) ? pos.hr_employees.length : 0
+        }));
+        
+        groupMessage = "Select a position for bulk course generation:\n\n" + 
+          groups.map((pos: any, index: number) => 
+            `${index + 1}. ${pos.name} (${pos.employee_count} employees)`
+          ).join('\n');
+        
+      } else if (byType.toLowerCase() === 'course') {
+        const { data, error } = await supabase
+          .from('hr_courses')
+          .select('id, title, hr_course_enrollments(id)')
+          .order('title');
+          
+        if (error) throw error;
+        
+        groups = (data || []).map((course: any) => ({
+          id: course.id,
+          name: course.title,
+          employee_count: Array.isArray(course.hr_course_enrollments) ? course.hr_course_enrollments.length : 0
+        }));
+        
+        groupMessage = "Select a course for bulk course generation:\n\n" + 
+          groups.map((course: any, index: number) => 
+            `${index + 1}. ${course.name} (${course.employee_count} enrolled)`
+          ).join('\n');
+      }
+      
+      // Store the group data in command state
+      setCommandState({
+        processing: false,
+        type: null,
+        progress: 100,
+        status: '',
+        data: {
+          groupType: byType.toLowerCase(),
+          groups,
+          selectedGroup: null
+        }
+      });
+      
+      // Provide selection message
+      setMessages((prev: Message[]) => [
+        ...prev, 
+        {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: groupMessage + '\n\nTo select a group, respond with the number or name. Then I\'ll guide you through setting up the course template.',
+          timestamp: new Date()
+        }
+      ]);
+      
+    } catch (error) {
+      console.error('Error fetching group data:', error);
+      setCommandState({
+        processing: false,
+        type: null,
+        progress: 0,
+        status: ''
+      });
+      
+      setMessages((prev: Message[]) => [
+        ...prev, 
+        {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: `There was an error fetching ${byType} data: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`,
+          timestamp: new Date()
+        }
+      ]);
+      
+      toast({
+        title: "Error",
+        description: `Failed to fetch ${byType} data: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Handle employees listing command
+  const handleEmployeesCommand = async () => {
+    setMessages((prev: Message[]) => [
+      ...prev, 
+      {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: 'Fetching employee data...',
+        timestamp: new Date()
+      }
+    ]);
+    
+    try {
+      const { data, error } = await supabase
+        .from('hr_employees')
+        .select('id, name, email, hr_departments(name), hr_positions(title)')
+        .order('name');
+      
+      if (error) throw error;
+      
+      if (!data || data.length === 0) {
+        setMessages((prev: Message[]) => [
+          ...prev, 
+          {
+            id: crypto.randomUUID(),
+            role: 'assistant',
+            content: 'No employees found in the database.',
+            timestamp: new Date()
+          }
+        ]);
+        return;
+      }
+      
+      // Format employees as a table
+      const employeeList = data.map((emp: any) => ({
+        id: emp.id,
+        name: emp.name,
+        email: emp.email,
+        department: emp.hr_departments?.name || 'N/A',
+        position: emp.hr_positions?.title || 'N/A'
+      }));
+      
+      // Create message with list of employees
+      let message = `Found ${employeeList.length} employees:\n\n`;
+      
+      employeeList.forEach((emp: any, index: number) => {
+        message += `${index + 1}. ${emp.name} - ${emp.position} (${emp.department})\n`;
+      });
+      
+      message += '\nTo view an employee\'s details or create a course for them, reply with their name or number.';
+      
+      setMessages((prev: Message[]) => {
+        // Replace the loading message
+        const filteredMessages = prev.filter(m => m.content !== 'Fetching employee data...');
+        return [
+          ...filteredMessages,
+          {
+            id: crypto.randomUUID(),
+            role: 'assistant',
+            content: message,
+            timestamp: new Date()
+          }
+        ];
+      });
+      
+    } catch (error) {
+      console.error('Error fetching employees:', error);
+      
+      setMessages((prev: Message[]) => {
+        // Replace the loading message
+        const filteredMessages = prev.filter(m => m.content !== 'Fetching employee data...');
+        return [
+          ...filteredMessages,
+          {
+            id: crypto.randomUUID(),
+            role: 'assistant',
+            content: `Error fetching employees: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            timestamp: new Date()
+          }
+        ];
+      });
+      
+      toast({
+        title: "Error",
+        description: `Failed to fetch employees: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Handle departments listing command
+  const handleDepartmentsCommand = async () => {
+    setMessages((prev: Message[]) => [
+      ...prev, 
+      {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: 'Fetching department data...',
+        timestamp: new Date()
+      }
+    ]);
+    
+    try {
+      const { data, error } = await supabase
+        .from('hr_departments')
+        .select('id, name, hr_employees(id)')
+        .order('name');
+      
+      if (error) throw error;
+      
+      if (!data || data.length === 0) {
+        setMessages((prev: Message[]) => [
+          ...prev.filter(m => m.content !== 'Fetching department data...'),
+          {
+            id: crypto.randomUUID(),
+            role: 'assistant',
+            content: 'No departments found in the database.',
+            timestamp: new Date()
+          }
+        ]);
+        return;
+      }
+      
+      // Format departments with employee count
+      const departmentList = data.map((dept: any) => ({
+        id: dept.id,
+        name: dept.name,
+        employeeCount: Array.isArray(dept.hr_employees) ? dept.hr_employees.length : 0
+      }));
+      
+      // Create message with department info
+      let message = `Found ${departmentList.length} departments:\n\n`;
+      
+      departmentList.forEach((dept: any) => {
+        message += `• ${dept.name}: ${dept.employeeCount} employees\n`;
+      });
+      
+      message += '\nYou can use `/bulk by:department` to create courses for all employees in a department.';
+      
+      setMessages((prev: Message[]) => [
+        ...prev.filter(m => m.content !== 'Fetching department data...'),
+        {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: message,
+          timestamp: new Date()
+        }
+      ]);
+      
+    } catch (error) {
+      console.error('Error fetching departments:', error);
+      
+      setMessages((prev: Message[]) => [
+        ...prev.filter(m => m.content !== 'Fetching department data...'),
+        {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: `Error fetching departments: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          timestamp: new Date()
+        }
+      ]);
+      
+      toast({
+        title: "Error",
+        description: `Failed to fetch departments: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Handle positions listing command
+  const handlePositionsCommand = async () => {
+    setMessages((prev: Message[]) => [
+      ...prev, 
+      {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: 'Fetching position data...',
+        timestamp: new Date()
+      }
+    ]);
+    
+    try {
+      const { data, error } = await supabase
+        .from('hr_positions')
+        .select('id, title, hr_employees(id)')
+        .order('title');
+      
+      if (error) throw error;
+      
+      if (!data || data.length === 0) {
+        setMessages((prev: Message[]) => [
+          ...prev.filter(m => m.content !== 'Fetching position data...'),
+          {
+            id: crypto.randomUUID(),
+            role: 'assistant',
+            content: 'No positions found in the database.',
+            timestamp: new Date()
+          }
+        ]);
+        return;
+      }
+      
+      // Format positions with employee count
+      const positionList = data.map((pos: any) => ({
+        id: pos.id,
+        title: pos.title,
+        employeeCount: Array.isArray(pos.hr_employees) ? pos.hr_employees.length : 0
+      }));
+      
+      // Create message with position info
+      let message = `Found ${positionList.length} positions:\n\n`;
+      
+      positionList.forEach((pos: any) => {
+        message += `• ${pos.title}: ${pos.employeeCount} employees\n`;
+      });
+      
+      message += '\nYou can use `/bulk by:position` to create courses for all employees in a position.';
+      
+      setMessages((prev: Message[]) => [
+        ...prev.filter(m => m.content !== 'Fetching position data...'),
+        {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: message,
+          timestamp: new Date()
+        }
+      ]);
+      
+    } catch (error) {
+      console.error('Error fetching positions:', error);
+      
+      setMessages((prev: Message[]) => [
+        ...prev.filter(m => m.content !== 'Fetching position data...'),
+        {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: `Error fetching positions: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          timestamp: new Date()
+        }
+      ]);
+      
+      toast({
+        title: "Error",
+        description: `Failed to fetch positions: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Handle courses listing command
+  const handleCoursesCommand = async () => {
+    setMessages((prev: Message[]) => [
+      ...prev, 
+      {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: 'Fetching course data...',
+        timestamp: new Date()
+      }
+    ]);
+    
+    try {
+      const { data, error } = await supabase
+        .from('hr_courses')
+        .select('id, title, description, hr_course_enrollments(id)')
+        .order('title');
+      
+      if (error) throw error;
+      
+      if (!data || data.length === 0) {
+        setMessages((prev: Message[]) => [
+          ...prev.filter(m => m.content !== 'Fetching course data...'),
+          {
+            id: crypto.randomUUID(),
+            role: 'assistant',
+            content: 'No courses found in the database.',
+            timestamp: new Date()
+          }
+        ]);
+        return;
+      }
+      
+      // Format courses with enrollment count
+      const courseList = data.map((course: any) => ({
+        id: course.id,
+        title: course.title,
+        description: course.description,
+        enrollmentCount: Array.isArray(course.hr_course_enrollments) ? course.hr_course_enrollments.length : 0
+      }));
+      
+      // Create message with course info
+      let message = `Found ${courseList.length} courses:\n\n`;
+      
+      courseList.forEach((course: any) => {
+        message += `• ${course.title} - ${course.enrollmentCount} enrolled\n`;
+        if (course.description) {
+          message += `  ${course.description.substring(0, 100)}${course.description.length > 100 ? '...' : ''}\n`;
+        }
+        message += '\n';
+      });
+      
+      setMessages((prev: Message[]) => [
+        ...prev.filter(m => m.content !== 'Fetching course data...'),
+        {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: message,
+          timestamp: new Date()
+        }
+      ]);
+      
+    } catch (error) {
+      console.error('Error fetching courses:', error);
+      
+      setMessages((prev: Message[]) => [
+        ...prev.filter(m => m.content !== 'Fetching course data...'),
+        {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: `Error fetching courses: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          timestamp: new Date()
+        }
+      ]);
+      
+      toast({
+        title: "Error",
+        description: `Failed to fetch courses: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Helper to parse params from command string
+  const parseParams = (paramsString: string): [string | undefined, string | undefined] => {
+    if (!paramsString) return [undefined, undefined];
+    
+    // Check for by:type format
+    const byMatch = paramsString.match(/by:([a-zA-Z]+)/i);
+    const byType = byMatch ? byMatch[1] : undefined;
+    
+    // Check for id: format or just an ID
+    const idMatch = paramsString.match(/id:([a-zA-Z0-9-]+)/i);
+    const id = idMatch ? idMatch[1] : undefined;
+    
+    return [byType, id];
+  };
+
   // Process command
   const processCommand = async (commandText: string) => {
     const { command, args } = parseCommand(commandText);
@@ -1134,6 +1628,26 @@ ${employee.cv_extracted_data ? '• CV data extracted for personalized recommend
         
       case '/publish':
         handlePublishCommand(args);
+        break;
+        
+      case '/bulk':
+        handleBulkCommand(args);
+        break;
+        
+      case '/employees':
+        handleEmployeesCommand();
+        break;
+        
+      case '/departments':
+        handleDepartmentsCommand();
+        break;
+        
+      case '/positions':
+        handlePositionsCommand();
+        break;
+        
+      case '/courses':
+        handleCoursesCommand();
         break;
         
       default:
