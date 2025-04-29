@@ -212,12 +212,12 @@ export default async function handler(
     
     // Format employee data for context
     const departmentName = Array.isArray(employee.hr_departments) 
-      ? employee.hr_departments[0]?.name 
-      : employee.hr_departments?.name || null;
+      ? (employee.hr_departments[0] as any)?.name 
+      : (employee.hr_departments as any)?.name || null;
       
     const positionTitle = Array.isArray(employee.hr_positions) 
-      ? employee.hr_positions[0]?.title 
-      : employee.hr_positions?.title || null;
+      ? (employee.hr_positions[0] as any)?.title 
+      : (employee.hr_positions as any)?.title || null;
     
     // Create a unique content ID for the course
     const contentId = uuidv4();
@@ -318,7 +318,7 @@ Do not include any explanations or text outside the JSON structure.
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt }
       ],
-      model: 'llama-3.1-70b-versatile',
+      model: 'llama-3.3-70b-versatile',
       temperature: 0.5,
       max_tokens: 4000,
       response_format: { type: "json_object" }
