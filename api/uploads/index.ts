@@ -26,19 +26,38 @@ const extractors: Record<string, FileExtractor> = {
 };
 
 /**
- * Extract text from a PDF file using pdf-parse
+ * Extract text from a PDF file using pdfjs-dist
  */
 async function extractFromPdf(buffer: Buffer): Promise<string> {
   try {
-    const pdfParse: typeof import('pdf-parse') = (await import('pdf-parse')).default || (await import('pdf-parse'));
-    const result = await pdfParse(buffer);
-    if (!result.text || result.text.trim().length === 0) {
+    // Dynamically import pdfjs-dist to ensure it works in serverless environment
+    const pdfjsLib = await import('pdfjs-dist');
+    
+    // Configure the worker - critical in serverless environment
+    pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`;
+    
+    // Load the PDF from buffer
+    const loadingTask = pdfjsLib.getDocument({ data: buffer });
+    const pdf = await loadingTask.promise;
+    
+    let textContent = '';
+    
+    // Extract text from each page
+    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+      const page = await pdf.getPage(pageNum);
+      const pageText = await page.getTextContent();
+      const pageItems = pageText.items.map((item: any) => item.str);
+      textContent += pageItems.join(' ') + '\n\n';
+    }
+    
+    if (!textContent || textContent.trim().length === 0) {
       console.warn('Extracted PDF text is empty');
       return 'No text content could be extracted from this PDF. It may be scanned or contain only images.';
     }
-    return result.text;
+    
+    return textContent;
   } catch (error) {
-    console.error('Error extracting text from PDF with pdf-parse:', error);
+    console.error('Error extracting text from PDF with pdfjs-dist:', error);
     return 'Error extracting text from PDF. File may be corrupted or password protected.';
   }
 }
