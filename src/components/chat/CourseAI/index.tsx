@@ -2,7 +2,7 @@ import React from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from "@/components/ui/card";
-import { Loader2, FileText, User, Book, Award, BookOpen, Bookmark, BarChart2, CheckCircle, ChevronDown, ChevronUp, RefreshCw, AlertCircle, Zap, Upload } from "lucide-react";
+import { Loader2, FileText, User, Book, Award, BookOpen, Bookmark, BarChart2, CheckCircle, ChevronDown, ChevronUp, RefreshCw, AlertCircle, Zap, Upload, Menu, ArrowLeft, ArrowRight } from "lucide-react";
 import SendIcon from '@/components/icons/SendIcon';
 import BotIcon from '@/components/icons/BotIcon';
 import { useToast } from "@/components/ui/use-toast";
@@ -23,6 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { uploadCommandSchema, generateCommandSchema, publishCommandSchema, courseAICommandSchema, type CourseAICommand } from '@/types/ai-course-schema';
+import { cn } from "@/lib/utils";
 
 // Create AccordionItem since it's not exported from accordion.tsx
 const AccordionItem = AccordionPrimitive.Item;
@@ -46,27 +47,68 @@ const PlusIcon = (props: React.SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
-// Command Palette component to provide persistent command visibility
-const CommandPalette = ({ onCommandClick }: { onCommandClick: (command: string) => void }) => (
-  <div className="fixed bottom-4 right-4 z-10 bg-card rounded-lg shadow-lg border p-3 flex flex-col gap-2 max-w-[250px]">
-    <h3 className="text-sm font-semibold mb-1">Available Commands</h3>
-    <div className="grid gap-2">
-      {[
-        { command: "/upload", description: "Upload documents", color: "bg-blue-500" },
-        { command: "/generate", description: "Create a course", color: "bg-green-500" },
-        { command: "/publish", description: "Publish to employees", color: "bg-amber-500" },
-        { command: "/bulk", description: "Bulk course generation", color: "bg-purple-500" },
-        { command: "/employees", description: "List all employees", color: "bg-teal-500" }
-      ].map((cmd) => (
-        <button
-          key={cmd.command}
-          onClick={() => onCommandClick(cmd.command)}
-          className={`${cmd.color} text-white text-xs font-medium px-3 py-2 rounded-md hover:opacity-90 transition-opacity flex items-center justify-between`}
-        >
-          <span>{cmd.command}</span>
-          <span className="text-xs opacity-80">{cmd.description}</span>
-        </button>
-      ))}
+// Command Sidebar component to provide persistent but expandable command visibility
+const CommandSidebar = ({ 
+  onCommandClick, 
+  isExpanded,
+  onToggle
+}: { 
+  onCommandClick: (command: string) => void;
+  isExpanded: boolean;
+  onToggle: () => void;
+}) => (
+  <div className={cn(
+    "h-full bg-card border-r border-border transition-all duration-200 overflow-hidden",
+    isExpanded ? "w-64" : "w-12"
+  )}>
+    <div className="flex flex-col h-full">
+      <div className="border-b p-3 flex items-center justify-between">
+        {isExpanded && <h3 className="text-sm font-semibold">Commands</h3>}
+        <Button variant="ghost" size="icon" onClick={onToggle} className="h-8 w-8">
+          {isExpanded ? <ArrowLeft className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+        </Button>
+      </div>
+      
+      <div className="flex-1 overflow-y-auto p-2">
+        {[
+          { command: "/upload", description: "Upload documents", color: "bg-blue-500", icon: <Upload className="h-4 w-4" /> },
+          { command: "/generate", description: "Create a course", color: "bg-green-500", icon: <Book className="h-4 w-4" /> },
+          { command: "/publish", description: "Publish to employees", color: "bg-amber-500", icon: <CheckCircle className="h-4 w-4" /> },
+          { command: "/bulk", description: "Bulk course generation", color: "bg-purple-500", icon: <BarChart2 className="h-4 w-4" /> },
+          { command: "/employees", description: "List all employees", color: "bg-teal-500", icon: <User className="h-4 w-4" /> }
+        ].map((cmd) => (
+          <TooltipProvider key={cmd.command}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => onCommandClick(cmd.command)}
+                  className={cn(
+                    "w-full mb-2 rounded-md text-left transition-colors",
+                    isExpanded 
+                      ? `${cmd.color} text-white px-3 py-2 hover:opacity-90` 
+                      : "bg-muted hover:bg-muted/80 p-2 flex justify-center"
+                  )}
+                >
+                  {isExpanded ? (
+                    <div className="flex items-center justify-between">
+                      <span>{cmd.command}</span>
+                      <span className="text-xs opacity-80">{cmd.description}</span>
+                    </div>
+                  ) : (
+                    <div className="text-foreground">{cmd.icon}</div>
+                  )}
+                </button>
+              </TooltipTrigger>
+              {!isExpanded && (
+                <TooltipContent side="right">
+                  <p>{cmd.command}</p>
+                  <p className="text-xs text-muted-foreground">{cmd.description}</p>
+                </TooltipContent>
+              )}
+            </Tooltip>
+          </TooltipProvider>
+        ))}
+      </div>
     </div>
   </div>
 );
@@ -245,6 +287,7 @@ export function CourseAI({ employeeId, initialMessage }: CourseAIProps) {
   });
   const [fileInputRef] = React.useState<React.RefObject<HTMLInputElement>>(React.createRef());
   const [showCommandAutocomplete, setShowCommandAutocomplete] = React.useState(false);
+  const [isCommandSidebarExpanded, setIsCommandSidebarExpanded] = React.useState(false);
   
   const endOfMessagesRef = React.useRef<HTMLDivElement>(null);
   const { toast } = useToast();
@@ -255,7 +298,7 @@ export function CourseAI({ employeeId, initialMessage }: CourseAIProps) {
     const initialSystemMessage: Message = {
       id: crypto.randomUUID(),
       role: 'system',
-      content: 'Welcome to the Course Designer AI. I can help you create personalized learning content based on employee skills, CV data, and learning needs.\n\nCommands you can use:\n- `/upload` - Upload files for course content generation\n- `/generate [title]` - Create a course with the given title\n- `/publish [contentId]` - Publish a generated course to employees\n- `/bulk [by:position|department|course]` - Generate courses for groups of employees\n- `/employees` - View list of all employees\n- `/departments` - View all departments\n- `/positions` - View all job positions\n- `/courses` - View existing courses\n\nHow would you like to start?',
+      content: 'Welcome to the Course Designer AI. I can help you create personalized learning content based on employee skills, CV data, and learning needs.\n\nUse the command sidebar on the left to access available commands, or type "/" to see all options.\n\nHow would you like to start?',
       timestamp: new Date()
     };
     setMessages([initialSystemMessage]);
@@ -2047,8 +2090,20 @@ ${employee.cv_extracted_data ? '• CV data extracted for personalized recommend
     );
   };
 
+  // Toggle command sidebar
+  const toggleCommandSidebar = () => {
+    setIsCommandSidebarExpanded((prevState: boolean) => !prevState);
+  };
+
   return (
     <div className="flex h-[calc(100vh-13rem)] md:h-[calc(100vh-12rem)] lg:h-[calc(100vh-10rem)] rounded-md border overflow-hidden relative">
+      {/* Command Sidebar */}
+      <CommandSidebar 
+        onCommandClick={handleCommandClick} 
+        isExpanded={isCommandSidebarExpanded}
+        onToggle={toggleCommandSidebar}
+      />
+      
       {/* Main chat area */}
       <div className="flex-1 flex flex-col h-full">
         {/* Messages container */}
@@ -2103,9 +2158,6 @@ ${employee.cv_extracted_data ? '• CV data extracted for personalized recommend
         multiple
         onChange={handleFileUpload}
       />
-      
-      {/* Floating command palette */}
-      <CommandPalette onCommandClick={handleCommandClick} />
     </div>
   );
 } 
