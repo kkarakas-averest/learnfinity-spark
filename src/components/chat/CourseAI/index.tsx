@@ -545,26 +545,23 @@ ${employee.cv_extracted_data ? '• CV data extracted for personalized recommend
   };
 
   // Function to handle sending a message
-  const handleSendMessage = async (event?: React.FormEvent) => {
-    if (event) {
-      event.preventDefault();
-    }
-    
+  const handleSendMessage = async (userMessage?: string) => {
     // Don't send if input is empty or just whitespace
-    if (!input.trim() || isLoading) return;
+    const messageToSend = userMessage || input;
+    if (!messageToSend.trim() || isLoading) return;
     
     // Create the user message
-    const userMessage: Message = {
+    const userMessageObj: Message = {
       id: crypto.randomUUID(),
       role: 'user',
-      content: input,
+      content: messageToSend,
       timestamp: new Date(),
     };
     
     // Add user message and a loading message to the messages array
     setMessages((prev: Message[]) => [
       ...prev,
-      userMessage,
+      userMessageObj,
       {
         id: crypto.randomUUID(),
         role: 'assistant',
@@ -574,8 +571,10 @@ ${employee.cv_extracted_data ? '• CV data extracted for personalized recommend
       },
     ]);
     
-    // Clear the input field
-    setInput('');
+    // Clear the input field if we're using the input state
+    if (!userMessage) {
+      setInput('');
+    }
     setIsLoading(true);
     
     // Scroll to the bottom
@@ -587,7 +586,7 @@ ${employee.cv_extracted_data ? '• CV data extracted for personalized recommend
 
     try {
       // Get the last few messages for context (exclude the loading message)
-      const recentMessages = [...messages.slice(-5), userMessage]
+      const recentMessages = [...messages.slice(-5), userMessageObj]
         .map((m: Message) => ({ role: m.role, content: m.content }));
       
       // Add enhanced employee context if available
@@ -1057,7 +1056,10 @@ ${employee.cv_extracted_data ? '• CV data extracted for personalized recommend
       </div>
       
       <CardFooter className="py-3 px-4 border-t">
-        <form onSubmit={handleSendMessage} className="w-full flex gap-2">
+        <form onSubmit={(e) => {
+          e.preventDefault();
+          handleSendMessage();
+        }} className="w-full flex gap-2">
           <Input
             placeholder="Type your message..."
             value={input}
