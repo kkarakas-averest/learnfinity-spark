@@ -544,33 +544,47 @@ ${employee.cv_extracted_data ? '• CV data extracted for personalized recommend
     }
   };
 
-  // Send a message to the chat
-  const handleSendMessage = async (messageText = input) => {
-    if (!messageText.trim() && !isLoading) {
-      return;
+  // Function to handle sending a message
+  const handleSendMessage = async (event?: React.FormEvent) => {
+    if (event) {
+      event.preventDefault();
     }
     
-    // Add user message to chat
+    // Don't send if input is empty or just whitespace
+    if (!input.trim() || isLoading) return;
+    
+    // Create the user message
     const userMessage: Message = {
       id: crypto.randomUUID(),
       role: 'user',
-      content: messageText.trim(),
-      timestamp: new Date()
-    };
-    
-    // Add temporary loading message
-    const loadingMessage: Message = {
-      id: crypto.randomUUID(),
-      role: 'assistant',
-      content: '',
+      content: input,
       timestamp: new Date(),
-      isLoading: true
     };
     
-    setMessages((prev: Message[]) => [...prev, userMessage, loadingMessage]);
+    // Add user message and a loading message to the messages array
+    setMessages((prev: Message[]) => [
+      ...prev,
+      userMessage,
+      {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: '',
+        isLoading: true,
+        timestamp: new Date(),
+      },
+    ]);
+    
+    // Clear the input field
     setInput('');
     setIsLoading(true);
     
+    // Scroll to the bottom
+    setTimeout(() => {
+      if (endOfMessagesRef.current) {
+        endOfMessagesRef.current.scrollIntoView({ behavior: 'smooth' });
+      }
+    }, 100);
+
     try {
       // Get the last few messages for context (exclude the loading message)
       const recentMessages = [...messages.slice(-5), userMessage]
@@ -621,7 +635,7 @@ ${employee.cv_extracted_data ? '• CV data extracted for personalized recommend
       if (!response.ok) {
         const errorText = await response.text();
         console.error('[ChatAI] Error response:', errorText);
-        throw new Error('Failed to get response from chat API');
+        throw new Error(`Failed to get response from chat API: ${response.status}`);
       }
       
       const responseText = await response.text();
@@ -644,6 +658,9 @@ ${employee.cv_extracted_data ? '• CV data extracted for personalized recommend
             }
           ];
         });
+        
+        // Ensure we don't navigate away from this page
+        window.history.replaceState(null, '', window.location.pathname);
       } catch (parseError) {
         console.error('[ChatAI] Error parsing JSON response:', parseError);
         throw parseError;
@@ -672,14 +689,6 @@ ${employee.cv_extracted_data ? '• CV data extracted for personalized recommend
       });
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  // Handle Enter key press
-  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
     }
   };
 
@@ -1049,25 +1058,29 @@ ${employee.cv_extracted_data ? '• CV data extracted for personalized recommend
         {employeeContext && showEmployeePanel && renderEmployeePanel()}
       </div>
       
-      <CardFooter className="p-3 border-t">
-        <div className="flex w-full items-center gap-2">
+      <CardFooter className="py-3 px-4 border-t">
+        <form onSubmit={handleSendMessage} className="w-full flex gap-2">
           <Input
+            placeholder="Type your message..."
             value={input}
             onChange={(e: React.ChangeEvent<HTMLInputElement>) => setInput(e.target.value)}
-            onKeyDown={handleKeyPress}
-            placeholder="Type a message or ask about designing a course..."
+            onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSendMessage();
+              }
+            }}
+            className="flex-1"
             disabled={isLoading}
-            className="flex-grow"
           />
           <Button 
-            onClick={() => handleSendMessage()} 
-            disabled={isLoading || !input.trim()} 
-            size="icon"
-            variant="default"
+            type="submit"
+            size="icon" 
+            disabled={!input.trim() || isLoading}
           >
-            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <SendIcon className="h-4 w-4" />}
+            <SendIcon className="h-4 w-4" />
           </Button>
-        </div>
+        </form>
       </CardFooter>
     </Card>
   );
