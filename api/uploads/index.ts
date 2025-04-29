@@ -1,9 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 import { v4 as uuidv4 } from 'uuid';
-// Revert to importing the whole legacy build; we'll safely access getDocument
-import mammoth from 'mammoth';
-import PDFParser from 'pdf2json';
+import * as officeparser from 'officeparser';
 
 // Set CORS headers helper function
 const setCorsHeaders = (res: VercelResponse) => {
@@ -22,87 +20,90 @@ type FileExtractor = (buffer: Buffer) => Promise<string>;
 const extractors: Record<string, FileExtractor> = {
   'application/pdf': extractFromPdf,
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document': extractFromDocx,
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation': extractFromPptx,
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': extractFromXlsx,
   'text/plain': extractFromText,
 };
 
 /**
- * Extract text from a PDF file using pdf2json, which works well in serverless environments
+ * Extract text from a PDF file using pdf-parse
  */
 async function extractFromPdf(buffer: Buffer): Promise<string> {
-  return new Promise((resolve) => {
-    try {
-      // Set a timeout to prevent hanging indefinitely on problematic PDFs
-      const extractionTimeout = setTimeout(() => {
-        console.warn('PDF extraction timed out after 30 seconds');
-        resolve('PDF extraction timed out. Partial text may be available.');
-      }, 30000); // 30 second timeout
-      
-      const pdfParser = new PDFParser(null, true); // true = silence warnings about unsupported features
-      
-      // Handle success
-      pdfParser.on("pdfParser.dataReady" as any, (pdfData: any) => {
-        clearTimeout(extractionTimeout); // Clear the timeout as we got data
-        
-        try {
-          // Extract text from the parsed data
-          let text = '';
-          if (pdfData && pdfData.Pages) {
-            for (const page of pdfData.Pages) {
-              if (page.Texts) {
-                for (const textItem of page.Texts) {
-                  if (textItem.R) {
-                    for (const r of textItem.R) {
-                      try {
-                        // Decode the URI-encoded text, handling invalid sequences
-                        const decodedText = decodeURIComponent(r.T.replace(/%(?![0-9A-Fa-f]{2})/g, '%25'));
-                        text += decodedText + ' ';
-                      } catch (decodeError) {
-                        // If decoding fails, just use the raw text
-                        text += r.T + ' ';
-                      }
-                    }
-                  }
-                }
-                text += '\n';
-              }
-            }
-          }
-          
-          if (text.trim().length === 0) {
-            console.warn('Extracted PDF text is empty');
-            resolve('No text content could be extracted from this PDF. It may be scanned or contain only images.');
-          } else {
-            resolve(text);
-          }
-        } catch (error) {
-          console.error('Error processing PDF text:', error);
-          resolve('Error extracting text: PDF content processing failed');
-        }
-      });
-
-      // Handle errors
-      pdfParser.on("pdfParser.dataError" as any, (err: Error) => {
-        clearTimeout(extractionTimeout); // Clear the timeout as we got an error
-        console.error('PDF parsing error:', err);
-        resolve('Error extracting text: PDF parsing failed');
-      });
-
-      // Parse the PDF buffer
-      pdfParser.parseBuffer(buffer);
-      
-    } catch (error) {
-      console.error('Error in PDF extraction:', error);
-      resolve('Error extracting text from PDF. File may be corrupted or password protected.');
+  try {
+    const pdfParse: typeof import('pdf-parse') = (await import('pdf-parse')).default || (await import('pdf-parse'));
+    const result = await pdfParse(buffer);
+    if (!result.text || result.text.trim().length === 0) {
+      console.warn('Extracted PDF text is empty');
+      return 'No text content could be extracted from this PDF. It may be scanned or contain only images.';
     }
-  });
+    return result.text;
+  } catch (error) {
+    console.error('Error extracting text from PDF with pdf-parse:', error);
+    return 'Error extracting text from PDF. File may be corrupted or password protected.';
+  }
 }
 
 /**
- * Extract text from a DOCX file
+ * Extract text from a DOCX file using officeparser
  */
 async function extractFromDocx(buffer: Buffer): Promise<string> {
-  const result = await mammoth.extractRawText({ buffer });
-  return result.value;
+  try {
+    const data = await officeparser.parseOfficeAsync(buffer);
+    
+    if (!data || data.trim().length === 0) {
+      console.warn('Extracted DOCX text is empty');
+      return 'No text content could be extracted from this document.';
+    }
+    
+    return data;
+  } catch (error) {
+    console.error('Error in DOCX extraction:', error);
+    return 'Error extracting text from DOCX. File may be corrupted.';
+  }
+}
+
+/**
+ * Extract text from a PowerPoint presentation (PPTX) using officeparser
+ */
+async function extractFromPptx(buffer: Buffer): Promise<string> {
+  try {
+    const options = {
+      // Options specific to PowerPoint files
+      ignoreNotes: false,    // Include slide notes
+      newlineDelimiter: '\n' // Use standard newlines
+    };
+    
+    const data = await officeparser.parseOfficeAsync(buffer, options);
+    
+    if (!data || data.trim().length === 0) {
+      console.warn('Extracted PPTX text is empty');
+      return 'No text content could be extracted from this presentation. It may contain only images or shapes.';
+    }
+    
+    return data;
+  } catch (error) {
+    console.error('Error in PPTX extraction:', error);
+    return 'Error extracting text from PPTX. File may be corrupted.';
+  }
+}
+
+/**
+ * Extract text from an Excel spreadsheet (XLSX) using officeparser
+ */
+async function extractFromXlsx(buffer: Buffer): Promise<string> {
+  try {
+    const data = await officeparser.parseOfficeAsync(buffer);
+    
+    if (!data || data.trim().length === 0) {
+      console.warn('Extracted XLSX text is empty');
+      return 'No text content could be extracted from this spreadsheet.';
+    }
+    
+    return data;
+  } catch (error) {
+    console.error('Error in XLSX extraction:', error);
+    return 'Error extracting text from XLSX. File may be corrupted.';
+  }
 }
 
 /**
@@ -121,7 +122,7 @@ async function extractFromText(buffer: Buffer): Promise<string> {
  * 3. Extracting text content from the document
  * 
  * Request format: multipart/form-data with:
- * - file: The document file (PDF, DOCX, TXT)
+ * - file: The document file (PDF, DOCX, PPTX, XLSX, TXT)
  * - companyId: (optional) Company ID for organization
  * 
  * Response format:
