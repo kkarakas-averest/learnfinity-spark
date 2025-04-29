@@ -41,6 +41,11 @@
     {
       "src": "/api/chat/conversation",
       "dest": "/src/pages/api/chat/conversation"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html",
+      "status": 200
     }
   ],
   "env": {
