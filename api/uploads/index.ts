@@ -29,12 +29,20 @@ const extractors: Record<string, FileExtractor> = {
  * Extract text from a PDF file using pdf2json, which works well in serverless environments
  */
 async function extractFromPdf(buffer: Buffer): Promise<string> {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     try {
-      const pdfParser = new PDFParser();
+      // Set a timeout to prevent hanging indefinitely on problematic PDFs
+      const extractionTimeout = setTimeout(() => {
+        console.warn('PDF extraction timed out after 30 seconds');
+        resolve('PDF extraction timed out. Partial text may be available.');
+      }, 30000); // 30 second timeout
       
-      // Handle the "pdfParser.on('pdfParser.dataReady', callback)" event
+      const pdfParser = new PDFParser(null, true); // true = silence warnings about unsupported features
+      
+      // Handle success
       pdfParser.on("pdfParser.dataReady" as any, (pdfData: any) => {
+        clearTimeout(extractionTimeout); // Clear the timeout as we got data
+        
         try {
           // Extract text from the parsed data
           let text = '';
@@ -44,8 +52,14 @@ async function extractFromPdf(buffer: Buffer): Promise<string> {
                 for (const textItem of page.Texts) {
                   if (textItem.R) {
                     for (const r of textItem.R) {
-                      // Decode the URI-encoded text
-                      text += decodeURIComponent(r.T) + ' ';
+                      try {
+                        // Decode the URI-encoded text, handling invalid sequences
+                        const decodedText = decodeURIComponent(r.T.replace(/%(?![0-9A-Fa-f]{2})/g, '%25'));
+                        text += decodedText + ' ';
+                      } catch (decodeError) {
+                        // If decoding fails, just use the raw text
+                        text += r.T + ' ';
+                      }
                     }
                   }
                 }
@@ -53,7 +67,13 @@ async function extractFromPdf(buffer: Buffer): Promise<string> {
               }
             }
           }
-          resolve(text);
+          
+          if (text.trim().length === 0) {
+            console.warn('Extracted PDF text is empty');
+            resolve('No text content could be extracted from this PDF. It may be scanned or contain only images.');
+          } else {
+            resolve(text);
+          }
         } catch (error) {
           console.error('Error processing PDF text:', error);
           resolve('Error extracting text: PDF content processing failed');
@@ -62,6 +82,7 @@ async function extractFromPdf(buffer: Buffer): Promise<string> {
 
       // Handle errors
       pdfParser.on("pdfParser.dataError" as any, (err: Error) => {
+        clearTimeout(extractionTimeout); // Clear the timeout as we got an error
         console.error('PDF parsing error:', err);
         resolve('Error extracting text: PDF parsing failed');
       });
