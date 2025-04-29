@@ -1,8 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 import { v4 as uuidv4 } from 'uuid';
-// Update the PDF.js import to access the correct Node.js compatible API
-import { getDocument } from 'pdfjs-dist/legacy/build/pdf.js';
+// Revert to importing the whole legacy build; we'll safely access getDocument
+import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.js';
 import mammoth from 'mammoth';
 
 // Set CORS headers helper function
@@ -32,8 +32,15 @@ async function extractFromPdf(buffer: Buffer): Promise<string> {
   try {
     // Load the PDF document
     const data = new Uint8Array(buffer);
-    // Update to use the imported getDocument function directly
-    const loadingTask = getDocument({ data });
+
+    // pdfjs-dist ESM default export quirk handling
+    const pdfModule: any = pdfjsLib;
+    const getDocumentFn = pdfModule.getDocument || (pdfModule.default && pdfModule.default.getDocument);
+    if (typeof getDocumentFn !== 'function') {
+      throw new Error('pdfjs getDocument method not found in the imported module');
+    }
+
+    const loadingTask = getDocumentFn({ data });
     const pdf = await loadingTask.promise;
     
     let extractedText = '';
@@ -42,7 +49,7 @@ async function extractFromPdf(buffer: Buffer): Promise<string> {
     for (let i = 1; i <= pdf.numPages; i++) {
       const page = await pdf.getPage(i);
       const content = await page.getTextContent();
-      const strings = content.items.map((item: any) => item.str);
+      const strings = (content.items || []).map((item: any) => item.str);
       extractedText += strings.join(' ') + '\n';
     }
     
