@@ -26,16 +26,26 @@ const extractors: Record<string, FileExtractor> = {
 };
 
 /**
- * Extract text from a PDF file using pdfjs-dist fallback to pdf-parse
+ * Extract text from a PDF file using pdf-parse with fallback to a simpler approach
  */
 async function extractFromPdf(buffer: Buffer): Promise<string> {
   try {
-    // Try pdf-parse first as it's simpler in Node.js environments
     console.log('Using pdf-parse for PDF extraction');
+    
+    // Import pdf-parse dynamically
     const pdfParse = (await import('pdf-parse')).default;
     
-    // Explicitly pass only the buffer to parse without any file paths
-    const result = await pdfParse(buffer);
+    // Configure pdf-parse options to avoid unnecessary file access
+    const options = {
+      // Avoid rendering - we only need text
+      max: 0,
+      // Skip rendering
+      rendering: false
+    };
+    
+    // Pass buffer directly with options
+    const result = await pdfParse(buffer, options);
+    
     if (result.text && result.text.trim().length > 0) {
       return result.text;
     } else {
@@ -45,44 +55,37 @@ async function extractFromPdf(buffer: Buffer): Promise<string> {
   } catch (error) {
     console.error('Error extracting text from PDF with pdf-parse:', error);
     
-    // If pdf-parse fails, try a simplified pdfjs approach
+    // If pdf-parse fails, try a simple manual approach
     try {
-      console.log('Attempting fallback PDF extraction with custom method');
+      console.log('Attempting simplified fallback PDF extraction');
       
-      // Simplified extraction without workers - corrected import path
-      const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.js');
+      // Simple fallback that doesn't rely on pdfjs or canvas
+      // This is a very basic approach - only works with simple text-based PDFs
+      const pdfContent = buffer.toString('utf-8', 0, Math.min(buffer.length, 10000));
       
-      // Disable worker to run in single-thread mode
-      pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+      // Basic extractor that can get some text from PDFs without external dependencies
+      let extractedText = '';
+      const textMarkers = ['/Contents', '/Text', '/TJ', '/Tj', '(', ')'];
       
-      // Load the PDF from buffer
-      const loadingTask = pdfjsLib.getDocument({
-        data: new Uint8Array(buffer)
-      });
-      
-      const pdf = await loadingTask.promise;
-      let textContent = '';
-      
-      // Extract text from each page
-      for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-        const page = await pdf.getPage(pageNum);
-        const pageText = await page.getTextContent();
-        const pageContent = pageText.items
-          .filter((item: any) => item.str !== undefined)
-          .map((item: any) => item.str)
-          .join(' ');
-        
-        textContent += pageContent + '\n\n';
+      if (textMarkers.some(marker => pdfContent.includes(marker))) {
+        // Extract basic text from PDF content by looking for common patterns
+        const textMatches = pdfContent.match(/\(([\x20-\x7E\n\r\t]+?)\)/g) || [];
+        extractedText = textMatches
+          .map(match => match.substring(1, match.length - 1))
+          .join(' ')
+          .replace(/\\(\d{3}|n|r|t|b|f|\\|\(|\))/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
       }
       
-      if (textContent && textContent.trim().length > 0) {
-        return textContent;
+      if (extractedText && extractedText.trim().length > 0) {
+        return extractedText;
       } else {
-        return 'No text content could be extracted from this PDF. It may be scanned or contain only images.';
+        return 'No text content could be extracted from this PDF. The file may be scanned, contain only images, or be in a format that cannot be processed in this environment.';
       }
     } catch (fallbackError) {
       console.error('All PDF extraction methods failed:', fallbackError);
-      return 'Error extracting text from PDF. File may be corrupted or password protected.';
+      return 'Unable to extract text from this PDF. The file may be corrupted, password protected, or incompatible with our extraction methods.';
     }
   }
 }
