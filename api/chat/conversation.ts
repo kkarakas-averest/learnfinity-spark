@@ -1,8 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 // Constants used for API calls - use hardcoded values as requested
-const GROQ_API_KEY = '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';
-const GROQ_MODEL = 'llama-3.3-70b-versatile';
+const GROQ_API_KEY = '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';
+const GROQ_MODEL = 'llama-3.3-70b-versatile'; // Keep the original model
 const SUPABASE_URL = 'https://ujlqzkkkfatehxeqtbdl.supabase.co';
 const SUPABASE_SERVICE_ROLE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqbHF6a2trZmF0ZWh4ZXF0YmRsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0MDY4MDgzMiwiZXhwIjoyMDU2MjU2ODMyfQ.MZZMNbG8rpCLQ7sMGKXKQP1YL0dZ_PMVBKBrXL-k7IY';
 
