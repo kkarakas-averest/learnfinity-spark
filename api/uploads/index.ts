@@ -34,20 +34,29 @@ async function extractFromPdf(buffer: Buffer): Promise<string> {
     // The correct way to import and access PDF.js in Node.js/serverless
     const pdfjsModule = await import('pdfjs-dist/legacy/build/pdf.js');
     const pdfjsLib = pdfjsModule.default || pdfjsModule;
-
+    
+    // Explicitly disable worker to avoid dependency issues in serverless
+    pdfjsLib.GlobalWorkerOptions = pdfjsLib.GlobalWorkerOptions || {};
+    pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+    
     // Log warning that canvas warnings are expected and can be ignored
     console.log('PDF.js canvas warnings can be safely ignored for text extraction');
 
     // Load the PDF from buffer (handle API differences in environments)
     let pdf;
     try {
-      // Try Node.js / CommonJS pattern
       // Ensure buffer is properly converted to Uint8Array that PDF.js will accept
       const uint8Array = new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
       
       const loadingTask = pdfjsLib.getDocument({
-        data: uint8Array
-      });
+        data: uint8Array,
+        // Explicitly disable worker for serverless compatibility
+        disableWorker: true,
+        // Disable range requests which can cause issues in serverless
+        disableRange: true,
+        // Disable autoDestroy to prevent premature cleanup
+        disableAutoFetch: true
+      } as any);
       pdf = await loadingTask.promise;
     } catch (loadError) {
       console.error('Initial PDF loading method failed:', loadError);
@@ -66,8 +75,14 @@ async function extractFromPdf(buffer: Buffer): Promise<string> {
         const uint8Array = new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
         
         const loadingTask = pdfjsGetDocument({
-          data: uint8Array
-        });
+          data: uint8Array,
+          // Explicitly disable worker for serverless compatibility
+          disableWorker: true,
+          // Disable range requests which can cause issues in serverless
+          disableRange: true,
+          // Disable autoDestroy to prevent premature cleanup
+          disableAutoFetch: true
+        } as any);
         pdf = await (loadingTask.promise || loadingTask);
       } catch (altLoadError) {
         throw new Error(`Failed to load PDF after trying alternative methods: ${altLoadError}`);
