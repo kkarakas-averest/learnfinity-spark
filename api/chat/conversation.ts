@@ -1,10 +1,4 @@
-import type { NextRequest } from 'next/server';
-
-// Export region configuration for Vercel Edge Functions
-export const config = {
-  runtime: 'edge',
-  regions: ['iad1'], // Washington DC region
-};
+import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 // Constants used for API calls
 const GROQ_API_KEY = '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';
@@ -12,35 +6,39 @@ const GROQ_MODEL = 'llama-3.3-70b-versatile';
 const SUPABASE_URL = 'https://ujlqzkkkfatehxeqtbdl.supabase.co';
 const SUPABASE_SERVICE_ROLE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqbHF6a2trZmF0ZWh4ZXF0YmRsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0MDY4MDgzMiwiZXhwIjoyMDU2MjU2ODMyfQ.MZZMNbG8rpCLQ7sMGKXKQP1YL0dZ_PMVBKBrXL-k7IY';
 
-// Handle edge function request
-export default async function handler(req: NextRequest) {
-  // Set CORS headers for the response
-  const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-  };
+// Standard CORS headers for all responses
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  'Access-Control-Allow-Credentials': 'true'
+};
+
+// Serverless function handler
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  console.log('Serverless function executed:', req.url);
   
   // Handle preflight OPTIONS request
   if (req.method === 'OPTIONS') {
-    return new Response(null, { 
-      status: 200,
-      headers: corsHeaders 
-    });
+    console.log('OPTIONS request received');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.status(200).end();
+    return;
   }
+  
+  // Set CORS headers on the response
+  Object.entries(corsHeaders).forEach(([key, value]) => {
+    res.setHeader(key, value);
+  });
   
   // Only allow POST requests
   if (req.method !== 'POST') {
-    return new Response(
-      JSON.stringify({ error: 'Method not allowed' }),
-      { 
-        status: 405, 
-        headers: { 
-          'Content-Type': 'application/json',
-          ...corsHeaders
-        } 
-      }
-    );
+    console.log('Invalid method:', req.method);
+    res.status(405).json({ error: 'Method not allowed' });
+    return;
   }
   
   const debugInfo: any = {
@@ -52,30 +50,20 @@ export default async function handler(req: NextRequest) {
   };
   
   try {
-    // Parse request body
-    const body = await req.json();
-    const { messages, employeeContext } = body;
+    const { messages, employeeContext } = req.body;
     
     debugInfo.hasMessages = !!messages && Array.isArray(messages);
     debugInfo.hasEmployeeContext = !!employeeContext;
     debugInfo.messageCount = messages?.length || 0;
     
     if (!messages || !Array.isArray(messages)) {
-      return new Response(
-        JSON.stringify({ error: 'Messages array is required', debug: debugInfo }),
-        { 
-          status: 400, 
-          headers: { 
-            'Content-Type': 'application/json',
-            ...corsHeaders
-          } 
-        }
-      );
+      res.status(400).json({ error: 'Messages array is required', debug: debugInfo });
+      return;
     }
     
     // Extract and verify auth token
     let userId: string = 'bec19c44-164f-4a0b-b63d-99697e15040a'; // Default fallback user ID
-    const authHeader = req.headers.get('authorization');
+    const authHeader = req.headers.authorization;
     
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.replace('Bearer ', '');
@@ -126,7 +114,7 @@ export default async function handler(req: NextRequest) {
     });
     
     try {
-      // Call GROQ API (works in Edge functions)
+      // Call GROQ API
       const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -156,16 +144,8 @@ export default async function handler(req: NextRequest) {
           errorMessage = errorText || groqResponse.statusText;
         }
         
-        return new Response(
-          JSON.stringify({ error: `AI service error: ${errorMessage}`, debug: debugInfo }),
-          { 
-            status: 500, 
-            headers: { 
-              'Content-Type': 'application/json',
-              ...corsHeaders
-            }
-          }
-        );
+        res.status(500).json({ error: `AI service error: ${errorMessage}`, debug: debugInfo });
+        return;
       }
       
       const result = await groqResponse.json();
@@ -175,20 +155,22 @@ export default async function handler(req: NextRequest) {
       debugInfo.responseLength = aiResponse?.length || 0;
       
       if (!aiResponse) {
-        return new Response(
-          JSON.stringify({ error: 'No response generated from AI', debug: debugInfo }),
-          { 
-            status: 500, 
-            headers: { 
-              'Content-Type': 'application/json',
-              ...corsHeaders
-            }
-          }
-        );
+        res.status(500).json({ error: 'No response generated from AI', debug: debugInfo });
+        return;
       }
       
       try {
         // Store conversation in database via direct API call
+        const dbPayload = {
+          user_id: userId,
+          employee_id: employeeContext?.employeeId || null,
+          messages: apiMessages,
+          response: aiResponse,
+          created_at: new Date().toISOString()
+        };
+        
+        console.log('Saving to database with payload:', JSON.stringify(dbPayload));
+        
         const dbResponse = await fetch(`${SUPABASE_URL}/rest/v1/chat_conversations`, {
           method: 'POST',
           headers: {
@@ -197,19 +179,18 @@ export default async function handler(req: NextRequest) {
             'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
             'Prefer': 'return=minimal'
           },
-          body: JSON.stringify({
-            user_id: userId,
-            employee_id: employeeContext?.employeeId || null,
-            messages: apiMessages,
-            response: aiResponse,
-            created_at: new Date().toISOString()
-          })
+          body: JSON.stringify(dbPayload)
         });
         
+        console.log('Database response status:', dbResponse.status);
+        
         if (!dbResponse.ok) {
-          debugInfo.dbError = await dbResponse.text();
+          const dbErrorText = await dbResponse.text();
+          console.error('Database error:', dbErrorText);
+          debugInfo.dbError = dbErrorText;
         } else {
           debugInfo.savedToDb = true;
+          console.log('Successfully saved to database');
         }
       } catch (dbError: any) {
         debugInfo.dbError = dbError.message;
@@ -221,69 +202,81 @@ export default async function handler(req: NextRequest) {
         ? { response: aiResponse, debug: debugInfo }
         : { response: aiResponse };
         
-      return new Response(
-        JSON.stringify(responseData),
-        { 
-          status: 200, 
-          headers: { 
-            'Content-Type': 'application/json',
-            ...corsHeaders
-          }
-        }
-      );
+      console.log('Sending response:', JSON.stringify(responseData).substring(0, 200) + '...');
       
-    } catch (groqError: any) {
-      debugInfo.groqFetchError = groqError.message;
-      return new Response(
-        JSON.stringify({ error: `Error calling AI service: ${groqError.message}`, debug: debugInfo }),
-        { 
-          status: 500, 
-          headers: { 
-            'Content-Type': 'application/json',
-            ...corsHeaders
-          }
-        }
-      );
+      res.status(200).json(responseData);
+    } catch (error: any) {
+      console.error('Error calling AI service:', error);
+      res.status(500).json({ 
+        error: `Error calling AI service: ${error.message}`, 
+        debug: { ...debugInfo, errorMessage: error.message }
+      });
     }
   } catch (error: any) {
-    debugInfo.fatalError = error.message;
-    debugInfo.errorStack = error.stack;
-    return new Response(
-      JSON.stringify({ error: `Internal server error: ${error.message}`, debug: debugInfo }),
-      { 
-        status: 500, 
-        headers: { 
-          'Content-Type': 'application/json',
-          ...corsHeaders
-        }
-      }
-    );
+    console.error('Request processing error:', error);
+    res.status(500).json({ 
+      error: `Internal server error: ${error.message}`,
+      debug: { timestamp: new Date().toISOString(), errorMessage: error.message }
+    });
   }
 }
 
 function generateSystemPrompt(employeeContext: any): string {
-  let prompt = `
-You are a Course Designer AI, specialized in helping HR professionals create personalized learning content.
-Your goal is to help design courses that address specific skill gaps and learning needs.
+  // Base prompt with LLM instructions
+  let systemPrompt = `You are Course Designer AI, an expert educational content creator specialized in corporate and professional training. 
+  
+Your goal is to assist human HR managers and learning specialists in creating personalized learning experiences for employees.
 
 Guidelines:
-- Be concise but informative in your responses
-- Ask clarifying questions when needed
-- Focus on actionable, educational content
-- Recommend specific learning modules and topics
-- Provide clear structure for courses
-- Consider learning objectives and outcomes
-`;
+- Provide detailed, actionable responses that are tailored to the specific employee context when provided
+- Create learning content that addresses skill gaps and aligns with career growth
+- Present information clearly with sections, bullet points, and emphasis on key points
+- Courses should focus on practical knowledge and workplace application
+- Be respectful, professional, and inclusive in your language
+- If asked for a full course design, format it properly with modules and sections
+- When addressing specific employee skill gaps, be specific about how learning content will help
+- Do not fabricate complex technical concepts - be accurate and educational`;
+
+  // Add employee context if available
   if (employeeContext) {
-    const { employeeName, skills = [], courses = [] } = employeeContext;
-    prompt += `\nEmployee Context:\n- Name: ${employeeName}\n- Existing Skills: ${skills.join(', ')}\n- Current Courses: ${courses.map((c: any) => c.title).join(', ')}\n`;
-    if (skills.length > 0) {
-      prompt += `\nThis employee already has proficiency in the skills listed above. Focus on complementary skills or advanced topics that build on this foundation.`;
+    systemPrompt += `\n\nEmployee Context:`;
+    
+    if (employeeContext.employeeName) {
+      systemPrompt += `\nName: ${employeeContext.employeeName}`;
     }
-    if (courses.length > 0) {
-      prompt += `\nThe employee is currently enrolled in the courses listed above. Consider how your recommendations might complement or extend these existing courses.`;
+    
+    if (employeeContext.position) {
+      systemPrompt += `\nPosition: ${employeeContext.position}`;
+    }
+    
+    if (employeeContext.department) {
+      systemPrompt += `\nDepartment: ${employeeContext.department}`;
+    }
+    
+    if (employeeContext.skills && employeeContext.skills.length > 0) {
+      systemPrompt += `\n\nExisting Skills: ${employeeContext.skills.join(', ')}`;
+    }
+    
+    if (employeeContext.missingSkills && employeeContext.missingSkills.length > 0) {
+      systemPrompt += `\n\nSkill Gaps: ${employeeContext.missingSkills.join(', ')}`;
+    }
+    
+    if (employeeContext.knowledgeAreas && employeeContext.knowledgeAreas.length > 0) {
+      systemPrompt += `\n\nKnowledge Areas: ${employeeContext.knowledgeAreas.join(', ')}`;
+    }
+    
+    if (employeeContext.knowledgeGaps && employeeContext.knowledgeGaps.length > 0) {
+      systemPrompt += `\n\nKnowledge Gaps: ${employeeContext.knowledgeGaps.join(', ')}`;
+    }
+    
+    if (employeeContext.courses && employeeContext.courses.length > 0) {
+      systemPrompt += `\n\nCurrent Courses: ${employeeContext.courses.map((c: any) => c.title).join(', ')}`;
+    }
+    
+    if (employeeContext.cvData) {
+      systemPrompt += `\n\nCV Data: ${JSON.stringify(employeeContext.cvData).substring(0, 500)}...`;
     }
   }
-  prompt += `\nYou can help with:\n1. Creating course outlines based on specific skills\n2. Developing learning objectives\n3. Structuring course content and modules\n4. Suggesting assessment methods\n5. Recommending learning resources\n6. Generating example course content`;
-  return prompt;
+
+  return systemPrompt;
 } 
