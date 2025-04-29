@@ -559,11 +559,12 @@ ${employee.cv_extracted_data ? '• CV data extracted for personalized recommend
     };
     
     // Add user message and a loading message to the messages array
+    const loadingMessageId = crypto.randomUUID();
     setMessages((prev: Message[]) => [
       ...prev,
       userMessageObj,
       {
-        id: crypto.randomUUID(),
+        id: loadingMessageId,
         role: 'assistant',
         content: '',
         isLoading: true,
@@ -620,8 +621,6 @@ ${employee.cv_extracted_data ? '• CV data extracted for personalized recommend
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          // Add Authorization header if needed by your API
-          // 'Authorization': `Bearer ${your_auth_token}` 
         },
         body: JSON.stringify({
           messages: recentMessages,
@@ -644,42 +643,71 @@ ${employee.cv_extracted_data ? '• CV data extracted for personalized recommend
         const data = JSON.parse(responseText);
         console.log('[ChatAI] Parsed response data:', data);
         
-        // Remove loading message and add real response
+        if (!data || !data.response) {
+          throw new Error('Invalid response format');
+        }
+        
+        // Update messages - replace loading message with actual response
         setMessages((prev: Message[]) => {
-          const filtered = prev.filter(m => !m.isLoading);
+          // Filter out the loading message
+          const messagesWithoutLoading = prev.filter(m => m.id !== loadingMessageId);
+          
+          // Add new assistant message
           return [
-            ...filtered,
+            ...messagesWithoutLoading,
             {
-          id: crypto.randomUUID(),
-          role: 'assistant',
-          content: data.response,
-          timestamp: new Date()
+              id: crypto.randomUUID(),
+              role: 'assistant',
+              content: data.response,
+              timestamp: new Date()
             }
           ];
         });
         
-        // Make sure we fully update the state before any potential issues
+        // Force clear loading state
+        setIsLoading(false);
+        
+        // Scroll to bottom after messages update
         setTimeout(() => {
-          setIsLoading(false);
+          if (endOfMessagesRef.current) {
+            endOfMessagesRef.current.scrollIntoView({ behavior: 'smooth' });
+          }
         }, 100);
         
       } catch (parseError) {
         console.error('[ChatAI] Error parsing JSON response:', parseError);
-        throw parseError;
+        
+        // Handle parse error by removing loading message and adding error message
+        setMessages((prev: Message[]) => {
+          // Filter out the loading message
+          const filtered = prev.filter(m => m.id !== loadingMessageId);
+          return [
+            ...filtered,
+            {
+              id: crypto.randomUUID(),
+              role: 'system',
+              content: 'Sorry, there was an error processing the response. Please try again.',
+              timestamp: new Date()
+            }
+          ];
+        });
+        
+        setIsLoading(false);
       }
     } catch (error) {
       console.error('Error in chat conversation:', error);
       
       // Remove loading message and add error
       setMessages((prev: Message[]) => {
-        const filtered = prev.filter(m => !m.isLoading);
+        // Filter out the loading message
+        const filtered = prev.filter(m => m.id !== loadingMessageId);
         return [
           ...filtered,
           {
-        id: crypto.randomUUID(),
-        role: 'system',
-        content: 'Sorry, I encountered an error while processing your request. Please try again.',
-        timestamp: new Date()
+            id: crypto.randomUUID(),
+            role: 'system',
+            content: 'Sorry, I encountered an error while processing your request. Please try again.',
+            timestamp: new Date()
           }
         ];
       });
@@ -689,6 +717,9 @@ ${employee.cv_extracted_data ? '• CV data extracted for personalized recommend
         description: "Failed to get a response. Please try again.",
         variant: "destructive"
       });
+      
+      // Ensure loading state is cleared
+      setIsLoading(false);
     }
   };
 
