@@ -192,7 +192,7 @@ export default async function handler(
       .from('hr_uploads')
       .insert({
         id: uploadId,
-        company_id: companyId || null,
+        company_id: null,
         file_path: filePath,
         file_name: fileName,
         file_type: fileType,

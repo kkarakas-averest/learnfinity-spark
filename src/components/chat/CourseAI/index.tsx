@@ -651,8 +651,7 @@ ${employee.cv_extracted_data ? '• CV data extracted for personalized recommend
           body: JSON.stringify({
             file: fileBase64,
             fileName: file.name,
-            fileType: file.type,
-            companyId: employeeContext?.employee?.department_id // Optional company ID
+            fileType: file.type
           }),
         });
         
