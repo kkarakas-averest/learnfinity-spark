@@ -30,64 +30,25 @@ const extractors: Record<string, FileExtractor> = {
  */
 async function extractFromPdf(buffer: Buffer): Promise<string> {
   try {
-    // Import pdfjs-dist for Node.js (serverless compatible)
-    // The correct way to import and access PDF.js in Node.js/serverless
-    const pdfjsModule = await import('pdfjs-dist/legacy/build/pdf.js');
-    const pdfjsLib = pdfjsModule.default || pdfjsModule;
+    // Import directly from the legacy build which is more compatible with Node.js environments
+    const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.js');
     
-    // Explicitly disable worker to avoid dependency issues in serverless
-    pdfjsLib.GlobalWorkerOptions = pdfjsLib.GlobalWorkerOptions || {};
-    pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+    // Convert buffer to ArrayBuffer - more reliable in serverless
+    const arrayBuffer = buffer.buffer.slice(
+      buffer.byteOffset,
+      buffer.byteOffset + buffer.byteLength
+    );
     
-    // Log warning that canvas warnings are expected and can be ignored
-    console.log('PDF.js canvas warnings can be safely ignored for text extraction');
-
-    // Load the PDF from buffer (handle API differences in environments)
-    let pdf;
-    try {
-      // Ensure buffer is properly converted to Uint8Array that PDF.js will accept
-      const uint8Array = new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
-      
-      const loadingTask = pdfjsLib.getDocument({
-        data: uint8Array,
-        // Explicitly disable worker for serverless compatibility
-        disableWorker: true,
-        // Disable range requests which can cause issues in serverless
-        disableRange: true,
-        // Disable autoDestroy to prevent premature cleanup
-        disableAutoFetch: true
-      } as any);
-      pdf = await loadingTask.promise;
-    } catch (loadError) {
-      console.error('Initial PDF loading method failed:', loadError);
-      
-      try {
-        // Alternative loading method
-        const pdfjsGetDocument = 
-          pdfjsLib.getDocument || 
-          pdfjsModule.getDocument;
-          
-        if (!pdfjsGetDocument) {
-          throw new Error('PDF.js getDocument function not found');
-        }
-        
-        // Ensure buffer is properly converted to Uint8Array that PDF.js will accept
-        const uint8Array = new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
-        
-        const loadingTask = pdfjsGetDocument({
-          data: uint8Array,
-          // Explicitly disable worker for serverless compatibility
-          disableWorker: true,
-          // Disable range requests which can cause issues in serverless
-          disableRange: true,
-          // Disable autoDestroy to prevent premature cleanup
-          disableAutoFetch: true
-        } as any);
-        pdf = await (loadingTask.promise || loadingTask);
-      } catch (altLoadError) {
-        throw new Error(`Failed to load PDF after trying alternative methods: ${altLoadError}`);
-      }
-    }
+    // Load the PDF using the minimal API to avoid worker issues
+    const pdf = await pdfjsLib.getDocument({ 
+      data: arrayBuffer,
+      verbosity: 0, // Minimize console logging
+      isEvalSupported: false, // Disable eval for security
+      useSystemFonts: false, // Avoid font loading issues
+      disableFontFace: true, // Disable font face loading
+      cMapUrl: '', // Disable character map loading
+      standardFontDataUrl: '' // Disable standard font loading
+    }).promise;
 
     let textContent = '';
 
@@ -96,14 +57,15 @@ async function extractFromPdf(buffer: Buffer): Promise<string> {
     for (let pageNum = 1; pageNum <= numPages; pageNum++) {
       try {
         const page = await pdf.getPage(pageNum);
-        const pageText = await page.getTextContent();
+        const content = await page.getTextContent();
         
-        const pageContent = pageText.items
-          .filter((item: any) => typeof item.str === 'string')
+        // Extract text strings from content items
+        const pageText = content.items
+          .filter((item: any) => item.str)
           .map((item: any) => item.str)
           .join(' ');
           
-        textContent += pageContent + '\n\n';
+        textContent += pageText + '\n\n';
       } catch (pageError) {
         console.error(`Error extracting text from page ${pageNum}:`, pageError);
         textContent += `[Error extracting text from page ${pageNum}]\n\n`;
