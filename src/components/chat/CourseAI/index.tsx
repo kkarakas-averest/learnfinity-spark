@@ -659,8 +659,6 @@ ${employee.cv_extracted_data ? '• CV data extracted for personalized recommend
           ];
         });
         
-        // Ensure we don't navigate away from this page
-        window.history.replaceState(null, '', window.location.pathname);
       } catch (parseError) {
         console.error('[ChatAI] Error parsing JSON response:', parseError);
         throw parseError;
