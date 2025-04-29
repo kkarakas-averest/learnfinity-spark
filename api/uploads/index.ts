@@ -2,7 +2,6 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 import { v4 as uuidv4 } from 'uuid';
 // Revert to importing the whole legacy build; we'll safely access getDocument
-import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.js';
 import mammoth from 'mammoth';
 
 // Set CORS headers helper function
@@ -30,17 +29,32 @@ const extractors: Record<string, FileExtractor> = {
  */
 async function extractFromPdf(buffer: Buffer): Promise<string> {
   try {
-    // Load the PDF document
-    const data = new Uint8Array(buffer);
-
-    // pdfjs-dist ESM default export quirk handling
-    const pdfModule: any = pdfjsLib;
-    const getDocumentFn = pdfModule.getDocument || (pdfModule.default && pdfModule.default.getDocument);
-    if (typeof getDocumentFn !== 'function') {
-      throw new Error('pdfjs getDocument method not found in the imported module');
+    // Load pdfjs-dist dynamically
+    let pdfLib;
+    try {
+      // Try to dynamically import the module
+      // ESM import style (which works in newer Node.js environments)
+      pdfLib = await import('pdfjs-dist/legacy/build/pdf.js');
+    } catch (importError) {
+      console.error("Dynamic import failed:", importError);
+      return "Error loading PDF library. Please try again later.";
     }
 
-    const loadingTask = getDocumentFn({ data, disableWorker: true });
+    // Get the correct function
+    const getDocument = pdfLib.getDocument || (pdfLib.default && pdfLib.default.getDocument);
+    if (typeof getDocument !== 'function') {
+      throw new Error("PDF.js getDocument function not found");
+    }
+
+    // Load the PDF document
+    const data = new Uint8Array(buffer);
+    const loadingTask = getDocument({
+      data,
+      disableWorker: true,
+      disableStream: true,
+      disableAutoFetch: true
+    });
+    
     const pdf = await loadingTask.promise;
     
     let extractedText = '';

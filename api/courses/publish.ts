@@ -136,7 +136,6 @@ export default async function handler(
         status: 'active',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-        learning_objectives: contentData.learning_objectives || []
       });
       
     if (courseError) {
