@@ -34,8 +34,8 @@ async function extractFromPdf(buffer: Buffer): Promise<string> {
     console.log('Using pdf-parse for PDF extraction');
     const pdfParse = (await import('pdf-parse')).default;
     
-    // Avoid module scope issues by explicitly passing the buffer to parse
-    const result = await pdfParse(Buffer.from(buffer));
+    // Explicitly pass only the buffer to parse without any file paths
+    const result = await pdfParse(buffer);
     if (result.text && result.text.trim().length > 0) {
       return result.text;
     } else {
@@ -49,8 +49,8 @@ async function extractFromPdf(buffer: Buffer): Promise<string> {
     try {
       console.log('Attempting fallback PDF extraction with custom method');
       
-      // Simplified extraction without workers 
-      const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf');
+      // Simplified extraction without workers - corrected import path
+      const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.js');
       
       // Disable worker to run in single-thread mode
       pdfjsLib.GlobalWorkerOptions.workerSrc = '';
