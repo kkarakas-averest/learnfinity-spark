@@ -1,11 +1,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 import { v4 as uuidv4 } from 'uuid';
-import * as pdfjsLib from 'pdfjs-dist';
+// Use the Node.js compatible version
+import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf';
 import mammoth from 'mammoth';
-
-// Initialize PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
 // Set CORS headers helper function
 const setCorsHeaders = (res: VercelResponse) => {
@@ -31,22 +29,27 @@ const extractors: Record<string, FileExtractor> = {
  * Extract text from a PDF file
  */
 async function extractFromPdf(buffer: Buffer): Promise<string> {
-  // Load the PDF document
-  const data = new Uint8Array(buffer);
-  const loadingTask = pdfjsLib.getDocument({ data });
-  const pdf = await loadingTask.promise;
-  
-  let extractedText = '';
-  
-  // Get all pages text
-  for (let i = 1; i <= pdf.numPages; i++) {
-    const page = await pdf.getPage(i);
-    const content = await page.getTextContent();
-    const strings = content.items.map((item: any) => item.str);
-    extractedText += strings.join(' ') + '\n';
+  try {
+    // Load the PDF document
+    const data = new Uint8Array(buffer);
+    const loadingTask = pdfjsLib.getDocument({ data });
+    const pdf = await loadingTask.promise;
+    
+    let extractedText = '';
+    
+    // Get all pages text
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      const strings = content.items.map((item: any) => item.str);
+      extractedText += strings.join(' ') + '\n';
+    }
+    
+    return extractedText;
+  } catch (error) {
+    console.error('Error extracting PDF text:', error);
+    return 'Error extracting text from PDF. File may be corrupted or password protected.';
   }
-  
-  return extractedText;
 }
 
 /**
