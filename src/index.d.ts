@@ -1,4 +1,3 @@
-
 // Global type declarations to fix import issues
 
 // Fix React import issues
@@ -84,6 +83,8 @@ declare module 'zod' {
     export function string(): any;
     export function object(schema: any): any;
     export function infer(schema: any): any;
+    export function union(schemas: any[]): any;
+    export function discriminatedUnion(discriminator: string, schemas: any[]): any;
   }
   export function object(schema: any): any;
   export function string(): any;

@@ -88,6 +88,8 @@ declare module 'zod' {
     nativeEnum: (values: any) => any;
     literal: (value: any) => any;
     infer: <T>(schema: any) => T;
+    union: (...schemas: any[]) => any;
+    discriminatedUnion: (discriminator: string, schemas: any[]) => any;
   };
   
   export type infer<T> = T;

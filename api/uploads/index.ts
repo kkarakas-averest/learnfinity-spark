@@ -26,39 +26,64 @@ const extractors: Record<string, FileExtractor> = {
 };
 
 /**
- * Extract text from a PDF file using pdfjs-dist
+ * Extract text from a PDF file using pdfjs-dist fallback to pdf-parse
  */
 async function extractFromPdf(buffer: Buffer): Promise<string> {
   try {
-    // Dynamically import pdfjs-dist to ensure it works in serverless environment
-    const pdfjsLib = await import('pdfjs-dist');
+    // Try pdf-parse first as it's simpler in Node.js environments
+    console.log('Using pdf-parse for PDF extraction');
+    const pdfParse = (await import('pdf-parse')).default;
     
-    // Configure the worker - critical in serverless environment
-    pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`;
-    
-    // Load the PDF from buffer
-    const loadingTask = pdfjsLib.getDocument({ data: buffer });
-    const pdf = await loadingTask.promise;
-    
-    let textContent = '';
-    
-    // Extract text from each page
-    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-      const page = await pdf.getPage(pageNum);
-      const pageText = await page.getTextContent();
-      const pageItems = pageText.items.map((item: any) => item.str);
-      textContent += pageItems.join(' ') + '\n\n';
-    }
-    
-    if (!textContent || textContent.trim().length === 0) {
-      console.warn('Extracted PDF text is empty');
+    // Avoid module scope issues by explicitly passing the buffer to parse
+    const result = await pdfParse(Buffer.from(buffer));
+    if (result.text && result.text.trim().length > 0) {
+      return result.text;
+    } else {
+      console.warn('Extracted PDF text is empty from pdf-parse');
       return 'No text content could be extracted from this PDF. It may be scanned or contain only images.';
     }
-    
-    return textContent;
   } catch (error) {
-    console.error('Error extracting text from PDF with pdfjs-dist:', error);
-    return 'Error extracting text from PDF. File may be corrupted or password protected.';
+    console.error('Error extracting text from PDF with pdf-parse:', error);
+    
+    // If pdf-parse fails, try a simplified pdfjs approach
+    try {
+      console.log('Attempting fallback PDF extraction with custom method');
+      
+      // Simplified extraction without workers 
+      const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf');
+      
+      // Disable worker to run in single-thread mode
+      pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+      
+      // Load the PDF from buffer
+      const loadingTask = pdfjsLib.getDocument({
+        data: new Uint8Array(buffer)
+      });
+      
+      const pdf = await loadingTask.promise;
+      let textContent = '';
+      
+      // Extract text from each page
+      for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+        const page = await pdf.getPage(pageNum);
+        const pageText = await page.getTextContent();
+        const pageContent = pageText.items
+          .filter((item: any) => item.str !== undefined)
+          .map((item: any) => item.str)
+          .join(' ');
+        
+        textContent += pageContent + '\n\n';
+      }
+      
+      if (textContent && textContent.trim().length > 0) {
+        return textContent;
+      } else {
+        return 'No text content could be extracted from this PDF. It may be scanned or contain only images.';
+      }
+    } catch (fallbackError) {
+      console.error('All PDF extraction methods failed:', fallbackError);
+      return 'Error extracting text from PDF. File may be corrupted or password protected.';
+    }
   }
 }
 
