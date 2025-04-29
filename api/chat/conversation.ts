@@ -1,10 +1,10 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 // Constants used for API calls
-const GROQ_API_KEY = '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';
+const GROQ_API_KEY = process.env.GROQ_API_KEY || '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';
 const GROQ_MODEL = 'llama-3.3-70b-versatile';
-const SUPABASE_URL = 'https://ujlqzkkkfatehxeqtbdl.supabase.co';
-const SUPABASE_SERVICE_ROLE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqbHF6a2trZmF0ZWh4ZXF0YmRsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0MDY4MDgzMiwiZXhwIjoyMDU2MjU2ODMyfQ.MZZMNbG8rpCLQ7sMGKXKQP1YL0dZ_PMVBKBrXL-k7IY';
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://ujlqzkkkfatehxeqtbdl.supabase.co';
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqbHF6a2trZmF0ZWh4ZXF0YmRsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0MDY4MDgzMiwiZXhwIjoyMDU2MjU2ODMyfQ.MZZMNbG8rpCLQ7sMGKXKQP1YL0dZ_PMVBKBrXL-k7IY';
 
 // Standard CORS headers for all responses
 const corsHeaders = {
@@ -159,6 +159,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return;
       }
       
+      // Create response data first to ensure we can return it even if DB save fails
+      const isDev = process.env.NODE_ENV === 'development';
+      const responseData = isDev 
+        ? { response: aiResponse, debug: debugInfo }
+        : { response: aiResponse };
+      
+      // Try to save to database, but don't let failures block the response
       try {
         // Store conversation in database via direct API call
         const dbPayload = {
@@ -171,40 +178,41 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         
         console.log('Saving to database with payload:', JSON.stringify(dbPayload));
         
-        const dbResponse = await fetch(`${SUPABASE_URL}/rest/v1/chat_conversations`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': SUPABASE_SERVICE_ROLE_KEY,
-            'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-            'Prefer': 'return=minimal'
-          },
-          body: JSON.stringify(dbPayload)
-        });
-        
-        console.log('Database response status:', dbResponse.status);
-        
-        if (!dbResponse.ok) {
-          const dbErrorText = await dbResponse.text();
-          console.error('Database error:', dbErrorText);
-          debugInfo.dbError = dbErrorText;
+        if (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
+          const dbResponse = await fetch(`${SUPABASE_URL}/rest/v1/chat_conversations`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': SUPABASE_SERVICE_ROLE_KEY,
+              'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+              'Prefer': 'return=minimal'
+            },
+            body: JSON.stringify(dbPayload)
+          });
+          
+          console.log('Database response status:', dbResponse.status);
+          
+          if (!dbResponse.ok) {
+            const dbErrorText = await dbResponse.text();
+            console.error('Database error:', dbErrorText);
+            debugInfo.dbError = dbErrorText;
+          } else {
+            debugInfo.savedToDb = true;
+            console.log('Successfully saved to database');
+          }
         } else {
-          debugInfo.savedToDb = true;
-          console.log('Successfully saved to database');
+          console.log('Skipping database save - missing environment variables');
+          debugInfo.dbSkipped = true;
         }
       } catch (dbError: any) {
+        console.error('Database save error (non-fatal):', dbError.message);
         debugInfo.dbError = dbError.message;
       }
       
-      // Return success response
-      const isDev = process.env.NODE_ENV === 'development';
-      const responseData = isDev 
-        ? { response: aiResponse, debug: debugInfo }
-        : { response: aiResponse };
-        
+      // Return success response regardless of database save success
       console.log('Sending response:', JSON.stringify(responseData).substring(0, 200) + '...');
-      
       res.status(200).json(responseData);
+      
     } catch (error: any) {
       console.error('Error calling AI service:', error);
       res.status(500).json({ 

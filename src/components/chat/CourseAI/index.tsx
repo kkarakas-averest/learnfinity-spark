@@ -658,6 +658,11 @@ ${employee.cv_extracted_data ? '• CV data extracted for personalized recommend
           ];
         });
         
+        // Make sure we fully update the state before any potential issues
+        setTimeout(() => {
+          setIsLoading(false);
+        }, 100);
+        
       } catch (parseError) {
         console.error('[ChatAI] Error parsing JSON response:', parseError);
         throw parseError;
@@ -684,8 +689,6 @@ ${employee.cv_extracted_data ? '• CV data extracted for personalized recommend
         description: "Failed to get a response. Please try again.",
         variant: "destructive"
       });
-    } finally {
-      setIsLoading(false);
     }
   };
 
