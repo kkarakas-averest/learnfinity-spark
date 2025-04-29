@@ -21,10 +21,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Handle preflight OPTIONS request
   if (req.method === 'OPTIONS') {
     console.log('OPTIONS request received');
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    Object.entries(corsHeaders).forEach(([key, value]) => res.setHeader(key, value));
     res.status(200).end();
     return;
   }
@@ -62,33 +59,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     
     // Extract and verify auth token
-    let userId: string = 'bec19c44-164f-4a0b-b63d-99697e15040a'; // Default fallback user ID
     const authHeader = req.headers.authorization;
-    
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      const token = authHeader.replace('Bearer ', '');
-      try {
-        // Get user from Supabase (direct API call instead of SDK)
-        const userResponse = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'apikey': SUPABASE_SERVICE_ROLE_KEY
-          }
-        });
-        
-        if (userResponse.ok) {
-          const userData = await userResponse.json();
-          if (userData.id) {
-            userId = userData.id;
-          } else {
-            console.log('Valid token but user not found for the provided JWT.');
-          }
-        } else {
-          console.log('JWT validation error:', await userResponse.text());
-        }
-      } catch (authError) {
-        console.error('Auth processing error:', authError);
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      res.status(401).json({ error: 'Unauthorized: No access token provided' });
+      return;
+    }
+    const token = authHeader.replace('Bearer ', '');
+    const userResponse = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'apikey': SUPABASE_SERVICE_ROLE_KEY
       }
+    });
+    if (!userResponse.ok) {
+      res.status(401).json({ error: 'Unauthorized: Invalid or expired token' });
+      return;
+    }
+    const userData = await userResponse.json();
+    const userId = userData.id;
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized: User not found' });
+      return;
     }
     
     // Generate prompt and prepare API messages
