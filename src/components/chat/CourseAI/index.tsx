@@ -144,9 +144,7 @@ const convertMarkdownToHtml = (markdown: string): string => {
   html = html.replace(/^#\s+(.*?)$/gm, '<h1>$1</h1>');
   
   // Handle paragraphs
-  html = html.replace(/(?:\r\n|\r|\n){2,}/g, '</p><p>');
-  html = `<p>${html}</p>`;
-  html = html.replace(/<p><\/p>/g, '');
+  html = html.replace(/(?:\r\n|\r|\n){2,}/g, '<br/><br/>');
 
   // Neutralize accidental links
   html = html.replace(/<a [^>]*href="([^"]+)"[^>]*>(.*?)<\/a>/g, '<span class="no-link">$2</span>');
