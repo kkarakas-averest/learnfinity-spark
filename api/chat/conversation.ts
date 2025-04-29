@@ -5,6 +5,8 @@ const GROQ_API_KEY = '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';
 const GROQ_MODEL = 'llama-3.3-70b-versatile'; // Keep the original model
 const SUPABASE_URL = 'https://ujlqzkkkfatehxeqtbdl.supabase.co';
 const SUPABASE_SERVICE_ROLE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqbHF6a2trZmF0ZWh4ZXF0YmRsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0MDY4MDgzMiwiZXhwIjoyMDU2MjU2ODMyfQ.A2AVZwetKe-CIJUzVcNm0OdNlceABZvDFU6YsX3kDRA';
+const DEV_TOKEN = 'dev-hr-dashboard-token';
+const DEV_USER_ID = '5deffe9c-dc0f-4371-9809-abdc82d74f6c';
 
 // Standard CORS headers for all responses
 const corsHeaders = {
@@ -60,25 +62,32 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     
     // Extract and verify auth token
     const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      res.status(401).json({ error: 'Unauthorized: No access token provided' });
-      return;
-    }
-    const token = authHeader.replace('Bearer ', '');
-    const userResponse = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'apikey': SUPABASE_SERVICE_ROLE_KEY
+    let userId: string | null = null;
+
+    if (authHeader && authHeader === `Bearer ${DEV_TOKEN}`) {
+      // Dev mode: accept hardcoded token and use known user
+      userId = DEV_USER_ID;
+    } else if (authHeader && authHeader.startsWith('Bearer ')) {
+      // Normal JWT validation
+      const token = authHeader.replace('Bearer ', '');
+      const userResponse = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'apikey': SUPABASE_SERVICE_ROLE_KEY
+        }
+      });
+      if (!userResponse.ok) {
+        res.status(401).json({ error: 'Unauthorized: Invalid or expired token' });
+        return;
       }
-    });
-    if (!userResponse.ok) {
-      res.status(401).json({ error: 'Unauthorized: Invalid or expired token' });
-      return;
-    }
-    const userData = await userResponse.json();
-    const userId = userData.id;
-    if (!userId) {
-      res.status(401).json({ error: 'Unauthorized: User not found' });
+      const userData = await userResponse.json();
+      userId = userData.id;
+      if (!userId) {
+        res.status(401).json({ error: 'Unauthorized: User not found' });
+        return;
+      }
+    } else {
+      res.status(401).json({ error: 'Unauthorized: No access token provided' });
       return;
     }
     
