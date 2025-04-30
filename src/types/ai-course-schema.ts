@@ -129,29 +129,44 @@ export const coursePublicationRequestSchema = z.object({
 export type CoursePublicationRequest = zInfer<typeof coursePublicationRequestSchema>;
 
 /**
- * Command handlers for CourseAI
+ * Schema for upload command
  */
 export const uploadCommandSchema = z.object({
-  command: z.literal('upload'),
-  files: z.array(z.object({}).passthrough()), // File objects from browser
+  command: z.literal("/upload"),
+  content: z.string().optional(),
 });
 
+/**
+ * Schema for generate command
+ */
 export const generateCommandSchema = z.object({
-  command: z.literal('generate'),
-  title: z.string(),
-  employeeId: z.string().uuid(),
-  params: z.object({}).passthrough().optional(),
+  command: z.literal("/generate"),
+  content: z.string(),
 });
 
+/**
+ * Schema for publish command
+ */
 export const publishCommandSchema = z.object({
-  command: z.literal('publish'),
-  contentId: z.string().uuid(),
-  employeeIds: z.array(z.string().uuid()).optional(),
+  command: z.literal("/publish"),
+  content: z.string(),
 });
 
-export type UploadCommand = zInfer<typeof uploadCommandSchema>;
-export type GenerateCommand = zInfer<typeof generateCommandSchema>;
-export type PublishCommand = zInfer<typeof publishCommandSchema>;
+/**
+ * Schema for bulk generation command
+ */
+export const bulkCommandSchema = z.object({
+  command: z.literal("/bulk"),
+  content: z.string(),
+});
+
+/**
+ * Schema for bulk status command
+ */
+export const bulkStatusCommandSchema = z.object({
+  command: z.literal("/bulk-status"),
+  content: z.string(),
+});
 
 /**
  * Union type for all possible commands
@@ -160,6 +175,8 @@ export const courseAICommandSchema = z.discriminatedUnion("command", [
   uploadCommandSchema,
   generateCommandSchema,
   publishCommandSchema,
+  bulkCommandSchema,
+  bulkStatusCommandSchema,
 ]);
 
 export type CourseAICommand = zInfer<typeof courseAICommandSchema>; 

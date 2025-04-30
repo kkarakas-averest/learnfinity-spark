@@ -24,6 +24,8 @@ import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { uploadCommandSchema, generateCommandSchema, publishCommandSchema, courseAICommandSchema, type CourseAICommand } from '@/types/ai-course-schema';
 import { cn } from "@/lib/utils";
+import ReactDOM from 'react-dom';
+import { BulkGenerationForm } from '@/components/bulk/BulkGenerationForm';
 
 // Create AccordionItem since it's not exported from accordion.tsx
 const AccordionItem = AccordionPrimitive.Item;
@@ -68,43 +70,54 @@ const CommandSidebar = ({
           {isExpanded ? <ArrowLeft className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
         </Button>
       </div>
+      <div className="flex-1 overflow-auto p-2">
+        <div className={cn(
+          "mb-3 w-full",
+          isExpanded ? "px-2" : "px-0"
+        )}>
+          <Button
+            variant="default"
+            size={isExpanded ? "default" : "icon"}
+            className={cn(
+              "w-full justify-start",
+              !isExpanded && "px-0"
+            )}
+            onClick={() => onCommandClick("/bulk")}
+          >
+            <Zap className="h-4 w-4" />
+            {isExpanded && <span className="ml-2 text-sm">Bulk Generation</span>}
+        </Button>
+      </div>
       
-      <div className="flex-1 overflow-y-auto p-2">
         {[
-          { command: "/upload", description: "Upload documents", color: "bg-blue-500", icon: <Upload className="h-4 w-4" /> },
-          { command: "/generate", description: "Create a course", color: "bg-green-500", icon: <Book className="h-4 w-4" /> },
-          { command: "/publish", description: "Publish to employees", color: "bg-amber-500", icon: <CheckCircle className="h-4 w-4" /> },
-          { command: "/bulk", description: "Bulk course generation", color: "bg-purple-500", icon: <BarChart2 className="h-4 w-4" /> },
-          { command: "/employees", description: "List all employees", color: "bg-teal-500", icon: <User className="h-4 w-4" /> }
+          { command: "/upload", icon: <Upload className="h-4 w-4" />, label: "Upload Documents" },
+          { command: "/generate", icon: <PlusIcon className="h-4 w-4" />, label: "Generate Course" },
+          { command: "/publish", icon: <BookOpen className="h-4 w-4" />, label: "Publish Course" },
+          { command: "/bulk-status", icon: <BarChart2 className="h-4 w-4" />, label: "Bulk Job Status" },
+          { command: "/employees", icon: <User className="h-4 w-4" />, label: "List Employees" },
+          { command: "/departments", icon: <Book className="h-4 w-4" />, label: "List Departments" },
+          { command: "/positions", icon: <Award className="h-4 w-4" />, label: "List Positions" },
+          { command: "/courses", icon: <Bookmark className="h-4 w-4" />, label: "List Courses" },
         ].map((cmd) => (
           <TooltipProvider key={cmd.command}>
             <Tooltip>
               <TooltipTrigger asChild>
-                <button
-                  onClick={() => onCommandClick(cmd.command)}
+                <Button
+                  variant="ghost"
+                  size={isExpanded ? "default" : "icon"}
                   className={cn(
-                    "w-full mb-2 rounded-md text-left transition-colors",
-                    isExpanded 
-                      ? `${cmd.color} text-white px-3 py-2 hover:opacity-90` 
-                      : "bg-muted hover:bg-muted/80 p-2 flex justify-center"
+                    "mb-1 w-full justify-start",
+                    isExpanded ? "px-2" : "px-0"
                   )}
+                  onClick={() => onCommandClick(cmd.command)}
                 >
-                  {isExpanded ? (
-                    <div className="flex items-center justify-between">
-                      <span>{cmd.command}</span>
-                      <span className="text-xs opacity-80">{cmd.description}</span>
-                    </div>
-                  ) : (
-                    <div className="text-foreground">{cmd.icon}</div>
-                  )}
-                </button>
+                  {cmd.icon}
+                  {isExpanded && <span className="ml-2 text-sm">{cmd.label}</span>}
+                </Button>
               </TooltipTrigger>
-              {!isExpanded && (
                 <TooltipContent side="right">
-                  <p>{cmd.command}</p>
-                  <p className="text-xs text-muted-foreground">{cmd.description}</p>
+                {cmd.label}
                 </TooltipContent>
-              )}
             </Tooltip>
           </TooltipProvider>
         ))}
@@ -115,11 +128,17 @@ const CommandSidebar = ({
 
 // Command autocomplete component that appears when typing "/"
 const CommandAutocomplete = ({ onSelect }: { onSelect: (command: string) => void }) => {
+  // Featured commands
+  const featuredCommands = [
+    { command: "/bulk", description: "Generate courses for a department or position" },
+  ];
+  
+  // Regular commands
   const commands = [
     { command: "/upload", description: "Upload documents for course generation" },
     { command: "/generate", description: "Create a new course with the given title" },
     { command: "/publish", description: "Publish a course to employees" },
-    { command: "/bulk", description: "Start bulk course generation by group" },
+    { command: "/bulk-status", description: "Check status of a bulk generation job" },
     { command: "/employees", description: "List all employees and their info" },
     { command: "/departments", description: "List all departments" },
     { command: "/positions", description: "List all job positions" },
@@ -128,6 +147,20 @@ const CommandAutocomplete = ({ onSelect }: { onSelect: (command: string) => void
   
   return (
     <div className="absolute bottom-14 left-0 right-0 bg-card border rounded-lg shadow-lg py-2">
+      {featuredCommands.map((cmd) => (
+        <button
+          key={cmd.command}
+          onClick={() => onSelect(cmd.command)}
+          className="w-full text-left px-4 py-3 hover:bg-accent flex items-center justify-between bg-primary/5 border-b"
+        >
+          <div className="flex items-center">
+            <Zap className="h-4 w-4 text-primary mr-2" />
+            <span className="font-medium">{cmd.command}</span>
+          </div>
+          <span className="text-xs text-muted-foreground">{cmd.description}</span>
+        </button>
+      ))}
+      
       {commands.map((cmd) => (
         <button
           key={cmd.command}
@@ -152,7 +185,7 @@ type Message = {
 
 type CommandState = {
   processing: boolean;
-  type: 'upload' | 'generate' | 'publish' | null;
+  type: 'upload' | 'generate' | 'publish' | 'bulk' | 'bulk-status' | null;
   progress: number;
   status: string;
   data?: any;
@@ -288,6 +321,7 @@ export function CourseAI({ employeeId, initialMessage }: CourseAIProps) {
   const [fileInputRef] = React.useState<React.RefObject<HTMLInputElement>>(React.createRef());
   const [showCommandAutocomplete, setShowCommandAutocomplete] = React.useState(false);
   const [isCommandSidebarExpanded, setIsCommandSidebarExpanded] = React.useState(false);
+  const [showBulkForm, setShowBulkForm] = React.useState(false);
   
   const endOfMessagesRef = React.useRef<HTMLDivElement>(null);
   const { toast } = useToast();
@@ -1169,120 +1203,271 @@ ${employee.cv_extracted_data ? '• CV data extracted for personalized recommend
     }
   };
 
-  // Handle bulk generation command
-  const handleBulkCommand = async (params: string) => {
-    const [byType, groupId] = parseParams(params);
-    
-    if (!byType || !['position', 'department', 'course'].includes(byType.toLowerCase())) {
+  // Handle bulk command
+  const handleBulkCommand = async (args: string) => {
+    // Check for arguments - if provided, use the old approach 
+    // for backward compatibility (in case someone is using the command directly)
+    if (args.trim()) {
+      const [groupType, groupId, ...titleParts] = args.split(' ');
+      const title = titleParts.join(' ');
+      
+      if (!groupType || !groupId || !title) {
       setMessages((prev: Message[]) => [
         ...prev, 
         {
           id: crypto.randomUUID(),
           role: 'assistant',
-          content: 'Please specify how you want to group employees for bulk generation. Example: `/bulk by:department` or `/bulk by:position` or `/bulk by:course`',
+            content: 'Please provide a valid bulk command format: `/bulk [department|position] [id] [course title]`\n\nAlternatively, just type `/bulk` to use the interactive form.',
           timestamp: new Date()
         }
       ]);
       return;
     }
     
-    // Set command state for bulk generation
-    setCommandState({
-      processing: true,
-      type: 'generate',
-      progress: 10,
-      status: `Fetching ${byType} data...`
-    });
-    
-    try {
-      // Fetch group data based on type
-      let groups: any[] = [];
-      let groupMessage = '';
-      
-      if (byType.toLowerCase() === 'department') {
-        const { data, error } = await supabase
-          .from('hr_departments')
-          .select('id, name, hr_employees(id)')
-          .order('name');
-          
-        if (error) throw error;
-        
-        groups = (data || []).map((dept: any) => ({
-          id: dept.id,
-          name: dept.name,
-          employee_count: Array.isArray(dept.hr_employees) ? dept.hr_employees.length : 0
-        }));
-        
-        groupMessage = "Select a department for bulk course generation:\n\n" + 
-          groups.map((dept: any, index: number) => 
-            `${index + 1}. ${dept.name} (${dept.employee_count} employees)`
-          ).join('\n');
-        
-      } else if (byType.toLowerCase() === 'position') {
-        const { data, error } = await supabase
-          .from('hr_positions')
-          .select('id, title, hr_employees(id)')
-          .order('title');
-          
-        if (error) throw error;
-        
-        groups = (data || []).map((pos: any) => ({
-          id: pos.id,
-          name: pos.title,
-          employee_count: Array.isArray(pos.hr_employees) ? pos.hr_employees.length : 0
-        }));
-        
-        groupMessage = "Select a position for bulk course generation:\n\n" + 
-          groups.map((pos: any, index: number) => 
-            `${index + 1}. ${pos.name} (${pos.employee_count} employees)`
-          ).join('\n');
-        
-      } else if (byType.toLowerCase() === 'course') {
-        const { data, error } = await supabase
-          .from('hr_courses')
-          .select('id, title, hr_course_enrollments(id)')
-          .order('title');
-          
-        if (error) throw error;
-        
-        groups = (data || []).map((course: any) => ({
-          id: course.id,
-          name: course.title,
-          employee_count: Array.isArray(course.hr_course_enrollments) ? course.hr_course_enrollments.length : 0
-        }));
-        
-        groupMessage = "Select a course for bulk course generation:\n\n" + 
-          groups.map((course: any, index: number) => 
-            `${index + 1}. ${course.name} (${course.employee_count} enrolled)`
-          ).join('\n');
+      if (groupType !== 'department' && groupType !== 'position') {
+        setMessages((prev: Message[]) => [
+          ...prev, 
+          {
+            id: crypto.randomUUID(),
+            role: 'assistant',
+            content: 'Group type must be either "department" or "position".',
+            timestamp: new Date()
+          }
+        ]);
+        return;
       }
       
-      // Store the group data in command state
-      setCommandState({
-        processing: false,
-        type: null,
-        progress: 100,
-        status: '',
-        data: {
-          groupType: byType.toLowerCase(),
-          groups,
-          selectedGroup: null
-        }
+      // Start bulk generation process with direct arguments
+    setCommandState({
+      processing: true,
+        type: 'bulk',
+        progress: 0,
+        status: 'Preparing to generate courses in bulk...'
       });
       
-      // Provide selection message
+      // ... rest of the existing direct command processing ...
+      
+    } else {
+      // No arguments provided, show the interactive form
+      setMessages((prev: Message[]) => [
+        ...prev, 
+        {
+          id: crypto.randomUUID(),
+          role: 'user',
+          content: '/bulk',
+          timestamp: new Date()
+        },
+        {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: 'I\'ll help you generate personalized courses for multiple employees. Please fill out the form below:',
+          timestamp: new Date()
+        }
+      ]);
+      
+      // Show the form
+      setShowBulkForm(true);
+      
+      // Set command state to indicate we're in bulk form mode
+      setCommandState({
+        processing: true,
+        type: 'bulk',
+      progress: 10,
+        status: 'Fill out the bulk generation form'
+      });
+    }
+  };
+
+  // Handle bulk form submission success
+  const handleBulkFormSuccess = (jobId: string, totalEmployees: number, estimatedTimeMinutes: number) => {
+    // Hide the form
+    setShowBulkForm(false);
+    
+    // Update command state
+    setCommandState({
+      processing: false,
+      type: null,
+      progress: 100,
+      status: 'Bulk generation job created!'
+    });
+    
+    // Add success message
+    setMessages((prev: Message[]) => [
+      ...prev, 
+      {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: `✅ Bulk generation job started for ${totalEmployees} employees!\n\nJob ID: \`${jobId}\`\n\nEstimated time: ${estimatedTimeMinutes} minutes\n\nYou can check the status of this job using:\n\n\`/bulk-status ${jobId}\``,
+        timestamp: new Date()
+      }
+    ]);
+  };
+  
+  // Handle bulk form cancellation
+  const handleBulkFormCancel = () => {
+    setShowBulkForm(false);
+    
+    // Reset command state
+    setCommandState({
+      processing: false,
+      type: null,
+      progress: 0,
+      status: ''
+    });
+    
+    // Add cancellation message
+    setMessages((prev: Message[]) => [
+      ...prev, 
+      {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: 'Bulk course generation cancelled. Let me know if you want to try again.',
+        timestamp: new Date()
+      }
+    ]);
+  };
+  
+  // Handle bulk status command
+  const handleBulkStatusCommand = async (jobId: string) => {
+    if (!jobId.trim()) {
       setMessages((prev: Message[]) => [
         ...prev, 
         {
           id: crypto.randomUUID(),
           role: 'assistant',
-          content: groupMessage + '\n\nTo select a group, respond with the number or name. Then I\'ll guide you through setting up the course template.',
+          content: 'Please provide a job ID to check status. Example: `/bulk-status 123e4567-e89b-12d3-a456-426614174000`',
+          timestamp: new Date()
+        }
+      ]);
+      return;
+    }
+    
+    // Start status checking process
+    setCommandState({
+      processing: true,
+      type: 'bulk-status',
+      progress: 0,
+      status: 'Checking job status...'
+    });
+    
+    try {
+      // Get the auth token
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      
+      if (!token) {
+        throw new Error('Authentication required');
+      }
+      
+      // Call the bulk status API
+      const response = await fetch(`/api/courses/bulk-status?jobId=${jobId}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(`Failed to get job status: ${errorData.error || response.statusText}`);
+      }
+      
+      // Parse response
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(`Failed to get job status: ${result.error || 'Unknown error'}`);
+      }
+      
+      // Finish status checking
+      setCommandState({
+        processing: false,
+        type: 'bulk-status',
+        progress: 100,
+        status: 'Status retrieved!',
+        data: {
+          jobId,
+          job: result.job,
+          tasks: result.tasks,
+          progress: result.progress,
+          estimatedCompletionTime: result.estimatedCompletionTime
+        }
+      });
+      
+      // Format status message with improved details
+      const job = result.job;
+      const tasks = result.tasks || [];
+      const progress = result.progress || 0;
+      
+      const completedTasks = tasks.filter((t: any) => t.status === 'completed').length;
+      const failedTasks = tasks.filter((t: any) => t.status === 'failed').length;
+      const pendingTasks = tasks.filter((t: any) => t.status === 'pending').length;
+      const processingTasks = tasks.filter((t: any) => t.status === 'processing').length;
+      
+      // Create status message with rich formatting
+      let statusMessage = `## Bulk Generation Job: ${job.base_title}\n\n`;
+      statusMessage += `**Status**: ${job.status.toUpperCase()}\n`;
+      statusMessage += `**Progress**: ${Math.round(progress)}% (${completedTasks} completed, ${failedTasks} failed, ${pendingTasks} pending, ${processingTasks} processing)\n`;
+      statusMessage += `**Total**: ${job.total_count} employees\n`;
+      
+      if (result.estimatedCompletionTime && job.status !== 'completed') {
+        const estimatedTime = new Date(result.estimatedCompletionTime);
+        const timeStr = estimatedTime.toLocaleTimeString();
+        statusMessage += `**Estimated completion**: ${timeStr}\n`;
+      }
+      
+      if (job.completed_at) {
+        const completedTime = new Date(job.completed_at);
+        const timeStr = completedTime.toLocaleTimeString();
+        statusMessage += `**Completed at**: ${timeStr}\n`;
+      }
+      
+      statusMessage += '\n### Employee Status\n\n';
+      
+      // Add a small table with the first few employees
+      const displayLimit = Math.min(5, tasks.length);
+      const hasMoreTasks = tasks.length > displayLimit;
+      
+      if (tasks.length === 0) {
+        statusMessage += 'No tasks found for this job.';
+      } else {
+        statusMessage += '| Employee | Status | Updated |\n';
+        statusMessage += '| --- | --- | --- |\n';
+        
+        for (let i = 0; i < displayLimit; i++) {
+          const task = tasks[i];
+          const employeeName = task.employee_info ? task.employee_info.full_name : 'Unknown';
+          const taskStatus = task.status.charAt(0).toUpperCase() + task.status.slice(1);
+          const updatedAt = task.updated_at 
+            ? new Date(task.updated_at).toLocaleTimeString() 
+            : 'N/A';
+          
+          statusMessage += `| ${employeeName} | ${taskStatus} | ${updatedAt} |\n`;
+        }
+        
+        if (hasMoreTasks) {
+          statusMessage += `\n... and ${tasks.length - displayLimit} more employees`;
+        }
+      }
+      
+      // Add link to refresh status
+      statusMessage += `\n\nTo check for updates, run: \`/bulk-status ${jobId}\``;
+      
+      // Add completion message
+      setMessages((prev: Message[]) => [
+        ...prev, 
+        {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: statusMessage,
           timestamp: new Date()
         }
       ]);
       
-    } catch (error) {
-      console.error('Error fetching group data:', error);
+    } catch (error: any) {
+      console.error('Bulk status check error:', error);
+      
+      // Reset command state
       setCommandState({
         processing: false,
         type: null,
@@ -1290,21 +1475,16 @@ ${employee.cv_extracted_data ? '• CV data extracted for personalized recommend
         status: ''
       });
       
+      // Show error message
       setMessages((prev: Message[]) => [
         ...prev, 
         {
           id: crypto.randomUUID(),
           role: 'assistant',
-          content: `There was an error fetching ${byType} data: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`,
+          content: `❌ Error: ${error.message || 'Failed to retrieve job status'}`,
           timestamp: new Date()
         }
       ]);
-      
-      toast({
-        title: "Error",
-        description: `Failed to fetch ${byType} data: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        variant: "destructive"
-      });
     }
   };
 
@@ -1677,6 +1857,10 @@ ${employee.cv_extracted_data ? '• CV data extracted for personalized recommend
         handleBulkCommand(args);
         break;
         
+      case '/bulk-status':
+        handleBulkStatusCommand(args);
+        break;
+        
       case '/employees':
         handleEmployeesCommand();
         break;
@@ -1908,42 +2092,68 @@ ${employee.cv_extracted_data ? '• CV data extracted for personalized recommend
   const renderCommandProgress = () => {
     if (!commandState.processing) return null;
     
-    // If we have generated course data, show the preview card
-    if (commandState.type === 'generate' && commandState.data && commandState.progress === 100) {
+    // Show a progress indicator with current status
+    const progressElement = (
+      <div className="flex flex-col space-y-2 mt-4">
+        <Progress value={commandState.progress} className="h-2" />
+        <p className="text-sm text-muted-foreground">{commandState.status}</p>
+      </div>
+    );
+    
+    // Different UI for different command types
+    switch (commandState.type) {
+      case 'upload':
       return (
-        <div className="border-t pt-4 pb-2">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-medium">Course Generation Complete</h3>
-            <Badge variant="outline" className="text-xs">
-              ID: {commandState.data.id?.substring(0, 8)}
-            </Badge>
-          </div>
-          <CoursePreviewCard course={commandState.data} />
-          <div className="text-center text-xs text-muted-foreground mt-2">
-            Use <code className="bg-muted px-1 py-0.5 rounded">/publish {commandState.data.id}</code> to assign this course to employees
+          <div className="my-4">
+            {progressElement}
+            <div className="mt-4">
+              <Input 
+                type="file" 
+                id="file-upload" 
+                accept=".pdf,.doc,.docx,.txt" 
+                onChange={handleFileUpload}
+                className="hidden"
+              />
+              <Button 
+                onClick={() => document.getElementById('file-upload')?.click()}
+                className="w-full"
+              >
+                Select File
+              </Button>
           </div>
         </div>
       );
-    }
-    
-    // Show progress indicator for all other states
+        
+      case 'generate':
+        // Generate command may have a form or progress
+        return progressElement;
+        
+      case 'publish':
+        // Publish command progress
+        return progressElement;
+      
+      case 'bulk':
+        // Show bulk generation form if enabled
     return (
-      <div className="border-t pt-4 pb-2">
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="text-sm font-medium">
-            {commandState.type === 'upload' ? 'Uploading Documents' : 
-             commandState.type === 'generate' ? 'Generating Course' : 
-             commandState.type === 'publish' ? 'Publishing Course' : 
-             'Processing Command'}
-          </h3>
-          <Badge variant="outline" className="text-xs">
-            {commandState.progress}%
-          </Badge>
-        </div>
-        <Progress value={commandState.progress} className="h-2" />
-        <p className="text-xs text-muted-foreground mt-2">{commandState.status}</p>
+          <div className="my-4 space-y-4">
+            {progressElement}
+            
+            {showBulkForm && (
+              <BulkGenerationForm 
+                onSuccess={handleBulkFormSuccess}
+                onCancel={handleBulkFormCancel}
+              />
+            )}
       </div>
     );
+      
+      case 'bulk-status':
+        // Show bulk status progress
+        return progressElement;
+        
+      default:
+        return progressElement;
+    }
   };
 
   // Handle command palette button click
@@ -1985,14 +2195,16 @@ ${employee.cv_extracted_data ? '• CV data extracted for personalized recommend
     // Process message content to highlight commands
     const highlightCommands = (content: string) => {
       return content.replace(
-        /(\/upload|\/generate|\/publish)(\s+[^\n]+)?/g, 
+        /(\/upload|\/generate|\/publish|\/bulk|\/bulk-status)(\s+[^\n]+)?/g, 
         (match, command, args) => {
           let color = '';
           if (command === '/upload') color = 'bg-blue-100 text-blue-800';
           else if (command === '/generate') color = 'bg-green-100 text-green-800';
-          else if (command === '/publish') color = 'bg-amber-100 text-amber-800';
+          else if (command === '/publish') color = 'bg-purple-100 text-purple-800';
+          else if (command === '/bulk') color = 'bg-yellow-100 text-yellow-800';
+          else if (command === '/bulk-status') color = 'bg-orange-100 text-orange-800';
           
-          return `<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${color}">${command}${args || ''}</span>`;
+          return `<span class="inline-block rounded px-1 ${color} dark:bg-opacity-20">${command}${args || ''}</span>`;
         }
       );
     };
