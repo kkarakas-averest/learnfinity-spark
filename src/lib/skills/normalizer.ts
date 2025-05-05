@@ -171,6 +171,7 @@ export async function normalizeSkill(
   const mergedOptions = { ...DEFAULT_OPTIONS, ...options };
   
   if (!rawSkill || typeof rawSkill !== 'string' || rawSkill.trim() === '') {
+    console.log(`Skipping empty or invalid skill: "${rawSkill}"`);
     return {
       rawSkill,
       taxonomySkillId: null,
@@ -180,11 +181,15 @@ export async function normalizeSkill(
     };
   }
   
+  console.log(`Normalizing individual skill: "${rawSkill}"`);
+  
   try {
     // Find potential matches
+    console.log(`Searching taxonomy for matches to "${rawSkill}"`);
     const matches = await searchTaxonomySkills(rawSkill, mergedOptions);
     
     if (matches.length === 0) {
+      console.log(`No taxonomy matches found for "${rawSkill}"`);
       return {
         rawSkill,
         taxonomySkillId: null,
@@ -194,9 +199,12 @@ export async function normalizeSkill(
       };
     }
     
+    console.log(`Found ${matches.length} potential taxonomy matches for "${rawSkill}"`);
+    
     // Get the best match
     const bestMatch = matches[0];
     const confidence = bestMatch.similarityScore;
+    console.log(`Best match: "${bestMatch.name}" (ID: ${bestMatch.id.substring(0, 8)}...) with confidence ${confidence.toFixed(2)}`);
     
     // Fetch hierarchy information if needed
     const topMatches = matches.slice(0, mergedOptions.maxMatches);
@@ -215,15 +223,18 @@ export async function normalizeSkill(
       })
     );
     
+    const isAccepted = confidence >= (mergedOptions.confidenceThreshold || 0);
+    console.log(`Match ${isAccepted ? 'accepted' : 'rejected'} based on confidence threshold ${mergedOptions.confidenceThreshold}`);
+    
     return {
       rawSkill,
-      taxonomySkillId: confidence >= (mergedOptions.confidenceThreshold || 0) ? bestMatch.id : null,
-      taxonomySkillName: confidence >= (mergedOptions.confidenceThreshold || 0) ? bestMatch.name : null,
+      taxonomySkillId: isAccepted ? bestMatch.id : null,
+      taxonomySkillName: isAccepted ? bestMatch.name : null,
       confidence,
       matches: matchesWithHierarchy
     };
   } catch (error) {
-    console.error('Error normalizing skill:', error);
+    console.error(`Error normalizing skill "${rawSkill}":`, error);
     return {
       rawSkill,
       taxonomySkillId: null,
@@ -245,12 +256,53 @@ export async function normalizeSkills(
   const results: SkillNormalizationResult[] = [];
   const batchSize = 5;
   
+  console.log(`======== TAXONOMY NORMALIZATION START ========`);
+  console.log(`Starting normalization of ${rawSkills.length} skills to taxonomy`);
+  console.log(`Raw skills to normalize: ${rawSkills.join(', ')}`);
+  console.log(`Using options:`, options);
+  
+  const startTime = performance.now();
+  
   for (let i = 0; i < rawSkills.length; i += batchSize) {
     const batch = rawSkills.slice(i, i + batchSize);
+    console.log(`Processing batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(rawSkills.length/batchSize)}: ${batch.join(', ')}`);
+    
     const batchPromises = batch.map(skill => normalizeSkill(skill, options));
     const batchResults = await Promise.all(batchPromises);
     results.push(...batchResults);
+    
+    console.log(`Batch ${Math.floor(i/batchSize) + 1} results:`, 
+      batchResults.map(r => ({
+        raw: r.rawSkill,
+        taxonomyId: r.taxonomySkillId ? r.taxonomySkillId.substring(0, 8) + '...' : 'null',
+        taxonomyName: r.taxonomySkillName,
+        confidence: r.confidence.toFixed(2)
+      }))
+    );
   }
+  
+  const endTime = performance.now();
+  const duration = ((endTime - startTime) / 1000).toFixed(2);
+  
+  // Calculate statistics
+  const matchedSkills = results.filter(r => r.taxonomySkillId !== null);
+  const matchRate = (matchedSkills.length / results.length) * 100;
+  const avgConfidence = matchedSkills.length > 0 
+    ? matchedSkills.reduce((sum, r) => sum + r.confidence, 0) / matchedSkills.length 
+    : 0;
+  
+  console.log(`======== TAXONOMY NORMALIZATION COMPLETE ========`);
+  console.log(`Normalized ${results.length} skills in ${duration}s`);
+  console.log(`Match rate: ${matchRate.toFixed(1)}% (${matchedSkills.length}/${results.length})`);
+  console.log(`Average confidence for matches: ${avgConfidence.toFixed(2)}`);
+  console.log(`Results summary:`, 
+    results.map(r => ({
+      raw: r.rawSkill,
+      normalized: r.taxonomySkillName,
+      taxonomyId: r.taxonomySkillId ? r.taxonomySkillId.substring(0, 8) + '...' : 'null',
+      confidence: r.confidence.toFixed(2)
+    }))
+  );
   
   return results;
 }
