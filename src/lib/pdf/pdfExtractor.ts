@@ -7,8 +7,6 @@
 // This uses dynamic imports to avoid require() calls during SSR/build time
 let PDFJS: typeof import('pdfjs-dist');
 
-import pdfjsWorker from 'pdfjs-dist/build/pdf.worker?worker';
-
 // Initialize PDF.js only in browser environment
 const initPdfJs = async (): Promise<typeof import('pdfjs-dist')> => {
   if (typeof window === 'undefined') {
@@ -20,23 +18,17 @@ const initPdfJs = async (): Promise<typeof import('pdfjs-dist')> => {
       // Dynamically import PDF.js
       PDFJS = await import('pdfjs-dist');
       
-      // Let PDF.js set up its own worker via its built-in web worker
-      // This avoids CORS issues with external CDNs
-      
-      // First check if worker source is already set
+      // Set worker source - Vite compatible approach
       if (!PDFJS.GlobalWorkerOptions.workerSrc) {
         try {
-          // Try to load the worker directly from the same origin
-          // This will work when the worker is properly bundled with the app
-          PDFJS.GlobalWorkerOptions.workerSrc = pdfjsWorker;
-          
-          console.log('PDF.js worker source set using Vite worker import');
-        } catch (workerError) {
-          console.warn('Unable to set PDF.js worker source:', workerError);
-          
-          // Last resort - let PDF.js use a fake worker
-          // This is less efficient but will work without a separate worker script
-          console.log('Falling back to PDF.js fake worker mode');
+          // Dynamic import the worker
+          const worker = await import('pdfjs-dist/build/pdf.worker.js?url');
+          // Set the worker source to the URL of the worker bundle
+          PDFJS.GlobalWorkerOptions.workerSrc = worker.default;
+          console.log('PDF.js worker source set using Vite dynamic import');
+        } catch (workerError: unknown) {
+          console.error('Failed to load PDF.js worker:', workerError);
+          throw new Error(`PDF.js worker failed to load: ${workerError instanceof Error ? workerError.message : String(workerError)}`);
         }
       }
     } catch (error) {
