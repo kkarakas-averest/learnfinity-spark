@@ -8,9 +8,12 @@ import { AlertTriangle, CheckCircle, Award } from 'lucide-react';
 
 interface SkillsInventoryProps {
   skills: Skill[];
+  requiredSkills?: Skill[];
+  missingSkills?: Skill[];
   onAddSkill?: () => void;
   onEditSkill?: (skillId: string) => void;
   isEditable?: boolean;
+  onGenerateLearningPath?: () => void;
 }
 
 /**
@@ -60,10 +63,13 @@ const groupSkillsByCategory = (skills: Skill[]): Record<string, Skill[]> => {
  */
 const SkillsInventory: React.FC<SkillsInventoryProps> = ({
   skills,
+  requiredSkills = [],
+  missingSkills = [],
   onAddSkill,
   onEditSkill,
   isEditable = false,
-}) => {
+  onGenerateLearningPath,
+}: SkillsInventoryProps) => {
   if (!skills || skills.length === 0) {
     return (
       <Card>
@@ -89,7 +95,10 @@ const SkillsInventory: React.FC<SkillsInventoryProps> = ({
     );
   }
 
-  const skillGroups = groupSkillsByCategory(skills);
+  const skillGroups: Record<string, Skill[]> = groupSkillsByCategory(skills);
+  const totalRequired = requiredSkills.length;
+  const totalMissing = missingSkills.length;
+  const totalCovered = totalRequired - totalMissing;
 
   return (
     <Card>
@@ -98,6 +107,11 @@ const SkillsInventory: React.FC<SkillsInventoryProps> = ({
           <CardTitle>Skills Inventory</CardTitle>
           <CardDescription>
             {skills.length} skill{skills.length !== 1 ? 's' : ''} recorded
+            {totalRequired > 0 && (
+              <span className="ml-2 text-xs text-muted-foreground">
+                | {totalCovered}/{totalRequired} required skills met
+              </span>
+            )}
           </CardDescription>
         </div>
         {isEditable && (
@@ -164,8 +178,35 @@ const SkillsInventory: React.FC<SkillsInventoryProps> = ({
             </div>
           ))}
           
+          {/* Required skills summary and missing skills visualization */}
+          {totalRequired > 0 && (
+            <div className="mt-4 p-3 bg-muted rounded-md flex gap-2 items-center">
+              <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0" />
+              <div>
+                <p className="text-sm font-medium">
+                  {totalMissing === 0
+                    ? 'All required skills for this role are covered!'
+                    : `${totalMissing} required skill${totalMissing > 1 ? 's are' : ' is'} missing for this role.`}
+                </p>
+                {totalMissing > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {missingSkills.map((skill: Skill) => (
+                      <Badge key={skill.id} variant="destructive" className="text-xs">
+                        {skill.name}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+                {totalMissing > 0 && onGenerateLearningPath && (
+                  <Button size="sm" className="mt-2" onClick={onGenerateLearningPath}>
+                    Generate Learning Path for Missing Skills
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
           {/* Required skills check */}
-          {skills.some(s => s.isRequired) && (
+          {skills.some((s: Skill) => s.isRequired) && (
             <div className="mt-4 p-3 bg-muted rounded-md flex gap-2">
               <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0" />
               <div>

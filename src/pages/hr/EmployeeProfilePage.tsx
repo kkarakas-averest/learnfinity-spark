@@ -60,6 +60,7 @@ import { supabase } from '@/lib/supabase';
 import { uploadFileToStorage, fixStorageUrl, getPublicUrl } from '@/utils/storageHelpers';
 import { useResumeHandler } from './resumeHandler';
 import EnhanceCourseContentButton from '@/components/hr/EnhanceCourseContentButton';
+import SkillsInventory from '@/components/hr/profile/SkillsInventory';
 
 // Define interfaces for the data
 interface Employee {
@@ -162,7 +163,9 @@ const EmployeeProfilePage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [courses, setCourses] = useState<Course[]>([]);
-  const [skills, setSkills] = useState<Skill[]>([]);
+  const [skills, setSkills] = useState<any[]>([]);
+  const [requiredSkills, setRequiredSkills] = useState<any[]>([]);
+  const [missingSkills, setMissingSkills] = useState<any[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [isMessageModalOpen, setIsMessageModalOpen] = useState<boolean>(false);
   const [assignDialogOpen, setAssignDialogOpen] = useState<boolean>(false);
@@ -187,6 +190,8 @@ const EmployeeProfilePage: React.FC = () => {
   const [inProgressCourses, setInProgressCourses] = useState(0);
   const [notStartedCourses, setNotStartedCourses] = useState(0);
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
+  const [generatingPath, setGeneratingPath] = useState(false);
+  const [learningPathResult, setLearningPathResult] = useState<string | null>(null);
   
   // Add this right after where the component gets the ID
   const {
@@ -201,48 +206,41 @@ const EmployeeProfilePage: React.FC = () => {
   useEffect(() => {
     const loadEmployeeData = async () => {
       if (!extractedId) return;
-      
       setLoading(true);
       try {
         console.log('Fetching employee with ID:', extractedId);
-        const { data, error } = await hrEmployeeService.getEmployee(extractedId);
-        
-        if (error) throw error;
-        
-        console.log('Employee data response:', { data, error });
+        const { data, error: employeeError } = await hrEmployeeService.getEmployee(extractedId);
+        if (employeeError) throw employeeError;
         setEmployee(data);
-        
+
         // Fetch employee's courses
-        console.log('Fetching courses for employee:', extractedId);
         const { data: coursesData, error: coursesError } = await hrEmployeeService.getEmployeeCourses(extractedId);
-        console.log('Courses data response:', { data: coursesData, error: coursesError });
-        
         if (!coursesError && coursesData) {
           setCourses(coursesData);
-          
           // Calculate course statistics
           const completed = coursesData.filter(c => c.progress === 100).length;
           const notStarted = coursesData.filter(c => c.progress === 0).length;
           const inProgress = coursesData.length - completed - notStarted;
-          
           setCompletedCourses(completed);
           setNotStartedCourses(notStarted);
           setInProgressCourses(inProgress);
         }
-        
-        // Fetch employee skills
-        const { data: skillsData } = await hrEmployeeService.getEmployeeSkills(extractedId);
-        if (skillsData) {
-          setSkills(skillsData);
+
+        // Fetch employee skills with taxonomy and gaps
+        const { skills, requiredSkills, missingSkills, error: skillsError } = await hrEmployeeService.getEmployeeSkillsWithTaxonomyAndGaps(extractedId);
+        if (!skillsError) {
+          setSkills(skills);
+          setRequiredSkills(requiredSkills);
+          setMissingSkills(missingSkills);
         }
-        
+
         // Fetch employee activities
         const { data: activitiesData } = await hrEmployeeService.getEmployeeActivities(extractedId);
         if (activitiesData) {
           setActivities(activitiesData);
         }
-      } catch (error) {
-        console.error('Error loading employee data:', error);
+      } catch (err) {
+        console.error('Error loading employee data:', err);
         toast({
           variant: 'destructive',
           title: 'Error',
@@ -252,7 +250,6 @@ const EmployeeProfilePage: React.FC = () => {
         setLoading(false);
       }
     };
-    
     if (extractedId) {
       loadEmployeeData();
     }
@@ -380,38 +377,6 @@ const EmployeeProfilePage: React.FC = () => {
   const professionalInterests = Array.isArray(cvData.professionalInterests) ? cvData.professionalInterests : [];
   const personalInsights = typeof cvData.personalInsights === 'object' && cvData.personalInsights !== null ? cvData.personalInsights : {};
   const publications = Array.isArray(personalInsights.publications) ? personalInsights.publications : [];
-
-  const SkillsSection: React.FC<{ skills: Skill[] | undefined | null }> = ({ skills }: { skills: Skill[] | undefined | null }) => {
-    if (!Array.isArray(skills) || skills.length === 0) {
-      return <div className="text-center py-4 text-gray-500">No skills recorded for this employee.</div>;
-    }
-
-    const getProficiencyColor = (level: string) => {
-      switch (level.toLowerCase()) {
-        case 'beginner': return 'bg-blue-100 text-blue-800 border-blue-200';
-        case 'intermediate': return 'bg-green-100 text-green-800 border-green-200';
-        case 'advanced': return 'bg-purple-100 text-purple-800 border-purple-200';
-        case 'expert': return 'bg-amber-100 text-amber-800 border-amber-200';
-        default: return 'bg-gray-100 text-gray-800 border-gray-200';
-      }
-    };
-
-    return (
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {skills.map((skill: Skill, index: number) => (
-          <div key={index} className="border rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow">
-            <div className="flex justify-between items-start mb-2">
-              <h3 className="font-medium">{skill.name}</h3>
-              <Badge className={`${getProficiencyColor(skill.level)}`}>{skill.level}</Badge>
-            </div>
-            {skill.inProgress && (
-              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">In Progress</Badge>
-            )}
-          </div>
-        ))}
-      </div>
-    );
-  };
 
   const handleAssignCourse = () => {
     setAssignDialogOpen(true);
@@ -664,6 +629,36 @@ const EmployeeProfilePage: React.FC = () => {
       });
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleGenerateLearningPath = async () => {
+    if (!employee || !missingSkills.length) return;
+    setGeneratingPath(true);
+    try {
+      const response = await fetch('/api/skills/course-generation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          employeeId: employee.id,
+          positionId: employee.position_id,
+          title: `Learning Path for ${employee.name}`,
+          skillIds: missingSkills.map((s: any) => s.taxonomy_skill_id || s.id),
+        }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        setLearningPathResult('Learning path generated successfully!');
+        toast({ title: 'Success', description: 'Learning path generated. Check the learner dashboard.' });
+      } else {
+        setLearningPathResult('Failed to generate learning path.');
+        toast({ title: 'Error', description: 'Failed to generate learning path.' });
+      }
+    } catch (err) {
+      setLearningPathResult('Error generating learning path.');
+      toast({ title: 'Error', description: 'Error generating learning path.' });
+    } finally {
+      setGeneratingPath(false);
     }
   };
 
@@ -1101,7 +1096,15 @@ const EmployeeProfilePage: React.FC = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <SkillsSection skills={skills} />
+                <SkillsInventory
+                  skills={skills}
+                  requiredSkills={requiredSkills}
+                  missingSkills={missingSkills}
+                  onAddSkill={() => {}}
+                  onEditSkill={() => {}}
+                  isEditable={false}
+                  onGenerateLearningPath={handleGenerateLearningPath}
+                />
               </CardContent>
             </Card>
           </TabsContent>

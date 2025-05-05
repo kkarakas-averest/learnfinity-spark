@@ -1354,7 +1354,7 @@ ${employee.cv_extracted_data ? '• CV data extracted for personalized recommend
       // Get the auth token
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
-      
+          
       if (!token) {
         throw new Error('Authentication required');
       }

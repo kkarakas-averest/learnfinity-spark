@@ -269,6 +269,8 @@ export const BulkSkillsAssessment: React.FC<BulkSkillsAssessmentProps> = ({ empl
   const [isSaving, setIsSaving] = React.useState(false);
   const [saveSuccess, setSaveSuccess] = React.useState(false);
   const [userId, setUserId] = React.useState<string | null>(null);
+  const [generatingPaths, setGeneratingPaths] = React.useState(false);
+  const [bulkPathResults, setBulkPathResults] = React.useState<string[]>([]);
 
   // Replace useSession with Supabase user fetch
   React.useEffect(() => {
@@ -899,6 +901,42 @@ export const BulkSkillsAssessment: React.FC<BulkSkillsAssessmentProps> = ({ empl
     }
   };
 
+  // Bulk learning path generation handler
+  const handleBulkGenerateLearningPaths = async () => {
+    setGeneratingPaths(true);
+    setBulkPathResults([]);
+    try {
+      const results: string[] = [];
+      for (const result of assessmentResults) {
+        if (!result.employee || !result.missingSkills || result.missingSkills.length === 0) continue;
+        try {
+          const response = await fetch('/api/skills/course-generation', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              employeeId: result.employee.id,
+              positionId: result.employee.position_id,
+              title: `Learning Path for ${result.employee.name}`,
+              skillIds: result.missingSkills,
+            }),
+          });
+          const data = await response.json();
+          if (data.success) {
+            results.push(`✅ ${result.employee.name}: Success`);
+          } else {
+            results.push(`❌ ${result.employee.name}: Failed`);
+          }
+        } catch (err) {
+          results.push(`❌ ${result.employee.name}: Error`);
+        }
+      }
+      setBulkPathResults(results);
+      toast({ title: 'Bulk Learning Path Generation Complete', description: results.join('\n') });
+    } finally {
+      setGeneratingPaths(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="bg-white p-6 rounded-lg border shadow-sm">
@@ -1184,6 +1222,21 @@ export const BulkSkillsAssessment: React.FC<BulkSkillsAssessmentProps> = ({ empl
           </div>
         </DialogContent>
       </Dialog>
+
+      {assessmentResults.length > 0 && (
+        <div className="my-4 flex gap-2">
+          <Button onClick={handleBulkGenerateLearningPaths} disabled={generatingPaths}>
+            {generatingPaths ? 'Generating Learning Paths...' : 'Generate Learning Paths for All with Gaps'}
+          </Button>
+          {bulkPathResults.length > 0 && (
+            <div className="ml-4 text-sm">
+              {bulkPathResults.map((msg: string, idx: number) => (
+                <div key={idx}>{msg}</div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }; 

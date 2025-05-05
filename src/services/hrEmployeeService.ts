@@ -139,6 +139,12 @@ export interface EmployeeService {
   getEmployeeActivities: (employeeId: string, limit?: number) => Promise<{data: any, error: any}>;
   addEmployeeSkill: (employeeId: string, skill: any) => Promise<SkillResponse>;
   assignCourseToEmployee: (employeeId: string, courseId: string) => Promise<CourseResponse>;
+  getEmployeeSkillsWithTaxonomyAndGaps: (employeeId: string) => Promise<{
+    skills: any[];
+    requiredSkills: any[];
+    missingSkills: any[];
+    error?: string;
+  }>;
 }
 
 // Create the service object
@@ -1503,12 +1509,95 @@ const hrEmployeeService: EmployeeService = {
         error: error?.message || 'Unknown error occurred'
       };
     }
+  },
+
+  /**
+   * Get employee skills with taxonomy hierarchy and gap analysis
+   */
+  async getEmployeeSkillsWithTaxonomyAndGaps(employeeId: string): Promise<{
+    skills: any[];
+    requiredSkills: any[];
+    missingSkills: any[];
+    error?: string;
+  }> {
+    try {
+      // 1. Fetch employee's position
+      const { data: employee, error: empError } = await supabase
+        .from('hr_employees')
+        .select('id, position_id')
+        .eq('id', employeeId)
+        .single();
+      if (empError || !employee) return { skills: [], requiredSkills: [], missingSkills: [], error: empError?.message || 'Employee not found' };
+
+      // 2. Fetch employee's skills with taxonomy hierarchy
+      const { data: employeeSkills, error: skillsError } = await supabase
+        .from('hr_employee_skills')
+        .select(`
+          id,
+          taxonomy_skill_id,
+          proficiency,
+          verified,
+          source,
+          skill_taxonomy_items (
+            id, name, description, group_id,
+            skill_taxonomy_groups (
+              id, name, subcategory_id,
+              skill_taxonomy_subcategories (
+                id, name, category_id,
+                skill_taxonomy_categories (
+                  id, name
+                )
+              )
+            )
+          )
+        `)
+        .eq('employee_id', employeeId);
+
+      if (skillsError) return { skills: [], requiredSkills: [], missingSkills: [], error: skillsError.message };
+
+      // 3. Fetch required skills for the employee's position
+      const { data: requiredSkills, error: reqError } = await supabase
+        .from('position_skill_requirements')
+        .select(`
+          taxonomy_skill_id,
+          required_proficiency,
+          skill_taxonomy_items (
+            id, name, description, group_id,
+            skill_taxonomy_groups (
+              id, name, subcategory_id,
+              skill_taxonomy_subcategories (
+                id, name, category_id,
+                skill_taxonomy_categories (
+                  id, name
+                )
+              )
+            )
+          )
+        `)
+        .eq('position_id', employee.position_id);
+
+      if (reqError) return { skills: [], requiredSkills: [], missingSkills: [], error: reqError.message };
+
+      // 4. Compute missing skills (gap analysis)
+      const employeeSkillIds = new Set(employeeSkills.map(s => s.taxonomy_skill_id));
+      const missingSkills = requiredSkills.filter(req => !employeeSkillIds.has(req.taxonomy_skill_id));
+
+      return {
+        skills: employeeSkills,
+        requiredSkills,
+        missingSkills,
+        error: undefined
+      };
+    } catch (error: any) {
+      return { skills: [], requiredSkills: [], missingSkills: [], error: error.message || 'Unknown error' };
+    }
   }
 };
 
 // Export the service
-export { hrEmployeeService };
-export default hrEmployeeService;
+const typedHrEmployeeService: EmployeeService = hrEmployeeService;
+export { typedHrEmployeeService as hrEmployeeService };
+export default typedHrEmployeeService;
 
 // Initialize database tables when the service is imported
 (async () => {
