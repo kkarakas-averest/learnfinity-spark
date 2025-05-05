@@ -7,6 +7,8 @@
 // This uses dynamic imports to avoid require() calls during SSR/build time
 let PDFJS: typeof import('pdfjs-dist');
 
+import pdfjsWorker from 'pdfjs-dist/build/pdf.worker?worker';
+
 // Initialize PDF.js only in browser environment
 const initPdfJs = async (): Promise<typeof import('pdfjs-dist')> => {
   if (typeof window === 'undefined') {
@@ -26,9 +28,9 @@ const initPdfJs = async (): Promise<typeof import('pdfjs-dist')> => {
         try {
           // Try to load the worker directly from the same origin
           // This will work when the worker is properly bundled with the app
-          PDFJS.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
+          PDFJS.GlobalWorkerOptions.workerSrc = pdfjsWorker;
           
-          console.log('PDF.js worker source set to same-origin path');
+          console.log('PDF.js worker source set using Vite worker import');
         } catch (workerError) {
           console.warn('Unable to set PDF.js worker source:', workerError);
           
