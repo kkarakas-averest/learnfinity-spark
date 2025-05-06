@@ -9,51 +9,31 @@
     "enabled": true,
     "silent": false
   },
-  "functions": {
-    "api/hr/courses/[courseId]/enrollment.ts": {
-      "memory": 1024,
-      "maxDuration": 10
-    },
-    "api/hr/employee-courses.ts": {
-      "memory": 1024,
-      "maxDuration": 10
-    },
-    "api/chat/conversation.ts": {
-      "memory": 1024,
-      "maxDuration": 10
-    },
-    "api/hr/positions-with-requirement-counts.ts": {
-      "memory": 1024,
-      "maxDuration": 10
-    },
-    "api/hr/positions-test.js": {
-      "memory": 1024,
-      "maxDuration": 10
-    },
-    "api/skills/position-requirements.ts": {
-      "memory": 1024,
-      "maxDuration": 10
-    },
-    "api/skills/taxonomy-search.ts": {
-      "memory": 1024,
-      "maxDuration": 10
-    },
-    "api/ai/suggest-skills.ts": {
-      "memory": 1024,
-      "maxDuration": 10
-    }
-  },
-  "routes": [
+  "regions": ["sfo1"],
+  "headers": [
     {
-      "src": "/api/(.*)",
-      "headers": {
-        "Access-Control-Allow-Credentials": "true",
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET,OPTIONS,PATCH,DELETE,POST,PUT",
-        "Access-Control-Allow-Headers": "X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization"
-      },
-      "continue": true
-    },
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        },
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        },
+        {
+          "key": "Access-Control-Allow-Methods",
+          "value": "GET, POST, PUT, DELETE, OPTIONS"
+        },
+        {
+          "key": "Access-Control-Allow-Headers",
+          "value": "Content-Type, Authorization"
+        }
+      ]
+    }
+  ],
+  "routes": [
     {
       "src": "/api/hr/courses/(?<courseId>[^/]+)/enrollment",
       "dest": "/api/hr/courses/[courseId]/enrollment.ts"
@@ -63,28 +43,76 @@
       "dest": "/api/hr/employee-courses.ts"
     },
     {
-      "src": "/api/chat/conversation",
-      "dest": "/api/chat/conversation.ts"
+      "src": "/api/hr/employee-goals",
+      "dest": "/api/hr/employee-goals.ts"
+    },
+    {
+      "src": "/api/hr/employees",
+      "dest": "/api/hr/employees.ts"
+    },
+    {
+      "src": "/api/hr/departments",
+      "dest": "/api/hr/departments.ts"
+    },
+    {
+      "src": "/api/hr/positions",
+      "dest": "/api/hr/positions.ts"
     },
     {
       "src": "/api/hr/positions-with-requirement-counts",
       "dest": "/api/hr/positions-with-requirement-counts.ts"
     },
     {
-      "src": "/api/hr/positions-test",
-      "dest": "/api/hr/positions-test.js"
-    },
-    {
       "src": "/api/skills/position-requirements",
       "dest": "/api/skills/position-requirements.ts"
+    },
+    {
+      "src": "/api/skills/position-requirements/apply-suggestions",
+      "dest": "/api/skills/position-requirements/apply-suggestions.ts"
     },
     {
       "src": "/api/skills/taxonomy-search",
       "dest": "/api/skills/taxonomy-search.ts"
     },
     {
+      "src": "/api/skills/employee-skills",
+      "dest": "/api/skills/employee-skills.ts"
+    },
+    {
+      "src": "/api/skills/gap-analysis",
+      "dest": "/api/skills/gap-analysis.ts"
+    },
+    {
+      "src": "/api/skills/course-generation",
+      "dest": "/api/skills/course-generation.ts"
+    },
+    {
       "src": "/api/ai/suggest-skills",
       "dest": "/api/ai/suggest-skills.ts"
+    },
+    {
+      "src": "/api/ai/regenerate-content",
+      "dest": "/api/ai/regenerate-content.ts"
+    },
+    {
+      "src": "/api/chat/conversation",
+      "dest": "/api/chat/conversation.ts"
+    },
+    {
+      "src": "/api/chat/model-settings",
+      "dest": "/api/chat/model-settings.ts"
+    },
+    {
+      "src": "/api/course-generation/generate",
+      "dest": "/api/course-generation/generate.ts"
+    },
+    {
+      "src": "/api/employee",
+      "dest": "/api/employee.js"
+    },
+    {
+      "src": "/api/auth/(.*)",
+      "dest": "/api/auth/$1"
     },
     {
       "src": "/assets/(.*)",
@@ -102,6 +130,72 @@
       "status": 200
     }
   ],
+  "functions": {
+    "api/hr/courses/[courseId]/enrollment.ts": {
+      "memory": 1024,
+      "maxDuration": 10
+    },
+    "api/hr/employee-courses.ts": {
+      "memory": 1024,
+      "maxDuration": 10
+    },
+    "api/hr/employee-goals.ts": {
+      "memory": 1024,
+      "maxDuration": 30
+    },
+    "api/hr/employees.ts": {
+      "memory": 1024,
+      "maxDuration": 30
+    },
+    "api/chat/conversation.ts": {
+      "memory": 2048,
+      "maxDuration": 60
+    },
+    "api/hr/positions-with-requirement-counts.ts": {
+      "memory": 1024,
+      "maxDuration": 10
+    },
+    "api/skills/position-requirements.ts": {
+      "memory": 1024,
+      "maxDuration": 10
+    },
+    "api/skills/position-requirements/apply-suggestions.ts": {
+      "memory": 1024,
+      "maxDuration": 15
+    },
+    "api/skills/taxonomy-search.ts": {
+      "memory": 1024,
+      "maxDuration": 10
+    },
+    "api/skills/gap-analysis.ts": {
+      "memory": 1024,
+      "maxDuration": 10
+    },
+    "api/skills/course-generation.ts": {
+      "memory": 2048,
+      "maxDuration": 60
+    },
+    "api/ai/suggest-skills.ts": {
+      "memory": 1024,
+      "maxDuration": 15
+    },
+    "api/ai/regenerate-content.ts": {
+      "memory": 1024,
+      "maxDuration": 60
+    },
+    "api/course-generation/generate.ts": {
+      "memory": 3008,
+      "maxDuration": 300
+    },
+    "api/profile/set-preferences.ts": {
+      "memory": 1024,
+      "maxDuration": 10
+    },
+    "api/sentry": {
+      "memory": 1024,
+      "maxDuration": 10
+    }
+  },
   "env": {
     "VITE_SUPABASE_URL": "${VITE_SUPABASE_URL}",
     "VITE_SUPABASE_ANON_KEY": "${VITE_SUPABASE_ANON_KEY}",
