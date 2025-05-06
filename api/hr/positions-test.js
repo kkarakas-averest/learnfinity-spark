@@ -1,3 +1,4 @@
+// @vercel/node
 // Simple test API for positions requirements
 // This provides a healthcheck endpoint to verify routing is working
 

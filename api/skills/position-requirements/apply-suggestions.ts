@@ -1,3 +1,4 @@
+// @vercel/node
 import { NextApiRequest, NextApiResponse } from 'next';
 import { supabase } from '../../../src/lib/supabase';
 

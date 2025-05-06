@@ -50,79 +50,103 @@
   "functions": {
     "api/hr/courses/[courseId]/enrollment.ts": {
       "memory": 1024,
-      "maxDuration": 10
+      "maxDuration": 10,
+      "runtime": "nodejs18.x"
     },
     "api/hr/employee-courses.ts": {
       "memory": 1024,
-      "maxDuration": 10
+      "maxDuration": 10,
+      "runtime": "nodejs18.x"
     },
     "api/hr/employees/[employeeId]/index.ts": {
       "memory": 1024,
-      "maxDuration": 30
+      "maxDuration": 30,
+      "runtime": "nodejs18.x"
     },
     "api/chat/conversation.ts": {
       "memory": 2048,
-      "maxDuration": 60
+      "maxDuration": 60,
+      "runtime": "nodejs18.x"
     },
     "api/hr/positions-with-requirement-counts.ts": {
       "memory": 1024,
-      "maxDuration": 10
+      "maxDuration": 10,
+      "runtime": "nodejs18.x"
     },
     "api/skills/position-requirements.ts": {
       "memory": 1024,
-      "maxDuration": 10
+      "maxDuration": 10,
+      "runtime": "nodejs18.x"
     },
     "api/skills/position-requirements/apply-suggestions.ts": {
       "memory": 1024,
-      "maxDuration": 15
+      "maxDuration": 15,
+      "runtime": "nodejs18.x"
     },
     "api/skills/taxonomy-search.ts": {
       "memory": 1024,
-      "maxDuration": 10
+      "maxDuration": 10,
+      "runtime": "nodejs18.x"
     },
     "api/ai/suggest-skills.ts": {
       "memory": 1024,
-      "maxDuration": 15
+      "maxDuration": 15,
+      "runtime": "nodejs18.x"
     },
     "api/ai/regenerate-content.ts": {
       "memory": 1024,
-      "maxDuration": 60
+      "maxDuration": 60,
+      "runtime": "nodejs18.x"
     },
     "api/courses/generate.ts": {
       "memory": 3008,
-      "maxDuration": 300
+      "maxDuration": 300,
+      "runtime": "nodejs18.x"
     },
     "api/courses/bulk-generate.ts": {
       "memory": 3008,
-      "maxDuration": 300
+      "maxDuration": 300,
+      "runtime": "nodejs18.x"
     },
     "api/courses/publish.ts": {
       "memory": 1024,
-      "maxDuration": 60
+      "maxDuration": 60,
+      "runtime": "nodejs18.x"
     },
     "api/uploads/index.ts": {
       "memory": 1024,
-      "maxDuration": 30
+      "maxDuration": 30,
+      "runtime": "nodejs18.x"
     },
     "api/groq-test.js": {
       "memory": 1024,
-      "maxDuration": 30
+      "maxDuration": 30,
+      "runtime": "nodejs18.x"
     },
     "api/hr/db-permissions-check.js": {
       "memory": 1024,
-      "maxDuration": 10
+      "maxDuration": 10,
+      "runtime": "nodejs18.x"
     },
     "api/hr/debug-api-health.js": {
       "memory": 1024,
-      "maxDuration": 10
+      "maxDuration": 10,
+      "runtime": "nodejs18.x"
     },
     "api/index.js": {
       "memory": 1024,
-      "maxDuration": 10
+      "maxDuration": 10,
+      "runtime": "nodejs18.x"
     },
     "api/learner/dashboard.js": {
       "memory": 1024,
-      "maxDuration": 30
+      "maxDuration": 30,
+      "runtime": "nodejs18.x"
+    },
+    "api/hr/positions-test.js": {
+      "memory": 1024,
+      "maxDuration": 10,
+      "runtime": "nodejs18.x"
     }
   },
   "env": {
