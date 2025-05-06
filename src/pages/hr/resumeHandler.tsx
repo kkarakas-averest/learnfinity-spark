@@ -4,6 +4,7 @@ import { uploadResumeFile, uploadResumeViaAPI, createMockResumeUrl } from '@/uti
 import { supabase } from '@/lib/supabase';
 import { GROQ_API_KEY } from '@/lib/env';
 import { extractTextFromPdf } from '@/lib/pdf/pdfExtractor';
+import { normalizeSkills } from '@/lib/skills/normalizer';
 
 /**
  * Hook for handling resume upload and viewing in employee profiles
@@ -124,7 +125,7 @@ export function useResumeHandler(employeeId: string | null) {
       } catch (extractionError) {
         console.error("Error extracting PDF text:", extractionError);
         // Enhanced fallback prompt with better guidance for the LLM
-        pdfContent = `PDF text extraction error: ${extractionError.message}
+        pdfContent = `PDF text extraction error: ${extractionError instanceof Error ? extractionError.message : String(extractionError)}
 
           Please generate a placeholder profile for:
           Name: ${employeeName}
@@ -283,7 +284,7 @@ Return ONLY a properly formatted JSON object with no additional text.`;
           }
         } catch (fetchError) {
           console.error("Network error calling Groq API:", fetchError);
-          console.log("Fetch error details:", fetchError.message);
+          console.log("Fetch error details:", fetchError instanceof Error ? fetchError.message : String(fetchError));
           retries--;
           if (retries < 0) throw fetchError;
           await new Promise(resolve => setTimeout(resolve, 1000));
@@ -338,7 +339,7 @@ Return ONLY a properly formatted JSON object with no additional text.`;
               parsedData = JSON.parse(jsonMatch[0]);
               console.log("Successfully parsed JSON using basic regex extraction");
             } catch (basicRegexError) {
-              console.error("Basic regex extraction failed:", basicRegexError.message);
+              console.error("Basic regex extraction failed:", basicRegexError instanceof Error ? basicRegexError.message : String(basicRegexError));
               
               // Try stricter pattern: find JSON-like content with balanced braces
               console.log("Trying advanced JSON extraction with balanced braces");
@@ -363,7 +364,7 @@ Return ONLY a properly formatted JSON object with no additional text.`;
                     parsedData = JSON.parse(jsonString);
                     console.log("Successfully parsed JSON using balanced brace extraction");
                   } catch (advancedError) {
-                    console.error("Advanced JSON extraction failed:", advancedError.message);
+                    console.error("Advanced JSON extraction failed:", advancedError instanceof Error ? advancedError.message : String(advancedError));
                     throw new Error("Could not parse response as valid JSON");
                   }
                 }
@@ -400,7 +401,7 @@ Return ONLY a properly formatted JSON object with no additional text.`;
             const skillsMatch = content.match(/"skills"[:\s]+\[(.*?)\]/s);
             if (skillsMatch) {
               const skillsStr = skillsMatch[1];
-              parsedData.skills = skillsStr.match(/"([^"]+)"/g)?.map(s => s.replace(/"/g, '')) || [];
+              parsedData.skills = skillsStr.match(/"([^"]+)"/g)?.map((s: string) => s.replace(/"/g, '')) || [];
             }
             
             console.log("Manual extraction produced partial data");
@@ -429,11 +430,11 @@ Return ONLY a properly formatted JSON object with no additional text.`;
         console.error("All JSON parsing attempts failed:", error);
         console.log("Full response content:", content);
         console.log('----------- GROQ DIRECT CALL FAILED -----------');
-        throw new Error(`Failed to parse Groq response: ${error.message}`);
+        throw new Error(`Failed to parse Groq response: ${error instanceof Error ? error.message : String(error)}`);
       }
     } catch (error) {
       console.error("Error in callGroqForCvAnalysis:", error);
-      console.log("Error details:", error.message);
+      console.log("Error details:", error instanceof Error ? error.message : String(error));
       console.log('----------- GROQ DIRECT CALL FAILED -----------');
       throw error;
     }
@@ -507,7 +508,7 @@ Return ONLY a properly formatted JSON object with no additional text.`;
           console.log("Experience entries:", profileData.experience?.length || 0);
         } catch (groqError) {
           console.error("Error with direct Groq API call:", groqError);
-          console.log("Groq API error details:", groqError.message);
+          console.log("Groq API error details:", groqError instanceof Error ? groqError.message : String(groqError));
           
           // Fall back to mock data if Groq API call fails
           console.log("FALLBACK: Using mock data due to Groq API error");
@@ -562,7 +563,14 @@ Return ONLY a properly formatted JSON object with no additional text.`;
         return false;
       }
       
-      console.log("Database updated successfully with profile data");
+      // Add this code to call our new function:
+      if (profileData.skills && profileData.skills.length > 0) {
+        console.log(`Processing ${profileData.skills.length} extracted skills for taxonomy normalization`);
+        await normalizeAndSaveSkills(employeeId, profileData.skills);
+      } else {
+        console.log('No skills found to normalize');
+      }
+      
       toast({
         title: "Profile Data Generated",
         description: "CV processed and profile data extracted successfully."
@@ -572,7 +580,7 @@ Return ONLY a properly formatted JSON object with no additional text.`;
       return true;
     } catch (error) {
       console.error('Error processing CV:', error);
-      console.log('Error details:', error.message);
+      console.log('Error details:', error instanceof Error ? error.message : String(error));
       console.log('FALLBACK: Creating fallback mock data after error');
       
       // Create and save fallback mock data
@@ -623,7 +631,7 @@ Return ONLY a properly formatted JSON object with no additional text.`;
         }
       } catch (fallbackError) {
         console.error('Error creating fallback profile:', fallbackError);
-        console.log('Fallback error details:', fallbackError.message);
+        console.log('Fallback error details:', fallbackError instanceof Error ? fallbackError.message : String(fallbackError));
       }
       
       toast({
@@ -881,6 +889,76 @@ Return ONLY a properly formatted JSON object with no additional text.`;
       source: 'mock_data',
       model: 'none'
     };
+  };
+
+  /**
+   * Process extracted skills and normalize them to taxonomy
+   */
+  const normalizeAndSaveSkills = async (employeeId: string, extractedSkills: string[]): Promise<boolean> => {
+    try {
+      console.log(`----- PROCESSING SKILLS FOR TAXONOMY -----`);
+      console.log(`Employee ID: ${employeeId}`);
+      console.log(`Found ${extractedSkills.length} skills to normalize: ${extractedSkills.join(', ')}`);
+      
+      // Normalize the skills to taxonomy IDs
+      const normalizedResults = await normalizeSkills(extractedSkills, {
+        confidenceThreshold: 0.65, // Slightly lower threshold for CV extraction
+        includeHierarchy: true,
+      });
+      
+      // Get the successfully matched skills (those with taxonomy IDs)
+      const matchedSkills = normalizedResults.filter(result => result.taxonomySkillId !== null);
+      console.log(`Successfully matched ${matchedSkills.length} of ${normalizedResults.length} skills to taxonomy`);
+      
+      if (matchedSkills.length === 0) {
+        console.log(`No skills could be matched to taxonomy. Skipping database update.`);
+        return false;
+      }
+      
+      // Create entries for the employee_skills table
+      const skillEntries = matchedSkills.map(match => ({
+        employee_id: employeeId,
+        taxonomy_skill_id: match.taxonomySkillId,
+        skill_name: match.taxonomySkillName || match.rawSkill,
+        source: 'cv_extraction',
+        confidence: match.confidence,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }));
+      
+      // Insert skills into the hr_employee_skills table
+      console.log(`Inserting ${skillEntries.length} normalized skills into database`);
+      const { error } = await supabase
+        .from('hr_employee_skills')
+        .insert(skillEntries);
+        
+      if (error) {
+        console.error('Error saving normalized skills to database:', error);
+        return false;
+      }
+      
+      // Log normalized skills to the skill_normalization_logs table for tracking
+      await supabase
+        .from('skill_normalization_logs')
+        .insert({
+          employee_id: employeeId,
+          raw_skills: extractedSkills,
+          normalized_skills: matchedSkills.map(m => ({
+            raw: m.rawSkill, 
+            normalized: m.taxonomySkillName, 
+            taxonomy_id: m.taxonomySkillId
+          })),
+          source: 'cv_extraction',
+          created_at: new Date().toISOString()
+        });
+      
+      console.log(`Successfully saved ${skillEntries.length} normalized skills to database`);
+      console.log(`----- SKILL TAXONOMY PROCESSING COMPLETE -----`);
+      return true;
+    } catch (error: unknown) {
+      console.error('Error normalizing skills to taxonomy:', error instanceof Error ? error.message : String(error));
+      return false;
+    }
   };
 
   const uploadResume = async (): Promise<{success: boolean, url?: string}> => {
