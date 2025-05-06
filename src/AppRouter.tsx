@@ -27,6 +27,7 @@ import EmployeesPage from './pages/hr/EmployeesPage';
 import EmployeeProfilePage from './pages/hr/EmployeeProfilePage';
 import EditEmployeePage from './components/hr/EditEmployeePage';
 import CreateEmployeePage from './components/hr/CreateEmployeePage';
+import PositionRequirementsPage from './pages/hr/PositionRequirementsPage';
 
 // Super Admin Pages
 import SuperAdminDashboard from '@/features/super-admin/pages/SuperAdminDashboard';
@@ -68,6 +69,7 @@ const AppRouter: React.FC = () => {
           <TypeSafeRoute path="employees/new" element={<CreateEmployeePage />} />
           <TypeSafeRoute path="employees/:id" element={<EmployeeProfilePage />} />
           <TypeSafeRoute path="employees/:id/edit" element={<EditEmployeePage />} />
+          <TypeSafeRoute path="positions/requirements" element={<PositionRequirementsPage />} />
         </TypeSafeRoute>
 
         {/* Super Admin Routes */}
