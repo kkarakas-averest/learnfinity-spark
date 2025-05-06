@@ -37,30 +37,22 @@
     {
       "src": "/api/hr/courses/(?<courseId>[^/]+)/enrollment",
       "dest": "/api/hr/courses/[courseId]/enrollment.ts",
-      "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-      "memory": 1024,
-      "maxDuration": 10
+      "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
     },
     {
       "src": "/api/hr/employee-courses",
       "dest": "/api/hr/employee-courses.ts",
-      "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-      "memory": 1024,
-      "maxDuration": 10
+      "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
     },
     {
       "src": "/api/hr/employee-goals",
       "dest": "/api/hr/employee-goals.ts",
-      "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-      "memory": 1024,
-      "maxDuration": 30
+      "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
     },
     {
       "src": "/api/hr/employees",
       "dest": "/api/hr/employees.ts",
-      "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-      "memory": 1024,
-      "maxDuration": 30
+      "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
     },
     {
       "src": "/api/hr/departments",
@@ -75,30 +67,22 @@
     {
       "src": "/api/hr/positions-with-requirement-counts",
       "dest": "/api/hr/positions-with-requirement-counts.ts",
-      "methods": ["GET", "OPTIONS"],
-      "memory": 1024,
-      "maxDuration": 10
+      "methods": ["GET", "OPTIONS"]
     },
     {
       "src": "/api/skills/position-requirements",
       "dest": "/api/skills/position-requirements.ts",
-      "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-      "memory": 1024,
-      "maxDuration": 10
+      "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
     },
     {
       "src": "/api/skills/position-requirements/apply-suggestions",
       "dest": "/api/skills/position-requirements/apply-suggestions.ts",
-      "methods": ["POST", "OPTIONS"],
-      "memory": 1024,
-      "maxDuration": 15
+      "methods": ["POST", "OPTIONS"]
     },
     {
       "src": "/api/skills/taxonomy-search",
       "dest": "/api/skills/taxonomy-search.ts",
-      "methods": ["GET", "POST", "OPTIONS"],
-      "memory": 1024,
-      "maxDuration": 10
+      "methods": ["GET", "POST", "OPTIONS"]
     },
     {
       "src": "/api/skills/employee-skills",
@@ -108,37 +92,27 @@
     {
       "src": "/api/skills/gap-analysis",
       "dest": "/api/skills/gap-analysis.ts",
-      "methods": ["GET", "POST", "OPTIONS"],
-      "memory": 1024,
-      "maxDuration": 10
+      "methods": ["GET", "POST", "OPTIONS"]
     },
     {
       "src": "/api/skills/course-generation",
       "dest": "/api/skills/course-generation.ts",
-      "methods": ["POST", "OPTIONS"],
-      "memory": 2048,
-      "maxDuration": 60
+      "methods": ["POST", "OPTIONS"]
     },
     {
       "src": "/api/ai/suggest-skills",
       "dest": "/api/ai/suggest-skills.ts",
-      "methods": ["POST", "OPTIONS"],
-      "memory": 1024,
-      "maxDuration": 15
+      "methods": ["POST", "OPTIONS"]
     },
     {
       "src": "/api/ai/regenerate-content",
       "dest": "/api/ai/regenerate-content.ts",
-      "methods": ["POST", "OPTIONS"],
-      "memory": 1024,
-      "maxDuration": 60
+      "methods": ["POST", "OPTIONS"]
     },
     {
       "src": "/api/chat/conversation",
       "dest": "/api/chat/conversation.ts",
-      "methods": ["POST", "OPTIONS"],
-      "memory": 2048,
-      "maxDuration": 60
+      "methods": ["POST", "OPTIONS"]
     },
     {
       "src": "/api/chat/model-settings",
@@ -148,9 +122,7 @@
     {
       "src": "/api/course-generation/generate",
       "dest": "/api/course-generation/generate.ts",
-      "methods": ["POST", "OPTIONS"],
-      "memory": 3008,
-      "maxDuration": 300
+      "methods": ["POST", "OPTIONS"]
     },
     {
       "src": "/api/employee",
@@ -164,15 +136,11 @@
     {
       "src": "/api/profile/set-preferences",
       "dest": "/api/profile/set-preferences.ts",
-      "methods": ["POST", "OPTIONS"],
-      "memory": 1024,
-      "maxDuration": 10
+      "methods": ["POST", "OPTIONS"]
     },
     {
       "src": "/api/sentry",
-      "dest": "/api/sentry",
-      "memory": 1024,
-      "maxDuration": 10
+      "dest": "/api/sentry"
     },
     {
       "src": "/assets/(.*)",
@@ -190,6 +158,72 @@
       "status": 200
     }
   ],
+  "functions": {
+    "api/hr/courses/[courseId]/enrollment.ts": {
+      "memory": 1024,
+      "maxDuration": 10
+    },
+    "api/hr/employee-courses.ts": {
+      "memory": 1024,
+      "maxDuration": 10
+    },
+    "api/hr/employee-goals.ts": {
+      "memory": 1024,
+      "maxDuration": 30
+    },
+    "api/hr/employees.ts": {
+      "memory": 1024,
+      "maxDuration": 30
+    },
+    "api/chat/conversation.ts": {
+      "memory": 2048,
+      "maxDuration": 60
+    },
+    "api/hr/positions-with-requirement-counts.ts": {
+      "memory": 1024,
+      "maxDuration": 10
+    },
+    "api/skills/position-requirements.ts": {
+      "memory": 1024,
+      "maxDuration": 10
+    },
+    "api/skills/position-requirements/apply-suggestions.ts": {
+      "memory": 1024,
+      "maxDuration": 15
+    },
+    "api/skills/taxonomy-search.ts": {
+      "memory": 1024,
+      "maxDuration": 10
+    },
+    "api/skills/gap-analysis.ts": {
+      "memory": 1024,
+      "maxDuration": 10
+    },
+    "api/skills/course-generation.ts": {
+      "memory": 2048,
+      "maxDuration": 60
+    },
+    "api/ai/suggest-skills.ts": {
+      "memory": 1024,
+      "maxDuration": 15
+    },
+    "api/ai/regenerate-content.ts": {
+      "memory": 1024,
+      "maxDuration": 60
+    },
+    "api/course-generation/generate.ts": {
+      "memory": 3008,
+      "maxDuration": 300
+    },
+    "api/profile/set-preferences.ts": {
+      "memory": 1024,
+      "maxDuration": 10
+    },
+    "api/sentry": {
+      "memory": 1024,
+      "maxDuration": 10
+    }
+  },
   "env": {
     "VITE_SUPABASE_URL": "${VITE_SUPABASE_URL}",
     "VITE_SUPABASE_ANON_KEY": "${VITE_SUPABASE_ANON_KEY}",
