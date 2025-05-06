@@ -4,11 +4,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 
-// Helper function to get full API URL, matching the one in other components
+// Helper function to get API URL
 const getApiUrl = (path: string) => {
-  // Use window.location.origin to get the current base URL
-  const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
-  return `${baseUrl}${path}`;
+  return path;
 };
 
 export type TaxonomySkill = {

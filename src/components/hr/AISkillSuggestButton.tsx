@@ -5,8 +5,7 @@ import { toast } from 'sonner';
 
 // Helper function to get API URL
 const getApiUrl = (path: string) => {
-  const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
-  return `${baseUrl}${path}`;
+  return path;
 };
 
 type Props = {

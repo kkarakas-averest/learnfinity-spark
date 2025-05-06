@@ -2,6 +2,11 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { createClient } from '@supabase/supabase-js';
 
+// Export config for Vercel
+export const config = {
+  runtime: 'nodejs'
+};
+
 // Hardcoded Supabase credentials - environment variables aren't resolving correctly in Vercel
 // Using only hardcoded values that don't rely on env vars
 const SUPABASE_URL = 'https://ujlqzkkkfatehxeqtbdl.supabase.co';

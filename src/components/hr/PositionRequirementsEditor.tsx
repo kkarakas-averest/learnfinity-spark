@@ -8,11 +8,9 @@ import { AISkillSuggestButton } from './AISkillSuggestButton';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 
-// Helper function to get full API URL, matching the one in PositionRequirementsPage
+// Helper function to get API URL
 const getApiUrl = (path: string) => {
-  // Use window.location.origin to get the current base URL
-  const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
-  return `${baseUrl}${path}`;
+  return path;
 };
 
 export type PositionSkillRequirement = {

@@ -2,6 +2,11 @@
 // Simple test API for positions requirements
 // This provides a healthcheck endpoint to verify routing is working
 
+// Export config for Vercel
+export const config = {
+  runtime: 'nodejs'
+};
+
 export default function handler(req, res) {
   // Set CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
