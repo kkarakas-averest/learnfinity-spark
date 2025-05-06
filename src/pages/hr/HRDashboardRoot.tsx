@@ -20,6 +20,7 @@ import LearnerProgressSummary from '@/components/hr/LearnerProgressSummary';
 import AddEmployeeForm from '@/pages/hr/AddEmployeeForm';
 import SkillsInventoryPage from '@/pages/hr/SkillsInventoryPage';
 import CourseGeneratorPage from '@/pages/hr/CourseGeneratorPage';
+import PositionRequirementsPage from '@/pages/hr/PositionRequirementsPage';
 
 /**
  * Root layout component for the HR Dashboard
@@ -54,6 +55,7 @@ const HRDashboardRoot: React.FC = () => {
     if (path === '/hr-dashboard/settings') return <SettingsPage />;
     if (path === '/hr-dashboard/course-builder') return <CourseBuilderPage />;
     if (path === '/hr-dashboard/skills-inventory') return <SkillsInventoryPage />;
+    if (path === '/hr-dashboard/positions/requirements') return <PositionRequirementsPage />;
     if (path === '/hr-dashboard/course-generator') return <CourseGeneratorPage />;
     
     // Second-level pages
