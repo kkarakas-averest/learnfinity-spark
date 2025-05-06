@@ -21,13 +21,28 @@ export default function PositionRequirementsPage() {
       try {
         const res = await fetch('/api/hr/positions-with-requirement-counts');
         if (!res.ok) {
-          console.error('API response error:', await res.text());
-          throw new Error(`Failed to fetch positions: ${res.status}`);
+          const errorText = await res.text();
+          console.error('API response error:', errorText);
+          
+          // Try to parse the error response
+          let errorDetail = `Failed to fetch positions: ${res.status}`;
+          try {
+            const errorJson = JSON.parse(errorText);
+            if (errorJson.error) {
+              errorDetail = `${errorJson.error} (${res.status})`;
+            }
+          } catch (parseError) {
+            // If parsing fails, use the text as is
+          }
+          
+          throw new Error(errorDetail);
         }
         return res.json();
       } catch (err) {
         console.error('Position requirements fetch error:', err);
-        throw new Error('Failed to load positions data. See console for details.');
+        throw err instanceof Error 
+          ? err 
+          : new Error('Failed to load positions data. See console for details.');
       }
     },
   });

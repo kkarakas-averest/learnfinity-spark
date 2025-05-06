@@ -3,8 +3,8 @@ import { createClient } from '@supabase/supabase-js';
 
 // Hardcoded Supabase credentials for debugging (replace with your actual values if needed)
 const SUPABASE_URL = 'https://ujlqzkkkfatehxeqtbdl.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqbHF6a2trZmF0ZWh4ZXF0YmRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDA2ODA4MzIsImV4cCI6MjA1NjI1NjgzMn0.ed-wciIqkubS4f2T3UNnkgqwzLEdpC-SVZoVsP7-W1E';
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const SUPABASE_SERVICE_ROLE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVqbHF6a2trZmF0ZWh4ZXF0YmRsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0MDY4MDgzMiwiZXhwIjoyMDU2MjU2ODMyfQ.MZZMNbG8rpCLQ7sMGKXKQP1YL0dZ_PMVBKBrXL-k7IY';
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 type PositionWithRequirementCount = {
   id: string;
@@ -55,8 +55,19 @@ export default async function handler(
     return res.status(200).json({ positions: result });
   } catch (error) {
     console.error('Error in positions with requirements count:', error);
+    
+    // More detailed error logging
+    if (error instanceof Error) {
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
+    }
+    
     return res.status(500).json({
-      error: error instanceof Error ? error.message : 'Unknown error fetching positions'
+      error: error instanceof Error ? error.message : 'Unknown error fetching positions',
+      detail: 'Check server logs for more information'
     });
   }
 } 
