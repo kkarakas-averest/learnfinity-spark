@@ -51,102 +51,102 @@
     "api/hr/courses/[courseId]/enrollment.ts": {
       "memory": 1024,
       "maxDuration": 10,
-      "runtime": "nodejs18.x"
+      "runtime": "@vercel/node@4.0.0"
     },
     "api/hr/employee-courses.ts": {
       "memory": 1024,
       "maxDuration": 10,
-      "runtime": "nodejs18.x"
+      "runtime": "@vercel/node@4.0.0"
     },
     "api/hr/employees/[employeeId]/index.ts": {
       "memory": 1024,
       "maxDuration": 30,
-      "runtime": "nodejs18.x"
+      "runtime": "@vercel/node@4.0.0"
     },
     "api/chat/conversation.ts": {
       "memory": 2048,
       "maxDuration": 60,
-      "runtime": "nodejs18.x"
+      "runtime": "@vercel/node@4.0.0"
     },
     "api/hr/positions-with-requirement-counts.ts": {
       "memory": 1024,
       "maxDuration": 10,
-      "runtime": "nodejs18.x"
+      "runtime": "@vercel/node@4.0.0"
     },
     "api/skills/position-requirements.ts": {
       "memory": 1024,
       "maxDuration": 10,
-      "runtime": "nodejs18.x"
+      "runtime": "@vercel/node@4.0.0"
     },
     "api/skills/position-requirements/apply-suggestions.ts": {
       "memory": 1024,
       "maxDuration": 15,
-      "runtime": "nodejs18.x"
+      "runtime": "@vercel/node@4.0.0"
     },
     "api/skills/taxonomy-search.ts": {
       "memory": 1024,
       "maxDuration": 10,
-      "runtime": "nodejs18.x"
+      "runtime": "@vercel/node@4.0.0"
     },
     "api/ai/suggest-skills.ts": {
       "memory": 1024,
       "maxDuration": 15,
-      "runtime": "nodejs18.x"
+      "runtime": "@vercel/node@4.0.0"
     },
     "api/ai/regenerate-content.ts": {
       "memory": 1024,
       "maxDuration": 60,
-      "runtime": "nodejs18.x"
+      "runtime": "@vercel/node@4.0.0"
     },
     "api/courses/generate.ts": {
       "memory": 3008,
       "maxDuration": 300,
-      "runtime": "nodejs18.x"
+      "runtime": "@vercel/node@4.0.0"
     },
     "api/courses/bulk-generate.ts": {
       "memory": 3008,
       "maxDuration": 300,
-      "runtime": "nodejs18.x"
+      "runtime": "@vercel/node@4.0.0"
     },
     "api/courses/publish.ts": {
       "memory": 1024,
       "maxDuration": 60,
-      "runtime": "nodejs18.x"
+      "runtime": "@vercel/node@4.0.0"
     },
     "api/uploads/index.ts": {
       "memory": 1024,
       "maxDuration": 30,
-      "runtime": "nodejs18.x"
+      "runtime": "@vercel/node@4.0.0"
     },
     "api/groq-test.js": {
       "memory": 1024,
       "maxDuration": 30,
-      "runtime": "nodejs18.x"
+      "runtime": "@vercel/node@4.0.0"
     },
     "api/hr/db-permissions-check.js": {
       "memory": 1024,
       "maxDuration": 10,
-      "runtime": "nodejs18.x"
+      "runtime": "@vercel/node@4.0.0"
     },
     "api/hr/debug-api-health.js": {
       "memory": 1024,
       "maxDuration": 10,
-      "runtime": "nodejs18.x"
+      "runtime": "@vercel/node@4.0.0"
     },
     "api/index.js": {
       "memory": 1024,
       "maxDuration": 10,
-      "runtime": "nodejs18.x"
+      "runtime": "@vercel/node@4.0.0"
     },
     "api/learner/dashboard.js": {
       "memory": 1024,
       "maxDuration": 30,
-      "runtime": "nodejs18.x"
+      "runtime": "@vercel/node@4.0.0"
     },
     "api/hr/positions-test.js": {
       "memory": 1024,
       "maxDuration": 10,
-      "runtime": "nodejs18.x"
+      "runtime": "@vercel/node@4.0.0"
     }
   },
   "env": {
