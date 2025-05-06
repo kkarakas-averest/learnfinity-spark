@@ -8,51 +8,80 @@ const SUPABASE_SERVICE_ROLE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3Mi
 // Create Supabase client
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-// Sample skills for different position types
-const sampleSkills = {
+// Skill categories for suggestion
+const skillKeywords = {
   developer: [
-    { id: 'skill-1', name: 'JavaScript' },
-    { id: 'skill-2', name: 'TypeScript' },
-    { id: 'skill-3', name: 'React' },
-    { id: 'skill-4', name: 'Node.js' },
-    { id: 'skill-5', name: 'SQL' }
+    'JavaScript', 'TypeScript', 'React', 'Node.js', 'SQL',
+    'Python', 'Java', 'C#', 'HTML', 'CSS'
   ],
   designer: [
-    { id: 'skill-6', name: 'Figma' },
-    { id: 'skill-7', name: 'UI Design' },
-    { id: 'skill-8', name: 'UX Research' },
-    { id: 'skill-9', name: 'Adobe Creative Suite' },
-    { id: 'skill-10', name: 'Design Systems' }
+    'Figma', 'UI Design', 'UX Research', 'Adobe Creative Suite', 'Design Systems',
+    'Wireframing', 'Prototyping', 'User Testing', 'Visual Design', 'Interaction Design'
   ],
   manager: [
-    { id: 'skill-11', name: 'Leadership' },
-    { id: 'skill-12', name: 'Project Management' },
-    { id: 'skill-13', name: 'Team Building' },
-    { id: 'skill-14', name: 'Strategic Planning' },
-    { id: 'skill-15', name: 'Performance Management' }
+    'Leadership', 'Project Management', 'Team Building', 'Strategic Planning', 'Performance Management',
+    'Agile', 'Scrum', 'Budgeting', 'Stakeholder Management', 'Risk Assessment'
   ],
   default: [
-    { id: 'skill-16', name: 'Communication' },
-    { id: 'skill-17', name: 'Problem Solving' },
-    { id: 'skill-18', name: 'Time Management' },
-    { id: 'skill-19', name: 'Adaptability' },
-    { id: 'skill-20', name: 'Teamwork' }
+    'Communication', 'Problem Solving', 'Time Management', 'Adaptability', 'Teamwork',
+    'Critical Thinking', 'Attention to Detail', 'Organization', 'Creativity', 'Decision Making'
   ]
 };
 
-// Mock AI suggestion function that returns appropriate skills based on position title
-function suggestSkillsForPosition(positionTitle: string) {
+// Async function to search for skills in the taxonomy
+async function findSkillsByKeywords(keywords: string[]) {
+  // Build a query with OR conditions for each keyword
+  const queries = keywords.map(keyword => {
+    return `name.ilike.%${keyword}%`;
+  });
+  
+  // Join the queries with OR
+  const filterString = queries.join(',');
+  
+  try {
+    const { data, error } = await supabase
+      .from('skill_taxonomy_items')
+      .select('id, name')
+      .or(filterString)
+      .limit(10);
+      
+    if (error) throw error;
+    
+    return data || [];
+  } catch (error) {
+    console.error('Error finding skills by keywords:', error);
+    return [];
+  }
+}
+
+// AI suggestion function that returns appropriate skills based on position title
+async function suggestSkillsForPosition(positionTitle: string) {
   const lowercaseTitle = positionTitle.toLowerCase();
   
+  let keywordsToUse: string[] = [];
+  
   if (lowercaseTitle.includes('develop') || lowercaseTitle.includes('engineer') || lowercaseTitle.includes('coder')) {
-    return sampleSkills.developer;
+    keywordsToUse = skillKeywords.developer;
   } else if (lowercaseTitle.includes('design') || lowercaseTitle.includes('ux') || lowercaseTitle.includes('ui')) {
-    return sampleSkills.designer;
+    keywordsToUse = skillKeywords.designer;
   } else if (lowercaseTitle.includes('manager') || lowercaseTitle.includes('director') || lowercaseTitle.includes('lead')) {
-    return sampleSkills.manager;
+    keywordsToUse = skillKeywords.manager;
   } else {
-    return sampleSkills.default;
+    keywordsToUse = skillKeywords.default;
   }
+  
+  // Find actual skills from the database
+  const suggestedSkills = await findSkillsByKeywords(keywordsToUse);
+  
+  // If we couldn't find any skills, return a fallback set
+  if (!suggestedSkills || suggestedSkills.length === 0) {
+    return skillKeywords.default.map((name, index) => ({
+      id: `fallback-${index}`,
+      name
+    }));
+  }
+  
+  return suggestedSkills;
 }
 
 export default async function handler(
@@ -91,8 +120,8 @@ export default async function handler(
     
     console.log(`[suggest-skills] Suggesting skills for position: ${positionTitle}`);
     
-    // Get suggestions from mock function
-    const suggestedSkills = suggestSkillsForPosition(positionTitle);
+    // Get suggestions from function
+    const suggestedSkills = await suggestSkillsForPosition(positionTitle);
     
     // Add placeholder hierarchy data for each skill
     const enrichedSkills = suggestedSkills.map(skill => ({

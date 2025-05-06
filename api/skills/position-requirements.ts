@@ -76,29 +76,28 @@ export default async function handler(
         // Get all taxonomy skill IDs
         const skillIds = requirements.map(req => req.taxonomy_skill_id);
         
-        // Fetch skill names
+        // Fetch skill data only first
         const { data: skillsData, error: skillsError } = await supabase
-          .from('taxonomy_skills')
-          .select('id, name')
+          .from('skill_taxonomy_items')
+          .select('id, name, group_id')
           .in('id', skillIds);
         
         if (skillsError) throw skillsError;
         
-        // Create a map of skill IDs to names
-        const skillNameMap = new Map();
-        skillsData?.forEach(skill => {
-          skillNameMap.set(skill.id, skill.name);
+        // Create a simplified map with skills and placeholder hierarchy values
+        const enrichedRequirements = requirements.map(req => {
+          // Find the matching skill data
+          const skillData = skillsData?.find(skill => skill.id === req.taxonomy_skill_id) || null;
+          
+          return {
+            ...req,
+            skill_name: skillData?.name || 'Unknown Skill',
+            // Simplify with default placeholders
+            group_name: 'Technical',
+            subcategory_name: 'Skills',
+            category_name: 'General'
+          };
         });
-        
-        // Simple hierarchy info (just skill names for now)
-        const enrichedRequirements = requirements.map(req => ({
-          ...req,
-          skill_name: skillNameMap.get(req.taxonomy_skill_id) || 'Unknown Skill',
-          // Adding placeholder values for hierarchy
-          category_name: 'General',
-          subcategory_name: 'Skills',
-          group_name: 'Technical'
-        }));
         
         return res.status(200).json({ success: true, data: enrichedRequirements });
       }

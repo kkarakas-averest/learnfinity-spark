@@ -44,7 +44,7 @@ export default async function handler(
     
     // Search for skills (simplified version)
     const { data: skills, error } = await supabase
-      .from('taxonomy_skills')
+      .from('skill_taxonomy_items')
       .select('id, name')
       .ilike('name', `%${searchQuery}%`)
       .order('name')
