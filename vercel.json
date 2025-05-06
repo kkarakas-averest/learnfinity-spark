@@ -29,6 +29,18 @@
     "api/hr/positions-test.js": {
       "memory": 1024,
       "maxDuration": 10
+    },
+    "api/skills/position-requirements.ts": {
+      "memory": 1024,
+      "maxDuration": 10
+    },
+    "api/skills/taxonomy-search.ts": {
+      "memory": 1024,
+      "maxDuration": 10
+    },
+    "api/ai/suggest-skills.ts": {
+      "memory": 1024,
+      "maxDuration": 10
     }
   },
   "routes": [
@@ -61,6 +73,18 @@
     {
       "src": "/api/hr/positions-test",
       "dest": "/api/hr/positions-test.js"
+    },
+    {
+      "src": "/api/skills/position-requirements",
+      "dest": "/api/skills/position-requirements.ts"
+    },
+    {
+      "src": "/api/skills/taxonomy-search",
+      "dest": "/api/skills/taxonomy-search.ts"
+    },
+    {
+      "src": "/api/ai/suggest-skills",
+      "dest": "/api/ai/suggest-skills.ts"
     },
     {
       "src": "/assets/(.*)",
