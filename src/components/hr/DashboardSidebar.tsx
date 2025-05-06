@@ -102,6 +102,12 @@ const DashboardSidebar: React.FC = () => {
           isActive: currentPath === "/hr-dashboard/skills-inventory"
         },
         {
+          title: "Position Requirements",
+          href: "/hr/positions/requirements",
+          icon: <FileText className="h-4 w-4" />,
+          isActive: currentPath === "/hr/positions/requirements"
+        },
+        {
           title: "Learner Progress",
           href: "/hr-dashboard/learner-progress",
           icon: <Activity className="h-4 w-4" />,
