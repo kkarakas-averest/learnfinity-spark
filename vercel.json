@@ -56,11 +56,7 @@
       "memory": 1024,
       "maxDuration": 10
     },
-    "api/hr/employee-goals.ts": {
-      "memory": 1024,
-      "maxDuration": 30
-    },
-    "api/hr/employees.ts": {
+    "api/hr/employees/[employeeId]/index.ts": {
       "memory": 1024,
       "maxDuration": 30
     },
@@ -84,14 +80,6 @@
       "memory": 1024,
       "maxDuration": 10
     },
-    "api/skills/gap-analysis.ts": {
-      "memory": 1024,
-      "maxDuration": 10
-    },
-    "api/skills/course-generation.ts": {
-      "memory": 2048,
-      "maxDuration": 60
-    },
     "api/ai/suggest-skills.ts": {
       "memory": 1024,
       "maxDuration": 15
@@ -100,17 +88,41 @@
       "memory": 1024,
       "maxDuration": 60
     },
-    "api/course-generation/generate.ts": {
+    "api/courses/generate.ts": {
       "memory": 3008,
       "maxDuration": 300
     },
-    "api/profile/set-preferences.ts": {
+    "api/courses/bulk-generate.ts": {
+      "memory": 3008,
+      "maxDuration": 300
+    },
+    "api/courses/publish.ts": {
+      "memory": 1024,
+      "maxDuration": 60
+    },
+    "api/uploads/index.ts": {
+      "memory": 1024,
+      "maxDuration": 30
+    },
+    "api/groq-test.js": {
+      "memory": 1024,
+      "maxDuration": 30
+    },
+    "api/hr/db-permissions-check.js": {
       "memory": 1024,
       "maxDuration": 10
     },
-    "api/sentry": {
+    "api/hr/debug-api-health.js": {
       "memory": 1024,
       "maxDuration": 10
+    },
+    "api/index.js": {
+      "memory": 1024,
+      "maxDuration": 10
+    },
+    "api/learner/dashboard.js": {
+      "memory": 1024,
+      "maxDuration": 30
     }
   },
   "env": {
