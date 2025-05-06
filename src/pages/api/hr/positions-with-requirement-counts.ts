@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { supabase } from '../../../lib/supabase';
+import { supabase } from '@/lib/supabase';
 
 type PositionWithRequirementCount = {
   id: string;
@@ -11,10 +11,10 @@ type PositionWithRequirementCount = {
 
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse<{ success: boolean; data?: PositionWithRequirementCount[]; error?: string }>
+  res: NextApiResponse
 ) {
   if (req.method !== 'GET') {
-    return res.status(405).json({ success: false, error: 'Method not allowed' });
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
@@ -47,11 +47,11 @@ export default async function handler(
       requirement_count: countMap.get(pos.id) || 0,
     }));
 
-    return res.status(200).json({ success: true, data: result });
+    return res.status(200).json({ positions: result });
   } catch (error) {
+    console.error('Error in positions with requirements count:', error);
     return res.status(500).json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error fetching positions',
+      error: error instanceof Error ? error.message : 'Unknown error fetching positions'
     });
   }
 } 

@@ -15,7 +15,7 @@ type PositionWithRequirementCount = {
 export default function PositionRequirementsPage() {
   const [selectedPosition, setSelectedPosition] = useState<PositionWithRequirementCount | null>(null);
 
-  const { data, isLoading, error } = useQuery<{ success: boolean; data: PositionWithRequirementCount[] }, Error>({
+  const { data, isLoading, error } = useQuery<{ positions: PositionWithRequirementCount[] }, Error>({
     queryKey: ['positions-with-requirement-counts'],
     queryFn: async () => {
       try {
@@ -43,7 +43,7 @@ export default function PositionRequirementsPage() {
           Error: {error.message}
         </div>
       )}
-      {data?.data && data.data.length > 0 ? (
+      {data?.positions && data.positions.length > 0 ? (
         <Table>
           <TableHeader>
             <TableRow>
@@ -54,7 +54,7 @@ export default function PositionRequirementsPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {data.data.map((pos) => (
+            {data.positions.map((pos) => (
               <TableRow key={pos.id}>
                 <TableCell>{pos.title}</TableCell>
                 <TableCell>{pos.department_name}</TableCell>

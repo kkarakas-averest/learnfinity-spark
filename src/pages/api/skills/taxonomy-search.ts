@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { supabase } from '../../../lib/supabase';
+import { supabase } from '@/lib/supabase';
 
 type TaxonomySkill = {
   id: string;
@@ -14,10 +14,10 @@ type TaxonomySkill = {
 
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse<{ success: boolean; data?: TaxonomySkill[]; error?: string }>
+  res: NextApiResponse
 ) {
   if (req.method !== 'GET') {
-    return res.status(405).json({ success: false, error: 'Method not allowed' });
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
   const search = typeof req.query.q === 'string' ? req.query.q : '';
@@ -66,11 +66,11 @@ export default async function handler(
       category_name: skill.skill_taxonomy_groups?.skill_taxonomy_subcategories?.skill_taxonomy_categories?.name ?? '',
     }));
 
-    return res.status(200).json({ success: true, data: result });
+    return res.status(200).json({ skills: result });
   } catch (error) {
+    console.error('Error in taxonomy search:', error);
     return res.status(500).json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error searching taxonomy skills',
+      error: error instanceof Error ? error.message : 'Unknown error searching taxonomy skills'
     });
   }
 } 

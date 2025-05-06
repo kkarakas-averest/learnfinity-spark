@@ -24,15 +24,25 @@ type Props = {
 export function TaxonomySkillPicker({ open, onSelect, onClose }: Props) {
   const [search, setSearch] = useState('');
 
-  const { data, isLoading, error } = useQuery<{ success: boolean; data: TaxonomySkill[] }, Error>({
+  const { data, isLoading, error } = useQuery<{ skills: TaxonomySkill[] }, Error>({
     queryKey: ['taxonomy-skills', search],
     queryFn: async () => {
-      const res = await fetch(`/api/skills/taxonomy-search?q=${encodeURIComponent(search)}`);
-      if (!res.ok) throw new Error('Failed to fetch skills');
-      return res.json();
+      try {
+        const res = await fetch(`/api/skills/taxonomy-search?q=${encodeURIComponent(search)}`);
+        if (!res.ok) {
+          console.error('API response error:', await res.text());
+          throw new Error(`Failed to fetch skills: ${res.status}`);
+        }
+        return res.json();
+      } catch (err) {
+        console.error('Taxonomy skills fetch error:', err);
+        throw new Error('Failed to load skills data. See console for details.');
+      }
     },
     enabled: open,
   });
+
+  console.log('TaxonomySkillPicker rendering:', { data, isLoading, error });
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -49,8 +59,8 @@ export function TaxonomySkillPicker({ open, onSelect, onClose }: Props) {
         {isLoading && <div>Loading...</div>}
         {error && <div className="text-red-500">{error.message}</div>}
         <div className="max-h-64 overflow-y-auto">
-          {data?.data?.length === 0 && <div>No skills found.</div>}
-          {data?.data?.map(skill => (
+          {data?.skills?.length === 0 && <div>No skills found.</div>}
+          {data?.skills?.map(skill => (
             <div key={skill.id} className="flex items-center justify-between py-2 border-b last:border-b-0">
               <div>
                 <div className="font-medium">{skill.name}</div>
