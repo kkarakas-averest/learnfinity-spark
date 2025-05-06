@@ -1,4 +1,4 @@
-import useState from 'react';
+import { useState } from '@/lib/react-helpers';
 import { useQuery } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';

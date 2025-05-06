@@ -1,4 +1,4 @@
-import useState from 'react';
+import { useState } from '@/lib/react-helpers';
 import { Button } from '@/components/ui/button';
 import type { TaxonomySkill } from './TaxonomySkillPicker';
 import { toast } from 'sonner';
