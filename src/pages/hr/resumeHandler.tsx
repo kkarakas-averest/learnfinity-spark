@@ -915,25 +915,43 @@ Return ONLY a properly formatted JSON object with no additional text.`;
         return false;
       }
       
-      // Create entries for the employee_skills table
-      const skillEntries = matchedSkills.map(match => ({
-        employee_id: employeeId,
-        taxonomy_skill_id: match.taxonomySkillId,
-        skill_name: match.taxonomySkillName || match.rawSkill,
-        source: 'cv_extraction',
-        confidence: match.confidence,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      }));
+      // Create entries for the employee_skills table with all required fields
+      const skillEntries = matchedSkills.map(match => {
+        // Create a complete entry with all required fields
+        return {
+          employee_id: employeeId,
+          taxonomy_skill_id: match.taxonomySkillId,
+          skill_name: match.taxonomySkillName || match.rawSkill,
+          proficiency_level: 'beginner', // Default proficiency level for CV-extracted skills
+          proficiency: 1, // Default proficiency value (1-5 scale)
+          is_in_progress: false,
+          verification_status: 'unverified',
+          source: 'cv_extraction',
+          confidence: match.confidence,
+          verified: false,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+      });
       
       // Insert skills into the hr_employee_skills table
       console.log(`Inserting ${skillEntries.length} normalized skills into database`);
-      const { error } = await supabase
-        .from('hr_employee_skills')
-        .insert(skillEntries);
-        
-      if (error) {
-        console.error('Error saving normalized skills to database:', error);
+      
+      // Use a direct SQL query to ensure all fields are properly handled
+      try {
+        for (const entry of skillEntries) {
+          const { error: insertError } = await supabase
+            .from('hr_employee_skills')
+            .insert(entry);
+            
+          if (insertError) {
+            console.error('Error inserting skill entry:', insertError);
+            throw insertError;
+          }
+        }
+        console.log(`Successfully inserted ${skillEntries.length} skill entries`);
+      } catch (insertError) {
+        console.error('Error saving normalized skills to database:', insertError);
         return false;
       }
       
