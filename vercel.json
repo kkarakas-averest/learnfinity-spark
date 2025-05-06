@@ -31,132 +31,21 @@
           "value": "Content-Type, Authorization"
         }
       ]
+    },
+    {
+      "source": "/assets/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
     }
   ],
-  "routes": [
-    {
-      "src": "/api/hr/courses/(?<courseId>[^/]+)/enrollment",
-      "dest": "/api/hr/courses/[courseId]/enrollment.ts",
-      "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
-    },
-    {
-      "src": "/api/hr/employee-courses",
-      "dest": "/api/hr/employee-courses.ts",
-      "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
-    },
-    {
-      "src": "/api/hr/employee-goals",
-      "dest": "/api/hr/employee-goals.ts",
-      "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
-    },
-    {
-      "src": "/api/hr/employees",
-      "dest": "/api/hr/employees.ts",
-      "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
-    },
-    {
-      "src": "/api/hr/departments",
-      "dest": "/api/hr/departments.ts",
-      "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
-    },
-    {
-      "src": "/api/hr/positions",
-      "dest": "/api/hr/positions.ts",
-      "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
-    },
-    {
-      "src": "/api/hr/positions-with-requirement-counts",
-      "dest": "/api/hr/positions-with-requirement-counts.ts",
-      "methods": ["GET", "OPTIONS"]
-    },
-    {
-      "src": "/api/skills/position-requirements",
-      "dest": "/api/skills/position-requirements.ts",
-      "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
-    },
-    {
-      "src": "/api/skills/position-requirements/apply-suggestions",
-      "dest": "/api/skills/position-requirements/apply-suggestions.ts",
-      "methods": ["POST", "OPTIONS"]
-    },
-    {
-      "src": "/api/skills/taxonomy-search",
-      "dest": "/api/skills/taxonomy-search.ts",
-      "methods": ["GET", "POST", "OPTIONS"]
-    },
-    {
-      "src": "/api/skills/employee-skills",
-      "dest": "/api/skills/employee-skills.ts",
-      "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
-    },
-    {
-      "src": "/api/skills/gap-analysis",
-      "dest": "/api/skills/gap-analysis.ts",
-      "methods": ["GET", "POST", "OPTIONS"]
-    },
-    {
-      "src": "/api/skills/course-generation",
-      "dest": "/api/skills/course-generation.ts",
-      "methods": ["POST", "OPTIONS"]
-    },
-    {
-      "src": "/api/ai/suggest-skills",
-      "dest": "/api/ai/suggest-skills.ts",
-      "methods": ["POST", "OPTIONS"]
-    },
-    {
-      "src": "/api/ai/regenerate-content",
-      "dest": "/api/ai/regenerate-content.ts",
-      "methods": ["POST", "OPTIONS"]
-    },
-    {
-      "src": "/api/chat/conversation",
-      "dest": "/api/chat/conversation.ts",
-      "methods": ["POST", "OPTIONS"]
-    },
-    {
-      "src": "/api/chat/model-settings",
-      "dest": "/api/chat/model-settings.ts",
-      "methods": ["GET", "OPTIONS"]
-    },
-    {
-      "src": "/api/course-generation/generate",
-      "dest": "/api/course-generation/generate.ts",
-      "methods": ["POST", "OPTIONS"]
-    },
-    {
-      "src": "/api/employee",
-      "dest": "/api/employee.js",
-      "methods": ["GET", "POST", "OPTIONS"]
-    },
-    {
-      "src": "/api/auth/(.*)",
-      "dest": "/api/auth/$1"
-    },
-    {
-      "src": "/api/profile/set-preferences",
-      "dest": "/api/profile/set-preferences.ts",
-      "methods": ["POST", "OPTIONS"]
-    },
-    {
-      "src": "/api/sentry",
-      "dest": "/api/sentry"
-    },
-    {
-      "src": "/assets/(.*)",
-      "dest": "/assets/$1",
-      "headers": {
-        "cache-control": "public, max-age=31536000, immutable"
-      }
-    },
-    {
-      "handle": "filesystem"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/index.html",
-      "status": 200
-    }
+  "rewrites": [
+    { "source": "/assets/(.*)", "destination": "/assets/$1" },
+    { "source": "/api/(.*)", "destination": "/api/$1" },
+    { "source": "/(.*)", "destination": "/index.html" }
   ],
   "functions": {
     "api/hr/courses/[courseId]/enrollment.ts": {
