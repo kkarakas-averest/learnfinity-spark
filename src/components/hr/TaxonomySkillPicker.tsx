@@ -4,6 +4,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 
+// Helper function to get full API URL, matching the one in other components
+const getApiUrl = (path: string) => {
+  // Use window.location.origin to get the current base URL
+  const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+  return `${baseUrl}${path}`;
+};
+
 export type TaxonomySkill = {
   id: string;
   name: string;
@@ -28,7 +35,7 @@ export function TaxonomySkillPicker({ open, onSelect, onClose }: Props) {
     queryKey: ['taxonomy-skills', search],
     queryFn: async () => {
       try {
-        const res = await fetch(`/api/skills/taxonomy-search?q=${encodeURIComponent(search)}`);
+        const res = await fetch(getApiUrl(`/api/skills/taxonomy-search?q=${encodeURIComponent(search)}`));
         if (!res.ok) {
           console.error('API response error:', await res.text());
           throw new Error(`Failed to fetch skills: ${res.status}`);

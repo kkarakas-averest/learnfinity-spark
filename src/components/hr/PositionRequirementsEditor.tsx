@@ -7,6 +7,13 @@ import { TaxonomySkillPicker } from './TaxonomySkillPicker';
 import { AISkillSuggestButton } from './AISkillSuggestButton';
 import { toast } from 'sonner';
 
+// Helper function to get full API URL, matching the one in PositionRequirementsPage
+const getApiUrl = (path: string) => {
+  // Use window.location.origin to get the current base URL
+  const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+  return `${baseUrl}${path}`;
+};
+
 export type PositionSkillRequirement = {
   id: string;
   taxonomy_skill_id: string;
@@ -33,7 +40,7 @@ export function PositionRequirementsEditor({ positionId, positionTitle, onClose 
   const { data, isLoading, error } = useQuery<{ success: boolean; data: PositionSkillRequirement[] }, Error>({
     queryKey: ['position-requirements', positionId],
     queryFn: async () => {
-      const res = await fetch(`/api/skills/position-requirements?positionId=${positionId}&includeHierarchy=true`);
+      const res = await fetch(getApiUrl(`/api/skills/position-requirements?positionId=${positionId}&includeHierarchy=true`));
       if (!res.ok) throw new Error('Failed to fetch requirements');
       return res.json();
     },
@@ -42,7 +49,7 @@ export function PositionRequirementsEditor({ positionId, positionTitle, onClose 
   // Remove requirement
   const removeMutation = useMutation({
     mutationFn: async (requirementId: string) => {
-      const res = await fetch(`/api/skills/position-requirements?requirementId=${requirementId}`, { method: 'DELETE' });
+      const res = await fetch(getApiUrl(`/api/skills/position-requirements?requirementId=${requirementId}`), { method: 'DELETE' });
       if (!res.ok) throw new Error('Failed to remove requirement');
       return res.json();
     },
@@ -56,7 +63,7 @@ export function PositionRequirementsEditor({ positionId, positionTitle, onClose 
   // Add requirement
   const addMutation = useMutation({
     mutationFn: async (skill: { taxonomySkillId: string; importanceLevel: number; requiredProficiency: number }) => {
-      const res = await fetch('/api/skills/position-requirements', {
+      const res = await fetch(getApiUrl('/api/skills/position-requirements'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

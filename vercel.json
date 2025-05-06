@@ -21,6 +21,14 @@
     "api/chat/conversation.ts": {
       "memory": 1024,
       "maxDuration": 10
+    },
+    "api/hr/positions-with-requirement-counts.ts": {
+      "memory": 1024,
+      "maxDuration": 10
+    },
+    "api/hr/positions-test.js": {
+      "memory": 1024,
+      "maxDuration": 10
     }
   },
   "routes": [
@@ -45,6 +53,14 @@
     {
       "src": "/api/chat/conversation",
       "dest": "/api/chat/conversation.ts"
+    },
+    {
+      "src": "/api/hr/positions-with-requirement-counts",
+      "dest": "/api/hr/positions-with-requirement-counts.ts"
+    },
+    {
+      "src": "/api/hr/positions-test",
+      "dest": "/api/hr/positions-test.js"
     },
     {
       "src": "/assets/(.*)",

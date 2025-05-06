@@ -12,6 +12,13 @@ type PositionWithRequirementCount = {
   requirement_count: number;
 };
 
+// Helper function to get full API URL
+const getApiUrl = (path: string) => {
+  // Use window.location.origin to get the current base URL
+  const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+  return `${baseUrl}${path}`;
+};
+
 export default function PositionRequirementsPage() {
   const [selectedPosition, setSelectedPosition] = useState<PositionWithRequirementCount | null>(null);
 
@@ -19,7 +26,20 @@ export default function PositionRequirementsPage() {
     queryKey: ['positions-with-requirement-counts'],
     queryFn: async () => {
       try {
-        const res = await fetch('/api/hr/positions-with-requirement-counts');
+        // First try the test endpoint to verify connection
+        try {
+          const testRes = await fetch(getApiUrl('/api/hr/positions-test'));
+          if (testRes.ok) {
+            const testData = await testRes.json();
+            console.log('Test endpoint response:', testData);
+          }
+        } catch (testError) {
+          console.warn('Test endpoint check failed:', testError);
+          // Continue with main request even if test fails
+        }
+
+        // Now fetch the actual data
+        const res = await fetch(getApiUrl('/api/hr/positions-with-requirement-counts'));
         if (!res.ok) {
           const errorText = await res.text();
           console.error('API response error:', errorText);
