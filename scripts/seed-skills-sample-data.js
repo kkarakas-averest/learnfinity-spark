@@ -125,7 +125,7 @@ async function createSamplePositions() {
   // Insert positions
   const { error } = await supabase
     .from('hr_positions')
-    .upsert(positionData, { onConflict: 'id' });
+    .upsert(positionData, { onConflict: 'title' });
   
   if (error) {
     console.error('Error inserting sample positions:', error);
@@ -288,7 +288,12 @@ async function seedData() {
   console.log('Clearing existing sample data...');
   await supabase.from('hr_employee_skills').delete().filter('id', 'neq', 'no_records');
   await supabase.from('position_skill_requirements').delete().filter('id', 'neq', 'no_records');
-  await supabase.from('hr_positions').delete().filter('id', 'neq', 'no_records');
+  
+  // Delete positions based on their titles to ensure no duplicates
+  console.log('Clearing existing positions...');
+  for (const position of samplePositions) {
+    await supabase.from('hr_positions').delete().eq('title', position.title);
+  }
   
   // Fetch existing employees
   await fetchExistingEmployees();

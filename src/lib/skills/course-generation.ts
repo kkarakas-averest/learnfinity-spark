@@ -1,43 +1,59 @@
 import { supabase } from '../supabase';
-import { SkillGap } from './gap-analysis';
+import { generateGapAnalysis } from './gap-analysis';
+import { formatSkillGapsForPrompt } from '../../lib/skills-utils';
+import { GroqClient } from '../groq-client';
 
-// Check if groq.ts exists
-let groqClient: any;
+// Initialize Groq client if available
+let groqClient: GroqClient | null = null;
 try {
-  const { generateWithStructuredOutput, GroqModels } = require('../groq');
-  groqClient = { generateWithStructuredOutput, models: GroqModels };
-} catch (error) {
-  console.error('Error importing Groq client:', error);
-  groqClient = null;
-}
-
-export interface CourseGenerationParams {
-  title: string;
-  objectives?: string[];
-  targetSkills?: string[]; // Taxonomy skill IDs
-  targetGaps?: SkillGap[]; // Skills gaps from gap analysis
-  employeeContext?: {
-    id: string;
-    name: string;
-    position?: string;
-    department?: string;
-  };
-  additionalContext?: string;
-  format?: 'markdown' | 'html';
-  length?: 'short' | 'medium' | 'long';
+  groqClient = new GroqClient();
+  console.log('Groq client initialized for course generation');
+} catch (e) {
+  console.warn('Could not initialize Groq client for course generation, using fallback generator');
 }
 
 export interface CourseModuleContent {
   title: string;
   content: string;
   quiz?: {
-    questions: Array<{
+    questions: {
       question: string;
       options: string[];
       correctOptionIndex: number;
       explanation: string;
-    }>;
-  }
+    }[];
+  };
+}
+
+export interface SkillContext {
+  id: string;
+  name: string;
+  description: string | null;
+  keywords?: string[] | null;
+  category: string | null;
+  subcategory: string | null;
+  group: string | null;
+}
+
+export interface CourseGenerationParams {
+  title: string;
+  targetSkills?: string[]; // Taxonomy skill IDs
+  targetGaps?: {
+    skill_name: string;
+    proficiency_gap: number;
+    importance_level: number;
+  }[];
+  objectives?: string[];
+  employeeContext?: {
+    id: string;
+    name: string;
+    position?: string;
+    department?: string;
+  };
+  positionId?: string; // New: Generate course content based on position requirements
+  additionalContext?: string;
+  format?: 'markdown' | 'html';
+  length?: 'short' | 'medium' | 'long';
 }
 
 export interface CourseGenerationResult {
@@ -49,57 +65,58 @@ export interface CourseGenerationResult {
   skillsCovered: string[];
 }
 
-// Taxonomy data structure types for the query result
-interface TaxonomyData {
-  id: string;
-  name: string;
-  description: string | null;
-  keywords: any;
-  group_id: string;
-  skill_taxonomy_groups: {
-    id: string;
-    name: string;
-    description: string | null;
-    subcategory_id: string;
-    skill_taxonomy_subcategories: {
-      id: string;
-      name: string;
-      description: string | null;
-      category_id: string;
-      skill_taxonomy_categories: {
-        id: string;
-        name: string;
-        description: string | null;
+interface GroqGeneratedOutput {
+  title: string;
+  description: string;
+  modules: CourseModuleContent[];
+  objectives: string[];
+}
+
+const COURSE_GENERATION_SCHEMA = {
+  type: "object",
+  properties: {
+    title: { type: "string" },
+    description: { type: "string" },
+    modules: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          title: { type: "string" },
+          content: { type: "string" },
+          quiz: {
+            type: "object",
+            properties: {
+              questions: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    question: { type: "string" },
+                    options: { 
+                      type: "array",
+                      items: { type: "string" }
+                    },
+                    correctOptionIndex: { type: "number" },
+                    explanation: { type: "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
       }
+    },
+    objectives: {
+      type: "array",
+      items: { type: "string" }
     }
   }
-}
+};
 
-interface SkillContext {
-  id: string;
-  name: string;
-  description: string | null;
-  keywords?: any;
-  category?: string | null;
-  subcategory?: string | null;
-  group?: string | null;
-  gapInfo?: {
-    skill: string;
-    category: string;
-    subcategory: string;
-    group: string;
-    currentLevel: number;
-    requiredLevel: number;
-    gap: number;
-    importance: number;
-  };
-}
-
-/**
- * Fetch skill taxonomy data by IDs
- */
-async function fetchSkillTaxonomyData(skillIds: string[]): Promise<TaxonomyData[]> {
-  if (!skillIds || skillIds.length === 0) return [];
+// Function to fetch skill taxonomy data for a list of skill IDs
+async function fetchSkillTaxonomyData(skillIds: string[]): Promise<any[]> {
+  if (!skillIds.length) return [];
   
   const { data, error } = await supabase
     .from('skill_taxonomy_items')
@@ -108,21 +125,15 @@ async function fetchSkillTaxonomyData(skillIds: string[]): Promise<TaxonomyData[
       name,
       description,
       keywords,
-      group_id,
-      skill_taxonomy_groups!inner (
+      skill_taxonomy_groups (
         id,
         name,
-        description,
-        subcategory_id,
-        skill_taxonomy_subcategories!inner (
+        skill_taxonomy_subcategories (
           id,
           name,
-          description,
-          category_id,
-          skill_taxonomy_categories!inner (
+          skill_taxonomy_categories (
             id,
-            name,
-            description
+            name
           )
         )
       )
@@ -134,25 +145,76 @@ async function fetchSkillTaxonomyData(skillIds: string[]): Promise<TaxonomyData[
     return [];
   }
   
-  return data as TaxonomyData[] || [];
+  return data || [];
 }
 
-/**
- * Transform skill gaps to a structured format for the LLM prompt
- */
-function formatSkillGapsForPrompt(gaps: SkillGap[]) {
-  if (!gaps || gaps.length === 0) return [];
-  
-  return gaps.map(gap => ({
-    skill: gap.skill_name,
-    category: gap.category_name || 'Uncategorized',
-    subcategory: gap.subcategory_name || 'Uncategorized',
-    group: gap.group_name || 'Uncategorized',
-    currentLevel: gap.current_proficiency || 0,
-    requiredLevel: gap.required_proficiency,
-    gap: gap.proficiency_gap,
-    importance: gap.importance_level,
-  }));
+// Function to get position requirements, returns skill IDs and position details
+async function getPositionRequirements(
+  positionId: string
+): Promise<{
+  positionName: string;
+  positionDescription: string;
+  skillIds: string[];
+  requirements: any[];
+}> {
+  try {
+    // Get position details
+    const { data: position, error: posError } = await supabase
+      .from('hr_positions')
+      .select('id, title, description, department_id')
+      .eq('id', positionId)
+      .single();
+      
+    if (posError) throw posError;
+    
+    // Get department name if available
+    let departmentName = '';
+    if (position.department_id) {
+      const { data: dept } = await supabase
+        .from('hr_departments')
+        .select('name')
+        .eq('id', position.department_id)
+        .single();
+      
+      if (dept) departmentName = dept.name;
+    }
+    
+    // Get position skill requirements
+    const { data: requirements, error: reqError } = await supabase
+      .from('position_skill_requirements')
+      .select(`
+        id,
+        taxonomy_skill_id,
+        importance_level,
+        required_proficiency,
+        skill_taxonomy_items (
+          id,
+          name,
+          description
+        )
+      `)
+      .eq('position_id', positionId);
+      
+    if (reqError) throw reqError;
+    
+    // Extract skill IDs
+    const skillIds = requirements.map((req: any) => req.taxonomy_skill_id);
+    
+    return {
+      positionName: position.title,
+      positionDescription: position.description || `Position: ${position.title}${departmentName ? ` in ${departmentName} department` : ''}`,
+      skillIds,
+      requirements
+    };
+  } catch (error) {
+    console.error('Error getting position requirements:', error);
+    return {
+      positionName: '',
+      positionDescription: '',
+      skillIds: [],
+      requirements: []
+    };
+  }
 }
 
 /**
@@ -170,8 +232,42 @@ export async function generateCourseContent(
     const format = params.format || 'markdown';
     const length = params.length || 'medium';
     const objectives = params.objectives || [];
-    const targetSkillIds = params.targetSkills || [];
-    const targetGaps = params.targetGaps || [];
+    let targetSkillIds = params.targetSkills || [];
+    let targetGaps = params.targetGaps || [];
+    
+    // If position ID is provided, use position requirements
+    if (params.positionId) {
+      const positionData = await getPositionRequirements(params.positionId);
+      
+      // If we have employee context, we can generate a gap analysis
+      if (params.employeeContext?.id && positionData.skillIds.length > 0) {
+        const gapAnalysis = await generateGapAnalysis(
+          params.employeeContext.id,
+          params.positionId
+        );
+        
+        // Use gap analysis to populate targetGaps if not already set
+        if (targetGaps.length === 0 && gapAnalysis.prioritized_gaps.length > 0) {
+          targetGaps = gapAnalysis.prioritized_gaps.map(gap => ({
+            skill_name: gap.skill_name,
+            proficiency_gap: gap.proficiency_gap,
+            importance_level: gap.importance_level
+          }));
+        }
+      }
+      
+      // Add position skill IDs to target skills if not already there
+      if (positionData.skillIds.length > 0) {
+        // Combine with existing target skills without duplicates
+        const combinedSkillIds = new Set([...targetSkillIds, ...positionData.skillIds]);
+        targetSkillIds = Array.from(combinedSkillIds);
+        
+        // Update params with position context if not already set
+        if (!params.additionalContext) {
+          params.additionalContext = `This course is designed for the ${positionData.positionName} position. ${positionData.positionDescription}`;
+        }
+      }
+    }
     
     // Prepare skill context
     let skillContext: SkillContext[] = [];
@@ -196,55 +292,38 @@ export async function generateCourseContent(
       });
     }
     
-    // If we have target gaps, format them for the prompt
+    // Create the prompt
+    const skillDetailsText = skillContext.map(skill => {
+      return `- ${skill.name}${skill.category ? ` (Category: ${skill.category})` : ''}${skill.description ? `\n  ${skill.description}` : ''}`;
+    }).join('\n');
+    
+    let gapsText = '';
     if (targetGaps.length > 0) {
-      const gapContext = formatSkillGapsForPrompt(targetGaps);
-      
-      // If we don't have skill context yet, use the gaps to provide context
-      if (skillContext.length === 0) {
-        // Get unique skill IDs from gaps
-        const gapSkillIds = [...new Set(targetGaps.map(gap => gap.taxonomy_skill_id))];
-        const taxonomyData = await fetchSkillTaxonomyData(gapSkillIds);
-        
-        skillContext = taxonomyData.map(skill => {
-          const group = skill.skill_taxonomy_groups;
-          const subcategory = group?.skill_taxonomy_subcategories;
-          const category = subcategory?.skill_taxonomy_categories;
-          
-          return {
-            id: skill.id,
-            name: skill.name,
-            description: skill.description,
-            keywords: skill.keywords,
-            category: category?.name || null,
-            subcategory: subcategory?.name || null,
-            group: group?.name || null,
-            gapInfo: gapContext.find(gap => gap.skill === skill.name)
-          };
-        });
-      } else {
-        // Enhance existing skill context with gap information
-        skillContext = skillContext.map(skill => ({
-          ...skill,
-          gapInfo: gapContext.find(gap => gap.skill === skill.name)
-        }));
-      }
+      gapsText = formatSkillGapsForPrompt(targetGaps);
     }
     
-    // Prepare Groq prompt
-    const prompt = buildCourseGenerationPrompt({
-      title: params.title,
-      objectives,
-      skillContext,
-      employeeContext: params.employeeContext,
-      additionalContext: params.additionalContext,
-      format,
-      length
-    });
+    const promptLength = length === 'short' ? '2-3' : length === 'medium' ? '4-5' : '6-8';
     
+    const prompt = `
+Generate a comprehensive professional course titled "${params.title}".
+
+${params.additionalContext ? `Context: ${params.additionalContext}\n` : ''}
+${params.employeeContext ? `This course is for ${params.employeeContext.name}${params.employeeContext.position ? ` who works as a ${params.employeeContext.position}` : ''}${params.employeeContext.department ? ` in the ${params.employeeContext.department} department` : ''}.` : ''}
+
+${skillContext.length > 0 ? `The course should cover these skills:\n${skillDetailsText}\n` : ''}
+${gapsText ? `Skill gaps to address:\n${gapsText}\n` : ''}
+${objectives.length > 0 ? `Learning objectives:\n${objectives.map(obj => `- ${obj}`).join('\n')}\n` : ''}
+
+Create a course with ${promptLength} modules, each with detailed content in ${format} format. For each module, include a quiz with 2-3 questions that test understanding of the material.
+
+The first module should provide an introduction to the subject. Subsequent modules should cover the core concepts, practical applications, and advanced topics. The final module should provide a conclusion and recommendations for further learning.
+
+Please provide the course title, description, module content, and quizzes.
+`;
+
     // Generate with Groq if available
     if (groqClient) {
-      const structuredOutput = await groqClient.generateWithStructuredOutput({
+      const structuredOutput = await groqClient.generateWithStructuredOutput<GroqGeneratedOutput>({
         model: groqClient.models.LLAMA_3_70B,
         prompt,
         outputSchema: COURSE_GENERATION_SCHEMA,
@@ -254,7 +333,10 @@ export async function generateCourseContent(
       
       // Clean up and return the result
       return {
-        ...structuredOutput,
+        title: structuredOutput.title,
+        description: structuredOutput.description,
+        modules: structuredOutput.modules,
+        objectives: structuredOutput.objectives,
         totalModules: structuredOutput.modules.length,
         skillsCovered: skillContext.map(s => s.name)
       };
@@ -266,88 +348,6 @@ export async function generateCourseContent(
     console.error('Error generating course content:', error);
     throw error;
   }
-}
-
-/**
- * Build the prompt for course generation with taxonomy context
- */
-function buildCourseGenerationPrompt(options: {
-  title: string;
-  objectives: string[];
-  skillContext: SkillContext[];
-  employeeContext?: any;
-  additionalContext?: string;
-  format: 'markdown' | 'html';
-  length: 'short' | 'medium' | 'long';
-}) {
-  const { title, objectives, skillContext, employeeContext, additionalContext, format, length } = options;
-  
-  // Define module count based on length
-  const moduleCount = length === 'short' ? '3-4' : length === 'medium' ? '5-7' : '8-10';
-  
-  // Format objectives
-  const objectivesText = objectives.length > 0 
-    ? objectives.map(obj => `- ${obj}`).join('\n')
-    : 'No specific objectives provided, please create appropriate learning objectives.';
-  
-  // Format skill context
-  const skillContextText = skillContext.length > 0
-    ? skillContext.map(skill => {
-        let text = `- ${skill.name}: ${skill.description || 'No description available'}`;
-        if (skill.category) text += `\n  Category: ${skill.category}`;
-        if (skill.subcategory) text += `\n  Subcategory: ${skill.subcategory}`;
-        if (skill.group) text += `\n  Group: ${skill.group}`;
-        if (skill.keywords) text += `\n  Keywords: ${Array.isArray(skill.keywords) ? skill.keywords.join(', ') : JSON.stringify(skill.keywords)}`;
-        if (skill.gapInfo) {
-          text += `\n  Current Level: ${skill.gapInfo.currentLevel}/5`;
-          text += `\n  Required Level: ${skill.gapInfo.requiredLevel}/5`;
-          text += `\n  Gap: ${skill.gapInfo.gap} levels`;
-          text += `\n  Importance: ${skill.gapInfo.importance}/5`;
-        }
-        return text;
-      }).join('\n\n')
-    : 'No specific skills provided, please create content that would be appropriate for the course title and objectives.';
-  
-  // Format employee context
-  let employeeContextText = '';
-  if (employeeContext) {
-    employeeContextText = `## Employee Context\n`;
-    employeeContextText += `Name: ${employeeContext.name}\n`;
-    if (employeeContext.position) employeeContextText += `Position: ${employeeContext.position}\n`;
-    if (employeeContext.department) employeeContextText += `Department: ${employeeContext.department}\n`;
-  }
-  
-  // Build the complete prompt
-  return `
-# Course Generation Task
-
-You are tasked with creating a comprehensive training course on "${title}".
-
-## Course Requirements
-- Format: ${format === 'markdown' ? 'Markdown (with ## for headings)' : 'HTML (with proper tags)'}
-- Length: ${length} (approximately ${moduleCount} modules)
-- Structure: Each module should have a title, content, and a short quiz
-
-## Learning Objectives
-${objectivesText}
-
-## Skills to Cover
-${skillContextText}
-
-${employeeContextText}
-
-${additionalContext ? `## Additional Context\n${additionalContext}` : ''}
-
-## Instructions
-1. Create a detailed course with ${moduleCount} modules
-2. Each module should cover specific aspects of the skills listed
-3. Include practical examples and exercises
-4. Each module should end with a short quiz (2-3 questions)
-5. For skills with gaps, focus more content on helping bridge those gaps
-6. Create content appropriate for the current skill level, aiming to help reach the required level
-
-Please generate a structured course that follows these requirements. The output should be formatted as a complete, ready-to-use course.
-`;
 }
 
 /**
@@ -404,51 +404,4 @@ function fallbackGenerateCourse(
     objectives: params.objectives || ['Learn about the subject'],
     skillsCovered: skillContext.map(s => s.name)
   };
-}
-
-// Schema for Groq structured output
-const COURSE_GENERATION_SCHEMA = {
-  type: 'object',
-  properties: {
-    title: { type: 'string' },
-    description: { type: 'string' },
-    objectives: {
-      type: 'array',
-      items: { type: 'string' }
-    },
-    modules: {
-      type: 'array',
-      items: {
-        type: 'object',
-        properties: {
-          title: { type: 'string' },
-          content: { type: 'string' },
-          quiz: {
-            type: 'object',
-            properties: {
-              questions: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    question: { type: 'string' },
-                    options: { 
-                      type: 'array',
-                      items: { type: 'string' }
-                    },
-                    correctOptionIndex: { type: 'number' },
-                    explanation: { type: 'string' }
-                  },
-                  required: ['question', 'options', 'correctOptionIndex', 'explanation']
-                }
-              }
-            },
-            required: ['questions']
-          }
-        },
-        required: ['title', 'content', 'quiz']
-      }
-    }
-  },
-  required: ['title', 'description', 'objectives', 'modules']
-}; 
+} 
