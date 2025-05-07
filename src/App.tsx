@@ -24,7 +24,7 @@ import { Toaster } from "./components/ui/toaster";
 import { useAuth, useHRAuth } from "./state";
 import { Button } from "./components/ui/button";
 import SystemHealthCheck from "./pages/SystemHealthCheck";
-import React, { useEffect } from "@/lib/react-helpers";
+import React, { useEffect, useState } from "@/lib/react-helpers";
 import { toast } from './components/ui/use-toast';
 import databaseInitService from "./services/databaseInitService";
 import LearnerLayout from './layouts/LearnerLayout';
@@ -87,20 +87,43 @@ const AuthDiagnostic = () => {
 };
 
 function App() {
+  const [dbInitialized, setDbInitialized] = useState<boolean | null>(null);
+  const [dbInitError, setDbInitError] = useState<Error | null>(null);
+
   useEffect(() => {
     const initDb = async () => {
       try {
+        console.log('[App] Initializing database connection');
         const result = await databaseInitService.initialize();
+        
         if (!result.success) {
-          console.error('Database initialization error:', result.error);
+          console.error('[App] Database initialization error:', result.error);
+          setDbInitError(new Error(result.error?.message || 'Unknown database initialization error'));
+          setDbInitialized(false);
+          
+          // Show toast but don't prevent app from loading
           toast({
             title: 'System Notice',
-            description: 'Some features may not be available. Please contact the administrator.',
-            variant: 'destructive'
+            description: 'Some features may not be available due to database connection issues. Please try again later.',
+            variant: 'destructive',
+            duration: 6000,
           });
+        } else {
+          console.log('[App] Database initialized successfully');
+          setDbInitialized(true);
         }
       } catch (error) {
-        console.error('Failed to initialize database:', error);
+        console.error('[App] Failed to initialize database:', error);
+        setDbInitError(error instanceof Error ? error : new Error('Unknown error during database initialization'));
+        setDbInitialized(false);
+        
+        // Show toast but don't prevent app from loading
+        toast({
+          title: 'Connection Error',
+          description: 'Unable to connect to database. Some features may be unavailable.',
+          variant: 'destructive',
+          duration: 6000,
+        });
       }
     };
     
