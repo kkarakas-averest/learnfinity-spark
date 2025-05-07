@@ -1,6 +1,7 @@
 import React from '@/lib/react-helpers';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
+import { motion } from 'framer-motion';
 
 // Import icons from lucide-react
 import { 
@@ -10,10 +11,13 @@ import {
   Settings, 
   FileText, 
   Layers, 
-  Library,
+  ChevronRight,
   Activity,
   Award,
-  Bot
+  Bot,
+  ChevronDown,
+  Home,
+  Building
 } from 'lucide-react';
 
 type NavItemProps = {
@@ -21,50 +25,124 @@ type NavItemProps = {
   href: string;
   icon?: React.ReactNode;
   isActive?: boolean;
+  color?: string;
 };
 
 type NavSectionProps = {
   title: string;
   items: NavItemProps[];
+  icon?: React.ReactNode;
+  defaultOpen?: boolean;
+  sectionColor?: string;
 };
 
 const NavItem: React.FC<NavItemProps> = ({ 
   title, 
   href, 
   icon, 
-  isActive = false 
+  isActive = false,
+  color = "blue"
 }: NavItemProps) => {
+  // Extract color classes based on the provided color
+  const getColorClasses = (colorName: string) => {
+    const colorMap: {[key: string]: {bg: string, text: string, hover: string}} = {
+      blue: { bg: "bg-blue-100", text: "text-blue-700", hover: "hover:bg-blue-50" },
+      green: { bg: "bg-green-100", text: "text-green-700", hover: "hover:bg-green-50" },
+      purple: { bg: "bg-purple-100", text: "text-purple-700", hover: "hover:bg-purple-50" },
+      amber: { bg: "bg-amber-100", text: "text-amber-700", hover: "hover:bg-amber-50" },
+      rose: { bg: "bg-rose-100", text: "text-rose-700", hover: "hover:bg-rose-50" },
+      indigo: { bg: "bg-indigo-100", text: "text-indigo-700", hover: "hover:bg-indigo-50" },
+      cyan: { bg: "bg-cyan-100", text: "text-cyan-700", hover: "hover:bg-cyan-50" },
+      teal: { bg: "bg-teal-100", text: "text-teal-700", hover: "hover:bg-teal-50" },
+    };
+    
+    return colorMap[colorName] || colorMap.blue;
+  };
+  
+  const colors = getColorClasses(color);
+  
   return (
-    <Link
-      to={href}
-      className={cn(
-        "flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors",
-        isActive 
-          ? "bg-primary/10 text-primary font-medium" 
-          : "text-muted-foreground hover:bg-muted hover:text-foreground"
-      )}
+    <motion.div
+      whileHover={{ x: 4 }}
+      whileTap={{ scale: 0.98 }}
+      transition={{ duration: 0.1 }}
     >
-      {icon}
-      <span>{title}</span>
-    </Link>
+      <Link
+        to={href}
+        className={cn(
+          "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-all",
+          isActive 
+            ? `${colors.bg} ${colors.text} shadow-sm` 
+            : `text-muted-foreground ${colors.hover} hover:text-gray-900`
+        )}
+      >
+        <div className={`${isActive ? colors.text : "text-gray-500"} transition-colors`}>
+          {icon}
+        </div>
+        <span>{title}</span>
+      </Link>
+    </motion.div>
   );
 };
 
-const NavSection: React.FC<NavSectionProps> = ({ title, items }: NavSectionProps) => {
+const NavSection: React.FC<NavSectionProps> = ({ 
+  title, 
+  items, 
+  icon, 
+  defaultOpen = true, 
+  sectionColor 
+}: NavSectionProps) => {
+  const [isOpen, setIsOpen] = React.useState(defaultOpen);
+  
+  // Assign a color to each nav item based on the section color
+  const itemsWithColors = items.map(item => ({
+    ...item,
+    color: item.color || sectionColor
+  }));
+  
   return (
     <div className="py-2">
-      <h3 className="px-3 text-xs font-medium text-muted-foreground mb-1">{title}</h3>
-      <div className="space-y-1">
-        {items.map((item: NavItemProps, index: number) => (
-          <NavItem 
-            key={index} 
-            title={item.title} 
-            href={item.href} 
-            icon={item.icon} 
-            isActive={item.isActive} 
-          />
-        ))}
-      </div>
+      <motion.button
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full flex items-center justify-between px-3 py-1.5 text-sm font-medium text-gray-700 rounded-md hover:bg-gray-100 transition-colors group"
+        whileHover={{ scale: 1.01 }}
+        whileTap={{ scale: 0.99 }}
+      >
+        <div className="flex items-center gap-2">
+          {icon && <span className="text-gray-500 group-hover:text-gray-700">{icon}</span>}
+          <h3 className="text-xs font-semibold tracking-wide uppercase">{title}</h3>
+        </div>
+        <motion.div
+          animate={{ rotate: isOpen ? 90 : 0 }}
+          transition={{ duration: 0.2 }}
+          className="opacity-70"
+        >
+          <ChevronRight size={14} />
+        </motion.div>
+      </motion.button>
+      
+      <motion.div 
+        initial={defaultOpen ? { height: "auto", opacity: 1 } : { height: 0, opacity: 0 }}
+        animate={{ 
+          height: isOpen ? "auto" : 0,
+          opacity: isOpen ? 1 : 0
+        }}
+        transition={{ duration: 0.2, ease: "easeInOut" }}
+        className="overflow-hidden"
+      >
+        <div className="space-y-1 ml-2 pl-2 mt-1 border-l-2 border-gray-100">
+          {itemsWithColors.map((item: NavItemProps, index: number) => (
+            <NavItem 
+              key={index} 
+              title={item.title} 
+              href={item.href} 
+              icon={item.icon} 
+              isActive={item.isActive}
+              color={item.color}
+            />
+          ))}
+        </div>
+      </motion.div>
     </div>
   );
 };
@@ -72,95 +150,85 @@ const NavSection: React.FC<NavSectionProps> = ({ title, items }: NavSectionProps
 const DashboardSidebar: React.FC = () => {
   const location = useLocation();
   const currentPath = location.pathname;
+  
+  // Define color schemes for different sections
+  const sectionColors = {
+    dashboard: "blue",
+    learning: "green",
+    settings: "purple"
+  };
 
   const navSections: NavSectionProps[] = [
     {
-      title: "Dashboard",
+      title: "Main",
+      icon: <Home size={16} />,
+      sectionColor: sectionColors.dashboard,
       items: [
         {
-          title: "Overview",
+          title: "Dashboard",
           href: "/hr-dashboard",
-          icon: <BarChart2 className="h-4 w-4" />,
+          icon: <Home className="h-4 w-4" />,
           isActive: currentPath === "/hr-dashboard"
         },
         {
           title: "Employees",
           href: "/hr-dashboard/employees",
           icon: <Users className="h-4 w-4" />,
-          isActive: currentPath === "/hr-dashboard/employees"
-        },
-        {
-          title: "Programs",
-          href: "/hr-dashboard/programs",
-          icon: <BookOpen className="h-4 w-4" />,
-          isActive: currentPath === "/hr-dashboard/programs"
+          isActive: currentPath === "/hr-dashboard/employees" || currentPath.includes("/hr-dashboard/employees/")
         },
         {
           title: "Skills Inventory",
           href: "/hr-dashboard/skills-inventory",
           icon: <Award className="h-4 w-4" />,
-          isActive: currentPath === "/hr-dashboard/skills-inventory"
+          isActive: currentPath === "/hr-dashboard/skills-inventory",
+          color: "indigo"
         },
         {
           title: "Position Requirements",
           href: "/hr-dashboard/positions/requirements",
-          icon: <FileText className="h-4 w-4" />,
-          isActive: currentPath === "/hr-dashboard/positions/requirements"
+          icon: <Building className="h-4 w-4" />,
+          isActive: currentPath === "/hr-dashboard/positions/requirements",
+          color: "amber"
         },
         {
           title: "Learner Progress",
           href: "/hr-dashboard/learner-progress",
           icon: <Activity className="h-4 w-4" />,
-          isActive: currentPath === "/hr-dashboard/learner-progress"
+          isActive: currentPath === "/hr-dashboard/learner-progress",
+          color: "teal"
         },
         {
           title: "Reports",
           href: "/hr-dashboard/reports",
           icon: <BarChart2 className="h-4 w-4" />,
-          isActive: currentPath === "/hr-dashboard/reports"
+          isActive: currentPath === "/hr-dashboard/reports",
+          color: "rose"
         }
       ]
     },
     {
-      title: "Course Builder",
+      title: "Learning",
+      icon: <BookOpen size={16} />,
+      sectionColor: sectionColors.learning,
+      defaultOpen: false,
       items: [
-        {
-          title: "Overview",
-          href: "/hr-dashboard/course-builder",
-          icon: <BookOpen className="h-4 w-4" />,
-          isActive: currentPath === "/hr-dashboard/course-builder"
-        },
-        {
-          title: "Course Templates",
-          href: "/hr-dashboard/course-builder/templates",
-          icon: <FileText className="h-4 w-4" />,
-          isActive: currentPath === "/hr-dashboard/course-builder/templates"
-        },
-        {
-          title: "Module Editor",
-          href: "/hr-dashboard/course-builder/modules",
-          icon: <Layers className="h-4 w-4" />,
-          isActive: currentPath.includes("/hr-dashboard/course-builder/modules")
-        },
-        {
-          title: "Content Library",
-          href: "/hr-dashboard/course-builder/library",
-          icon: <Library className="h-4 w-4" />,
-          isActive: currentPath === "/hr-dashboard/course-builder/library"
-        },
         {
           title: "AI Course Generator",
           href: "/hr-dashboard/course-generator",
           icon: <Bot className="h-4 w-4" />,
-          isActive: currentPath === "/hr-dashboard/course-generator"
+          isActive: currentPath === "/hr-dashboard/course-generator",
+          color: "cyan"
         }
       ]
     },
     {
-      title: "Settings",
+      title: "Configuration",
+      icon: <Settings size={16} />,
+      sectionColor: sectionColors.settings,
+      defaultOpen: false,
       items: [
         {
-          title: "General",
+          title: "Settings",
           href: "/hr-dashboard/settings",
           icon: <Settings className="h-4 w-4" />,
           isActive: currentPath === "/hr-dashboard/settings"
@@ -169,51 +237,58 @@ const DashboardSidebar: React.FC = () => {
     }
   ];
 
-  // Management section items
-  const managementItems = [
-    {
-      title: "Employees",
-      href: "/hr-dashboard/employees",
-      icon: <Users className="h-4 w-4" />,
-      isActive: currentPath === "/hr-dashboard/employees"
-    },
-    {
-      title: "Learning Programs",
-      href: "/hr-dashboard/programs",
-      icon: <Layers className="h-4 w-4" />,
-      isActive: currentPath === "/hr-dashboard/programs"
-    },
-    {
-      title: "Course Builder",
-      href: "/hr-dashboard/courses",
-      icon: <Library className="h-4 w-4" />,
-      isActive: currentPath === "/hr-dashboard/courses"
-    },
-    {
-      title: "Learner Progress",
-      href: "/hr-dashboard/learner-progress",
-      icon: <Activity className="h-4 w-4" />,
-      isActive: currentPath === "/hr-dashboard/learner-progress"
-    }
-  ];
-
   return (
-    <div className="w-64 border-r h-screen overflow-y-auto py-4 px-2 bg-background">
-      <div className="px-3 py-2">
-        <h2 className="text-lg font-semibold">HR Dashboard</h2>
-        <p className="text-sm text-muted-foreground">Employee management portal</p>
+    <motion.div
+      initial={{ width: 64 }}
+      animate={{ width: 260 }}
+      className="border-r h-screen overflow-hidden transition-all duration-300 py-4 bg-white shadow-sm relative"
+    >
+      <motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.1, duration: 0.3 }}
+        className="px-4 py-3"
+      >
+        <h2 className="font-bold text-xl bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+          HR Dashboard
+        </h2>
+        <p className="text-xs text-gray-500 mt-1">Employee management portal</p>
+      </motion.div>
+      
+      <div className="mt-4 h-[calc(100vh-110px)] overflow-y-auto px-2 custom-scrollbar">
+        <nav className="space-y-1">
+          {navSections.map((section, index) => (
+            <NavSection 
+              key={index} 
+              title={section.title} 
+              items={section.items}
+              icon={section.icon}
+              defaultOpen={section.defaultOpen}
+              sectionColor={section.sectionColor}
+            />
+          ))}
+        </nav>
       </div>
       
-      <nav className="mt-4 space-y-1">
-        {navSections.map((section, index) => (
-          <NavSection 
-            key={index} 
-            title={section.title} 
-            items={section.items} 
-          />
-        ))}
-      </nav>
-    </div>
+      {/* Add custom scrollbar styles */}
+      <style dangerouslySetInnerHTML={{
+        __html: `
+          .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+          }
+          .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+          }
+          .custom-scrollbar::-webkit-scrollbar-thumb {
+            background-color: rgba(156, 163, 175, 0.3);
+            border-radius: 20px;
+          }
+          .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background-color: rgba(156, 163, 175, 0.5);
+          }
+        `
+      }} />
+    </motion.div>
   );
 };
 

@@ -1,123 +1,96 @@
 import React from '@/lib/react-helpers';
+import { useNavigate } from 'react-router-dom';
 import { 
-  Users, 
-  BookOpen, 
-  BarChart2,
-  Clock,
-  UserPlus,
-  FileText,
-  Activity,
-  AlertTriangle,
-  Award,
-  CheckCircle,
-  MessageSquare
+  Building,
+  ArrowRight,
+  UserPlus, 
+  Users,
+  Download,
+  FileSpreadsheet
 } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import HRProcessRoadmap from './HRProcessRoadmap';
+import { generateEmployeeCSVTemplate } from '@/lib/utils/csvTemplates';
 import { useToast } from '@/components/ui/use-toast';
-import { hrEmployeeService } from '@/lib/services/hrEmployeeService';
-import { hrServices } from '@/lib/services/hrServices';
-
-// Define an extended type for hrServices
-type HRServicesExtended = typeof hrServices & {
-  getRecentActivities: () => Promise<any[]>;
-  getEmployeesByRAGStatus: (status: string) => Promise<{ success: boolean; employees: any[] }>;
-  getEmployeeCountByRAGStatus: (status: string) => Promise<number>;
-};
-
-// Cast the imported hrServices to our extended type
-const hrServicesExtended = hrServices as HRServicesExtended;
+import { 
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger
+} from '@/components/ui/dialog';
+import EmployeeBulkImport from './EmployeeBulkImport';
 
 const DashboardOverview: React.FC = () => {
+  const navigate = useNavigate();
+  const [isLoading, setIsLoading] = React.useState(false);
+  const [hasOrganizationStructure, setHasOrganizationStructure] = React.useState(false);
+  const [showRoadmap, setShowRoadmap] = React.useState(false);
+  const [onboardingInProgress, setOnboardingInProgress] = React.useState(false);
+  const [onboardingStep, setOnboardingStep] = React.useState(0);
+  const [totalOnboardingSteps, setTotalOnboardingSteps] = React.useState(0);
   const { toast } = useToast();
-  const [isLoading, setIsLoading] = React.useState(true);
-  const [keyMetricsData, setKeyMetricsData] = React.useState([]);
-  const [recentActivities, setRecentActivities] = React.useState([]);
-  const [ragSummary, setRagSummary] = React.useState({
-    green: 0,
-    amber: 0,
-    red: 0,
-    total: 0
-  });
 
+  // Check if organization has departments and positions already set up
   React.useEffect(() => {
-    // Fetch data when component mounts
-    const fetchDashboardData = async () => {
+    const checkOrganizationStructure = async () => {
       try {
-        setIsLoading(true);
+        // In a real implementation, we would check if departments exist in the database
+        // For now, let's use localStorage to simulate this check
+        const hasSetup = localStorage.getItem('hasOrganizationSetup') === 'true';
+        setHasOrganizationStructure(hasSetup);
         
-        // Fetch key metrics data
-        const metrics = await hrServicesExtended.getDashboardMetrics();
-        if (metrics && metrics.success && metrics.metrics) {
-          setKeyMetricsData([
-            {
-              title: "Active Learners",
-              value: metrics.metrics.activeEmployees.toString(),
-              change: `${metrics.metrics.newEmployees > 0 ? '+' : ''}${metrics.metrics.newEmployees} this month`,
-              trend: metrics.metrics.newEmployees >= 0 ? "up" : "down",
-              icon: Users,
-            },
-            {
-              title: "Course Completion",
-              value: `${metrics.metrics.completionRate}%`,
-              change: `${metrics.metrics.completionRateChange >= 0 ? '+' : ''}${metrics.metrics.completionRateChange}% from last month`,
-              trend: metrics.metrics.completionRateChange >= 0 ? "up" : "down",
-              icon: CheckCircle,
-            },
-            {
-              title: "Average Engagement",
-              value: `${metrics.metrics.averageEngagement}%`,
-              change: `${metrics.metrics.engagementChange >= 0 ? '+' : ''}${metrics.metrics.engagementChange}% from last month`,
-              trend: metrics.metrics.engagementChange >= 0 ? "up" : "down",
-              icon: Activity,
-            },
-            {
-              title: "Courses Assigned",
-              value: metrics.metrics.coursesAssigned.toString(),
-              change: `${metrics.metrics.newCoursesAssigned > 0 ? '+' : ''}${metrics.metrics.newCoursesAssigned} this month`,
-              trend: metrics.metrics.newCoursesAssigned >= 0 ? "up" : "down",
-              icon: BookOpen,
-            }
-          ]);
-          
-          // Set RAG summary data if available
-          if (metrics.metrics.ragStatusCounts) {
-            setRagSummary({
-              green: metrics.metrics.ragStatusCounts.green || 0,
-              amber: metrics.metrics.ragStatusCounts.amber || 0,
-              red: metrics.metrics.ragStatusCounts.red || 0,
-              total: metrics.metrics.ragStatusCounts.total || 0
-            });
+        // Check if onboarding is in progress
+        try {
+          const onboardingData = localStorage.getItem('onboardingFlow');
+          if (onboardingData) {
+            const parsedData = JSON.parse(onboardingData);
+            setOnboardingInProgress(true);
+            setOnboardingStep(parsedData.currentStep || 0);
+            setTotalOnboardingSteps(parsedData.totalSteps || 6);
           }
-        }
-        
-        // Fetch recent activities
-        const activities = await hrServicesExtended.getRecentActivities();
-        if (activities && activities.length > 0) {
-          setRecentActivities(activities);
+        } catch (err) {
+          console.error('Error parsing onboarding flow data:', err);
         }
       } catch (error) {
-        console.error('Error fetching dashboard data:', error);
-        toast({
-          variant: 'destructive',
-          title: 'Error',
-          description: 'Failed to load dashboard data. Please try again.',
-        });
-      } finally {
-        setIsLoading(false);
+        console.error('Error checking organization structure:', error);
       }
     };
-    
-    fetchDashboardData();
-  }, [toast]);
+
+    checkOrganizationStructure();
+  }, []);
+
+  // Function to navigate to organization setup wizard
+  const navigateToOrganizationSetup = () => {
+    navigate('/hr-dashboard/organization-setup');
+  };
   
-  // Function to navigate to employees filtered by RAG status
-  const viewEmployeesByStatus = (status) => {
-    // This will be implemented to navigate to the employees tab with a filter
-    console.log(`Viewing employees with ${status} status`);
-    // For example: navigate('/hr-dashboard?tab=employees&status=' + status);
+  // Function to continue existing onboarding flow
+  const continueOnboarding = () => {
+    if (onboardingStep >= 4) {
+      // If we're in the employee phase (steps 4-6)
+      navigate('/hr-dashboard/employees/new');
+    } else {
+      // If we're in the organization setup phase (steps 1-3)
+      navigate('/hr-dashboard/organization-setup');
+    }
+  };
+  
+  // Function to navigate to add new employee page
+  const navigateToAddEmployee = () => {
+    navigate('/hr-dashboard/employees/new');
+  };
+
+  // Function to download CSV template
+  const handleDownloadTemplate = () => {
+    generateEmployeeCSVTemplate();
+    toast({
+      title: "Template Downloaded",
+      description: "Employee import template has been downloaded.",
+      duration: 3000,
+    });
   };
 
   // Display loading state
@@ -130,149 +103,134 @@ const DashboardOverview: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6">
-      <h2 className="text-3xl font-bold tracking-tight">Dashboard Overview</h2>
+    <div className="space-y-6 max-w-5xl mx-auto">
+      <div className="text-center py-6">
+        <h2 className="text-3xl font-bold tracking-tight mb-2">Welcome to your HR Dashboard</h2>
+        <p className="text-gray-600">Manage your organization's structure and employee skills</p>
+      </div>
       
-      {/* RAG Status Overview */}
-      <div className="grid grid-cols-1 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Employee RAG Status</CardTitle>
-            <CardDescription>
-              Overview of employee learning progress status
-            </CardDescription>
+      {onboardingInProgress && (
+        <Card className="border-amber-200 bg-amber-50 shadow-sm mb-6">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg text-amber-800">Setup in Progress</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Card className="bg-green-50 border-green-100">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg flex items-center">
-                    <CheckCircle className="mr-2 h-5 w-5 text-green-500" />
-                    <span>Green Status</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{ragSummary.green}</div>
-                  <p className="text-sm text-muted-foreground">Employees on track</p>
-                </CardContent>
-                <CardFooter>
-                  <Button 
-                    variant="ghost" 
-                    className="w-full text-green-700" 
-                    onClick={() => viewEmployeesByStatus('green')}
-                  >
-                    View Employees
-                  </Button>
-                </CardFooter>
-              </Card>
-              
-              <Card className="bg-amber-50 border-amber-100">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg flex items-center">
-                    <AlertTriangle className="mr-2 h-5 w-5 text-amber-500" />
-                    <span>Amber Status</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{ragSummary.amber}</div>
-                  <p className="text-sm text-muted-foreground">Employees needing attention</p>
-                </CardContent>
-                <CardFooter>
-                  <Button 
-                    variant="ghost" 
-                    className="w-full text-amber-700" 
-                    onClick={() => viewEmployeesByStatus('amber')}
-                  >
-                    View Employees
-                  </Button>
-                </CardFooter>
-              </Card>
-              
-              <Card className="bg-red-50 border-red-100">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg flex items-center">
-                    <Activity className="mr-2 h-5 w-5 text-red-500" />
-                    <span>Red Status</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{ragSummary.red}</div>
-                  <p className="text-sm text-muted-foreground">Employees requiring intervention</p>
-                </CardContent>
-                <CardFooter>
-                  <Button 
-                    variant="ghost" 
-                    className="w-full text-red-700" 
-                    onClick={() => viewEmployeesByStatus('red')}
-                  >
-                    View Employees
-                  </Button>
-                </CardFooter>
-              </Card>
+            <div className="space-y-4">
+              <p>You have an organization setup in progress. You're on step {onboardingStep} of {totalOnboardingSteps}.</p>
+              <Button 
+                variant="default" 
+                className="w-full justify-start bg-amber-600 hover:bg-amber-700"
+                onClick={continueOnboarding}
+              >
+                <ArrowRight className="mr-2 h-4 w-4" />
+                Continue Setup
+              </Button>
             </div>
+          </CardContent>
+        </Card>
+      )}
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Card className="border-blue-100 shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg text-blue-800">Get Started</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {!hasOrganizationStructure && !onboardingInProgress ? (
+                <Button 
+                  variant="default" 
+                  className="w-full justify-start"
+                  onClick={navigateToOrganizationSetup}
+                >
+                  <Building className="mr-2 h-4 w-4" />
+                  Set Up Your Organization
+                </Button>
+              ) : (
+                <>
+                  <Button 
+                    variant="default" 
+                    className="w-full justify-start"
+                    onClick={navigateToAddEmployee}
+                  >
+                    <UserPlus className="mr-2 h-4 w-4" />
+                    Add Employee
+                  </Button>
+
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <Button 
+                        variant="outline" 
+                        className="w-full justify-start bg-green-50 border-green-200 text-green-700 hover:bg-green-100"
+                      >
+                        <FileSpreadsheet className="mr-2 h-4 w-4" />
+                        Bulk Import Employees
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-3xl">
+                      <DialogHeader>
+                        <DialogTitle>Bulk Employee Import</DialogTitle>
+                        <DialogDescription>
+                          Import multiple employees at once using a CSV file
+                        </DialogDescription>
+                      </DialogHeader>
+                      <EmployeeBulkImport />
+                    </DialogContent>
+                  </Dialog>
+                </>
+              )}
+              
+              <Button 
+                variant="outline" 
+                className="w-full justify-start"
+                onClick={() => navigate('/hr-dashboard/employees')}
+              >
+                <Users className="mr-2 h-4 w-4 text-blue-500" />
+                View Employees
+              </Button>
+              
+              {hasOrganizationStructure && (
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start"
+                  onClick={handleDownloadTemplate}
+                >
+                  <Download className="mr-2 h-4 w-4 text-blue-500" />
+                  Download CSV Template
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card className="border-green-100 shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg text-green-800">HR Workflow</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-gray-600 mb-4">
+              {!hasOrganizationStructure 
+                ? "Start by setting up your organization structure before adding employees."
+                : "View the complete employee skills management process from onboarding to course generation."
+              }
+            </p>
+            <Button 
+              className="w-full bg-green-600 hover:bg-green-700"
+              onClick={() => setShowRoadmap(!showRoadmap)}
+            >
+              {showRoadmap ? 'Hide Process Roadmap' : 'View Process Roadmap'}
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
           </CardContent>
         </Card>
       </div>
       
-      {/* Original key metrics grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {keyMetricsData.map((metric, index) => (
-          <Card key={index}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                {metric.title}
-              </CardTitle>
-              {metric.icon && <metric.icon className="h-4 w-4 text-muted-foreground" />}
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{metric.value}</div>
-              <p className="text-xs text-muted-foreground">
-                {metric.change}
-              </p>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-      
-      {/* Recent Activity Section */}
-      <h3 className="text-xl font-semibold mt-8 mb-4">Recent Activity</h3>
-      <div className="space-y-4">
-        {recentActivities.length > 0 ? (
-          recentActivities.map((activity, index) => (
-            <Card key={index}>
-              <CardContent className="p-4">
-                <div className="flex items-start space-x-4">
-                  <span className="rounded-full p-2 bg-primary/10">
-                    {activity.type === 'enrollment' ? (
-                      <UserPlus className="h-4 w-4 text-primary" />
-                    ) : activity.type === 'completion' ? (
-                      <CheckCircle className="h-4 w-4 text-green-500" />
-                    ) : activity.type === 'achievement' ? (
-                      <Award className="h-4 w-4 text-amber-500" />
-                    ) : (
-                      <AlertTriangle className="h-4 w-4 text-red-500" />
-                    )}
-                  </span>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">{activity.description}</p>
-                    <div className="flex items-center mt-1">
-                      <p className="text-xs text-muted-foreground">{activity.user}</p>
-                      <span className="mx-1 text-muted-foreground">•</span>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(activity.timestamp).toLocaleDateString()}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))
-        ) : (
-          <div className="text-center p-6 bg-muted rounded-lg">
-            <p className="text-muted-foreground">No recent activities found.</p>
-          </div>
-        )}
-      </div>
+      {/* HR Process Roadmap conditionally shown */}
+      {showRoadmap && (
+        <div className="mt-6 border-t pt-6">
+          <HRProcessRoadmap />
+        </div>
+      )}
     </div>
   );
 };

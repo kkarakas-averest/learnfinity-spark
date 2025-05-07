@@ -1,10 +1,11 @@
 import React from '@/lib/react-helpers';
-import { useLocation, useParams } from 'react-router-dom';
+import { useLocation, useParams, useNavigate } from 'react-router-dom';
 import HRDashboardHeader from '@/components/hr/HRDashboardHeader';
 import DashboardSidebar from '@/components/hr/DashboardSidebar';
 import { useHRAuth } from '@/state';
 import { Button } from '@/components/ui/button';
 import { Activity } from 'lucide-react';
+import { hrServices } from '@/services/hrServices';
 
 // Import all pages
 import HRDashboardMigrated from '@/pages/HRDashboardMigrated';
@@ -22,6 +23,7 @@ import CreateEmployeePage from '@/components/hr/CreateEmployeePage';
 import SkillsInventoryPage from '@/pages/hr/SkillsInventoryPage';
 import CourseGeneratorPage from '@/pages/hr/CourseGeneratorPage';
 import PositionRequirementsPage from '@/pages/hr/PositionRequirementsPage';
+import OrganizationSetupWizard from '@/components/hr/OrganizationSetupWizard';
 
 /**
  * Root layout component for the HR Dashboard
@@ -31,9 +33,48 @@ const HRDashboardRoot: React.FC = () => {
   const { hrUser, logout } = useHRAuth();
   const location = useLocation();
   const params = useParams();
+  const navigate = useNavigate();
+  const [isFirstLogin, setIsFirstLogin] = React.useState(false);
+  const [hasCheckedFirstLogin, setHasCheckedFirstLogin] = React.useState(false);
   
   console.log('HRDashboardRoot - Path:', location.pathname);
   console.log('HRDashboardRoot - Params:', params);
+
+  // Check if this is the user's first login by checking if there are any employees
+  React.useEffect(() => {
+    // Skip check if not on the main dashboard page
+    if (location.pathname !== '/hr-dashboard') {
+      setHasCheckedFirstLogin(true);
+      return;
+    }
+    
+    const checkFirstLogin = async () => {
+      try {
+        // Check if there are any employees in the system
+        const result = await hrServices.getDashboardMetrics();
+        
+        if (result && result.success && result.metrics) {
+          const hasEmployees = result.metrics.activeEmployees > 0;
+          setIsFirstLogin(!hasEmployees);
+          
+          // Auto-redirect to add employee page if this is the first login
+          // and we're on the main dashboard page
+          if (!hasEmployees && location.pathname === '/hr-dashboard') {
+            // Small delay to ensure the user sees the dashboard briefly
+            setTimeout(() => {
+              navigate('/hr-dashboard/employees/new');
+            }, 500);
+          }
+        }
+      } catch (error) {
+        console.error('Error checking first login status:', error);
+      } finally {
+        setHasCheckedFirstLogin(true);
+      }
+    };
+    
+    checkFirstLogin();
+  }, [location.pathname, navigate]);
 
   // Handle logout
   const handleLogout = () => {
@@ -58,6 +99,7 @@ const HRDashboardRoot: React.FC = () => {
     if (path === '/hr-dashboard/skills-inventory') return <SkillsInventoryPage />;
     if (path === '/hr-dashboard/positions/requirements') return <PositionRequirementsPage />;
     if (path === '/hr-dashboard/course-generator') return <CourseGeneratorPage />;
+    if (path === '/hr-dashboard/organization-setup') return <OrganizationSetupWizard />;
     
     // Second-level pages
     if (path === '/hr-dashboard/course-builder/templates') return <CourseTemplates />;
@@ -94,6 +136,15 @@ const HRDashboardRoot: React.FC = () => {
     // Default to dashboard
     return <HRDashboardMigrated />;
   };
+
+  // Display a simple loading state until we check for first login
+  if (!hasCheckedFirstLogin && location.pathname === '/hr-dashboard') {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">

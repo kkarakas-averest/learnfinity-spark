@@ -145,6 +145,7 @@ export interface EmployeeService {
     missingSkills: any[];
     error?: string;
   }>;
+  bulkImportEmployees: (file: File) => Promise<{success: boolean, importedCount?: number, error?: string}>;
 }
 
 // Create the service object
@@ -1590,6 +1591,99 @@ const hrEmployeeService: EmployeeService = {
       };
     } catch (error: any) {
       return { skills: [], requiredSkills: [], missingSkills: [], error: error.message || 'Unknown error' };
+    }
+  },
+
+  /**
+   * Bulk import employees from a CSV file
+   * @param {File} file - CSV file with employee data
+   * @returns {Promise<{success: boolean, importedCount?: number, error?: string}>}
+   */
+  async bulkImportEmployees(file: File): Promise<{success: boolean, importedCount?: number, error?: string}> {
+    try {
+      // Read the file as text
+      const fileContent = await file.text();
+      
+      // Parse CSV content
+      const rows = fileContent.split('\n');
+      const headers = rows[0].split(',');
+      
+      // Validate required headers
+      const requiredHeaders = ['name', 'email', 'department_id', 'position_id'];
+      const missingHeaders = requiredHeaders.filter(header => !headers.includes(header));
+      
+      if (missingHeaders.length > 0) {
+        return {
+          success: false,
+          error: `Missing required columns: ${missingHeaders.join(', ')}`
+        };
+      }
+      
+      // Process employee records (skip header row)
+      const employees = [];
+      const errors = [];
+      let importedCount = 0;
+      
+      for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        if (!row.trim()) continue; // Skip empty rows
+        
+        const values = row.split(',');
+        if (values.length !== headers.length) {
+          errors.push(`Row ${i + 1}: Invalid column count`);
+          continue;
+        }
+        
+        // Create employee object from CSV row
+        const employee: any = {};
+        headers.forEach((header, index) => {
+          employee[header.trim()] = values[index].trim();
+        });
+        
+        // Set defaults for optional fields
+        employee.status = employee.status || 'active';
+        employee.hire_date = employee.hire_date || new Date().toISOString().split('T')[0];
+        
+        // Validate required fields
+        const missingFields = requiredHeaders.filter(header => !employee[header]);
+        if (missingFields.length > 0) {
+          errors.push(`Row ${i + 1}: Missing required fields: ${missingFields.join(', ')}`);
+          continue;
+        }
+        
+        // Add to employees array for processing
+        employees.push(employee);
+      }
+      
+      // Import the employees in a batch or one by one
+      if (employees.length === 0) {
+        return {
+          success: false,
+          error: 'No valid employee records found in the CSV file'
+        };
+      }
+      
+      // Process each employee
+      for (const employee of employees) {
+        const result = await this.createEmployee(employee);
+        if (result.success) {
+          importedCount++;
+        } else {
+          errors.push(`Failed to import employee ${employee.name}: ${result.error}`);
+        }
+      }
+      
+      return {
+        success: true,
+        importedCount,
+        error: errors.length > 0 ? `Imported ${importedCount} employees with ${errors.length} errors` : undefined
+      };
+    } catch (error: any) {
+      console.error('Error in bulk import:', error);
+      return {
+        success: false,
+        error: error.message || 'Failed to process CSV file'
+      };
     }
   }
 };
