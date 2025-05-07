@@ -1,7 +1,7 @@
 // @vercel/node
 import { NextApiRequest, NextApiResponse } from 'next';
 import { supabase } from '../../src/lib/supabase';
-import { createGroqClient } from '../lib/groq-client';
+import { createGroqClient } from '../lib/groq-client.js';
 
 // Define interfaces
 interface ApiError {
