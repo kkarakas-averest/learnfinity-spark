@@ -9,7 +9,7 @@ const GROQ_API_KEY = process.env.GROQ_API_KEY || "gsk_0123456789abcdef";
 /**
  * Initialize Groq client
  */
-function createGroqClient(apiKey = GROQ_API_KEY) {
+export function createGroqClient(apiKey = GROQ_API_KEY) {
   // Define standard models for easier access
   const models = {
     LLAMA_3_8B: 'llama3-8b-8192',
@@ -113,7 +113,5 @@ function createGroqClient(apiKey = GROQ_API_KEY) {
   };
 }
 
-// Export a factory function
-module.exports = {
-  createGroqClient
-}; 
+// ES Module export (already exported above)
+// No module.exports needed 
