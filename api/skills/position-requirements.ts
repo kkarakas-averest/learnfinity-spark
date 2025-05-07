@@ -32,68 +32,51 @@ export default async function handler(
   try {
     // GET: Fetch position requirements
     if (req.method === 'GET') {
-      const { positionId, requirementId, includeHierarchy } = req.query;
+      // Normalize query parameters to strings
+      const positionIdParam = Array.isArray(req.query.positionId) ? req.query.positionId[0] : req.query.positionId;
+      const requirementIdParam = Array.isArray(req.query.requirementId) ? req.query.requirementId[0] : req.query.requirementId;
+      const includeHierarchyParam = Array.isArray(req.query.includeHierarchy) ? req.query.includeHierarchy[0] : req.query.includeHierarchy;
+      // Ensure positionId is provided
+      if (!positionIdParam) {
+        return res.status(400).json({ success: false, error: 'Position ID is required' });
+      }
       
       // If requirementId is provided, fetch a single requirement
-      if (requirementId) {
-        console.log(`[position-requirements] Fetching single requirement: ${requirementId}`);
+      if (requirementIdParam) {
+        console.log(`[position-requirements] Fetching single requirement: ${requirementIdParam}`);
         const { data, error } = await supabase
           .from('position_skill_requirements')
           .select('*')
-          .eq('id', requirementId)
+          .eq('id', requirementIdParam)
           .single();
-          
         if (error) throw error;
         return res.status(200).json({ success: true, data });
       }
       
-      // positionId is required
-      if (!positionId) {
-        return res.status(400).json({
-          success: false,
-          error: 'Position ID is required'
-        });
-      }
-      
-      console.log(`[position-requirements] Fetching requirements for position: ${positionId}`);
-      
+      console.log(`[position-requirements] Fetching requirements for position: ${positionIdParam}`);
       // Fetch requirements for position
-      const { data: requirements, error } = await supabase
+      const { data: requirements, error: reqError } = await supabase
         .from('position_skill_requirements')
-        .select(`
-          id,
-          taxonomy_skill_id,
-          importance_level,
-          required_proficiency
-        `)
-        .eq('position_id', positionId);
-      
-      if (error) throw error;
+        .select('id, taxonomy_skill_id, importance_level, required_proficiency')
+        .eq('position_id', positionIdParam);
+      if (reqError) throw reqError;
       
       // If includeHierarchy is true and we have requirements, fetch the taxonomy info
-      if (includeHierarchy === 'true' && requirements && requirements.length > 0) {
+      if (includeHierarchyParam === 'true' && requirements && requirements.length > 0) {
         console.log(`[position-requirements] Including hierarchy info for ${requirements.length} requirements`);
-        
-        // Get all taxonomy skill IDs
-        const skillIds = requirements.map(req => req.taxonomy_skill_id);
-        
-        // Fetch skill data only first
+        const skillIds = requirements.map(r => r.taxonomy_skill_id);
         const { data: skillsData, error: skillsError } = await supabase
           .from('skill_taxonomy_items')
           .select('id, name, group_id')
           .in('id', skillIds);
-        
         if (skillsError) throw skillsError;
         
         // Create a simplified map with skills and placeholder hierarchy values
-        const enrichedRequirements = requirements.map(req => {
-          // Find the matching skill data
-          const skillData = skillsData?.find(skill => skill.id === req.taxonomy_skill_id) || null;
-          
+        const enrichedRequirements = requirements.map(reqItem => {
+          const skillData = skillsData?.find(skill => skill.id === reqItem.taxonomy_skill_id) || null;
           return {
-            ...req,
+            ...reqItem,
             skill_name: skillData?.name || 'Unknown Skill',
-            // Simplify with default placeholders
             group_name: 'Technical',
             subcategory_name: 'Skills',
             category_name: 'General'
