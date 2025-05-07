@@ -18,6 +18,7 @@ import CourseTemplates from '@/pages/hr/CourseTemplates';
 import ModuleEditor from '@/pages/hr/ModuleEditor';
 import LearnerProgressSummary from '@/components/hr/LearnerProgressSummary';
 import AddEmployeeForm from '@/pages/hr/AddEmployeeForm';
+import CreateEmployeePage from '@/components/hr/CreateEmployeePage';
 import SkillsInventoryPage from '@/pages/hr/SkillsInventoryPage';
 import CourseGeneratorPage from '@/pages/hr/CourseGeneratorPage';
 import PositionRequirementsPage from '@/pages/hr/PositionRequirementsPage';
@@ -74,9 +75,9 @@ const HRDashboardRoot: React.FC = () => {
       const employeeId = path.split('/').pop();
       console.log('Loading employee profile with ID:', employeeId);
       
-      // If the ID is "new", render the AddEmployeeForm
+      // If the ID is "new", render the CreateEmployeePage
       if (employeeId === 'new') {
-        return <AddEmployeeForm />;
+        return <CreateEmployeePage />;
       }
       
       // Otherwise render the EmployeeProfilePage with the specific ID

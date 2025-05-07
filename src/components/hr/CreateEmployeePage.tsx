@@ -90,6 +90,7 @@ const CreateEmployeePage: React.FC = () => {
   const [hasUploadedResume, setHasUploadedResume] = useState(false);
   const [hasPositionRequirements, setHasPositionRequirements] = useState(false);
   const [processingStarted, setProcessingStarted] = useState(false);
+  const [processingComplete, setProcessingComplete] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
   
   // Fetch departments and positions when component mounts
@@ -148,7 +149,7 @@ const CreateEmployeePage: React.FC = () => {
         status: formData.status || 'active',
         company_id: formData.companyId,
         hire_date: new Date().toISOString().split('T')[0], // Today's date
-        course_ids: formData.courseIds || [] 
+        course_ids: [] // Initialize with empty course list - courses will be assigned after skills gap analysis
       };
       
       // Create the employee first to get the ID
@@ -195,11 +196,27 @@ const CreateEmployeePage: React.FC = () => {
   
   const handleProcessingComplete = () => {
     setCurrentStep(3);
+    setProcessingComplete(true);
     console.log('All processing completed successfully');
   };
   
   const startProcessing = () => {
     setProcessingStarted(true);
+  };
+  
+  const handleCourseAssignment = async (courseIds: string[]) => {
+    if (!createdEmployee?.id) return;
+    
+    try {
+      const result = await hrEmployeeService.assignCoursesToEmployee(createdEmployee.id, courseIds);
+      if (result.success) {
+        console.log('Courses successfully assigned to employee');
+      } else {
+        console.error('Failed to assign courses:', result.error);
+      }
+    } catch (err) {
+      console.error('Error assigning courses:', err);
+    }
   };
   
   return (
@@ -240,6 +257,7 @@ const CreateEmployeePage: React.FC = () => {
                 isLoading={loading}
                 departments={departments}
                 positions={positions}
+                showCourseSelection={false}
               />
             </CardContent>
             <CardFooter className="flex justify-between">
@@ -329,13 +347,53 @@ const CreateEmployeePage: React.FC = () => {
                   />
                 </CardContent>
                 <CardFooter className="flex justify-end">
-                  <Button 
-                    onClick={() => navigate(`${ROUTES.HR_DASHBOARD}/employees/${createdEmployee.id}`)}
-                  >
-                    View Employee Profile
-                    <ChevronRight className="ml-2 h-4 w-4" />
-                  </Button>
+                  {processingComplete ? (
+                    <Button 
+                      onClick={() => navigate(`${ROUTES.HR_DASHBOARD}/employees/${createdEmployee.id}`)}
+                    >
+                      View Employee Profile
+                      <ChevronRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  ) : (
+                    <Button 
+                      variant="outline"
+                      onClick={() => navigate(`${ROUTES.HR_DASHBOARD}/employees`)}
+                    >
+                      Skip for Now
+                    </Button>
+                  )}
                 </CardFooter>
+              </Card>
+            )}
+            
+            {processingComplete && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Course Assignment</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Based on the skills gap analysis, assign appropriate courses to help {createdEmployee?.name} 
+                    develop the necessary skills for their role.
+                  </p>
+                  
+                  <EmployeeProfileForm 
+                    onSubmit={(formData: FormData) => {
+                      handleCourseAssignment(formData.courseIds);
+                      navigate(`${ROUTES.HR_DASHBOARD}/employees/${createdEmployee.id}`);
+                    }}
+                    isLoading={loading}
+                    initialData={{
+                      name: createdEmployee?.name || '',
+                      email: createdEmployee?.email || '',
+                      departmentId: createdEmployee?.department_id || '',
+                      positionId: createdEmployee?.position_id || '',
+                      status: createdEmployee?.status || 'active',
+                      companyId: createdEmployee?.company_id || '',
+                    }}
+                    showCourseSelection={true}
+                  />
+                </CardContent>
               </Card>
             )}
           </div>

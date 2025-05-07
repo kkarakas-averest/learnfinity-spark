@@ -45,6 +45,7 @@ interface EmployeeProfileFormProps {
   departments?: Department[];
   positions?: Position[];
   initialData?: Partial<FormData>;
+  showCourseSelection?: boolean;
 }
 
 // Define mock departments in case the API doesn't return any
@@ -117,7 +118,8 @@ const EmployeeProfileForm: React.FC<EmployeeProfileFormProps> = ({
   isLoading = false, 
   departments = [], 
   positions = [],
-  initialData = {} as Partial<FormData>
+  initialData = {} as Partial<FormData>,
+  showCourseSelection = false
 }: EmployeeProfileFormProps) => {
   const { hrUser } = useHRAuth() || {};
   
@@ -205,23 +207,20 @@ const EmployeeProfileForm: React.FC<EmployeeProfileFormProps> = ({
   };
   
   const handleResumeUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      // Check file type
-      const fileType = file.type;
-      const validTypes = [
-        'application/pdf', 
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-      ];
+    if (e.target.files && e.target.files.length > 0) {
+      const file = e.target.files[0];
       
-      if (!validTypes.includes(fileType)) {
+      // Validate file type
+      const validTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+      if (!validTypes.includes(file.type)) {
         setError('Please upload a PDF or DOCX file');
         return;
       }
       
-      // Check file size (max 5MB)
-      if (file.size > 5 * 1024 * 1024) {
-        setError('File size should be less than 5MB');
+      // Validate file size (max 5MB)
+      const maxSize = 5 * 1024 * 1024; // 5MB in bytes
+      if (file.size > maxSize) {
+        setError('File size must be less than 5MB');
         return;
       }
       
@@ -260,8 +259,8 @@ const EmployeeProfileForm: React.FC<EmployeeProfileFormProps> = ({
       }));
     }
     
-    // Check if at least one course is selected
-    if (formData.courseIds.length === 0) {
+    // Only check for course selection if showCourseSelection is true
+    if (showCourseSelection && formData.courseIds.length === 0) {
       setError('Please select at least one course for the employee');
       return;
     }
@@ -397,29 +396,31 @@ const EmployeeProfileForm: React.FC<EmployeeProfileFormProps> = ({
         </div>
       </div>
       
-      <div className="space-y-4">
-        <Label>Assign Courses</Label>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {availableCourses.map((course: Course) => (
-            <div key={course.id} className="flex items-start space-x-2 border p-3 rounded-md">
-              <Checkbox
-                id={`course-${course.id}`}
-                checked={formData.courseIds.includes(course.id)}
-                onCheckedChange={() => handleCourseToggle(course.id)}
-              />
-              <div className="grid gap-1">
-                <Label
-                  htmlFor={`course-${course.id}`}
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                >
-                  {course.title}
-                </Label>
-                <p className="text-xs text-gray-500">{course.description}</p>
+      {showCourseSelection && (
+        <div className="space-y-4">
+          <Label>Assign Courses</Label>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {availableCourses.map((course: Course) => (
+              <div key={course.id} className="flex items-start space-x-2 border p-3 rounded-md">
+                <Checkbox
+                  id={`course-${course.id}`}
+                  checked={formData.courseIds.includes(course.id)}
+                  onCheckedChange={() => handleCourseToggle(course.id)}
+                />
+                <div className="grid gap-1">
+                  <Label
+                    htmlFor={`course-${course.id}`}
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  >
+                    {course.title}
+                  </Label>
+                  <p className="text-xs text-gray-500">{course.description}</p>
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
-      </div>
+      )}
       
       <div className="pt-4 border-t flex justify-end">
         <Button type="submit" disabled={isLoading}>
