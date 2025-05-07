@@ -40,6 +40,15 @@ try {
   process.exit(1);
 }
 
+// Generate diagnostic files
+try {
+  console.log('🔍 Generating diagnostic files...');
+  execSync('node scripts/create-diagnostics.js', { stdio: 'inherit' });
+} catch (error) {
+  console.error('❌ Failed to generate diagnostic files:', error);
+  // Continue with build even if diagnostics fail
+}
+
 // Create or update the _redirects file for SPA routing support
 const redirectsPath = path.join(process.cwd(), 'dist', '_redirects');
 const redirectsContent = `
@@ -61,23 +70,22 @@ try {
   console.error('❌ Failed to create _redirects file:', error);
 }
 
-// Create a Vercel-specific routing file
-const vercelRoutingPath = path.join(process.cwd(), 'dist', 'vercel.json');
-const vercelRoutingContent = {
-  "routes": [
-    { "src": "/api/(.*)", "dest": "/api/$1" },
-    { "src": "/assets/(.*)", "dest": "/assets/$1" },
-    { "handle": "filesystem" },
-    { "src": "/(.*)", "dest": "/index.html" }
-  ]
+// Create a config file to indicate Vite deployment for diagnostic purposes
+// NOTE: We no longer create a duplicate vercel.json file to avoid conflicts
+const viteConfigPath = path.join(process.cwd(), 'dist', 'vite-config.json');
+const viteConfigContent = {
+  "build": "vite",
+  "framework": "vite+react",
+  "timestamp": new Date().toISOString(),
+  "env": process.env.NODE_ENV || 'production'
 };
 
 try {
-  console.log('📄 Creating Vercel-specific routing rules...');
-  fs.writeFileSync(vercelRoutingPath, JSON.stringify(vercelRoutingContent, null, 2));
-  console.log('✅ Created vercel.json file for routing');
+  console.log('📄 Creating Vite deployment indicator...');
+  fs.writeFileSync(viteConfigPath, JSON.stringify(viteConfigContent, null, 2));
+  console.log('✅ Created vite-config.json file for diagnostics');
 } catch (error) {
-  console.error('❌ Failed to create vercel.json file:', error);
+  console.error('❌ Failed to create vite-config.json file:', error);
 }
 
 // Ensure the public directory exists in dist (for Vercel static file handling)
