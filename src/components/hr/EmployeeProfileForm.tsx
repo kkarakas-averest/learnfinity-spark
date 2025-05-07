@@ -113,12 +113,12 @@ const availableCourses: Course[] = [
 ];
 
 const EmployeeProfileForm: React.FC<EmployeeProfileFormProps> = ({ 
-  onSubmit, 
+  onSubmit,
   isLoading = false, 
   departments = [], 
   positions = [],
   initialData = {} as Partial<FormData>
-}) => {
+}: EmployeeProfileFormProps) => {
   const { hrUser } = useHRAuth() || {};
   
   const [formData, setFormData] = React.useState<FormData>({
@@ -140,13 +140,13 @@ const EmployeeProfileForm: React.FC<EmployeeProfileFormProps> = ({
   // Set the company ID from the HR user's context when component mounts
   React.useEffect(() => {
     if (hrUser?.company_id) {
-      setFormData(prev => ({
+      setFormData((prev: FormData) => ({
         ...prev,
         companyId: hrUser.company_id
       }));
     } else {
       // Fallback company ID - use valid UUID
-      setFormData(prev => ({
+      setFormData((prev: FormData) => ({
         ...prev,
         companyId: '4fb1a692-3995-40ee-8aa5-292fd8ebf029'
       }));
@@ -173,27 +173,27 @@ const EmployeeProfileForm: React.FC<EmployeeProfileFormProps> = ({
   
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
+    setFormData((prev: FormData) => ({
       ...prev,
       [name]: value
     }));
   };
   
   const handleSelectChange = (name: string, value: string) => {
-    setFormData(prev => ({
+    setFormData((prev: FormData) => ({
       ...prev,
       [name]: value
     }));
   };
   
   const handleCourseToggle = (courseId: string) => {
-    setFormData(prev => {
+    setFormData((prev: FormData) => {
       const currentCourses = [...prev.courseIds];
       
       if (currentCourses.includes(courseId)) {
         return {
           ...prev,
-          courseIds: currentCourses.filter(id => id !== courseId)
+          courseIds: currentCourses.filter((id: string) => id !== courseId)
         };
       } else {
         return {
@@ -225,7 +225,7 @@ const EmployeeProfileForm: React.FC<EmployeeProfileFormProps> = ({
         return;
       }
       
-      setFormData(prev => ({
+      setFormData((prev: FormData) => ({
         ...prev,
         resumeFile: file
       }));
@@ -235,7 +235,7 @@ const EmployeeProfileForm: React.FC<EmployeeProfileFormProps> = ({
     }
   };
   
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     
     // Simple validation
@@ -254,7 +254,7 @@ const EmployeeProfileForm: React.FC<EmployeeProfileFormProps> = ({
     // Ensure companyId is set
     if (!formData.companyId) {
       console.warn('Company ID not set in form. Setting default UUID.');
-      setFormData(prev => ({
+      setFormData((prev: FormData) => ({
         ...prev,
         companyId: '4fb1a692-3995-40ee-8aa5-292fd8ebf029'
       }));
@@ -277,11 +277,11 @@ const EmployeeProfileForm: React.FC<EmployeeProfileFormProps> = ({
   
   // Filter positions based on selected department
   const filteredPositions = formData.departmentId
-    ? displayPositions.filter(pos => pos.department_id === formData.departmentId)
+    ? displayPositions.filter((pos: Position) => pos.department_id === formData.departmentId)
     : displayPositions;
   
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit} className="space-y-6" id="employee-form">
       {error && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
@@ -317,13 +317,13 @@ const EmployeeProfileForm: React.FC<EmployeeProfileFormProps> = ({
           <Label htmlFor="department">Department</Label>
           <Select
             value={formData.departmentId}
-            onValueChange={(value) => handleSelectChange('departmentId', value)}
+            onValueChange={(value: string) => handleSelectChange('departmentId', value)}
           >
             <SelectTrigger id="department">
               <SelectValue placeholder="Select department" />
             </SelectTrigger>
             <SelectContent>
-              {displayDepartments.map((dept) => (
+              {displayDepartments.map((dept: Department) => (
                 <SelectItem key={dept.id} value={dept.id}>
                   {dept.name}
                 </SelectItem>
@@ -336,14 +336,14 @@ const EmployeeProfileForm: React.FC<EmployeeProfileFormProps> = ({
           <Label htmlFor="position">Position</Label>
           <Select
             value={formData.positionId}
-            onValueChange={(value) => handleSelectChange('positionId', value)}
+            onValueChange={(value: string) => handleSelectChange('positionId', value)}
             disabled={!formData.departmentId}
           >
             <SelectTrigger id="position">
               <SelectValue placeholder={!formData.departmentId ? "Select department first" : "Select position"} />
             </SelectTrigger>
             <SelectContent>
-              {filteredPositions.map((pos) => (
+              {filteredPositions.map((pos: Position) => (
                 <SelectItem key={pos.id} value={pos.id}>
                   {pos.title}
                 </SelectItem>
@@ -356,7 +356,7 @@ const EmployeeProfileForm: React.FC<EmployeeProfileFormProps> = ({
           <Label htmlFor="status">Status</Label>
           <Select
             value={formData.status}
-            onValueChange={(value) => handleSelectChange('status', value)}
+            onValueChange={(value: string) => handleSelectChange('status', value)}
           >
             <SelectTrigger id="status">
               <SelectValue placeholder="Select status" />
@@ -400,7 +400,7 @@ const EmployeeProfileForm: React.FC<EmployeeProfileFormProps> = ({
       <div className="space-y-4">
         <Label>Assign Courses</Label>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {availableCourses.map((course) => (
+          {availableCourses.map((course: Course) => (
             <div key={course.id} className="flex items-start space-x-2 border p-3 rounded-md">
               <Checkbox
                 id={`course-${course.id}`}
