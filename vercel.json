@@ -2,7 +2,8 @@
   "version": 2,
   "buildCommand": "pnpm run build",
   "devCommand": "pnpm run dev",
-  "framework": "vite",
+  "framework": null,
+  "outputDirectory": "dist",
   "installCommand": "pnpm install",
   "github": {
     "enabled": true,
@@ -41,9 +42,12 @@
       ]
     }
   ],
-  "rewrites": [
-    { "source": "/assets/(.*)", "destination": "/assets/$1" },
-    { "source": "/(.*)", "destination": "/index.html" }
+  "routes": [
+    { "handle": "filesystem" },
+    { "src": "/assets/(.*)", "dest": "/assets/$1", "continue": true },
+    { "src": "^/api/(.*)$", "dest": "/api/$1" },
+    { "src": "/(.*)\\.(.*)$", "dest": "/$1.$2" },
+    { "src": "/(.*)", "dest": "/index.html" }
   ],
   "functions": {
     "api/hr/courses/[courseId]/enrollment.ts": {

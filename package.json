@@ -6,7 +6,8 @@
   "notes": "IMPORTANT: For Vercel deployment, add these environment variables in Vercel project settings: VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, VITE_SUPABASE_SERVICE_KEY",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "node vite-vercel-build.js",
+    "build:vite": "vite build",
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
     "copy-pdf-worker": "cp node_modules/pdfjs-dist/build/pdf.worker.min.mjs public/",
