@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { z, ZodError } from 'zod';
+import { z } from 'zod';
 import type { NextApiRequest, NextApiResponse } from 'next';
 import type { BulkGenerationRequest, BulkGenerationResponse } from '../../src/types/bulk-generation';
 
@@ -41,7 +41,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const token = authHeader.split(' ')[1];
     
     // Verify the token and get the user
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    // Supabase typings may not expose getUser(token), so cast to any
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const { data: { user }, error: authError } = await (supabase.auth as any).getUser(token);
     
     if (authError || !user) {
       console.error('Authentication error:', authError);
@@ -57,7 +59,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     
     if (validatedData.employeeIds && validatedData.employeeIds.length > 0) {
       // If specific employee IDs are provided, use those
-      const employeeIds = validatedData.employeeIds.map(id => `'${id}'`).join(',');
+      const employeeIds = validatedData.employeeIds.map((id: string) => `'${id}'`).join(',');
       employeeQuery += ` AND id IN (${employeeIds})`;
     } else {
       // Otherwise filter by group
@@ -78,7 +80,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(500).json({ success: false, error: 'Failed to fetch employees' });
     }
     
-    const employeeResults = employees || [];
+    const employeeResults: any[] = employees || [];
     
     if (employeeResults.length === 0) {
       return res.status(400).json({ 
@@ -125,7 +127,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
     
     // Create tasks for each employee using direct SQL
-    const taskInsertQueries = employeeResults.map(employee => `
+    const taskInsertQueries = employeeResults.map((employee: any) => `
       INSERT INTO ai_bulk_generation_tasks (
         id,
         job_id, 
