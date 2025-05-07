@@ -121,7 +121,7 @@ export default async function handler(
         let taxonomySkill: TaxonomySkill | null = null;
         if (existingSkills && existingSkills.length > 0) {
           // Try exact match first
-          taxonomySkill = existingSkills.find(s => 
+          taxonomySkill = existingSkills.find((s: TaxonomySkill) => 
             s.name.toLowerCase() === skillName.toLowerCase()
           ) as TaxonomySkill || null;
           
@@ -167,7 +167,7 @@ export default async function handler(
         }
 
         // Check if position already has this skill requirement
-        const existingRequirement = existingRequirements?.find(req => 
+        const existingRequirement = existingRequirements?.find((req: { id: string; skill_id: string; importance_level: number; required_proficiency: number }) => 
           req.skill_id === taxonomySkill?.id
         );
 

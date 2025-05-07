@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
-import { z } from 'zod';
+import { z, ZodError } from 'zod';
+import type { NextApiRequest, NextApiResponse } from 'next';
 import type { BulkGenerationRequest, BulkGenerationResponse } from '../../src/types/bulk-generation';
 
 // Using real values from the codebase
@@ -21,7 +22,7 @@ const requestSchema = z.object({
   shouldSendNotifications: z.boolean().optional().default(false),
 });
 
-export default async function handler(req, res) {
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Only allow POST requests
   if (req.method !== 'POST') {
     return res.status(405).json({ success: false, error: 'Method not allowed' });
@@ -192,6 +193,24 @@ export default async function handler(req, res) {
 }
 
 // Background process function to handle bulk generation
+interface Task {
+  id: string;
+  employee_id: string;
+}
+
+interface Employee {
+  id: string;
+  name: string;
+  email: string;
+  department_id?: string;
+  position_id?: string;
+}
+
+interface Skill {
+  skill_name: string;
+  proficiency_level: string;
+}
+
 async function processBulkJob(jobId: string, baseTitle: string, description?: string, difficultyLevel: string = 'intermediate') {
   try {
     // Update job status to processing using direct SQL
@@ -212,7 +231,7 @@ async function processBulkJob(jobId: string, baseTitle: string, description?: st
       throw new Error(`Failed to fetch tasks: ${tasksError?.message || 'Unknown error'}`);
     }
     
-    const tasks = tasksData || [];
+    const tasks: Task[] = tasksData || [];
     
     // Process each task sequentially to avoid overloading the AI service
     let completedCount = 0;
@@ -226,19 +245,18 @@ async function processBulkJob(jobId: string, baseTitle: string, description?: st
         });
         
         // Get employee data for personalization using direct SQL
-        const { data: employeeData, error: employeeError } = await supabase.rpc('exec_sql', {
+        const employeeDataResult = await supabase.rpc('exec_sql', {
           query: `
             SELECT id, name, email, department_id, position_id 
             FROM hr_employees 
             WHERE id = '${task.employee_id}';
           `
         });
-        
+        const { data: employeeData, error: employeeError } = employeeDataResult;
         if (employeeError || !employeeData || employeeData.length === 0) {
           throw new Error(`Failed to fetch employee data: ${employeeError?.message || 'Employee not found'}`);
         }
-        
-        const employee = employeeData[0];
+        const employee: Employee = employeeData[0];
         
         // Get skills data if available using direct SQL
         const { data: skillsData } = await supabase.rpc('exec_sql', {
@@ -248,8 +266,7 @@ async function processBulkJob(jobId: string, baseTitle: string, description?: st
             WHERE employee_id = '${employee.id}';
           `
         });
-        
-        const skills = skillsData || [];
+        const skills: Skill[] = skillsData || [];
         
         // Create personalized title
         const personalizedTitle = `${baseTitle} for ${employee.name}`;
@@ -267,7 +284,7 @@ async function processBulkJob(jobId: string, baseTitle: string, description?: st
             title: personalizedTitle,
             description: personalizedDesc,
             difficultyLevel,
-            skillsToAddress: skills.map(s => s.skill_name) || [],
+            skillsToAddress: skills.map((s: Skill) => s.skill_name) || [],
           }),
         });
         
@@ -340,11 +357,9 @@ async function processBulkJob(jobId: string, baseTitle: string, description?: st
         });
         
         completedCount++;
-      } catch (error) {
+      } catch (error: unknown) {
         console.error(`Error processing task ${task.id}:`, error);
-        
-        // Update task with failure using direct SQL
-        const errorMessage = error.message ? error.message.replace(/'/g, "''") : 'Unknown error';
+        const errorMessage = error instanceof Error && error.message ? error.message.replace(/'/g, "''") : 'Unknown error';
         await supabase.rpc('exec_sql', {
           query: `
             UPDATE ai_bulk_generation_tasks 
@@ -355,7 +370,6 @@ async function processBulkJob(jobId: string, baseTitle: string, description?: st
             WHERE id = '${task.id}';
           `
         });
-        
         failedCount++;
       }
       
@@ -382,7 +396,7 @@ async function processBulkJob(jobId: string, baseTitle: string, description?: st
       `
     });
     
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Bulk job processing error:', error);
     
     // Update job as failed using direct SQL
