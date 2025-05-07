@@ -17,5 +17,8 @@ export function middleware(request: NextRequest) {
 
 // Optionally configure middleware to only run on API routes
 export const config = {
-  matcher: ['/api/:path*'],
+  // Run on all API routes except /api/hr/* to prevent Edge/Node conflicts
+  matcher: [
+    '/api/:path((?!hr/).*)',
+  ],
 }; 
