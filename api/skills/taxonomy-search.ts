@@ -54,7 +54,7 @@ export default async function handler(
     if (error) throw error;
     
     // Add placeholder hierarchy data
-    const enrichedSkills = (skills || []).map(skill => ({
+    const enrichedSkills = (skills || []).map((skill: { id: string; name: string }) => ({
       id: skill.id,
       name: skill.name,
       group_id: 'placeholder',

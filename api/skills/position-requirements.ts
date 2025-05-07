@@ -9,6 +9,19 @@ const SUPABASE_SERVICE_ROLE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3Mi
 // Create Supabase client
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
+// Type definitions for strict typing
+type RequirementRow = {
+  id: string;
+  taxonomy_skill_id: string;
+  importance_level: number;
+  required_proficiency: number;
+};
+type SkillItem = {
+  id: string;
+  name: string;
+  group_id: string;
+};
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -64,7 +77,7 @@ export default async function handler(
       // If includeHierarchy is true and we have requirements, fetch the taxonomy info
       if (includeHierarchyParam === 'true' && requirements && requirements.length > 0) {
         console.log(`[position-requirements] Including hierarchy info for ${requirements.length} requirements`);
-        const skillIds = requirements.map(r => r.taxonomy_skill_id);
+        const skillIds = requirements.map((r: RequirementRow) => r.taxonomy_skill_id);
         const { data: skillsData, error: skillsError } = await supabase
           .from('skill_taxonomy_items')
           .select('id, name, group_id')
@@ -72,8 +85,8 @@ export default async function handler(
         if (skillsError) throw skillsError;
         
         // Create a simplified map with skills and placeholder hierarchy values
-        const enrichedRequirements = requirements.map(reqItem => {
-          const skillData = skillsData?.find(skill => skill.id === reqItem.taxonomy_skill_id) || null;
+        const enrichedRequirements = requirements.map((reqItem: RequirementRow) => {
+          const skillData = skillsData?.find((skill: SkillItem) => skill.id === reqItem.taxonomy_skill_id) || null;
           return {
             ...reqItem,
             skill_name: skillData?.name || 'Unknown Skill',
