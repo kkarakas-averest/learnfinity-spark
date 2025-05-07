@@ -44,7 +44,7 @@
   ],
   "routes": [
     { "handle": "filesystem" },
-    { "src": "/assets/(.*)", "dest": "/assets/$1", "continue": true },
+    { "src": "/assets/(.*)", "dest": "/assets/$1" },
     { "src": "^/api/(.*)$", "dest": "/api/$1" },
     { "src": "/(.*)\\.(.*)$", "dest": "/$1.$2" },
     { "src": "/(.*)", "dest": "/index.html" }
