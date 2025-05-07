@@ -1,6 +1,11 @@
 import { createClient } from '@supabase/supabase-js';
-import { z } from 'zod';
-import type { BulkJobStatusRequest, BulkJobStatusResponse } from '../../src/types/bulk-generation';
+import { z, ZodError } from 'zod';
+import type { NextApiRequest, NextApiResponse } from 'next';
+import type { 
+  BulkJobStatusRequest, 
+  BulkJobStatusResponse, 
+  BulkGenerationTask
+} from '../../src/types/bulk-generation';
 
 // Using real values from the codebase
 const SUPABASE_URL = 'https://ujlqzkkkfatehxeqtbdl.supabase.co';
@@ -14,7 +19,7 @@ const requestSchema = z.object({
   jobId: z.string().uuid()
 });
 
-export default async function handler(req, res) {
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Only allow GET requests
   if (req.method !== 'GET') {
     return res.status(405).json({ success: false, error: 'Method not allowed' });
@@ -35,7 +40,8 @@ export default async function handler(req, res) {
     const token = authHeader.split(' ')[1];
     
     // Verify the token and get the user
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    const { data, error: authError } = await supabase.auth.getUser(token);
+    const user = data?.user;
     
     if (authError || !user) {
       console.error('Authentication error:', authError);
@@ -117,15 +123,48 @@ export default async function handler(req, res) {
       });
     }
 
+    interface EmployeeInfo {
+      id: string;
+      full_name: string;
+      email: string;
+      avatar_url?: string;
+    }
+
+    interface TaskWithEmployee {
+      id: string;
+      job_id: string;
+      employee_id: string;
+      status: string;
+      content_id?: string;
+      course_id?: string;
+      created_at: string;
+      completed_at?: string;
+      error_message?: string;
+      item_id: string;
+      item_title: string;
+      message?: string;
+      updated_at?: string;
+      employee_info?: {
+        id: string;
+        full_name: string;
+        email: string;
+        avatar_url?: string;
+      };
+    }
+
     // Group tasks by status
-    const tasksByStatus = tasks.reduce((acc, task) => {
-      const taskWithEmployeeInfo = {
+    const tasksByStatus = tasks.reduce<Record<string, TaskWithEmployee[]>>((acc: Record<string, TaskWithEmployee[]>, task: any) => {
+      const taskWithEmployeeInfo: TaskWithEmployee = {
         id: task.id,
         job_id: task.job_id,
+        employee_id: task.assigned_to || '',
         item_id: task.item_id,
         item_title: task.item_title,
         status: task.status,
         message: task.message,
+        content_id: task.content_id,
+        course_id: task.course_id,
+        error_message: task.error_message,
         created_at: task.created_at,
         updated_at: task.updated_at,
         completed_at: task.completed_at,
@@ -142,7 +181,7 @@ export default async function handler(req, res) {
       }
       acc[task.status].push(taskWithEmployeeInfo);
       return acc;
-    }, {} as Record<string, any[]>);
+    }, {});
     
     // Calculate ISO string for estimated completion time
     const estimatedCompletionTime = job.status === 'completed' 
@@ -165,17 +204,38 @@ export default async function handler(req, res) {
         completed_at: job.completed_at,
         created_by: job.created_by
       },
-      tasks: Object.values(tasksByStatus).flat(),
+      tasks: Object.values(tasksByStatus).flat().map(task => ({
+        id: task.id,
+        job_id: task.job_id,
+        employee_id: task.employee_id,
+        status: task.status,
+        content_id: task.content_id,
+        course_id: task.course_id,
+        created_at: task.created_at,
+        completed_at: task.completed_at,
+        error_message: task.error_message,
+        employee: task.employee_info ? {
+          id: task.employee_info.id,
+          name: task.employee_info.full_name,
+          email: task.employee_info.email
+        } : undefined
+      })) as Array<BulkGenerationTask & {
+        employee?: {
+          id: string;
+          name: string;
+          email: string;
+        }
+      }>,
       progress: (job.completed_count + job.failed_count) / job.total_count * 100,
       estimatedCompletionTime: estimatedCompletionTime
     };
     
     return res.status(200).json(response);
     
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error fetching bulk job status:', error);
     
-    if (error instanceof z.ZodError) {
+    if (error instanceof ZodError) {
       return res.status(400).json({ 
         success: false, 
         error: 'Validation failed', 

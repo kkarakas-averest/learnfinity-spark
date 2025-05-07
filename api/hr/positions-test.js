@@ -2,9 +2,9 @@
 // Simple test API for positions requirements
 // This provides a healthcheck endpoint to verify routing is working
 
-// Export config for Vercel
+// Export config for Vercel no longer needs runtime specification
 export const config = {
-  runtime: 'nodejs'
+  // runtime: 'nodejs' - removed as per warning
 };
 
 export default function handler(req, res) {

@@ -410,7 +410,7 @@ Do not include any explanations or text outside the JSON structure.
       learningObjectives: courseData.learning_objectives,
       moduleCount: courseData.modules.length,
       courseStructure: {
-        modules: courseData.modules.map(module => ({
+        modules: courseData.modules.map((module: { module_id: string; title: string; sections: any[] }) => ({
           moduleId: module.module_id,
           title: module.title,
           sectionCount: module.sections.length
