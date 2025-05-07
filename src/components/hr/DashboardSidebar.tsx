@@ -1,7 +1,7 @@
 import React from '@/lib/react-helpers';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 
 // Import icons from lucide-react
 import { 
@@ -17,8 +17,11 @@ import {
   Bot,
   ChevronDown,
   Home,
-  Building
+  Building,
+  Menu,
+  ChevronLeft
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 type NavItemProps = {
   title: string;
@@ -26,6 +29,7 @@ type NavItemProps = {
   icon?: React.ReactNode;
   isActive?: boolean;
   color?: string;
+  isCollapsed?: boolean;
 };
 
 type NavSectionProps = {
@@ -34,6 +38,11 @@ type NavSectionProps = {
   icon?: React.ReactNode;
   defaultOpen?: boolean;
   sectionColor?: string;
+  isCollapsed?: boolean;
+};
+
+type DashboardSidebarProps = {
+  onToggleCollapse?: (collapsed: boolean) => void;
 };
 
 const NavItem: React.FC<NavItemProps> = ({ 
@@ -41,7 +50,8 @@ const NavItem: React.FC<NavItemProps> = ({
   href, 
   icon, 
   isActive = false,
-  color = "blue"
+  color = "blue",
+  isCollapsed = false
 }: NavItemProps) => {
   // Extract color classes based on the provided color
   const getColorClasses = (colorName: string) => {
@@ -71,15 +81,17 @@ const NavItem: React.FC<NavItemProps> = ({
         to={href}
         className={cn(
           "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-all",
+          isCollapsed ? "justify-center" : "",
           isActive 
             ? `${colors.bg} ${colors.text} shadow-sm` 
             : `text-muted-foreground ${colors.hover} hover:text-gray-900`
         )}
+        title={isCollapsed ? title : undefined}
       >
         <div className={`${isActive ? colors.text : "text-gray-500"} transition-colors`}>
           {icon}
         </div>
-        <span>{title}</span>
+        {!isCollapsed && <span>{title}</span>}
       </Link>
     </motion.div>
   );
@@ -90,7 +102,8 @@ const NavSection: React.FC<NavSectionProps> = ({
   items, 
   icon, 
   defaultOpen = true, 
-  sectionColor 
+  sectionColor,
+  isCollapsed = false
 }: NavSectionProps) => {
   const [isOpen, setIsOpen] = React.useState(defaultOpen);
   
@@ -99,6 +112,27 @@ const NavSection: React.FC<NavSectionProps> = ({
     ...item,
     color: item.color || sectionColor
   }));
+  
+  // If sidebar is collapsed, just show the items without section header
+  if (isCollapsed) {
+    return (
+      <div className="py-2">
+        <div className="space-y-1">
+          {itemsWithColors.map((item: NavItemProps, index: number) => (
+            <NavItem 
+              key={index} 
+              title={item.title} 
+              href={item.href} 
+              icon={item.icon} 
+              isActive={item.isActive}
+              color={item.color}
+              isCollapsed={isCollapsed}
+            />
+          ))}
+        </div>
+      </div>
+    );
+  }
   
   return (
     <div className="py-2">
@@ -139,6 +173,7 @@ const NavSection: React.FC<NavSectionProps> = ({
               icon={item.icon} 
               isActive={item.isActive}
               color={item.color}
+              isCollapsed={isCollapsed}
             />
           ))}
         </div>
@@ -147,9 +182,33 @@ const NavSection: React.FC<NavSectionProps> = ({
   );
 };
 
-const DashboardSidebar: React.FC = () => {
+const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ 
+  onToggleCollapse 
+}: DashboardSidebarProps) => {
   const location = useLocation();
   const currentPath = location.pathname;
+  const [isCollapsed, setIsCollapsed] = React.useState(false);
+  const [isMobile, setIsMobile] = React.useState(false);
+
+  // Check if we're on mobile
+  React.useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+      // If mobile, ensure sidebar is collapsed by default
+      if (window.innerWidth < 768 && !isCollapsed) {
+        setIsCollapsed(true);
+      }
+    };
+    
+    // Set initial value
+    checkMobile();
+    
+    // Add event listener
+    window.addEventListener('resize', checkMobile);
+    
+    // Cleanup
+    return () => window.removeEventListener('resize', checkMobile);
+  }, [isCollapsed]);
   
   // Define color schemes for different sections
   const sectionColors = {
@@ -236,58 +295,68 @@ const DashboardSidebar: React.FC = () => {
       ]
     }
   ];
+  
+  // Toggle sidebar collapsed state
+  const toggleSidebar = () => {
+    const newCollapsedState = !isCollapsed;
+    setIsCollapsed(newCollapsedState);
+    
+    // Inform parent component if callback provided
+    if (onToggleCollapse) {
+      onToggleCollapse(newCollapsedState);
+    }
+  };
 
   return (
     <motion.div
-      initial={{ width: 64 }}
-      animate={{ width: 260 }}
-      className="border-r h-screen overflow-hidden transition-all duration-300 py-4 bg-white shadow-sm relative"
+      initial={{ width: isMobile ? 72 : 260 }}
+      animate={{ width: isCollapsed ? 72 : 260 }}
+      transition={{ duration: 0.3, ease: "easeInOut" }}
+      className="border-r h-screen overflow-hidden py-4 bg-white shadow-sm relative flex flex-col"
     >
-      <motion.div 
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.1, duration: 0.3 }}
-        className="px-4 py-3"
-      >
-        <h2 className="font-bold text-xl bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-          HR Dashboard
-        </h2>
-        <p className="text-xs text-gray-500 mt-1">Employee management portal</p>
-      </motion.div>
-      
-      <div className="mt-4 h-[calc(100vh-110px)] overflow-y-auto px-2 custom-scrollbar">
-        <nav className="space-y-1">
-          {navSections.map((section, index) => (
-            <NavSection 
-              key={index} 
-              title={section.title} 
-              items={section.items}
-              icon={section.icon}
-              defaultOpen={section.defaultOpen}
-              sectionColor={section.sectionColor}
-            />
-          ))}
-        </nav>
+      {/* Toggle button */}
+      <div className="absolute top-3 right-3 z-10">
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          onClick={toggleSidebar}
+          className="h-8 w-8" 
+          title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+        >
+          {isCollapsed ? <Menu size={16} /> : <ChevronLeft size={16} />}
+        </Button>
       </div>
       
-      {/* Add custom scrollbar styles */}
-      <style dangerouslySetInnerHTML={{
-        __html: `
-          .custom-scrollbar::-webkit-scrollbar {
-            width: 4px;
-          }
-          .custom-scrollbar::-webkit-scrollbar-track {
-            background: transparent;
-          }
-          .custom-scrollbar::-webkit-scrollbar-thumb {
-            background-color: rgba(156, 163, 175, 0.3);
-            border-radius: 20px;
-          }
-          .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-            background-color: rgba(156, 163, 175, 0.5);
-          }
-        `
-      }} />
+      {/* Logo area */}
+      <div className={cn(
+        "px-4 py-3 flex items-center", 
+        isCollapsed ? "justify-center" : "justify-start"
+      )}>
+        <Link 
+          to="/hr-dashboard" 
+          className={cn(
+            "font-bold text-primary",
+            isCollapsed ? "text-xl" : "text-xl"
+          )}
+        >
+          {isCollapsed ? "LF" : "Learnfinity"}
+        </Link>
+      </div>
+      
+      {/* Navigation sections */}
+      <div className="flex-1 overflow-y-auto px-3 pt-2">
+        {navSections.map((section, index) => (
+          <NavSection 
+            key={index}
+            title={section.title}
+            items={section.items}
+            icon={section.icon}
+            defaultOpen={section.defaultOpen}
+            sectionColor={section.sectionColor}
+            isCollapsed={isCollapsed}
+          />
+        ))}
+      </div>
     </motion.div>
   );
 };

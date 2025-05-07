@@ -6,6 +6,7 @@ import { useHRAuth } from '@/state';
 import { Button } from '@/components/ui/button';
 import { Activity } from 'lucide-react';
 import { hrServices } from '@/services/hrServices';
+import { motion, AnimatePresence } from 'framer-motion';
 
 // Import all pages
 import HRDashboardMigrated from '@/pages/HRDashboardMigrated';
@@ -36,6 +37,7 @@ const HRDashboardRoot: React.FC = () => {
   const navigate = useNavigate();
   const [isFirstLogin, setIsFirstLogin] = React.useState(false);
   const [hasCheckedFirstLogin, setHasCheckedFirstLogin] = React.useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(false);
   
   console.log('HRDashboardRoot - Path:', location.pathname);
   console.log('HRDashboardRoot - Params:', params);
@@ -79,6 +81,11 @@ const HRDashboardRoot: React.FC = () => {
   // Handle logout
   const handleLogout = () => {
     logout();
+  };
+  
+  // Handle toggling the sidebar
+  const handleToggleSidebar = (collapsed: boolean) => {
+    setIsSidebarCollapsed(collapsed);
   };
   
   // Render the appropriate component based on the path
@@ -154,11 +161,20 @@ const HRDashboardRoot: React.FC = () => {
       />
       
       <div className="flex flex-1 overflow-hidden">
-        <DashboardSidebar />
+        {/* Pass sidebar collapsed state handler to the sidebar component */}
+        <DashboardSidebar onToggleCollapse={handleToggleSidebar} />
         
-        <main className="flex-1 overflow-y-auto p-6">
+        <motion.main 
+          className="flex-1 overflow-y-auto p-6"
+          initial={{ marginLeft: "0" }}
+          animate={{ 
+            marginLeft: "0",
+            width: "100%" 
+          }}
+          transition={{ duration: 0.3, ease: "easeInOut" }}
+        >
           {renderContent()}
-        </main>
+        </motion.main>
       </div>
     </div>
   );
