@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LearnFinity Personalized Course Demo</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <header>
+        <div class="logo">
+            <span class="logo-text">LearnFinity</span>
+            <span class="logo-badge">AI</span>
+        </div>
+        <nav>
+            <button id="view-toggle" class="toggle-btn">
+                <span class="student-view active">Student View</span>
+                <span class="process-view">Process View</span>
+            </button>
+        </nav>
+    </header>
+
+    <main>
+        <!-- Student View (Course Content) -->
+        <section id="student-view" class="view-section active">
+            <div class="course-header">
+                <h1 id="course-title">Financial Analyst Training Program</h1>
+                <p id="course-description">A personalized 4-week course designed for transitioning to a Financial Analyst role.</p>
+                <div class="course-meta">
+                    <div class="meta-item">
+                        <i class="fas fa-user"></i>
+                        <span id="student-name">Kubilaycan Karakas</span>
+                    </div>
+                    <div class="meta-item">
+                        <i class="fas fa-calendar"></i>
+                        <span>4 Weeks</span>
+                    </div>
+                    <div class="meta-item">
+                        <i class="fas fa-book"></i>
+                        <span>40 Modules</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="course-navigation">
+                <div class="week-tabs">
+                    <button class="week-tab active" data-week="1">Week 1</button>
+                    <button class="week-tab" data-week="2">Week 2</button>
+                    <button class="week-tab" data-week="3">Week 3</button>
+                    <button class="week-tab" data-week="4">Week 4</button>
+                </div>
+                
+                <div class="week-theme">
+                    <h2 id="current-week-theme">Financial Fundamentals & Analysis</h2>
+                </div>
+                
+                <div class="module-list">
+                    <!-- Modules will be populated by JavaScript -->
+                </div>
+            </div>
+
+            <div class="module-content">
+                <h2 id="module-title">Module 1: Introduction to Financial Analysis</h2>
+                <div id="module-content" class="content-area">
+                    <!-- Module content will be loaded here -->
+                    <div class="loader">Loading content...</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Process View (Backend Logic) -->
+        <section id="process-view" class="view-section">
+            <div class="process-header">
+                <h1>AI-Powered Course Generation Pipeline</h1>
+                <p>Explore how LearnFinity creates personalized courses using AI and structured data</p>
+            </div>
+
+            <div class="process-diagram">
+                <div class="process-stage" id="stage-1">
+                    <div class="stage-header">
+                        <h3>1. Skills Analysis</h3>
+                        <button class="view-data-btn" data-source="employee_data">View Employee Data</button>
+                        <button class="view-data-btn" data-source="taxonomy">View Taxonomy</button>
+                    </div>
+                    <div class="stage-content">
+                        <p>Analyze employee skills and role requirements using structured taxonomy data.</p>
+                        <div class="stage-icon">
+                            <i class="fas fa-user-tag"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="arrow"><i class="fas fa-arrow-down"></i></div>
+
+                <div class="process-stage" id="stage-2">
+                    <div class="stage-header">
+                        <h3>2. Gap Analysis</h3>
+                        <button class="view-data-btn" data-source="gap_analysis">View Skills Gap</button>
+                        <button class="view-data-btn" data-source="course_generation">View Python Code</button>
+                    </div>
+                    <div class="stage-content">
+                        <p>Identify critical skill gaps and transferable skills for the new role.</p>
+                        <div class="stage-icon">
+                            <i class="fas fa-chart-bar"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="arrow"><i class="fas fa-arrow-down"></i></div>
+
+                <div class="process-stage" id="stage-3">
+                    <div class="stage-header">
+                        <h3>3. Course Outline</h3>
+                        <button class="view-data-btn" data-source="course_outline">View Course Structure</button>
+                    </div>
+                    <div class="stage-content">
+                        <p>Generate personalized 4-week course structure with 40 modules.</p>
+                        <div class="stage-icon">
+                            <i class="fas fa-sitemap"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="arrow"><i class="fas fa-arrow-down"></i></div>
+
+                <div class="process-stage" id="stage-4">
+                    <div class="stage-header">
+                        <h3>4. Content Generation</h3>
+                        <button class="view-data-btn" data-source="api_details">View API Details</button>
+                        <button class="view-data-btn" data-source="content_generation">View Python Code</button>
+                    </div>
+                    <div class="stage-content">
+                        <p>Create 900-word modules with Groq API (llama-3.3-70b-versatile).</p>
+                        <div class="stage-icon">
+                            <i class="fas fa-robot"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="process-metrics">
+                    <div class="metric">
+                        <span class="metric-value">$0.12</span>
+                        <span class="metric-label">Cost per Course</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-value">~15 min</span>
+                        <span class="metric-label">Generation Time</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-value">40</span>
+                        <span class="metric-label">Modules</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="tech-explainer">
+                <h2>How It Works</h2>
+                <div class="explainer-content">
+                    <div class="explainer-section">
+                        <h3>1. Data Collection & Preparation</h3>
+                        <p>We start with structured data about the employee's skills and the target role requirements. This data is organized using a consistent taxonomy of financial skills.</p>
+                    </div>
+                    <div class="explainer-section">
+                        <h3>2. AI-Powered Course Design</h3>
+                        <p>The system analyzes skill gaps and generates a personalized course outline using the Groq API and llama-3.3-70b-versatile model. The AI creates a progressive learning journey that builds on existing skills.</p>
+                    </div>
+                    <div class="explainer-section">
+                        <h3>3. Content Generation</h3>
+                        <p>For each module, the AI generates highly detailed, personalized content that includes explanations, examples, and connections to the learner's existing skills. This is all accomplished through strategic prompting.</p>
+                    </div>
+                    <div class="explainer-section">
+                        <h3>4. Cost & Efficiency Benefits</h3>
+                        <p>The entire course (40 modules × 900 words each) is generated for approximately $0.12 in API costs, in about 15 minutes. This represents significant cost and time savings compared to traditional course development.</p>
+                    </div>
+                </div>
+                <div class="explainer-footer">
+                    <p>Click any "View" button above to see the actual data, API details, and Python code powering this system.</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Modal for displaying data -->
+    <div id="data-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <h2 id="modal-title">Data View</h2>
+            <div id="modal-content">
+                <pre id="json-display"></pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for displaying code -->
+    <div id="code-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <h2 id="code-modal-title">Code View</h2>
+            <div id="code-modal-content">
+                <pre id="code-display"></pre>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <p>LearnFinity Personalized Learning Platform &copy; 2025</p>
+    </footer>
+
+    <script src="data.js"></script>
+    <script src="scripts.js"></script>
+</body>
+</html> 
