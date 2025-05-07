@@ -12,16 +12,6 @@
   "regions": ["sfo1"],
   "routes": [
     {
-      "handle": "filesystem"
-    },
-    {
-      "src": "/assets/(.*)",
-      "headers": {
-        "Cache-Control": "public, max-age=31536000, immutable"
-      },
-      "continue": true
-    },
-    {
       "src": "/api/(.*)",
       "headers": {
         "Cache-Control": "no-store, max-age=0",
@@ -29,11 +19,20 @@
         "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
         "Access-Control-Allow-Headers": "Content-Type, Authorization"
       },
-      "dest": "/api/$1",
-      "continue": false
+      "dest": "/api/$1"
     },
     {
-      "src": "/(.*\\.(js|css|map|ico|json|png|svg|jpg|jpeg|gif|pdf|woff|woff2|ttf|otf)$)",
+      "src": "/assets/(.*)",
+      "headers": {
+        "Cache-Control": "public, max-age=31536000, immutable"
+      },
+      "dest": "/assets/$1" 
+    },
+    {
+      "src": "/(.*\\.(?:ico|png|jpg|jpeg|gif|svg|webmanifest|pdf|html|txt|css|js|map))$",
+      "headers": {
+        "Cache-Control": "public, max-age=86400" 
+      },
       "dest": "/$1"
     },
     {
@@ -43,6 +42,9 @@
     {
       "src": "/vercel.html",
       "dest": "/vercel.html"
+    },
+    {
+      "handle": "filesystem"
     },
     {
       "src": "/(.*)",
