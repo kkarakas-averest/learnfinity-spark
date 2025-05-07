@@ -2,9 +2,10 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { createClient } from '@supabase/supabase-js';
 
-// Export config for Vercel
+// Export config for Vercel with explicit runtime configuration
 export const config = {
-  // runtime: 'nodejs' - removed as per warning about semantics evolving soon
+  runtime: 'nodejs',  // Explicitly use Node.js runtime only
+  regions: ['iad1'],  // Use a single region for consistent behavior
 };
 
 // Hardcoded Supabase credentials - environment variables aren't resolving correctly in Vercel
