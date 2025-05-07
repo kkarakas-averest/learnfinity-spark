@@ -6,8 +6,30 @@ import { execSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 
+// Print environment information for debugging
+console.log('🔍 Build Environment:');
+console.log(`- NODE_ENV: ${process.env.NODE_ENV}`);
+console.log(`- VERCEL: ${process.env.VERCEL}`);
+console.log(`- VERCEL_ENV: ${process.env.VERCEL_ENV}`);
+
 // Log the start of the build process
 console.log('🚀 Starting Vite build for Vercel deployment...');
+
+// Check if critical environment variables exist
+const criticalVars = [
+  'VITE_SUPABASE_URL',
+  'VITE_SUPABASE_ANON_KEY',
+  'GROQ_API_KEY'
+];
+
+console.log('🔑 Checking environment variables:');
+criticalVars.forEach(varName => {
+  if (process.env[varName]) {
+    console.log(`- ${varName}: ${varName.includes('KEY') ? '✅ Defined' : process.env[varName]}`);
+  } else {
+    console.log(`- ${varName}: ❌ Missing`);
+  }
+});
 
 // Run the Vite build command
 try {
@@ -39,6 +61,25 @@ try {
   console.error('❌ Failed to create _redirects file:', error);
 }
 
+// Create a Vercel-specific routing file
+const vercelRoutingPath = path.join(process.cwd(), 'dist', 'vercel.json');
+const vercelRoutingContent = {
+  "routes": [
+    { "src": "/api/(.*)", "dest": "/api/$1" },
+    { "src": "/assets/(.*)", "dest": "/assets/$1" },
+    { "handle": "filesystem" },
+    { "src": "/(.*)", "dest": "/index.html" }
+  ]
+};
+
+try {
+  console.log('📄 Creating Vercel-specific routing rules...');
+  fs.writeFileSync(vercelRoutingPath, JSON.stringify(vercelRoutingContent, null, 2));
+  console.log('✅ Created vercel.json file for routing');
+} catch (error) {
+  console.error('❌ Failed to create vercel.json file:', error);
+}
+
 // Ensure the public directory exists in dist (for Vercel static file handling)
 const publicDirPath = path.join(process.cwd(), 'dist', 'public');
 if (!fs.existsSync(publicDirPath)) {
@@ -50,6 +91,21 @@ if (!fs.existsSync(publicDirPath)) {
   }
 }
 
+// Create an index.html file in the public directory as a fallback
+const publicIndexPath = path.join(publicDirPath, 'index.html');
+if (!fs.existsSync(publicIndexPath)) {
+  try {
+    // Copy the main index.html to public/index.html as a fallback
+    fs.copyFileSync(
+      path.join(process.cwd(), 'dist', 'index.html'),
+      publicIndexPath
+    );
+    console.log('📄 Created fallback index.html in public directory');
+  } catch (error) {
+    console.error('❌ Failed to create fallback index.html:', error);
+  }
+}
+
 // Add an additional verification file to detect if the build completed successfully
 const verificationPath = path.join(process.cwd(), 'dist', 'vercel-vite-build.json');
 try {
@@ -58,12 +114,35 @@ try {
     JSON.stringify({
       built: true,
       timestamp: new Date().toISOString(),
-      environment: process.env.NODE_ENV || 'production'
+      environment: process.env.NODE_ENV || 'production',
+      vercel: process.env.VERCEL === '1',
+      vercelEnv: process.env.VERCEL_ENV || 'unknown'
     }, null, 2)
   );
   console.log('✅ Created verification file');
 } catch (error) {
   console.error('❌ Failed to create verification file:', error);
+}
+
+// List all files in the dist directory to verify output
+try {
+  console.log('\n📂 Files in dist directory:');
+  const distFiles = fs.readdirSync(path.join(process.cwd(), 'dist'));
+  distFiles.forEach(file => {
+    console.log(`- ${file}`);
+  });
+  
+  // Check if assets directory exists and list its contents
+  const assetsPath = path.join(process.cwd(), 'dist', 'assets');
+  if (fs.existsSync(assetsPath)) {
+    console.log('\n📂 Files in assets directory:');
+    const assetFiles = fs.readdirSync(assetsPath);
+    assetFiles.forEach(file => {
+      console.log(`- ${file}`);
+    });
+  }
+} catch (error) {
+  console.error('❌ Error listing dist files:', error);
 }
 
 console.log('✅ Vite-Vercel build completed successfully!'); 
