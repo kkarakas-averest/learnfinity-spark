@@ -204,7 +204,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         completed_at: job.completed_at,
         created_by: job.created_by
       },
-      tasks: Object.values(tasksByStatus).flat().map(task => ({
+      tasks: Object.values(tasksByStatus).flat().map((task: TaskWithEmployee) => ({
         id: task.id,
         job_id: task.job_id,
         employee_id: task.employee_id,

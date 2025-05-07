@@ -4,7 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 
 // Export config for Vercel
 export const config = {
-  runtime: 'nodejs'
+  // runtime: 'nodejs' - removed as per warning about semantics evolving soon
 };
 
 // Hardcoded Supabase credentials - environment variables aren't resolving correctly in Vercel
