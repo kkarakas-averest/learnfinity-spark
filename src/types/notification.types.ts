@@ -74,7 +74,6 @@ export interface NotificationPreferences {
 }
 
 // Input for updating notification preferences
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export type NotificationPreferencesInput = Partial<Omit<NotificationPreferences, 'userId' | 'updatedAt'>>;
 
 // Notification template for generating consistent messages
